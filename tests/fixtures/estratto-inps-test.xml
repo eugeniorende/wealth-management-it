@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EstrattoConto>
+  <DatiAnagrafici>
+    <Cognome>ROSSI</Cognome>
+    <Nome>MARIO</Nome>
+    <DataNascita><Giorno>15</Giorno><Mese>03</Mese><Anno>1990</Anno></DataNascita>
+    <Sesso>Maschio</Sesso>
+  </DatiAnagrafici>
+  <RegimeGenerale>
+    <Contributi>
+      <RigaContributi>
+        <PeriodoDal><Giorno>01</Giorno><Mese>01</Mese><Anno>2023</Anno></PeriodoDal>
+        <PeriodoAl><Giorno>31</Giorno><Mese>12</Mese><Anno>2023</Anno></PeriodoAl>
+        <TipoContribuzione>Lavoro dipendente</TipoContribuzione>
+        <ContributiUtiliCalcolo>52</ContributiUtiliCalcolo>
+        <RetribuzioneEuro>30000</RetribuzioneEuro>
+        <Descrizione>AZIENDA TEST SRL</Descrizione>
+      </RigaContributi>
+      <RigaContributi>
+        <PeriodoDal><Giorno>01</Giorno><Mese>01</Mese><Anno>2024</Anno></PeriodoDal>
+        <PeriodoAl><Giorno>31</Giorno><Mese>12</Mese><Anno>2024</Anno></PeriodoAl>
+        <TipoContribuzione>Lavoro dipendente</TipoContribuzione>
+        <ContributiUtiliCalcolo>52</ContributiUtiliCalcolo>
+        <RetribuzioneEuro>31000</RetribuzioneEuro>
+        <Descrizione>AZIENDA TEST SRL</Descrizione>
+      </RigaContributi>
+    </Contributi>
+  </RegimeGenerale>
+</EstrattoConto>

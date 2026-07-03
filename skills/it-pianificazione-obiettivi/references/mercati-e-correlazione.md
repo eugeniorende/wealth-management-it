@@ -1,0 +1,37 @@
+# Due correzioni di onestà al Monte Carlo
+
+Il Monte Carlo del pianificatore (`monte-carlo.md`, `assets/montecarlo-obiettivi.py`) ha due ipotesi nascoste che lo rendono più ottimista di quanto dovrebbe. Questa reference le espone e le corregge, nello spirito del fork: niente falsa certezza. Non è consulenza.
+
+## 1. La serie storica è USA, e gli USA sono il caso eccezionale
+
+Il bootstrap ricampiona da `rendimenti-storici.csv`, che è **S&P 500 + US Treasury** (Damodaran, 1928-2025). Il problema: il mercato azionario americano è, su orizzonte secolare, il **più fortunato del mondo** — usarlo come campione del futuro sovrastima sistematicamente i risultati.
+
+I numeri vengono dalla fonte più autorevole sui rendimenti di lungo periodo, il **Global Investment Returns Yearbook 2025** (Dimson, Marsh, Staunton — UBS / London Business School), che copre 35 mercati dal 1900:
+
+- L'azionario **mondiale** ha reso in termini reali circa **5,2% all'anno** dal 1900 al 2024; le obbligazioni governative mondiali **1,7%**. Gli **USA** stanno **sopra** la media mondiale — sono lo standout, non il rappresentante.
+- Nel **21° secolo** (2000-2024) l'azionario mondiale reale è sceso a circa **3,5% all'anno**: anche meno del lungo periodo.
+- Diversi mercati hanno vissuto **periodi pluridecennali** di rendimenti reali molto bassi o negativi (è la tesi di *Triumph of the Optimists*: chi guarda solo gli USA vede un sopravvissuto fortunato, non l'esperienza media di un investitore globale). La volatilità reale media dell'azionario tra i paesi è stata ~23%.
+
+Due conseguenze pratiche:
+
+**(a) Calibrare le aspettative sul mondo, non sugli USA.** Quando si imposta il rendimento atteso di un profilo nel pianificatore, non ancorarlo all'esperienza americana (~6,5% reale azionario): un valore **globale** più difendibile è dell'ordine del **4-5% reale** per l'azionario, e l'esperienza recente (3,5%) invita alla prudenza. Nel Monte Carlo di accumulo questo si controlla direttamente, perché il rendimento atteso è un **input del profilo** (e l'opzione `RICENTRA_MEDIA` riporta la media storica USA su quel valore, mantenendo però la *forma* — volatilità, code, sequenza — del mercato americano, che resta benigna).
+
+**(b) Il de-rating per gli scenari grezzi.** Quando si usano i rendimenti storici **grezzi** (senza ricentrare — è il caso del Monte Carlo di **decumulo**, `assets/decumulo-obiettivi.py`, dove conta l'intera distribuzione USA), conviene applicare un **de-rating**: uno scarto verso il basso sui rendimenti azionari (dell'ordine di **−1,5%**, lo scarto storico USA-vs-mondo) per trasformare "storia USA" in "scenario globale rappresentativo". Lo script di decumulo ha il parametro `DERATING_AZIONARIO` e mostra di quanto cala la probabilità di successo passando dalla lente USA a quella mondiale: è il modo onesto di non spacciare la fortuna americana per la norma.
+
+> Nota sui dati: non si è inserita una serie annuale Europa/mondo nel CSV perché una serie lunga, pulita e verificabile non è banale da ricostruire senza rischiare di inventare numeri — e un dato inventato sarebbe peggio del caveat. Il de-rating (ancorato alle statistiche aggregate DMS) e la guida sulla calibrazione del rendimento atteso ottengono lo stesso scopo senza fabbricare una serie. Chi disponga di una propria serie mondiale può sostituirla nel CSV (stesse colonne) e fare il bootstrap su quella.
+
+## 2. Gli obiettivi non sono indipendenti: il rischio sistemico
+
+Il Monte Carlo, di base, simula **ogni obiettivo separatamente**, con estrazioni casuali indipendenti. Ma tutti gli obiettivi sono investiti negli **stessi mercati**: un crollo non colpisce un obiettivo per volta, li colpisce **tutti insieme**. Trattarli come indipendenti è un errore che falsa le code della distribuzione congiunta.
+
+Concretamente, sotto l'ipotesi di indipendenza la probabilità che **tutti** gli obiettivi vadano bene è il **prodotto** delle probabilità singole, e quella che vadano **tutti male** è molto piccola. Ma con un fattore di mercato **condiviso** entrambe le code si ingrossano: i percorsi buoni sollevano tutti gli obiettivi insieme, e — ciò che conta per la resilienza — i percorsi cattivi li affondano **insieme**. L'indipendenza **sottostima la probabilità che un'unica brutta sequenza di mercato mandi fuori strada più obiettivi contemporaneamente**. Non ci si può diversificare *tra* obiettivi che condividono lo stesso mercato.
+
+La correzione: simulare gli obiettivi **congiuntamente**, estraendo un **unico percorso di mercato per simulazione** e applicandolo a tutti gli obiettivi (ciascuno con la propria quota azionaria, così reagisce in proporzione alla propria esposizione, ma allo **stesso** shock). Gli obiettivi con orizzonti diversi condividono gli **anni iniziali** del percorso — quindi un crollo nei primi anni colpisce davvero sia l'obiettivo a 5 anni sia quello a 19. Lo script `assets/montecarlo-obiettivi.py` aggiunge questa **simulazione congiunta** e riporta la **probabilità che tutti gli obiettivi essenziali riescano insieme**, confrontandola con il prodotto ingenuo delle probabilità indipendenti: la differenza è la misura di quanto l'indipendenza inganna.
+
+La lettura pratica: le probabilità **marginali** di ciascun obiettivo restano quelle che sono, ma la domanda di resilienza — *qual è il rischio che, in un brutto scenario, salti più di un obiettivo insieme?* — ha una risposta peggiore di quella che il prodotto delle probabilità suggerirebbe. È il motivo per cui un fondo di emergenza adeguato e gli obiettivi essenziali ben coperti vengono **prima**: sono proprio quelli che non possono permettersi di saltare nello stesso anno in cui salta tutto il resto.
+
+## In sintesi
+
+Due aggiustamenti, una sola direzione: rendere la simulazione meno compiacente. Il primo dice *non confondere la fortuna USA con il rendimento atteso* (calibrazione globale + de-rating). Il secondo dice *non confondere obiettivi indipendenti con obiettivi che condividono il mercato* (simulazione congiunta). Entrambi spostano le conclusioni verso il prudente, ed entrambi sono il tipo di onestà metodologica che un piano serio deve avere. I risultati restano ordini di grandezza per ragionare sul rischio, non garanzie.
+
+Cross-reference: `monte-carlo.md` (il modello, le volatilità per profilo, gli altri limiti), `decumulo.md` (dove il de-rating e il rischio di sequenza si incontrano), e gli script `montecarlo-obiettivi.py` (simulazione congiunta) e `decumulo-obiettivi.py` (de-rating).

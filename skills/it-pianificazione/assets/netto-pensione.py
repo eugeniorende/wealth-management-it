@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+netto-pensione.py — dal tasso di sostituzione LORDO a quello NETTO/NETTO.
+
+Il lordo confronta due numeri tassati in modo molto diverso e sottostima
+sistematicamente la copertura pensionistica:
+  - lo STIPENDIO paga contributi IVS (9,19%) + IRPEF piena + addizionali;
+  - la PENSIONE INPS non paga contributi e ha detrazioni dedicate;
+  - la RENDITA del fondo pensione NON entra nell'IRPEF: paga un'imposta
+    sostitutiva del 15%, ridotta dello 0,30% per ogni anno di partecipazione
+    oltre il 15°, fino al minimo del 9% (D.Lgs. 252/2005, art. 11).
+Questo script calcola il confronto giusto: pensione netta / ultimo stipendio netto.
+
+Uso:
+    python netto-pensione.py
+    python netto-pensione.py --set PENSIONE_INPS_LORDA=27138 --set RAL_FINALE_LORDA=57972
+
+Regole fiscali incorporate (Verificato: 2026-07; periodo d'imposta 2026):
+  - IRPEF a tre scaglioni: 23% fino a 28.000; 33% da 28.000 a 50.000
+    (ridotta dal 35% dalla L. 199/2025, art. 1 co. 3); 43% oltre 50.000
+  - detrazione redditi da pensione (art. 13 TUIR): 1.955 € fino a 8.500 di
+    reddito, poi decrescente, zero oltre 50.000 (no tax area 8.500 €)
+  - detrazione lavoro dipendente (art. 13 TUIR): 1.955 € fino a 15.000, poi
+    decrescente, zero oltre 50.000
+  - contributi IVS a carico del dipendente: 9,19% della RAL
+  - addizionali regionale e comunale: parametriche (variano per territorio)
+
+ONESTÀ METODOLOGICA
+- Il calcolo proietta le regole fiscali DI OGGI su redditi in moneta di oggi:
+  è lo standard della pianificazione, ma aliquote, scaglioni e detrazioni
+  cambiano quasi ogni anno (questa stessa legge di bilancio ha toccato il
+  secondo scaglione). Il numero è una fotografia coerente, non una promessa.
+- Le addizionali locali sono medie parametriche: imposta i valori della tua
+  regione/comune per il risultato puntuale.
+- Semplificazioni dichiarate: nessun altro reddito IRPEF, nessuna detrazione
+  per carichi di famiglia od oneri, niente trattamento integrativo.
+Questo strumento è educativo e non costituisce consulenza fiscale.
+"""
+
+from motore_bootstrap import applica_override, percorso_json, scrivi_json
+
+# ============================== PARAMETRI ==============================
+
+PENSIONE_INPS_LORDA = 27_000.0   # pensione pubblica lorda annua (da proiezione-inps.py)
+
+# rendita lorda annua del fondo pensione: uno o più scenari (es. P10/P50/P90
+# dal Monte Carlo). Etichetta libera; anche un solo scenario va bene.
+RENDITE_FP = [
+    ("P10", 9_500.0),
+    ("mediana", 16_000.0),
+    ("P90", 27_000.0),
+]
+ANNI_ISCRIZIONE_FP = 37          # anni di partecipazione al fondo alla decorrenza
+                                 # (il TRASFERIMENTO tra fondi conserva l'anzianità)
+
+RAL_FINALE_LORDA = 58_000.0      # ultimo stipendio lordo (per il confronto netto/netto)
+
+ALIQ_CONTRIBUTI_DIP = 0.0919     # IVS a carico del dipendente (aliquota generalità)
+ADDIZIONALE_REGIONALE = 0.0173   # media nazionale indicativa; range reale ~1,23–3,33%
+ADDIZIONALE_COMUNALE = 0.005     # media indicativa; range reale 0–0,9%
+
+# Scaglioni IRPEF 2026 (limite superiore, aliquota) — L. 199/2025
+SCAGLIONI = [(28_000, 0.23), (50_000, 0.33), (float("inf"), 0.43)]
+
+# =======================================================================
+
+
+def irpef_lorda(imponibile):
+    imposta, prec = 0.0, 0.0
+    for lim, aliq in SCAGLIONI:
+        if imponibile > prec:
+            imposta += (min(imponibile, lim) - prec) * aliq
+        prec = lim
+    return imposta
+
+
+def detrazione_pensione(reddito):
+    """Art. 13 co. 3 TUIR (redditi da pensione), struttura vigente 2026."""
+    if reddito <= 8_500:
+        return 1_955.0
+    if reddito <= 28_000:
+        return 700.0 + 1_255.0 * (28_000 - reddito) / 19_500
+    if reddito <= 50_000:
+        return 700.0 * (50_000 - reddito) / 22_000
+    return 0.0
+
+
+def detrazione_lavoro(reddito):
+    """Art. 13 co. 1 TUIR (lavoro dipendente), struttura vigente 2026."""
+    if reddito <= 15_000:
+        return 1_955.0
+    if reddito <= 28_000:
+        return 1_910.0 + 1_190.0 * (28_000 - reddito) / 13_000
+    if reddito <= 50_000:
+        return 1_910.0 * (50_000 - reddito) / 22_000
+    return 0.0
+
+
+def aliquota_rendita_fp(anni_iscrizione):
+    """15% − 0,30% per ogni anno oltre il 15°, floor 9% (D.Lgs. 252/2005 art. 11)."""
+    return max(0.09, 0.15 - 0.003 * max(0, anni_iscrizione - 15))
+
+
+def netto_pensionato(inps_lorda, add_reg, add_com):
+    """Netto della sola pensione INPS (IRPEF + addizionali, detrazione pensione)."""
+    irpef = max(0.0, irpef_lorda(inps_lorda) - detrazione_pensione(inps_lorda))
+    addiz = inps_lorda * (add_reg + add_com) if irpef > 0 else 0.0
+    return inps_lorda - irpef - addiz, irpef, addiz
+
+
+def netto_lavoratore(ral, aliq_contr, add_reg, add_com):
+    """Netto dello stipendio: contributi IVS, poi IRPEF con detrazione lavoro, addizionali."""
+    contributi = ral * aliq_contr
+    imponibile = ral - contributi
+    irpef = max(0.0, irpef_lorda(imponibile) - detrazione_lavoro(imponibile))
+    addiz = imponibile * (add_reg + add_com) if irpef > 0 else 0.0
+    return ral - contributi - irpef - addiz, contributi, irpef, addiz
+
+
+def main():
+    applica_override(globals())
+    json_out = percorso_json()
+
+    print("=" * 74)
+    print("TASSO DI SOSTITUZIONE NETTO — pensione netta / ultimo stipendio netto")
+    print("=" * 74)
+
+    # lato lavoro
+    netto_lav, contr, irpef_lav, add_lav = netto_lavoratore(
+        RAL_FINALE_LORDA, ALIQ_CONTRIBUTI_DIP, ADDIZIONALE_REGIONALE, ADDIZIONALE_COMUNALE)
+    print(f"\nULTIMO STIPENDIO   lordo € {RAL_FINALE_LORDA:>10,.0f}")
+    print(f"  − contributi IVS ({ALIQ_CONTRIBUTI_DIP:.2%})   € {contr:>9,.0f}")
+    print(f"  − IRPEF (netto detrazione lavoro) € {irpef_lav:>9,.0f}")
+    print(f"  − addizionali ({(ADDIZIONALE_REGIONALE+ADDIZIONALE_COMUNALE):.2%})"
+          f"        € {add_lav:>9,.0f}")
+    print(f"  = NETTO            € {netto_lav:>10,.0f}   (aliquota effettiva "
+          f"{1-netto_lav/RAL_FINALE_LORDA:.1%})")
+
+    # lato pensione INPS
+    netto_inps, irpef_p, add_p = netto_pensionato(
+        PENSIONE_INPS_LORDA, ADDIZIONALE_REGIONALE, ADDIZIONALE_COMUNALE)
+    print(f"\nPENSIONE INPS      lorda € {PENSIONE_INPS_LORDA:>10,.0f}")
+    print(f"  − IRPEF (netto detrazione pensione) € {irpef_p:>9,.0f}")
+    print(f"  − addizionali      € {add_p:>9,.0f}")
+    print(f"  = NETTA            € {netto_inps:>10,.0f}   (aliquota effettiva "
+          f"{1-netto_inps/PENSIONE_INPS_LORDA:.1%})")
+
+    # rendita complementare
+    aliq_fp = aliquota_rendita_fp(ANNI_ISCRIZIONE_FP)
+    print(f"\nRENDITA FONDO PENSIONE — imposta sostitutiva {aliq_fp:.1%} "
+          f"({ANNI_ISCRIZIONE_FP} anni di partecipazione; fuori IRPEF)")
+
+    print(f"\n{'scenario':<10}{'rendita lorda':>14}{'rendita netta':>14}"
+          f"{'pens. netta tot':>16}{'TASSO NETTO':>13}{'(lordo)':>9}")
+    ral_lorda_tot = RAL_FINALE_LORDA
+    for nome, lorda in RENDITE_FP:
+        netta = lorda * (1 - aliq_fp)
+        tot = netto_inps + netta
+        t_netto = tot / netto_lav
+        t_lordo = (PENSIONE_INPS_LORDA + lorda) / ral_lorda_tot
+        print(f"{nome:<10}{lorda:>14,.0f}{netta:>14,.0f}{tot:>16,.0f}"
+              f"{t_netto:>12.1%}{t_lordo:>9.1%}")
+
+    print("\nLettura: il tasso NETTO è il numero che descrive il tenore di vita —")
+    print("confronta ciò che entra davvero in tasca nei due momenti della vita.")
+    print("Il divario col lordo viene da tre asimmetrie: in pensione non si versano")
+    print(f"contributi ({ALIQ_CONTRIBUTI_DIP:.2%}), la rendita complementare paga "
+          f"{aliq_fp:.0%} secco fuori IRPEF,")
+    print("e l'IRPEF su un reddito più basso sconta scaglioni e detrazioni migliori.")
+    print("\nAvvertenze: regole fiscali di OGGI proiettate al futuro (cambiano quasi")
+    print("ogni anno); addizionali medie indicative; nessun altro reddito o detrazione.")
+    print("Questo strumento è educativo e non costituisce consulenza fiscale.")
+
+    if json_out:
+        scrivi_json(json_out, {
+            "netto_ultimo_stipendio": round(netto_lav, 2),
+            "netto_pensione_inps": round(netto_inps, 2),
+            "aliquota_rendita_fp": aliq_fp,
+            "scenari": [
+                {"nome": nome, "rendita_lorda": lorda,
+                 "rendita_netta": round(lorda * (1 - aliq_fp), 2),
+                 "pensione_netta_totale": round(netto_inps + lorda * (1 - aliq_fp), 2),
+                 "tasso_sostituzione_netto": round((netto_inps + lorda * (1 - aliq_fp)) / netto_lav, 4),
+                 "tasso_sostituzione_lordo": round((PENSIONE_INPS_LORDA + lorda) / RAL_FINALE_LORDA, 4)}
+                for nome, lorda in RENDITE_FP],
+        })
+
+
+if __name__ == "__main__":
+    main()
