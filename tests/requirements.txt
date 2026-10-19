@@ -1,0 +1,5 @@
+# Dipendenze degli script del plugin (le stesse dei Prerequisiti nel README).
+# Usato dalla CI; in locale: pip install -r tests/requirements.txt
+numpy
+openpyxl
+python-docx

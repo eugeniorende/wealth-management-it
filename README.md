@@ -1,5 +1,7 @@
 # wealth-management-it
 
+[![tests](https://github.com/eugeniorende/wealth-management-it/actions/workflows/tests.yml/badge.svg)](https://github.com/eugeniorende/wealth-management-it/actions/workflows/tests.yml)
+
 Fork community-driven del plugin [`wealth-management`](https://github.com/anthropics/financial-services/tree/main/plugins/vertical-plugins/wealth-management) di Anthropic, adattato alla fiscalità italiana (regime amministrato).
 
 > ⚠️ **Non costituisce consulenza fiscale, finanziaria o di investimento.** È uno strumento di pianificazione personale. Per casi specifici consultare un commercialista o consulente abilitato.
@@ -348,7 +350,7 @@ Le sei skill attive formano un sistema coordinato attorno a un flusso end-to-end
 
 ### Prerequisiti
 
-Python 3.10+ con le dipendenze degli script: `pip install numpy openpyxl python-docx`.
+Python 3.10+ con le dipendenze degli script: `pip install numpy openpyxl python-docx` (oppure `pip install -r tests/requirements.txt`, lo stesso file usato dalla CI).
 
 ### Claude Code
 
@@ -376,7 +378,7 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (21+ test, ~10 secondi, richiede le dipendenze dei Prerequisiti).
+Dal repository: `python tests/run_tests.py` (22 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request: il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 
