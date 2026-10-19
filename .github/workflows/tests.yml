@@ -1,8 +1,8 @@
 # La test suite del plugin come CI: gira a ogni push su main/develop e su ogni
 # pull request. Avvio manuale da "Actions → tests → Run workflow".
-# Nota voluta: il test di freshness fiscale FALLIRÀ quando i marcatori
-# "Verificato: AAAA-MM" superano i 12 mesi — un badge rosso qui significa
-# "riverificare i dati normativi alle fonti", non un bug.
+# Il test di freshness fiscale è escluso (--skip freshness): scade per design
+# dopo 12 mesi e non deve bloccare PR non correlate. Lo esegue freshness.yml,
+# schedulato ogni mese, che apre una issue quando i dati vanno riverificati.
 name: tests
 
 on:
@@ -30,4 +30,4 @@ jobs:
           cache: pip
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
-      - run: python tests/run_tests.py
+      - run: python tests/run_tests.py --skip freshness

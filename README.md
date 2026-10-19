@@ -71,6 +71,10 @@ python tests/run_tests.py
 
 Undici test in ~7 secondi, senza dipendenze oltre a quelle del plugin (numpy, openpyxl). Coprono: igiene del repo (versioning, limiti SKILL.md), compilazione, unit test dei parser previdenziali su fixture sintetiche, un valore chiuso per la proiezione INPS (verifica incrociata loop vs formula d'annuità, con PIL ≠ 0 per rendere osservabile la meccanica di rivalutazione), la coerenza mediana/deterministico del Monte Carlo pensione, gli invarianti dell'allocatore, e due test di REGRESSIONE su bug reali trovati durante l'uso (la sottostringa "azionar" dentro "obbligazionario"; gli obiettivi senza target saltati dal glide path). La suite è stata validata per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
+### Freshness fiscale
+
+I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marcatore `Verificato: AAAA-MM` e il test di freshness li considera **scaduti oltre i 12 mesi**: le leggi di bilancio cambiano i numeri ogni anno, quindi il plugin "scade" per design finché non si riverifica alle fonti. Quel test non gira nella CI delle pull request (una scadenza normativa non deve bloccare un fix sul ribilanciamento) ma in un workflow dedicato, `.github/workflows/freshness.yml`, il primo di ogni mese: se fallisce apre una issue etichettata `freshness` con i file da riverificare, e la commenta ai run successivi finché resta aperta. Nota: GitHub esegue i workflow schedulati solo dal branch di default, quindi il cron parte dopo che il workflow è arrivato su `main`. In locale: `python tests/run_tests.py --only freshness`.
+
 ### Changelog
 
 **v0.9.6** (corrente):
@@ -378,7 +382,7 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (22 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request: il badge in cima al README ne riporta lo stato.
+Dal repository: `python tests/run_tests.py` (23 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 
