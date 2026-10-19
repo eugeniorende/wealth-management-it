@@ -1,0 +1,20 @@
+{
+  "name": "wm-it",
+  "owner": {
+    "name": "Eugenio Rende",
+    "url": "https://github.com/eugeniorende"
+  },
+  "metadata": {
+    "description": "Marketplace del plugin wealth-management-it (pianificazione finanziaria, fiscalità italiana in regime amministrato)."
+  },
+  "plugins": [
+    {
+      "name": "wealth-management-it",
+      "source": "./",
+      "description": "Wealth management per la fiscalità italiana: obiettivi, minusvalenze, pensione dipendenti e autonomi, ribilanciamento tax-aware, revisione periodica. NON COSTITUISCE CONSULENZA FISCALE.",
+      "version": "0.9.6",
+      "category": "finance",
+      "keywords": ["finanza", "fisco", "pensione", "minusvalenze", "ribilanciamento", "italia"]
+    }
+  ]
+}

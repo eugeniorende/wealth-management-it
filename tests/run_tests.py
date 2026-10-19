@@ -66,6 +66,7 @@ def test(nome):
             except Exception as e:  # noqa: BLE001 — un test fallito non ferma la suite
                 RISULTATI.append((nome, False, f"{type(e).__name__}: {e}"))
         wrapped.__test__ = True
+        wrapped.__nome__ = nome
         return wrapped
     return deco
 
@@ -87,6 +88,10 @@ def t_marketplace():
 def t_igiene():
     d = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json")))
     assert re.match(r"^\d+\.\d+\.\d+$", d.get("version", "")), "version non semver"
+    assert isinstance(d.get("author"), dict) and d["author"].get("name"), \
+        "author deve essere un oggetto {name, ...} (claude plugin validate lo richiede)"
+    assert str(d.get("repository", "")).startswith("https://github.com/"), \
+        "repository mancante o non è un URL GitHub"
     for skill in sorted(os.listdir(SKILLS)):
         p = os.path.join(SKILLS, skill, "SKILL.md")
         if os.path.exists(p):
@@ -431,13 +436,81 @@ def t_guardia():
     assert "NON riconosciuta" in out, out[-300:]
 
 
+@test("runner: --only/--skip filtrano i test per sottostringa del nome")
+def t_filtro():
+    me = os.path.abspath(__file__)
+    r = subprocess.run([sys.executable, me, "--only", "freshness"],
+                       capture_output=True, text=True, timeout=120)
+    assert "1/1 test passati" in r.stdout, r.stdout[-400:]
+    assert "freshness fiscale" in r.stdout
+    r = subprocess.run([sys.executable, me, "--skip", "freshness", "--only", "igiene"],
+                       capture_output=True, text=True, timeout=120)
+    assert "2/2 test passati" in r.stdout, r.stdout[-400:]
+    assert "freshness" not in r.stdout
+    r = subprocess.run([sys.executable, me, "--only", "nome-inesistente"],
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode != 0, "nessun test selezionato deve essere un errore, non un verde vuoto"
+
+
+@test("pacchetto: lo zip per Cowork contiene solo il plugin, nome = versione del manifest")
+def t_pacchetto():
+    import zipfile
+    script = os.path.join(ROOT, "scripts", "pacchetto.py")
+    ver = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json")))["version"]
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(script, "--out", tmp, "--tag", f"v{ver}", cwd=ROOT)
+        assert rc == 0, out[-400:]
+        zpath = os.path.join(tmp, f"wealth-management-it-v{ver}.zip")
+        assert os.path.exists(zpath), f"zip atteso: {zpath}; presenti: {os.listdir(tmp)}"
+        nomi = zipfile.ZipFile(zpath).namelist()
+        radice = "wealth-management-it/"
+        assert all(n.startswith(radice) for n in nomi), "tutto deve stare sotto wealth-management-it/"
+        for atteso in (radice + ".claude-plugin/plugin.json", radice + "README.md",
+                       radice + "commands/pensione.md",
+                       radice + "skills/it-tax-optimization/SKILL.md",
+                       radice + "skills/it-pianificazione/assets/proiezione-inps.py"):
+            assert atteso in nomi, f"manca {atteso}"
+        for vietato in ("/tests/", "/.github/", "/.remember/", "__pycache__", ".DS_Store",
+                        "/.git/", "/scripts/", "/dist/", "/ordini/"):
+            assert not any(vietato in n for n in nomi), f"nello zip non deve esserci {vietato}"
+        # il tag deve coincidere con la versione del manifest
+        rc, out = run_script(script, "--out", tmp, "--tag", "v9.9.9", cwd=ROOT)
+        assert rc != 0 and "9.9.9" in out, "tag ≠ manifest deve fallire citando le versioni"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════════ RUNNER ═══════════════════════════════
 
+def seleziona(tests, only, skip):
+    """Filtra i test per sottostringa (case-insensitive) del nome dichiarato."""
+    def nome(fn):
+        return fn.__nome__.lower()
+    if only:
+        tests = [fn for fn in tests if any(o.lower() in nome(fn) for o in only)]
+    if skip:
+        tests = [fn for fn in tests if not any(k.lower() in nome(fn) for k in skip)]
+    return tests
+
+
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description="Smoke test suite del plugin wealth-management-it.")
+    ap.add_argument("--only", action="append", metavar="NOME",
+                    help="esegui solo i test il cui nome contiene NOME (ripetibile)")
+    ap.add_argument("--skip", action="append", metavar="NOME",
+                    help="salta i test il cui nome contiene NOME (ripetibile)")
+    args = ap.parse_args()
+
     print("=" * 74)
     print("SMOKE TEST SUITE — wealth-management-it")
     print("=" * 74)
     tests = [v for v in globals().values() if getattr(v, "__test__", False)]
+    tests = seleziona(tests, args.only, args.skip)
+    if not tests:
+        print("Nessun test selezionato: controlla --only/--skip.")
+        sys.exit(2)
     for fn in tests:
         fn()
     ok = sum(1 for _, esito, _ in RISULTATI if esito)

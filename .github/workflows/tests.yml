@@ -1,0 +1,45 @@
+# La test suite del plugin come CI: gira a ogni push su main/develop e su ogni
+# pull request. Avvio manuale da "Actions → tests → Run workflow".
+# Il test di freshness fiscale è escluso (--skip freshness): scade per design
+# dopo 12 mesi e non deve bloccare PR non correlate. Lo esegue freshness.yml,
+# schedulato ogni mese, che apre una issue quando i dati vanno riverificati.
+name: tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un solo run per branch/PR: un push nuovo cancella quello in corso.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+      - run: pip install -r tests/requirements.txt
+      - run: python tests/run_tests.py --skip freshness
+
+  # Il manifest del plugin passa `claude plugin validate` (errori bloccano,
+  # i warning no). Evita di scoprire un plugin.json rotto solo all'installazione.
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate .

@@ -1,0 +1,56 @@
+# Release del plugin. Gitflow: release branch da develop → PR su main → tag vX.Y.Z
+# su main. Il push del tag fa partire questo workflow, che:
+#   1. verifica che il tag coincida con la versione in plugin.json;
+#   2. esegue la suite COMPLETA, freshness inclusa (non si rilascia con dati
+#      normativi scaduti: è l'unico posto in cui quel test blocca);
+#   3. costruisce lo zip per Cowork con scripts/pacchetto.py;
+#   4. crea la GitHub Release con lo zip allegato e le note generate dai commit.
+# Avvio manuale = prova: costruisce lo zip e lo carica come artifact del run,
+# senza creare la release. Serve a collaudare il workflow prima del primo tag.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+      - run: pip install -r tests/requirements.txt
+
+      - name: Suite completa (freshness inclusa)
+        run: python tests/run_tests.py
+
+      - name: Costruisci lo zip per Cowork
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            python scripts/pacchetto.py --out dist --tag "${{ github.ref_name }}"
+          else
+            python scripts/pacchetto.py --out dist
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-zip
+          path: dist/*.zip
+          if-no-files-found: error
+
+      - name: GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/*.zip \
+            --title "${{ github.ref_name }}" --generate-notes

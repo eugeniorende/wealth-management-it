@@ -1,5 +1,7 @@
 # wealth-management-it
 
+[![tests](https://github.com/eugeniorende/wealth-management-it/actions/workflows/tests.yml/badge.svg)](https://github.com/eugeniorende/wealth-management-it/actions/workflows/tests.yml)
+
 Fork community-driven del plugin [`wealth-management`](https://github.com/anthropics/financial-services/tree/main/plugins/vertical-plugins/wealth-management) di Anthropic, adattato alla fiscalità italiana (regime amministrato).
 
 > ⚠️ **Non costituisce consulenza fiscale, finanziaria o di investimento.** È uno strumento di pianificazione personale. Per casi specifici consultare un commercialista o consulente abilitato.
@@ -69,10 +71,16 @@ python tests/run_tests.py
 
 Undici test in ~7 secondi, senza dipendenze oltre a quelle del plugin (numpy, openpyxl). Coprono: igiene del repo (versioning, limiti SKILL.md), compilazione, unit test dei parser previdenziali su fixture sintetiche, un valore chiuso per la proiezione INPS (verifica incrociata loop vs formula d'annuità, con PIL ≠ 0 per rendere osservabile la meccanica di rivalutazione), la coerenza mediana/deterministico del Monte Carlo pensione, gli invarianti dell'allocatore, e due test di REGRESSIONE su bug reali trovati durante l'uso (la sottostringa "azionar" dentro "obbligazionario"; gli obiettivi senza target saltati dal glide path). La suite è stata validata per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
+### Freshness fiscale
+
+I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marcatore `Verificato: AAAA-MM` e il test di freshness li considera **scaduti oltre i 12 mesi**: le leggi di bilancio cambiano i numeri ogni anno, quindi il plugin "scade" per design finché non si riverifica alle fonti. Quel test non gira nella CI delle pull request (una scadenza normativa non deve bloccare un fix sul ribilanciamento) ma in un workflow dedicato, `.github/workflows/freshness.yml`, il primo di ogni mese: se fallisce apre una issue etichettata `freshness` con i file da riverificare, e la commenta ai run successivi finché resta aperta. Nota: GitHub esegue i workflow schedulati solo dal branch di default, quindi il cron parte dopo che il workflow è arrivato su `main`. In locale: `python tests/run_tests.py --only freshness`.
+
 ### Changelog
 
 **v0.9.6** (corrente):
-- **Integrazione GitHub**: repository inizializzato su `github.com/eugeniorende/wealth-management-it` con `.gitignore`, campo `repository` nel manifest, istruzioni di installazione con il repository reale, e **CI GitHub Actions** che esegue la test suite a ogni push — incluso il test di freshness fiscale, che per design farà fallire la CI quando i dati normativi supereranno i 12 mesi dalla verifica.
+- **Integrazione GitHub**: repository su `github.com/eugeniorende/wealth-management-it` con `.gitignore`, campo `repository` e `author` strutturato nel manifest (passa `claude plugin validate`), `.claude-plugin/marketplace.json` effettivamente presente, istruzioni di installazione con il repository reale. Gitflow: feature su `develop`, release su `main`.
+- **GitHub Actions** (tre workflow): `tests` esegue la suite a ogni push su `main`/`develop` e su ogni PR, più il job `validate` sul manifest; `freshness` esegue il solo test di freshness fiscale il primo di ogni mese e apre una issue quando i dati normativi superano i 12 mesi, così una scadenza non blocca le PR; `release` su tag `vX.Y.Z` verifica il tag contro il manifest, esegue la suite completa (freshness inclusa) e pubblica la GitHub Release con lo zip per Cowork.
+- **Runner e packaging**: `tests/run_tests.py` accetta `--only`/`--skip`; `scripts/pacchetto.py` costruisce lo zip del plugin; `tests/requirements.txt` per le dipendenze. Dependabot sulle action, badge della CI. Suite: 24 test.
 
 **v0.9.5**:
 - **Integrazione Claude Code**: aggiunto `.claude-plugin/marketplace.json` — il repository è ora un marketplace installabile (`/plugin marketplace add` + `/plugin install wealth-management-it@wm-it`). Sezione Installazione riscritta con le tre vie verificate sulla documentazione ufficiale (GitHub, marketplace locale, `--plugin-dir` per sviluppo), i prerequisiti Python espliciti, la nota sul **caching** (il plugin installato è una copia: si aggiorna dal repository, non si edita in cache) e la convenzione della **cartella di lavoro** (i dati personali e gli Excel compilati vivono fuori dal plugin). Test di igiene sulla coerenza marketplace/plugin. Suite: 22 test.
@@ -348,7 +356,7 @@ Le sei skill attive formano un sistema coordinato attorno a un flusso end-to-end
 
 ### Prerequisiti
 
-Python 3.10+ con le dipendenze degli script: `pip install numpy openpyxl python-docx`.
+Python 3.10+ con le dipendenze degli script: `pip install numpy openpyxl python-docx` (oppure `pip install -r tests/requirements.txt`, lo stesso file usato dalla CI).
 
 ### Claude Code
 
@@ -376,11 +384,11 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (21+ test, ~10 secondi, richiede le dipendenze dei Prerequisiti).
+Dal repository: `python tests/run_tests.py` (24 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 
-Settings → Plugins → Add plugin → Upload a zip (zip della directory `wealth-management-it/`).
+Settings → Plugins → Add plugin → Upload a zip. Lo zip pronto (`wealth-management-it-vX.Y.Z.zip`) è allegato a ogni [GitHub Release](https://github.com/eugeniorende/wealth-management-it/releases); in alternativa si costruisce dal repository con `python scripts/pacchetto.py` (finisce in `dist/`). Contiene solo manifest, comandi, skill e README, sotto la cartella `wealth-management-it/`.
 
 ## Uso
 
@@ -449,6 +457,17 @@ Quando la normativa cambia, aggiornare:
 1. SKILL.md sezione "Regole fiscali fondamentali"
 2. Reference files con esempi numerici
 3. Footer con data ultima revisione
+
+## Release
+
+Il repository segue il gitflow: le feature chiudono su `develop`, su `main` arrivano solo i release branch. Per pubblicare una versione:
+
+1. Da `develop`, aprire un release branch e allineare la versione in `.claude-plugin/plugin.json` e `marketplace.json` (il test di igiene e lo script di packaging la verificano) con la voce di changelog qui sopra.
+2. Pull request del release branch su `main`; la CI (`tests` + `validate`) deve essere verde.
+3. Dopo il merge, tag `vX.Y.Z` su `main` e push del tag. Il workflow `release.yml` rifiuta un tag diverso dalla versione del manifest, esegue la suite **completa, freshness inclusa** (non si rilascia con dati normativi scaduti), costruisce lo zip e crea la GitHub Release con le note generate dai commit.
+4. Merge back di `main` su `develop`.
+
+Il workflow si può avviare a mano senza tag (Actions → release → Run workflow): costruisce lo zip come artifact del run senza creare la release, utile per collaudarlo.
 
 ## Licenza
 

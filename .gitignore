@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# output generati dagli script (vivono nella cartella di lavoro, non nel repo)
+ordini/
+
+# zip di release costruiti da scripts/pacchetto.py
+dist/
