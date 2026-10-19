@@ -1,0 +1,66 @@
+# Freshness fiscale: i dati normativi in script e reference portano il marcatore
+# "Verificato: AAAA-MM" e la suite li considera scaduti oltre i 12 mesi (le leggi
+# di bilancio cambiano i numeri ogni anno). Questo workflow esegue SOLO quel test,
+# una volta al mese, e quando fallisce apre una issue con i file da riverificare.
+# È separato da tests.yml perché una scadenza normativa non deve bloccare le PR.
+#
+# ATTENZIONE: GitHub esegue i workflow "schedule" solo dal branch di default
+# (main). Con il gitflow, il cron parte davvero solo dopo la release su main.
+name: freshness
+
+on:
+  schedule:
+    - cron: "0 7 1 * *"   # il primo di ogni mese alle 07:00 UTC
+  workflow_dispatch:
+  pull_request:            # collaudo del job quando si tocca il workflow o il runner
+    paths:
+      - .github/workflows/freshness.yml
+      - tests/run_tests.py
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+      - run: pip install -r tests/requirements.txt
+      - name: Test di freshness fiscale
+        run: python tests/run_tests.py --only freshness 2>&1 | tee freshness.log
+
+      - name: Apri una issue se i dati normativi sono scaduti
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create freshness --color D93F0B --force \
+            --description "Dati normativi oltre i 12 mesi dalla verifica"
+          aperta=$(gh issue list --label freshness --state open --json number --jq '.[0].number')
+          if [ -n "$aperta" ]; then
+            echo "Issue #$aperta già aperta: aggiungo un commento con il run di oggi."
+            gh issue comment "$aperta" --body "Ancora scaduto al $(date -u +%F). Run: $RUN_URL"
+            exit 0
+          fi
+          {
+            echo "La suite di freshness fiscale è fallita il $(date -u +%F): almeno un marcatore \`Verificato: AAAA-MM\` ha superato i 12 mesi."
+            echo
+            echo "**Cosa fare**: riverificare i dati normativi alle fonti (Agenzia delle Entrate, INPS, COVIP, legge di bilancio), aggiornare i valori se cambiati e il marcatore nei file indicati sotto. Finché la issue è aperta, il plugin va considerato potenzialmente non aggiornato."
+            echo
+            echo "**Output della suite**:"
+            echo '```'
+            cat freshness.log
+            echo '```'
+            echo
+            echo "Run: $RUN_URL"
+          } > issue.md
+          gh issue create --title "Dati normativi da riverificare (freshness fiscale)" \
+            --label freshness --body-file issue.md
