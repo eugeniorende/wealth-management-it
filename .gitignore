@@ -7,3 +7,6 @@ __pycache__/
 
 # output generati dagli script (vivono nella cartella di lavoro, non nel repo)
 ordini/
+
+# zip di release costruiti da scripts/pacchetto.py
+dist/
