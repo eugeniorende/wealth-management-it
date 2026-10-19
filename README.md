@@ -382,11 +382,11 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (23 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
+Dal repository: `python tests/run_tests.py` (24 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 
-Settings → Plugins → Add plugin → Upload a zip (zip della directory `wealth-management-it/`).
+Settings → Plugins → Add plugin → Upload a zip. Lo zip pronto (`wealth-management-it-vX.Y.Z.zip`) è allegato a ogni [GitHub Release](https://github.com/eugeniorende/wealth-management-it/releases); in alternativa si costruisce dal repository con `python scripts/pacchetto.py` (finisce in `dist/`). Contiene solo manifest, comandi, skill e README, sotto la cartella `wealth-management-it/`.
 
 ## Uso
 
@@ -455,6 +455,17 @@ Quando la normativa cambia, aggiornare:
 1. SKILL.md sezione "Regole fiscali fondamentali"
 2. Reference files con esempi numerici
 3. Footer con data ultima revisione
+
+## Release
+
+Il repository segue il gitflow: le feature chiudono su `develop`, su `main` arrivano solo i release branch. Per pubblicare una versione:
+
+1. Da `develop`, aprire un release branch e allineare la versione in `.claude-plugin/plugin.json` e `marketplace.json` (il test di igiene e lo script di packaging la verificano) con la voce di changelog qui sopra.
+2. Pull request del release branch su `main`; la CI (`tests` + `validate`) deve essere verde.
+3. Dopo il merge, tag `vX.Y.Z` su `main` e push del tag. Il workflow `release.yml` rifiuta un tag diverso dalla versione del manifest, esegue la suite **completa, freshness inclusa** (non si rilascia con dati normativi scaduti), costruisce lo zip e crea la GitHub Release con le note generate dai commit.
+4. Merge back di `main` su `develop`.
+
+Il workflow si può avviare a mano senza tag (Actions → release → Run workflow): costruisce lo zip come artifact del run senza creare la release, utile per collaudarlo.
 
 ## Licenza
 

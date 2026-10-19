@@ -31,3 +31,15 @@ jobs:
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
       - run: python tests/run_tests.py --skip freshness
+
+  # Il manifest del plugin passa `claude plugin validate` (errori bloccano,
+  # i warning no). Evita di scoprire un plugin.json rotto solo all'installazione.
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate .
