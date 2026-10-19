@@ -87,6 +87,10 @@ def t_marketplace():
 def t_igiene():
     d = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json")))
     assert re.match(r"^\d+\.\d+\.\d+$", d.get("version", "")), "version non semver"
+    assert isinstance(d.get("author"), dict) and d["author"].get("name"), \
+        "author deve essere un oggetto {name, ...} (claude plugin validate lo richiede)"
+    assert str(d.get("repository", "")).startswith("https://github.com/"), \
+        "repository mancante o non è un URL GitHub"
     for skill in sorted(os.listdir(SKILLS)):
         p = os.path.join(SKILLS, skill, "SKILL.md")
         if os.path.exists(p):
