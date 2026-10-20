@@ -104,6 +104,36 @@ def t_igiene():
                 assert "antml:cite" not in testo, f"tag cite in {f}"
 
 
+@test("igiene CI: i workflow che usano una pipe nei run girano con pipefail")
+def t_pipefail():
+    # Senza "shell: bash" GitHub usa `bash -e {0}`, senza pipefail: in
+    # `comando | tee log` l'exit code è quello di tee e un fallimento passa verde.
+    cartella = os.path.join(ROOT, ".github", "workflows")
+    for nome in sorted(os.listdir(cartella)):
+        righe = open(os.path.join(cartella, nome), encoding="utf-8").read().splitlines()
+        con_pipe, blocco = [], None
+        for riga in righe:
+            rientro = len(riga) - len(riga.lstrip())
+            if blocco is not None and riga.strip() and rientro <= blocco:
+                blocco = None
+            m = re.match(r"^(\s*)(?:- )?run:\s*(.*)$", riga)
+            if m:
+                if m.group(2)[:1] in ("|", ">"):
+                    blocco = len(m.group(1))
+                    continue
+                comando = m.group(2)
+            elif blocco is not None:
+                comando = riga
+            else:
+                continue
+            if re.search(r"(?<!\|)\|(?!\|)", comando):
+                con_pipe.append(comando.strip())
+        if con_pipe:
+            testo = "\n".join(righe)
+            assert re.search(r"^defaults:\s*\n\s+run:\s*\n\s+shell:\s*bash\s*$", testo, re.M), \
+                f"{nome}: pipe senza pipefail ({con_pipe[0]!r}); aggiungere defaults.run.shell: bash"
+
+
 @test("compilazione: tutti gli script Python compilano")
 def t_compila():
     import py_compile
@@ -445,7 +475,7 @@ def t_filtro():
     assert "freshness fiscale" in r.stdout
     r = subprocess.run([sys.executable, me, "--skip", "freshness", "--only", "igiene"],
                        capture_output=True, text=True, timeout=120)
-    assert "2/2 test passati" in r.stdout, r.stdout[-400:]
+    assert "3/3 test passati" in r.stdout, r.stdout[-400:]
     assert "freshness" not in r.stdout
     r = subprocess.run([sys.executable, me, "--only", "nome-inesistente"],
                        capture_output=True, text=True, timeout=120)
