@@ -473,6 +473,37 @@ def t_netto():
     assert abs(netto - (27_138 - att_irpef - 27_138 * 0.0223)) < 0.01
 
 
+@test("proiezione-pensione.xlsx: detrazione pensionati = netto-pensione.py (art. 13 c. 3 TUIR)")
+def t_excel_detrazione():
+    # REGRESSIONE F008: Pubblica!B64 usava una formula inventata (1.880 € fissi oltre 28.000).
+    from openpyxl import load_workbook
+    orig = asset("it-pianificazione", "proiezione-pensione.xlsx")
+    ws = load_workbook(xlsx_ricalcolati()[orig], data_only=True)["Pubblica"]
+    cartella = os.path.dirname(orig)
+    sys.path.insert(0, cartella)  # netto-pensione importa motore_bootstrap
+    try:
+        netto = carica_modulo(asset("it-pianificazione", "netto-pensione.py"))
+    finally:
+        sys.path.remove(cartella)
+    lorda, detrazione = ws["B61"].value, ws["B64"].value
+    attesa = netto.detrazione_pensione(lorda)
+    assert abs(detrazione - attesa) < 0.01, f"B64 = {detrazione:.2f} su lorda {lorda:,.0f}, attesa {attesa:.2f}"
+
+
+@test("parametri previdenziali: nessun valore superato né dato personale dell'autore")
+def t_parametri_superati():
+    # REGRESSIONE F002/F009/F051: massimale 2025 spacciato per 2026, plafond "era €5.300",
+    # "Quota 104" (mai esistita), riferimenti all'autore nelle reference.
+    vietati = ("~€120.607", "era €5.300", "Quota 104", "Eugenio", "Calabria", "no, attenzione")
+    for base in (SKILLS, os.path.join(ROOT, "commands")):
+        for cartella, _, files in os.walk(base):
+            for f in files:
+                if f.endswith((".md", ".py")):
+                    testo = open(os.path.join(cartella, f), encoding="utf-8").read()
+                    for v in vietati:
+                        assert v not in testo, f"{os.path.relpath(os.path.join(cartella, f), ROOT)}: «{v}»"
+
+
 @test("tracker-secchielli: fogli, formule vive, semaforo demo funzionante")
 def t_tracker():
     from openpyxl import load_workbook

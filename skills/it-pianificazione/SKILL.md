@@ -37,15 +37,15 @@ pensione_lorda_annua = montante_contributivo × coefficiente_trasformazione_PROI
 
 I coefficienti di trasformazione sono fissati per legge e aggiornati ogni 2 anni (in calo strutturale per via dell'aumento speranza di vita). Per il biennio 2025-2026 (Decreto direttoriale 20/11/2024, GU n. 35 del 12/02/2025): a 67 anni = **5,608%** (era 5,723%); range 57-71 anni.
 
-Vedi `references/previdenza-obbligatoria.md` per: tabella coefficienti completa, requisiti accesso (vecchiaia/anticipata/quota 103/104/opzione donna), tasso di sostituzione tipico, tassazione assegno pensione.
+Vedi `references/previdenza-obbligatoria.md` per: tabella coefficienti completa, requisiti accesso (vecchiaia, anticipata ordinaria e contributiva, APE sociale; Quota 103 e Opzione donna solo per chi aveva già maturato i requisiti), tasso di sostituzione tipico, tassazione assegno pensione.
 
 ### Sistema 2: Previdenza complementare
 
 Tre forme: fondo negoziale (di categoria), fondo aperto, PIP (Piano Individuale Pensionistico). Si alimenta con:
 
 1. **TFR** (se conferito): ~6,91% della RAL annua + rivalutazione
-2. **Contributo volontario lavoratore**: deducibile fino a **€5.300/anno** (era €5.300, alzato dalla Legge di Bilancio 2026)
-3. **Contributo datore di lavoro**: se previsto da CCNL/contratto, NON conta nel plafond €5.300
+2. **Contributo volontario lavoratore**: deducibile fino a **€5.300/anno** (era €5.164,57, alzato dalla Legge di Bilancio 2026)
+3. **Contributo datore di lavoro**: se previsto da CCNL/contratto, **conta nel plafond** di €5.300 insieme ai contributi del lavoratore (art. 8 c. 4 D.Lgs. 252/2005); il TFR conferito no
 
 Tassazione:
 - Sui rendimenti annui (fase accumulo): **20%** (12,5% sulla quota in titoli di Stato whitelist)
@@ -76,16 +76,16 @@ Strategie di copertura del gap (vedi `references/proiezione-tenore-vita.md`):
 | €28.001 - €50.000 | **33%** (ridotta da 35%) |
 | Oltre €50.000 | 43% |
 
-No tax area: €8.500 (dipendenti/pensionati). Detrazione lavoro dipendente max: €1.955. Detrazione pensione: parametrata, simile struttura.
+No tax area: €8.500 (dipendenti/pensionati). Detrazione lavoro dipendente max: €1.955. Detrazione pensione: art. 13 c. 3 TUIR, formula nella sezione «Tassazione assegno pensionistico».
 
 Sterilizzazione benefit per redditi > €200.000: riduzione di €440 sulle detrazioni 19% (annulla il vantaggio della riduzione aliquota).
 
 ### Contributi INPS lavoro dipendente privato
 
 - **Aliquota di computo**: 33%
-- **A carico lavoratore**: 9,19% (10% per la parte di reddito > primo scaglione INPS, soglia ~€55k)
+- **A carico lavoratore**: 9,19% (10% per la parte di reddito oltre la prima fascia di retribuzione pensionabile, €56.224 nel 2026)
 - **A carico azienda**: 23,81%
-- **Tetto contributivo annuo**: per il 2026 ~€120.607 (oltre, no contribuzione obbligatoria — soglia post-1995)
+- **Tetto contributivo annuo**: €122.295 nel 2026, Circ. INPS 6/2026 (oltre, no contribuzione obbligatoria — soglia post-1995)
 
 ### TFR (lavoratore dipendente privato)
 
@@ -97,7 +97,7 @@ Sterilizzazione benefit per redditi > €200.000: riduzione di €440 sulle detr
 ### Tassazione assegno pensionistico
 
 L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si applicano:
-- Detrazione pensionati (no tax area €8.500, decrescente fino a €28k poi €1.880 fisso)
+- Detrazione pensionati (art. 13 c. 3 TUIR, R = reddito complessivo): €1.955 fino a €8.500 (no tax area); 700 + 1.255 × (28.000 − R) / 19.500 fino a €28.000; 700 × (50.000 − R) / 22.000 fino a €50.000; zero oltre; +€50 tra €25.000 e €29.000 (c. 3-bis). È la formula di `assets/netto-pensione.py`
 - Addizionali regionali e comunali (variabili: 0,7-3,33% regionale, 0-0,9% comunale)
 
 ## Workflow operativo
@@ -117,7 +117,7 @@ Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico mo
 **Dati anagrafici e lavorativi:**
 - `data_nascita` (o età corrente)
 - `sesso` (rilevante per requisiti pensione anticipata)
-- `eta_pensionamento_target` (default: 67 = vecchiaia; opzioni: 64 anticipata, 67 vecchiaia, 70 ritardata)
+- `eta_pensionamento_target` (default: 67 = vecchiaia; opzioni: 64 anticipata contributiva, 67 vecchiaia, 70 ritardata)
 - `RAL_lordo_attuale` (€)
 - `anni_anzianita_INPS_correnti` (a oggi)
 - `montante_INPS_corrente` (€, dal **estratto conto INPS** — il dato esatto; se assente viene stimato dalla RAL e dall'anzianità)
@@ -182,7 +182,7 @@ coefficiente_proiettato = coefficiente_attuale × (1 - decadimento_biennale)^bie
 pensione_lorda_annua = montante_finale × coefficiente_proiettato
 
 # Pensione netta
-detrazione_pensionati = calcola_detrazione(pensione_lorda_annua)
+detrazione_pensionati = calcola_detrazione(pensione_lorda_annua)  # art. 13 c. 3 TUIR, come netto-pensione.py
 IRPEF = applica_scaglioni(pensione_lorda_annua) - detrazione_pensionati
 addizionali = pensione_lorda × ~2%  # stima medio
 pensione_netta_annua = pensione_lorda_annua - IRPEF - addizionali
@@ -190,7 +190,7 @@ pensione_netta_annua = pensione_lorda_annua - IRPEF - addizionali
 
 > **Il montante di partenza è il dato che più conta, e il più incerto da stimare.** La stima dipende dall'intera carriera passata, che la formula non conosce: per questo va sempre chiesto all'utente il **montante reale dall'estratto conto INPS** (gratis sul sito INPS). La stima è solo un ripiego ed è dichiarata tale.
 
-**Esempio del perché conta** (caso reale: 37 anni, pensione a 67 = 30 anni di orizzonte):
+**Esempio del perché conta** (caso d'esempio: 37 anni, pensione a 67 = 30 anni di orizzonte):
 - Coefficiente attuale a 67 anni: 5,608%
 - Coefficiente proiettato al 2056 (15 bienni × −1,8%): **4,271%**
 - Su un montante di €786k: pensione lorda €33.576 col proiettato, contro €44.100 col coefficiente attuale (sovrastima del 31%!). Il tasso di sostituzione passa da un irrealistico 79% a un realistico 61%.
@@ -208,13 +208,16 @@ Output Step 2:
 ```pseudocodice
 # Contributi annui al fondo
 contributo_tfr_annuo = RAL × 0,0691  # se conferito
-contributo_volontario = min(input_utente, 5300)
+contributo_volontario = input_utente
 contributo_datore = input_utente  # da CCNL
 contributi_totali_annui = contributo_tfr_annuo + contributo_volontario + contributo_datore
 
-# Beneficio fiscale annuo dalla deduzione
+# Beneficio fiscale annuo dalla deduzione: lavoratore e datore condividono il plafond
+# di €5.300 (il TFR no); il volontario deduce solo lo spazio lasciato dal datore
 aliquota_marginale = max_aliquota_irpef_applicata(RAL)  # 23%, 33%, o 43%
-risparmio_fiscale_annuo = contributo_volontario × aliquota_marginale
+volontario_deducibile = min(5300, contributo_datore + contributo_volontario) - min(5300, contributo_datore)
+risparmio_fiscale_annuo = volontario_deducibile × aliquota_marginale
+# i contributi oltre il plafond vanno comunicati al fondo entro il 31/12 dell'anno successivo
 
 # Proiezione montante
 rendimento_lordo_comparto = parametro(comparto)
@@ -258,7 +261,7 @@ gap_percentuale = gap_annuo / spesa_target_annua
 
 Per ciascun pattern di copertura, quantificare l'impatto:
 
-- **Pattern P1 — Massimizzare contributo deducibile**: se l'utente non sta sfruttando i €5.300/anno, calcolare il delta montante finale + il risparmio IRPEF cumulato
+- **Pattern P1 — Massimizzare contributo deducibile**: se contributi del lavoratore e del datore insieme non saturano i €5.300/anno, calcolare il delta montante finale + il risparmio IRPEF cumulato
 - **Pattern P2 — Cambiare comparto**: se l'utente è in garantito con 25+ anni alla pensione, mostrare il delta atteso passando a bilanciato/azionario
 - **Pattern P3 — Ritardare pensionamento**: confronto 64/67/70 anni — più anni contributi + coefficiente migliore + meno anni di pensione (ma tenore di vita)
 - **Pattern P4 — Conferire TFR**: se ancora in azienda, simulare il delta cumulato sulla parte TFR
@@ -338,7 +341,7 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 - ❌ Assumere coefficienti di trasformazione fissi nel tempo — calano ~1,8% ogni biennio. Per pensioni lontane si DEVE proiettare il coefficiente in avanti (vedi Step 2), non usare quello attuale: su 30 anni la sovrastima della pensione arriva al 30%. L'Excel della skill lo fa automaticamente tramite il parametro "Decadimento coefficiente / biennio".
 - ❌ Promettere pensioni in valore nominale a 30+ anni come fossero certezze — l'inflazione e i cambi normativi rendono ogni stima un range, non un punto
 - ❌ Calcolare il "tasso di sostituzione" senza specificare se lordo o netto — sono valori diversi (il netto è quasi sempre più alto del lordo per via delle detrazioni pensionati)
-- ❌ Dimenticare il beneficio fiscale immediato del contributo volontario al fondo (per RAL nel secondo scaglione: €5.300 × 33% = €1.749 di risparmio IRPEF annuo)
+- ❌ Dimenticare il beneficio fiscale immediato del contributo volontario al fondo (per RAL nel secondo scaglione, con €800 di contributo datore: (€5.300 − €800) × 33% = €1.485 di risparmio IRPEF annuo)
 - ❌ Confondere "comparto garantito" con "investimento sicuro": il garantito ha rendimento atteso 1-2% lordo, sotto inflazione media → erosione del potere d'acquisto
 - ❌ Raccomandare di non aderire a fondo pensione "perché non si fida" senza quantificare il costo opportunità
 - ❌ Trattare l'opzione capitale al pensionamento (max 50% montante in molte forme) come reddito pensionistico — è patrimonio, va gestito separatamente

@@ -128,7 +128,7 @@ Nel report:
 
 ## Caso pratico
 
-Eugenio (esempio) ha:
+Un investitore d'esempio ha:
 
 | Broker | Zainetto (€) | Anno scad. | Plus latenti compensabili (€) |
 |---|---|---|---|
