@@ -4,8 +4,9 @@
 # una volta al mese, e quando fallisce apre una issue con i file da riverificare.
 # È separato da tests.yml perché una scadenza normativa non deve bloccare le PR.
 #
-# ATTENZIONE: GitHub esegue i workflow "schedule" solo dal branch di default
-# (main). Con il gitflow, il cron parte davvero solo dopo la release su main.
+# ATTENZIONE: GitHub esegue i workflow "schedule" solo dal branch di default,
+# che in questo repository è develop: il cron controlla i marcatori della
+# versione in sviluppo, cioè quella che diventerà la prossima release.
 name: freshness
 
 on:
@@ -20,6 +21,12 @@ on:
 permissions:
   contents: read
   issues: write
+
+# `shell: bash` attiva -o pipefail: senza, in `run_tests.py | tee` l'exit code
+# sarebbe quello di tee, lo step resterebbe verde e la issue non si aprirebbe mai.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   freshness:
