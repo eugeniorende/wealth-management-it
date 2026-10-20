@@ -10,7 +10,8 @@ motore_bootstrap.py — motore comune dei Monte Carlo del plugin (block bootstra
   tests/run_tests.py verifica l'identità delle due copie e fallisce se divergono.
 
 Contenuto:
-  - carica_storico(path_csv): serie annuali reali (azionario, obbligazionario)
+  - carica_storico(path_csv): serie annuali reali (azionario, obbligazionario); un
+    percorso relativo si risolve rispetto a questa cartella, non alla cwd
   - indici_bootstrap(n_hist, n_sim, anni, blocco): campionamento a blocchi circolari
   - blocchi_bootstrap(port, n_sim, anni, blocco): rendimenti di portafoglio campionati
   - pctl(a, p): percentile come float
@@ -29,13 +30,21 @@ resta deliberatamente fuori da questo motore.
 """
 
 import ast
+import os
 import sys
 
 import numpy as np
 
 
 def carica_storico(path_csv):
-    """Carica la serie annuale (azionario, obbligazionario) dal CSV. Valori in % → frazioni."""
+    """Carica la serie annuale (azionario, obbligazionario) dal CSV. Valori in % → frazioni.
+
+    Un percorso relativo si risolve rispetto alla cartella del motore, dove stanno anche gli
+    script e rendimenti-storici.csv: così gli script funzionano lanciati dalla cartella di
+    lavoro dell'utente. Per una serie propria, passare un percorso assoluto.
+    """
+    if not os.path.isabs(path_csv):
+        path_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), path_csv)
     az, ob = [], []
     with open(path_csv) as f:
         for riga in f:

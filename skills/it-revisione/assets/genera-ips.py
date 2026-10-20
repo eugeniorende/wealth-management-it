@@ -28,6 +28,7 @@ Questo strumento è educativo e non costituisce consulenza finanziaria.
 """
 
 import datetime
+import re
 import sys
 
 from docx import Document
@@ -332,6 +333,10 @@ def nota_rischio(quota_azioni):
 
 # ═══════════════════════════════ COSTRUZIONE ═══════════════════════════════
 
+MESI = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
+        "agosto", "settembre", "ottobre", "novembre", "dicembre")  # strftime("%B") dipende dal locale
+
+
 def genera(dati, path_out):
     d = dict(DATI)
     d.update(dati or {})
@@ -343,7 +348,11 @@ def genera(dati, path_out):
     tot_cap = sum(o[4] for o in d["obiettivi"])
     if abs(tot_cap - d["capitale"]) > max(1, d["capitale"] * 0.005):
         print(f"⚠ i capitali per obiettivo sommano a €{tot_cap:,.0f} vs capitale €{d['capitale']:,.0f}")
-    quota_az = next((p for cl, _, p in d["allocazione"] if cl.lower().startswith("azion")), 0)
+    # tutte le classi azionarie ("Azionario sviluppati", "ETF azionario globale", "Equity"),
+    # non solo la prima; \b esclude "obbligazionario", che contiene "azion" a metà parola
+    quota_az = sum(p for cl, _, p in d["allocazione"] if re.search(r"\b(azion|equity)", cl, re.I))
+    if not quota_az:
+        print("⚠ nessuna classe azionaria riconosciuta nell'allocazione: la nota di rischio usa 0%")
 
     doc = Document()
     st = doc.styles["Normal"]
@@ -363,7 +372,8 @@ def genera(dati, path_out):
     para(doc, d["sottotitolo"], size=12, color=GREY, italic=True)
     doc.add_paragraph()
     para(doc, d["investitore"], size=15).runs[0].bold = True
-    data = d["data"] or datetime.date.today().strftime("%B %Y").capitalize()
+    oggi = datetime.date.today()
+    data = d["data"] or f"{MESI[oggi.month - 1].capitalize()} {oggi.year}"
     para(doc, data, size=12, color=GREY)
     for _ in range(3):
         doc.add_paragraph()

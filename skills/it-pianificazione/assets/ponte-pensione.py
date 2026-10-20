@@ -179,7 +179,8 @@ def main():
         (((1 + PIL_REALE) ** anni_ponte - 1) / (PIL_REALE * anni_ponte) if PIL_REALE > 0 else 1.0)
     d_inps = d_montante_inps * COEFF_TRASFORMAZIONE
     r = RENDIMENTO_FP_REALE
-    d_fondo_vers = VERSAMENTO_FP_ANNUO * (((1 + r) ** anni_ponte - 1) / r) * COEFF_TRASFORMAZIONE
+    fattore = ((1 + r) ** anni_ponte - 1) / r if r else anni_ponte  # a r = 0 l'annuità è lineare
+    d_fondo_vers = VERSAMENTO_FP_ANNUO * fattore * COEFF_TRASFORMAZIONE
     d_fondo_rita = montante_rita * COEFF_TRASFORMAZIONE  # il montante usato non genera rendita a 69
 
     print(f"\nCOSTI PERMANENTI dell'uscita a {ETA_USCITA:.0f} (lordi, sulla pensione da "
