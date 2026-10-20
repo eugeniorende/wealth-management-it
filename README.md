@@ -79,6 +79,11 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 
 ### Changelog
 
+**v0.10.0** (in sviluppo, piano in [ROADMAP.md](ROADMAP.md)):
+- **Freshness**: il workflow mensile gira con `shell: bash` (pipefail). Prima l'exit code era quello di `tee`, quindi lo step restava verde anche con i dati scaduti e la issue non si apriva mai. Nuovo test di igiene sulle pipe nei workflow.
+- **Ricalcolo degli Excel in CI**: `scripts/ricalcola-excel.py` ricalcola gli xlsx con LibreOffice headless in locale it-IT e segnala le celle in errore. Tre test nuovi: ricalcolo forzato e locale italiano (validati per mutazione), nessuna cella in errore, cache consegnate uguali al ricalcolo. Il runner distingue i test saltati.
+- **Bug trovati dal ricalcolo in italiano**: in `proiezione-pensione.xlsx` le otto ipotesi di `Scenari!B5:B8` e `D5:D8` erano testo ("0.022"). Con il punto come separatore delle migliaia diventavano 22 e la pensione degli scenari usciva a −1,7·10¹⁹; ora sono numeri. Nel cruscotto e nell'IPS, `TEXT(x;"0.0%")` dipendeva dal locale e perdeva il decimale; ora è `FIXED(x*100;1)&"%"`, quindi "10,0%" in italiano.
+
 **v0.9.6** (corrente):
 - **Integrazione GitHub**: repository su `github.com/eugeniorende/wealth-management-it` con `.gitignore`, campo `repository` e `author` strutturato nel manifest (passa `claude plugin validate`), `.claude-plugin/marketplace.json` effettivamente presente, istruzioni di installazione con il repository reale. Gitflow: feature su `develop`, release su `main`.
 - **GitHub Actions** (tre workflow): `tests` esegue la suite a ogni push su `main`/`develop` e su ogni PR, più il job `validate` sul manifest; `freshness` esegue il solo test di freshness fiscale il primo di ogni mese e apre una issue quando i dati normativi superano i 12 mesi, così una scadenza non blocca le PR; `release` su tag `vX.Y.Z` verifica il tag contro il manifest, esegue la suite completa (freshness inclusa) e pubblica la GitHub Release con lo zip per Cowork.
@@ -386,7 +391,7 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (25 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
+Dal repository: `python tests/run_tests.py` (28 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). Tre test ricalcolano gli Excel con LibreOffice headless in locale italiano (`scripts/ricalcola-excel.py`): verificano che nessuna cella vada in errore e che le cache salvate nei file coincidano col ricalcolo. Senza LibreOffice risultano saltati; nella CI è installato e obbligatorio (`RICHIEDI_LIBREOFFICE=1`). Dopo aver modificato un Excel, `python scripts/ricalcola-excel.py FILE --in-place` ne aggiorna le cache. `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 

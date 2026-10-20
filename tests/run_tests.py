@@ -57,12 +57,18 @@ def euro(testo, etichetta):
     return float(m.group(1).replace(".", "").replace(",", ""))
 
 
+class Salta(Exception):
+    """Il test non si può eseguire in questo ambiente (es. LibreOffice assente)."""
+
+
 def test(nome):
     def deco(fn):
         def wrapped():
             try:
                 fn()
                 RISULTATI.append((nome, True, ""))
+            except Salta as e:
+                RISULTATI.append((nome, None, str(e)))
             except Exception as e:  # noqa: BLE001 — un test fallito non ferma la suite
                 RISULTATI.append((nome, False, f"{type(e).__name__}: {e}"))
         wrapped.__test__ = True
@@ -466,6 +472,96 @@ def t_guardia():
     assert "NON riconosciuta" in out, out[-300:]
 
 
+# ═══════════════════════════ EXCEL RICALCOLATI ═══════════════════════════
+# openpyxl legge solo le cache salvate nei file: questi test ricalcolano gli
+# xlsx con LibreOffice in locale italiano (scripts/ricalcola-excel.py). Senza
+# LibreOffice i test sono saltati, salvo RICHIEDI_LIBREOFFICE=1 (la CI).
+
+_RICALCOLATI = {}
+VOLATILI = ("TODAY(", "NOW(", "RAND(", "RANDBETWEEN(")
+
+
+def ricalcolatore():
+    mod = carica_modulo(os.path.join(ROOT, "scripts", "ricalcola-excel.py"))
+    if not mod.trova_soffice():
+        if os.environ.get("RICHIEDI_LIBREOFFICE"):
+            raise AssertionError("RICHIEDI_LIBREOFFICE è impostato ma LibreOffice non è installato")
+        raise Salta("LibreOffice non installato")
+    return mod
+
+
+def xlsx_ricalcolati():
+    """{xlsx del plugin: copia ricalcolata}, un solo ricalcolo per esecuzione della suite."""
+    if not _RICALCOLATI:
+        mod = ricalcolatore()
+        originali = mod.tutti_gli_xlsx()
+        _RICALCOLATI.update(zip(originali, mod.ricalcola(originali, tempfile.mkdtemp(prefix="ricalcolo-"))))
+    return _RICALCOLATI
+
+
+@test("ricalcolo Excel: LibreOffice ricalcola al caricamento, in locale italiano")
+def t_ricalcolo():
+    import zipfile
+    from openpyxl import Workbook, load_workbook
+    mod = ricalcolatore()
+    tmp = tempfile.mkdtemp()
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"], ws["A2"], ws["A3"] = 5, "=A1*3", "=FIXED(1.5,1)"
+    nuovo = os.path.join(tmp, "nuovo.xlsx")
+    wb.save(nuovo)
+    # Cache vecchia: A2 dichiara 6 (come se A1 valesse ancora 2), A3 "1.5".
+    vecchio = os.path.join(tmp, "vecchio.xlsx")
+    with zipfile.ZipFile(nuovo) as zi, zipfile.ZipFile(vecchio, "w") as zo:
+        for voce in zi.infolist():
+            dati = zi.read(voce.filename)
+            if voce.filename == "xl/worksheets/sheet1.xml":
+                dati = re.sub(rb"(<c r=\"A2\"[^>]*>\s*<f>A1\*3</f>)\s*(<v\s*/>|<v>\s*</v>)?", rb"\1<v>6</v>", dati)
+                dati = re.sub(rb"(<c r=\"A3\")([^>]*>\s*<f>[^<]*</f>)\s*(<v\s*/>|<v>\s*</v>)?",
+                              rb'\1 t="str"\2<v>1.5</v>', dati)
+            zo.writestr(voce, dati)
+    assert load_workbook(vecchio, data_only=True).active["A2"].value == 6, "fixture: cache vecchia non scritta"
+    (out,) = mod.ricalcola([vecchio], os.path.join(tmp, "out"))
+    ws = load_workbook(out, data_only=True).active
+    assert ws["A2"].value == 15, f"cache non ricalcolata: A2 = {ws['A2'].value}"
+    assert ws["A3"].value == "1,5", f"locale non italiano: FIXED(1.5;1) = {ws['A3'].value!r}"
+
+
+@test("Excel: ricalcolati in locale italiano, nessuna cella in errore")
+def t_excel_errori():
+    mod = ricalcolatore()
+    for orig, ricalcolato in xlsx_ricalcolati().items():
+        trovati = mod.errori(ricalcolato)
+        assert not trovati, f"{os.path.basename(orig)}: {len(trovati)} celle in errore, es. {trovati[:3]}"
+
+
+@test("Excel: le cache consegnate coincidono col ricalcolo (file aggiornati prima del commit)")
+def t_excel_cache():
+    import math
+    from openpyxl import load_workbook
+    problemi = []
+    for orig, ricalcolato in xlsx_ricalcolati().items():
+        formule = load_workbook(orig)
+        if any(isinstance(c.value, str) and any(v in c.value.upper() for v in VOLATILI)
+               for ws in formule.worksheets for riga in ws.iter_rows() for c in riga):
+            continue  # con OGGI() la cache dipende dal giorno: per questi file contano solo gli errori
+        cache, nuovo = load_workbook(orig, data_only=True), load_workbook(ricalcolato, data_only=True)
+        diverse = []
+        for ws in formule.worksheets:
+            for riga in ws.iter_rows():
+                for c in riga:
+                    if not (isinstance(c.value, str) and c.value.startswith("=")):
+                        continue
+                    a, b = cache[ws.title][c.coordinate].value, nuovo[ws.title][c.coordinate].value
+                    numeri = all(isinstance(x, (int, float)) for x in (a, b))
+                    if not (a == b or (numeri and math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9))):
+                        diverse.append(f"{ws.title}!{c.coordinate}: {a!r} → {b!r}")
+        if diverse:
+            problemi.append(f"{os.path.basename(orig)}: {len(diverse)} cache diverse, es. {diverse[:2]}")
+    assert not problemi, ("; ".join(problemi) + ". Se le formule sono giuste: "
+                          "python scripts/ricalcola-excel.py FILE --in-place")
+
+
 @test("runner: --only/--skip filtrano i test per sottostringa del nome")
 def t_filtro():
     me = os.path.abspath(__file__)
@@ -544,13 +640,18 @@ def main():
     for fn in tests:
         fn()
     ok = sum(1 for _, esito, _ in RISULTATI if esito)
+    saltati = sum(1 for _, esito, _ in RISULTATI if esito is None)
+    eseguiti = len(RISULTATI) - saltati
     for nome, esito, dett in RISULTATI:
+        if esito is None:
+            print(f"  ⏭️  {nome} — saltato: {dett}")
+            continue
         print(("  ✅ " if esito else "  ❌ ") + nome)
         if not esito:
             print("       → " + dett)
     print("-" * 74)
-    print(f"{ok}/{len(RISULTATI)} test passati")
-    sys.exit(0 if ok == len(RISULTATI) else 1)
+    print(f"{ok}/{eseguiti} test passati" + (f", {saltati} saltati" if saltati else ""))
+    sys.exit(0 if ok == eseguiti else 1)
 
 
 if __name__ == "__main__":

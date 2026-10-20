@@ -30,8 +30,8 @@ Prese il 20/10/2026.
 
 ### Ondata 0 — fine ottobre
 
-- [ ] Fix pipefail del workflow di freshness, che non apriva mai la issue mensile (PR #5).
-- [ ] Ricalcolo headless degli Excel con LibreOffice in CI, anticipato da T12. Serve ai test a valori di T4, T5 e T6.
+- [x] Fix pipefail del workflow di freshness, che non apriva mai la issue mensile (PR #5).
+- [x] Ricalcolo headless degli Excel con LibreOffice in CI, anticipato da T12. Serve ai test a valori di T4, T5 e T6. Il ricalcolo in locale italiano ha trovato due bug fuori dall'audit, già corretti: le ipotesi di `Scenari` salvate come testo e `TEXT(x;"0.0%")` dipendente dal locale.
 - [ ] Disclaimer in `commands/pensione.md`, in `commands/pensione-autonomi.md` e nel CSV degli ordini del ribilanciamento (decisione 4).
 - Quick win, sotto le 2 ore ciascuno:
   - [ ] **F006.** Quadro RW sempre dovuto per titoli, ETF e cripto presso intermediari esteri. La soglia di €15.000 vale solo per conti e depositi.
