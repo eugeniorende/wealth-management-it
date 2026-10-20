@@ -88,12 +88,12 @@ Ordine consigliato delle vendite di fine anno:
 **Setup (novembre 2026)**:
 - Zainetto: €3.000 di minus formate nel 2022 → **scadono il 31/12/2026**
 - Portafoglio €120.000, azionario sovrappeso del +7% (€8.400 in eccesso, fuori banda)
-- Posizione azionaria sovrappesata: **ETF FTSE MIB (azioni italiane, reddito diverso)** con €15.000 di controvalore e +€4.000 di plus latente
+- Posizione azionaria sovrappesata: **azioni italiane del FTSE MIB detenute direttamente (reddito diverso)** con €15.000 di controvalore e +€4.000 di plus latente
 
 **Senza coordinamento** (ribilanciare a gennaio 2027):
 ```
 Lo zainetto 2022 (€3.000) evapora il 1/1/2027 → perso
-A gennaio vendo €8.400 di ETF FTSE MIB per ribilanciare
+A gennaio vendo €8.400 di azioni FTSE MIB per ribilanciare
   plus realizzata = €8.400 × (4.000/15.000) = €2.240
   tassa 26% = €582 (nessuna compensazione, zainetto già perso)
 COSTO: €582 di tasse + €3.000 di zainetto buttato
@@ -101,7 +101,7 @@ COSTO: €582 di tasse + €3.000 di zainetto buttato
 
 **Con coordinamento** (ribilanciare a dicembre 2026):
 ```
-A dicembre vendo €8.400 di ETF FTSE MIB per ribilanciare
+A dicembre vendo €8.400 di azioni FTSE MIB per ribilanciare
   plus realizzata = €2.240 (reddito diverso, compensabile)
   compensazione con zainetto 2022: €2.240 compensati (su €3.000 disponibili)
   tassa = €0 (interamente compensata)

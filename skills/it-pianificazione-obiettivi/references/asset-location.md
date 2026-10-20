@@ -38,7 +38,7 @@ Quindi l'asset location in Italia non è "distribuisci gli asset tra i conti age
 
 ### Polizze vita (Ramo I/III): differimento e successione
 - **Differimento**: i rendimenti sono tassati solo al riscatto (non annualmente), quindi compongono al lordo. Ramo I (gestione separata) offre garanzia del capitale e consolidamento; Ramo III (unit/index linked) è esposto al mercato.
-- **Successione**: la prestazione caso morte è **fuori dall'asse ereditario** (esente da imposta di successione) ed esente IRPEF per il beneficiario. È un vantaggio reale di pianificazione successoria.
+- **Successione**: la prestazione caso morte è **fuori dall'asse ereditario** ed esente dall'imposta di successione (art. 12 lett. c D.Lgs. 346/1990). L'esenzione IRPEF per il beneficiario, dal 2015, vale solo per la quota a copertura del **rischio demografico** (art. 34 DPR 601/1973; le temporanee caso morte pure restano esenti al 100%): la componente finanziaria è reddito di capitale, tassato dalla compagnia al 26% (12,5% sulla quota in titoli di Stato). Il bollo 0,2% riguarda solo i Rami III e V, non il Ramo I. È comunque un vantaggio reale di pianificazione successoria. *(Verificato: 2026-10, Circ. AdE 8/E/2016 e 7/E/2025.)*
 - ⚠️ **Costi tipicamente alti** (caricamenti, commissioni) che spesso mangiano il vantaggio fiscale. Strumento più di *estate planning* che di investimento puro: ha senso quando la finalità successoria è prioritaria, non come wrapper di rendimento.
 
 ### Conto deposito (liquidità)

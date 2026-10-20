@@ -9,7 +9,7 @@ Questa asimmetria rende il classico "tax-loss harvesting" americano largamente i
 ## Riferimento normativo
 
 - Art. 67 comma 1 lettera c-ter TUIR: include tra i redditi diversi le plusvalenze "realizzate mediante cessione a titolo oneroso ovvero rimborso di titoli non rappresentativi di merci, di certificati di massa, di valute estere, oggetto di cessione a termine o rivenienti da depositi o conti correnti, di metalli preziosi, sempreché siano allo stato grezzo o monetato, e di quote di partecipazione ad organismi di investimento collettivo".
-- Per gli OICR (Organismi di Investimento Collettivo del Risparmio) **armonizzati** (cioè conformi alla direttiva UCITS), il legislatore ha però disposto che il provento sia classificato come reddito di capitale ex art. 44 TUIR comma 1 lettera g.
+- Per gli OICR (Organismi di Investimento Collettivo del Risparmio), sia **armonizzati** (conformi alla direttiva UCITS) sia **non armonizzati**, il legislatore ha però disposto che il provento sia classificato come reddito di capitale ex art. 44 TUIR comma 1 lettera g. Per i non armonizzati cambia anche il regime: vedi la tabella "nemici".
 - La conseguenza pratica: i due flussi (in entrata da plus, in uscita per coprire minus) viaggiano su binari fiscali separati che non comunicano.
 
 ## Esempio numerico 1: la situazione ingenua
@@ -49,7 +49,7 @@ Impatto netto: ~€2.550 di risparmio.
 - Riacquisto immediato dello stesso ETF (o di un sostituto UCITS) → nuovo PMC più basso → futura plus su questo ETF sarà reddito di capitale, **NON compensabile** con i €3.000 appena creati
 
 **Quando ha senso**:
-- Se prevedi di avere plus su azioni/certificates/ETF non armonizzati nei prossimi 4 anni → SÌ, lo zainetto verrà consumato da quelle
+- Se prevedi di avere plus su azioni/certificates/ETC nei prossimi 4 anni → SÌ, lo zainetto verrà consumato da quelle
 - Se il tuo portafoglio è puramente ETF UCITS → NO, lo zainetto creato evaporerà a vuoto
 
 **Quando NON ha senso**:
@@ -70,9 +70,8 @@ Impatto netto: ~€2.550 di risparmio.
 | Strumento | Plus = reddito diverso? | Compensa minus pregresse? |
 |---|---|---|
 | Azione singola (italiana o estera) | Sì | Sì |
-| ETF non armonizzato (non-UCITS, es. alcuni US-listed) | Sì | Sì |
 | Certificate (investment, leva, ecc.) | Sì | Sì |
-| Obbligazione (capital gain alla vendita/scadenza) | Sì | Sì |
+| Obbligazione (solo la differenza di prezzo, al netto di cedole, ratei e scarto di emissione) | Sì | Sì |
 | Warrant, covered warrant, opzioni quotate | Sì | Sì |
 | ETC fisico (oro, argento, materie prime) | Sì (con eccezioni) | Generalmente sì |
 
@@ -82,6 +81,8 @@ Impatto netto: ~€2.550 di risparmio.
 |---|---|---|
 | ETF UCITS armonizzato | Sì | NO |
 | Fondo comune armonizzato | Sì | NO |
+| ETF o fondo non armonizzato (non UCITS, es. domiciliato USA) | Sì: 26% solo se UE/SEE con gestore vigilato AIFMD, altrimenti IRPEF progressiva con acconto 26% e quadro RL | NO |
+| Scarto di emissione (BOT, CTZ, zero coupon tenuti a scadenza) | Sì (12,5% sui titoli di Stato) | NO |
 | Dividendo azionario | Sì | NO |
 | Cedola obbligazionaria | Sì | NO |
 | Distribuzione ETF (anche se UCITS) | Sì | NO |
@@ -101,3 +102,4 @@ Questo è il caso più sottile e spesso trascurato: anche se cambi la formula da
 
 ---
 *Dati normativi (qualificazione fiscale di ETF/fondi come redditi di capitale) — Verificato: 2026-06.*
+*OICR non armonizzati (art. 10-ter L. 77/1983, Circ. 21/E/2014) e scarto di emissione (artt. 44-45 e 68 c. 7 TUIR) — Verificato: 2026-10.*

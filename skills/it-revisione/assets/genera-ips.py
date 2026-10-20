@@ -138,7 +138,8 @@ POLICY_RIBILANCIAMENTO = [
 POLICY_FISCALITA = [
     ("**La \u201ctrappola degli ETF\u201d.** In Italia le plusvalenze da ETF e fondi sono redditi di "
      "capitale: NON compensabili con le minusvalenze dello zainetto fiscale. Le minusvalenze "
-     "(redditi diversi) si compensano con le plus da azioni singole, obbligazioni, certificati."),
+     "(redditi diversi) si compensano con le plus da azioni singole, certificati e obbligazioni "
+     "(per queste solo la differenza di prezzo: cedole e scarto di emissione sono redditi di capitale)."),
     ("**Aliquote.** 26% sulla generalità delle rendite finanziarie; 12,5% sui titoli di Stato "
      "italiani e white-list."),
     ("**Asset location.** Il fondo pensione tassa i rendimenti al 20% (12,5% sulla quota in titoli "

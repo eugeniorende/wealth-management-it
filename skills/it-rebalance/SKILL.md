@@ -66,10 +66,11 @@ In regime amministrato il metodo è **LIFO** (Last In First Out): si vendono pri
 ### L'asimmetria redditi diversi vs capitale (vedi it-tax-optimization)
 
 Quando si vende per ribilanciare:
-- Vendita di **azioni, ETF non armonizzati, certificates** in plus → reddito diverso → la plus **può** essere compensata con minus pregresse
+- Vendita di **azioni dirette, certificates, ETC** in plus → reddito diverso → la plus **può** essere compensata con minus pregresse
 - Vendita di **ETF UCITS armonizzati** in plus → reddito di capitale → la plus **NON può** essere compensata con minus pregresse
+- Vendita di **ETF o fondi non armonizzati** (non UCITS) in plus → reddito di capitale, mai compensabile; se l'OICR non è UE/SEE con gestore vigilato concorre all'IRPEF progressiva → sono le ultime posizioni da vendere in plus
 
-⚠️ **Conseguenza per il ribilanciamento**: se devi vendere asset azionario in plus per ribilanciare, e hai zainetto disponibile, è fiscalmente più efficiente vendere **azioni dirette o ETF non armonizzati** (compensabili) piuttosto che ETF UCITS armonizzati (non compensabili). A parità di drift da correggere, la scelta dello strumento da vendere cambia il conto fiscale.
+⚠️ **Conseguenza per il ribilanciamento**: se devi vendere asset azionario in plus per ribilanciare, e hai zainetto disponibile, è fiscalmente più efficiente vendere **azioni dirette** (compensabili) piuttosto che ETF, armonizzati o no (non compensabili). A parità di drift da correggere, la scelta dello strumento da vendere cambia il conto fiscale.
 
 ### Costi di transazione e Tobin tax (2026)
 
@@ -91,7 +92,7 @@ Raccogliere:
 - `isin` / `ticker`
 - `descrizione` — es. "iShares Core MSCI World UCITS ETF"
 - `asset_class` — es. azionario_globale, azionario_EU, obbligazionario_governativo, obbligazionario_corporate, monetario, oro/commodity, ecc.
-- `tipo_fiscale` — `reddito_diverso` (azioni, ETF non armonizzati) o `reddito_capitale` (ETF UCITS armonizzati). Se non noto, dedurre da descrizione (UCITS armonizzato → capitale)
+- `tipo_fiscale` — `reddito_diverso` (azioni dirette, certificates, ETC) o `reddito_capitale` (ETF e fondi, UCITS e non armonizzati). Se non noto, dedurre da descrizione (ETF o fondo → capitale)
 - `quantita`
 - `pmc` (prezzo medio di carico) o dettaglio lotti con `data_acquisto`/`quantita`/`prezzo`
 - `prezzo_corrente` o `controvalore_attuale`
@@ -238,7 +239,8 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 - ❌ Proporre vendite (Leve 3-4) prima di aver esaurito nuovi versamenti e flussi (Leve 1-2). La vendita è l'ultima risorsa, non la prima.
 - ❌ Trattare il ribilanciamento come fiscalmente neutro: ogni vendita in Italia è un evento fiscale. Mai dimenticarlo (errore tipico di chi ragiona col modello USA tax-deferred).
 - ❌ Ignorare il LIFO: la scelta del lotto NON è libera, e influenza la plus realizzata.
-- ❌ Vendere ETF UCITS armonizzati in plus quando si potrebbe vendere azioni/ETF non armonizzati compensabili con zainetto: si butta via la possibilità di compensazione.
+- ❌ Vendere ETF UCITS armonizzati in plus quando si potrebbero vendere azioni dirette compensabili con zainetto: si butta via la possibilità di compensazione.
+- ❌ Trattare un ETF non armonizzato (es. domiciliato USA) come compensabile: la plus è reddito di capitale, spesso a IRPEF progressiva, e lo zainetto resta intatto.
 - ❌ Ribilanciare per scostamenti dentro la banda di tolleranza: genera costi senza beneficio.
 - ❌ Sovrastimare la Tobin tax sul ribilanciamento: per portafogli in ETF è zero (esenti).
 - ❌ Suggerire ribilanciamenti cross-broker assumendo compensazione automatica dello zainetto: lo zainetto è per-intermediario. La skill ora **ottimizza intorno a questo vincolo** scegliendo dove realizzare le plus (broker × tipo fiscale, vedi `ribilanciamento-multibroker.md`), ma non bisogna mai dare per scontata una compensazione che attraversa i broker.
