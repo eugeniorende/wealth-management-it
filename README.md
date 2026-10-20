@@ -18,13 +18,13 @@ L'upstream è cablato sulla fiscalità USA: wash sale rule a 30 giorni, scelta d
 | Dividendi | Possono essere "qualified" o "ordinary", compensabili in alcuni casi | Sempre reddito di capitale, mai compensabili con minus |
 | ETF | Tutti uguali fiscalmente | Trappola ETF: plus reddito di capitale (UCITS e non armonizzati), minus reddito diverso |
 | Scadenza loss carryforward | Indefinita | 4 anni |
-| Tax-advantaged accounts | Roth/Traditional IRA, 401k, HSA, 529 | Fondo pensione (regime distinto, non coperto da questa skill) |
+| Tax-advantaged accounts | Roth/Traditional IRA, 401k, HSA, 529 | Fondo pensione: coperto dalle skill previdenziali (deducibilità, tassazione in uscita, confronto con il PAC) |
 
 Un overlay/extension avrebbe creato conflitti dove Claude pesca dalla skill sbagliata. Meglio sostituzione completa.
 
 ## Stato del progetto (v0.9.6)
 
-> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producono numeri sbagliati sui percorsi principali (zainetto, quadro RW, fondo pensione, Excel previdenziali). Il piano di correzione, con la 0.10.0 entro il 31/12/2026, è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
+> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. L'ondata 0 (ottobre 2026) ha chiuso i quick win: quadro RW, ETF non armonizzati, detrazione pensionati, massimale e requisiti 2026, casse professionali, comunicazione dei contributi non dedotti, disclaimer. Restano aperti, tra gli altri, l'importatore broker (F001), il costo medio in amministrato (F012), la certificazione delle minus alla chiusura del rapporto (F011), il plafond del fondo pensione nell'Excel (F007) e il ribilanciamento con i versamenti (F004). Il piano, con la 0.10.0 entro il 31/12/2026, è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
 
 Sei skill operative: `it-pianificazione-obiettivi` (pianificazione goals-based — il pezzo a monte), `it-tax-optimization` (ottimizzazione minus/plus, titoli e cripto), `it-pianificazione` (pensione dipendenti), `it-pianificazione-autonomi` (pensione autonomi/forfettari), `it-rebalance` (ribilanciamento tax-aware), e `it-revisione` (revisione periodica di sintesi — il livello che tiene insieme tutto).
 
@@ -71,11 +71,11 @@ La suite di smoke test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-Undici test in ~7 secondi, senza dipendenze oltre a quelle del plugin (numpy, openpyxl). Coprono: igiene del repo (versioning, limiti SKILL.md), compilazione, unit test dei parser previdenziali su fixture sintetiche, un valore chiuso per la proiezione INPS (verifica incrociata loop vs formula d'annuità, con PIL ≠ 0 per rendere osservabile la meccanica di rivalutazione), la coerenza mediana/deterministico del Monte Carlo pensione, gli invarianti dell'allocatore, e due test di REGRESSIONE su bug reali trovati durante l'uso (la sottostringa "azionar" dentro "obbligazionario"; gli obiettivi senza target saltati dal glide path). La suite è stata validata per mutazione: rompendo deliberatamente il codice, i test falliscono.
+39 test in circa 15 secondi, con le dipendenze dei Prerequisiti e, per i tre test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Freshness fiscale
 
-I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marcatore `Verificato: AAAA-MM` e il test di freshness li considera **scaduti oltre i 12 mesi**: le leggi di bilancio cambiano i numeri ogni anno, quindi il plugin "scade" per design finché non si riverifica alle fonti. Quel test non gira nella CI delle pull request (una scadenza normativa non deve bloccare un fix sul ribilanciamento) ma in un workflow dedicato, `.github/workflows/freshness.yml`, il primo di ogni mese: se fallisce apre una issue etichettata `freshness` con i file da riverificare, e la commenta ai run successivi finché resta aperta. Nota: GitHub esegue i workflow schedulati solo dal branch di default, che qui è `develop`: il cron controlla quindi i marcatori della versione in sviluppo. In locale: `python tests/run_tests.py --only freshness`.
+I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marcatore `Verificato: AAAA-MM` e il test di freshness li considera **scaduti oltre i 12 mesi** (l'elenco `OBBLIGATI_FRESHNESS` in `tests/run_tests.py` fissa i file che devono portarlo: se uno ne è privo il test fallisce): le leggi di bilancio cambiano i numeri ogni anno, quindi il plugin "scade" per design finché non si riverifica alle fonti. Quel test non gira nella CI delle pull request (una scadenza normativa non deve bloccare un fix sul ribilanciamento) ma in un workflow dedicato, `.github/workflows/freshness.yml`, il primo di ogni mese: se fallisce apre una issue etichettata `freshness` con i file da riverificare, e la commenta ai run successivi finché resta aperta. Nota: GitHub esegue i workflow schedulati solo dal branch di default, che qui è `develop`: il cron controlla quindi i marcatori della versione in sviluppo. In locale: `python tests/run_tests.py --only freshness`.
 
 ### Changelog
 
@@ -83,6 +83,13 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 - **Freshness**: il workflow mensile gira con `shell: bash` (pipefail). Prima l'exit code era quello di `tee`, quindi lo step restava verde anche con i dati scaduti e la issue non si apriva mai. Nuovo test di igiene sulle pipe nei workflow.
 - **Ricalcolo degli Excel in CI**: `scripts/ricalcola-excel.py` ricalcola gli xlsx con LibreOffice headless in locale it-IT e segnala le celle in errore. Tre test nuovi: ricalcolo forzato e locale italiano (validati per mutazione), nessuna cella in errore, cache consegnate uguali al ricalcolo. Il runner distingue i test saltati.
 - **Bug trovati dal ricalcolo in italiano**: in `proiezione-pensione.xlsx` le otto ipotesi di `Scenari!B5:B8` e `D5:D8` erano testo ("0.022"). Con il punto come separatore delle migliaia diventavano 22 e la pensione degli scenari usciva a −1,7·10¹⁹; ora sono numeri. Nel cruscotto e nell'IPS, `TEXT(x;"0.0%")` dipendeva dal locale e perdeva il decimale; ora è `FIXED(x*100;1)&"%"`, quindi "10,0%" in italiano.
+
+- **Quick win sugli script** (PR #8): la serie storica si trova anche lanciando ponte e Monte Carlo pensione dalla cartella di lavoro; rendimento zero nel ponte senza divisione per zero; la leva di rischio è un'OPZIONE solo per gli obiettivi desiderabili oltre la finestra di de-risking (prima proponeva ~95% azionario per l'anticipo casa a 6 anni); il bootstrap del decumulo campiona anche l'ultimo anno; l'IPS somma tutte le classi azionarie e scrive il mese in italiano.
+- **Disclaimer** (PR #9): ogni comando chiede in fondo il disclaimer «non è consulenza»; i CSV degli ordini si chiudono con una riga NOTA e lo stdout del ribilanciamento lo ripete.
+- **Quick win fiscali** (PR #10): quadro RW dovuto per titoli e cripto esteri senza soglia (i €15.000 valgono solo per i conti); plus di ETF e fondi non armonizzati come redditi di capitale, mai compensabili; scarto di emissione e cedole come redditi di capitale; polizze vita esenti IRPEF solo per la componente demografica; cripto con soglie penali, doppia tabella del ravvedimento, DAC8 e regime amministrato dal 2023.
+- **Previdenza dei dipendenti** (PR #11): il contributo del datore conta nel plafond di €5.300; detrazione pensionati dell'Excel secondo l'art. 13 c. 3 TUIR (pensione netta d'esempio da €30.833 a €29.263); massimale €122.295 e prima fascia €56.224; Quota 103 e Opzione donna solo per requisiti già maturati, anticipata contributiva a 64 anni; trasferimento con il contributo del datore dal 31/10/2026 e adesione automatica dal 1/7/2026. Il capitale del fondo resta al 50%. Tolti i dati personali dell'autore dalle reference.
+- **Autonomi e revisione** (PR #12): artigiani e commercianti dichiarati fuori perimetro; CIPAG 20% + 5% (anche verso la PA) ed ENPAM con Quota B al 19,5%; requisiti 2026 nella Gestione Separata; la comunicazione al fondo dei contributi non dedotti entra in tutte le scadenze di fine anno; nel cruscotto il TWR non dà più −100% sulle righe non compilate.
+- **Freshness e documentazione** (PR #13): l'elenco `OBBLIGATI_FRESHNESS` rende obbligatorio il marcatore su 19 file normativi. I quattro che ne erano privi sono stati verificati alle fonti: in `criptovalute-casi-speciali.md` corretti gli importi del regime neo-residenti (€300.000 dal 2026), l'IVA del mining (fuori campo, non pro-rata), la localizzazione delle cripto (criteri della circ. 30/E/2023) e la riforma delle successioni (in vigore dal 2025); in it-pianificazione la sterilizzazione oltre €200.000; in it-rebalance la Tobin tax (0,4% fuori mercato, 0,2% sui mercati regolamentati). README: «Cosa il plugin NON fa» riscritto, `/revisione` tra i comandi, un solo conteggio dei test.
 
 **v0.9.6** (corrente):
 - **Integrazione GitHub**: repository su `github.com/eugeniorende/wealth-management-it` con `.gitignore`, campo `repository` e `author` strutturato nel manifest (passa `claude plugin validate`), `.claude-plugin/marketplace.json` effettivamente presente, istruzioni di installazione con il repository reale. Gitflow: feature su `develop`, release su `main`.
@@ -391,7 +398,7 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (28 test, ~10 secondi, richiede le dipendenze dei Prerequisiti). Tre test ricalcolano gli Excel con LibreOffice headless in locale italiano (`scripts/ricalcola-excel.py`): verificano che nessuna cella vada in errore e che le cache salvate nei file coincidano col ricalcolo. Senza LibreOffice risultano saltati; nella CI è installato e obbligatorio (`RICHIEDI_LIBREOFFICE=1`). Dopo aver modificato un Excel, `python scripts/ricalcola-excel.py FILE --in-place` ne aggiorna le cache. `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
+Dal repository: `python tests/run_tests.py` (39 test, circa 15 secondi, richiede le dipendenze dei Prerequisiti). Tre test ricalcolano gli Excel con LibreOffice headless in locale italiano (`scripts/ricalcola-excel.py`): verificano che nessuna cella vada in errore e che le cache salvate nei file coincidano col ricalcolo. Senza LibreOffice risultano saltati; nella CI è installato e obbligatorio (`RICHIEDI_LIBREOFFICE=1`). Dopo aver modificato un Excel, `python scripts/ricalcola-excel.py FILE --in-place` ne aggiorna le cache. `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 
@@ -407,6 +414,7 @@ Comandi espliciti:
 /pensione          → it-pianificazione (pensione dipendenti: INPS + complementare + TFR)
 /pensione-autonomi → it-pianificazione-autonomi (pensione autonomi/forfettari: Gestione Separata)
 /ribilancia        → it-rebalance (ribilanciamento tax-aware del portafoglio)
+/revisione         → it-revisione (revisione periodica: stato, scostamenti, azioni)
 ```
 
 Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazione-obiettivi` su obiettivi/pianificare investimenti/fondo emergenza/quanto risparmiare; `it-tax-optimization` su minusvalenze/plusvalenze/zainetto/Tobin tax; `it-pianificazione` su pensione/fondo pensione/TFR per dipendenti; `it-pianificazione-autonomi` su pensione/Gestione Separata/forfettario per P.IVA; `it-rebalance` su ribilanciamento/drift/allocazione target.
@@ -442,11 +450,12 @@ Più disclaimer obbligatorio.
 
 ## Cosa il plugin NON fa
 
-- Non opera in regime dichiarativo
-- Non gestisce: cripto, immobili, partecipazioni qualificate, fondi pensione
-- Non dà consigli su quale azione/ETF comprare per ragioni di rendimento
-- Non sostituisce un commercialista
-- Non si connette a broker italiani via API (i dati si forniscono manualmente; un MCP server custom sarà parte di una futura iterazione)
+- Il motore di ottimizzazione e ribilanciamento assume il regime amministrato: regime dichiarativo e cripto sono coperti come principi e adempimenti (quadri RT, RW e IVAFE, ravvedimento), senza un importatore dedicato
+- Non gestisce immobili, partecipazioni qualificate e derivati OTC
+- Non copre dipendenti pubblici né artigiani e commercianti iscritti alle gestioni IVS INPS
+- Non compila il Modello Redditi e non sostituisce un commercialista o un consulente abilitato
+- Non dà consigli su quale azione o ETF comprare per ragioni di rendimento
+- Non si connette ai broker via API: un MCP server sui broker è stato valutato ed escluso (le API non espongono lo zainetto e richiederebbero credenziali); i dati si forniscono con gli estratti CSV
 
 ## Differenza chiave: zainetto fiscale
 

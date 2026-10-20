@@ -28,37 +28,43 @@ Prese il 20/10/2026.
 
 ## 0.10.0 — correttiva, entro il 31/12/2026
 
-### Ondata 0 — fine ottobre
+### Ondata 0 — fine ottobre (chiusa il 20/10/2026, PR #5 e #7-#13)
 
 - [x] Fix pipefail del workflow di freshness, che non apriva mai la issue mensile (PR #5).
 - [x] Ricalcolo headless degli Excel con LibreOffice in CI, anticipato da T12. Serve ai test a valori di T4, T5 e T6. Il ricalcolo in locale italiano ha trovato due bug fuori dall'audit, già corretti: le ipotesi di `Scenari` salvate come testo e `TEXT(x;"0.0%")` dipendente dal locale.
-- [ ] Disclaimer in `commands/pensione.md`, in `commands/pensione-autonomi.md` e nel CSV degli ordini del ribilanciamento (decisione 4).
+- [x] Disclaimer in `commands/pensione.md`, in `commands/pensione-autonomi.md` e nel CSV degli ordini del ribilanciamento (decisione 4). Esteso a tutti i commands, con un test di igiene, e allo stdout del ribilanciamento (PR #9).
 - Quick win, sotto le 2 ore ciascuno:
-  - [ ] **F006.** Quadro RW sempre dovuto per titoli, ETF e cripto presso intermediari esteri. La soglia di €15.000 vale solo per conti e depositi.
-  - [ ] **F007 (testo) e F051.** Il contributo del datore conta nel plafond di €5.300, il TFR no. Vanno tolti l'appunto di bozza e i dati personali dell'autore dalle reference.
-  - [ ] **F008.** Detrazione pensionati in `Pubblica!B64` con la formula dell'art. 13 c. 3 TUIR già usata da `netto-pensione.py`.
-  - [ ] **F002.** Massimale 2026 a €122.295 e prima fascia a €56.224, coerenti tra le skill.
-  - [ ] **F003, F052 e F042 (testo):**
+  - [x] **F006.** Quadro RW sempre dovuto per titoli, ETF e cripto presso intermediari esteri. La soglia di €15.000 vale solo per conti e depositi.
+  - [x] **F007 (testo) e F051.** Il contributo del datore conta nel plafond di €5.300, il TFR no. Vanno tolti l'appunto di bozza e i dati personali dell'autore dalle reference.
+  - [x] **F008.** Detrazione pensionati in `Pubblica!B64` con la formula dell'art. 13 c. 3 TUIR già usata da `netto-pensione.py`.
+  - [x] **F002.** Massimale 2026 a €122.295 e prima fascia a €56.224, coerenti tra le skill.
+  - [x] **F003, F052 e F042 (testo):**
     - ETF non armonizzati tra gli strumenti non compensabili;
     - scarto di emissione come reddito di capitale;
     - polizze vita esenti IRPEF solo per la componente demografica.
-  - [ ] **F009 e F010 (testo):**
+  - [x] **F009 e F010 (testo):**
     - requisiti 2026: via Quota 103, Opzione donna e «Quota 104»;
     - soglia di vecchiaia a 1× l'assegno sociale;
     - portabilità e adesione automatica secondo la L. 199/2025.
-  - [ ] **F016 (testo) e F038.** Artigiani e commercianti dichiarati fuori perimetro; righe CIPAG ed ENPAM corrette.
-  - [ ] **F020.** Comunicazione al fondo dei contributi non dedotti in tutte le superfici «Scadenza».
-  - [ ] **F036 (a)-(d).** Reference cripto: pena, ravvedimento, amministrato dal 2023, Trade Republic.
+  - [x] **F016 (testo) e F038.** Artigiani e commercianti dichiarati fuori perimetro; righe CIPAG ed ENPAM corrette.
+  - [x] **F020.** Comunicazione al fondo dei contributi non dedotti in tutte le superfici «Scadenza».
+  - [x] **F036 (a)-(d).** Reference cripto: pena, ravvedimento, amministrato dal 2023, Trade Republic.
   - [x] **F017.** Gate della OPZIONE legato a `FINESTRA_DERISK` e alla priorità «discrezionale», con test.
   - [x] **F005 e F056 (parte).** `rendimenti-storici.csv` ancorato a `__file__`; `RENDIMENTO_FP_REALE=0` gestito in ponte-pensione.
   - [x] **F029.** Off-by-one del bootstrap in decumulo-obiettivi.
-  - [ ] **F060 (b) e F049 (b).** Quota azionaria su tutte le classi in genera-ips; celle TWR vuote invece di −100%. F060 (a, b) fatto, con il mese in italiano; F049 (b) resta, sul cruscotto.
-  - [ ] **F025 e riga comune:**
+  - [x] **F060 (b) e F049 (b).** Quota azionaria su tutte le classi in genera-ips, con il mese in italiano; celle TWR vuote invece di −100%.
+  - [x] **F025 e riga comune:**
     - «Cosa il plugin NON fa» riscritto;
     - `/revisione` tra i comandi;
     - un solo conteggio dei test;
     - via «default ±5%» da `commands/ribilancia.md`.
-  - [ ] **F024 (test).** Elenco esplicito dei file obbligati al marcatore in `t_freshness`. Il test fallisce finché i dati non sono verificati alle fonti, ed è voluto: la issue mensile lo segnalerà.
+  - [x] **F024 (test).** Elenco esplicito dei file obbligati al marcatore in `t_freshness` (`OBBLIGATI_FRESHNESS`, 19 file). I quattro file che ne erano privi sono stati verificati alle fonti e corretti prima di marcarli: in `criptovalute-casi-speciali.md` c'erano errori di sostanza (importi del regime neo-residenti, IVA del mining, localizzazione delle cripto, decorrenza della riforma delle successioni).
+
+**Emerso nell'ondata 0, oltre l'audit:**
+- Le fonti primarie hanno smentito l'audit su due punti. Il capitale del fondo pensione resta al 50%: l'aumento al 60% della L. 199/2025 è stato soppresso dal DL 62/2026 prima di entrare in vigore. La CIPAG applica il 5% anche verso la PA. «Quota 104» non risulta da nessuna fonte.
+- Il ricalcolo in locale italiano ha trovato due bug negli Excel, corretti nella PR #7.
+- I marcatori nuovi sono circoscritti alle parti verificate: dove un file è stato riverificato solo in parte, la data del file intero resta quella di prima.
+- Restano da verificare su fonte primaria, e sono esclusi dai marcatori: le righe Inarcassa, Forense, CNPADC ed ENPAP; la leva ETN/ETC su cripto; le minus pregresse di Scalable; gli articoli dei testi unici 2027 che sostituiscono l'art. 13 TUIR e i commi 76-84 della L. 190/2014. Finiscono in T3, T6 e T11.
 
 ### Ondata 1 — fiscale, novembre
 

@@ -78,7 +78,9 @@ Strategie di copertura del gap (vedi `references/proiezione-tenore-vita.md`):
 
 No tax area: €8.500 (dipendenti/pensionati). Detrazione lavoro dipendente max: €1.955. Detrazione pensione: art. 13 c. 3 TUIR, formula nella sezione «Tassazione assegno pensionistico».
 
-Sterilizzazione benefit per redditi > €200.000: riduzione di €440 sulle detrazioni 19% (annulla il vantaggio della riduzione aliquota).
+Sterilizzazione benefit per redditi > €200.000: le detrazioni per oneri al 19% (escluse le spese sanitarie), per erogazioni ai partiti politici e per premi di polizze contro eventi calamitosi sono ridotte di €440 (art. 16-ter c. 5-bis TUIR, introdotto dalla L. 199/2025): neutralizza il risparmio massimo della riduzione di aliquota (2% × €22.000).
+
+*Scaglioni IRPEF 2026 (art. 11 TUIR, mod. L. 199/2025 c. 3), detrazione lavoro dipendente max €1.955 e no tax area €8.500 (art. 13 TUIR), riduzione di €440 per redditi > €200.000 (art. 16-ter c. 5-bis TUIR) — Verificato: 2026-10.*
 
 ### Contributi INPS lavoro dipendente privato
 

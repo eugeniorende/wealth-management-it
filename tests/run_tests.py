@@ -637,17 +637,46 @@ def t_autonomi_perimetro():
 
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
-@test("freshness fiscale: marcatori 'Verificato: AAAA-MM' presenti (≥7) e ≤12 mesi")
+# File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:
+# senza, i loro numeri resterebbero fuori dal controllo mensile di freshness.yml (F024).
+OBBLIGATI_FRESHNESS = (
+    "it-tax-optimization/references/aliquote-12-5-26.md",
+    "it-tax-optimization/references/etf-trap-redditi-capitale.md",
+    "it-tax-optimization/references/regime-dichiarativo.md",
+    "it-tax-optimization/references/criptovalute.md",
+    "it-tax-optimization/references/criptovalute-avanzate.md",
+    "it-tax-optimization/references/criptovalute-casi-speciali.md",
+    "it-pianificazione/SKILL.md",
+    "it-pianificazione/references/previdenza-obbligatoria.md",
+    "it-pianificazione/references/previdenza-complementare.md",
+    "it-pianificazione/assets/netto-pensione.py",
+    "it-pianificazione/assets/proiezione-inps.py",
+    "it-pianificazione/assets/ponte-pensione.py",
+    "it-pianificazione/assets/importa-previdenza.py",
+    "it-pianificazione-autonomi/references/casse-professionali.md",
+    "it-pianificazione-autonomi/references/previdenza-gestione-separata.md",
+    "it-pianificazione-autonomi/references/fiscalita-forfettario.md",
+    "it-pianificazione-obiettivi/references/asset-location.md",
+    "it-rebalance/SKILL.md",
+    "it-revisione/assets/genera-ips.py",
+)
+
+
+@test("freshness fiscale: i file normativi portano 'Verificato: AAAA-MM' e nessuno supera i 12 mesi")
 def t_freshness():
     import datetime
     trovati = []
     for base, _, files in os.walk(SKILLS):
         for f in files:
             if f.endswith((".py", ".md")):
+                rel = os.path.relpath(os.path.join(base, f), SKILLS)
                 testo = open(os.path.join(base, f), encoding="utf-8", errors="replace").read()
                 for m in re.finditer(r"Verificato: (\d{4})-(\d{2})", testo):
-                    trovati.append((f, int(m.group(1)), int(m.group(2))))
-    assert len(trovati) >= 7, f"attesi ≥7 marcatori freshness, trovati {len(trovati)}"
+                    trovati.append((rel, int(m.group(1)), int(m.group(2))))
+    marcati = {rel for rel, _, _ in trovati}
+    mancanti = [rel for rel in OBBLIGATI_FRESHNESS if rel not in marcati]
+    assert not mancanti, ("file normativi senza marcatore (verificarli alle fonti primarie e "
+                          f"aggiungere «Verificato: AAAA-MM»): {mancanti}")
     oggi = datetime.date.today()
     for f, a, m in trovati:
         eta = (oggi.year - a) * 12 + (oggi.month - m)
