@@ -4,7 +4,7 @@
 
 ### Fondo negoziale (chiuso, di categoria)
 
-Istituito da contrattazione collettiva per i lavoratori di un settore o azienda specifica. Esempi: Cometa (metalmeccanici), Fonchim (chimici), Fondoposte, Fondenergia, Fondaereo, Telemaco (telecomunicazioni — rilevante per developer in TLC), Previambiente.
+Istituito da contrattazione collettiva per i lavoratori di un settore o azienda specifica. Esempi: Cometa (metalmeccanici), Fonchim (chimici), Fondoposte, Fondenergia, Fondaereo, Telemaco (telecomunicazioni), Previambiente.
 
 **Pro:**
 - Costi gestione bassissimi (ISC tipicamente 0,2-0,5% annui — i più bassi del mercato)
@@ -48,9 +48,9 @@ Prodotto assicurativo (ramo VI vita), distribuito principalmente da reti agenzia
 
 **Regola pratica della skill**: a parità di tutte le altre variabili, **un fondo negoziale (se accessibile) batte sempre un fondo aperto, che a sua volta batte sempre un PIP**, per puro effetto costi. La differenza di 1,5 punti % annui di ISC, capitalizzata su 30 anni, si traduce in **30-40% di montante finale in meno**. È enorme.
 
-### Riforma 2026: portabilità tra forme
+### Trasferimento tra forme e contributo del datore (dal 31/10/2026)
 
-A partire da luglio 2026 (Legge di Bilancio 2024/2025 ratificata), la **portabilità integrale tra fondo negoziale, fondo aperto e PIP** diventa operativa senza penalità. Storicamente molti PIP avevano vincoli stringenti. Implicazione: chi ha un PIP costoso può finalmente trasferire il montante a un negoziale con costi 5-10x inferiori. Questa è probabilmente la decisione di pianificazione finanziaria personale a più alto valore singolo realizzabile nel 2026 in Italia.
+Trasferire la posizione a un'altra forma è un diritto dal 2007, dopo almeno 2 anni di partecipazione: chi ha un PIP costoso può spostare il montante a un negoziale con costi 5-10x inferiori, ed è spesso la decisione di pianificazione previdenziale a più alto valore. La novità riguarda la direzione opposta: dal 31/10/2026 chi lascia il fondo negoziale per un'altra forma **conserva il contributo del datore**, perché l'art. 14 c. 6 D.Lgs. 252/2005 non rinvia più ai limiti dei contratti collettivi (L. 199/2025; termine fissato dal DL 19/2026, art. 29 c. 11-bis, conv. L. 50/2026). Prima, spostarsi su un PIP o su un fondo aperto faceva spesso perdere il contributo datoriale.
 
 ## Come si alimenta un fondo pensione
 
@@ -78,13 +78,14 @@ Se conferito al fondo, l'accantonamento TFR (~6,91% della RAL annua, vedi formul
 - Tassi di interesse molto alti che rendono la rivalutazione TFR azienda (1,5%+75% inflazione) competitiva con i rendimenti netti del fondo
 
 **Decisione del conferimento:**
-- Da fare entro 6 mesi dall'assunzione (silenzio-assenso: chi non sceglie, il TFR va al fondo di categoria di default)
+- Neoassunti del settore privato dal 1/7/2026: **adesione automatica** alla forma negoziale di riferimento, con possibilità di rinuncia entro 60 giorni (L. 199/2025 c. 204-205; art. 8 c. 7 e 7-quater D.Lgs. 252/2005); il comparto di default è un percorso life-cycle tarato su età e orizzonte
+- Assunti prima: scelta entro 6 mesi dall'assunzione (silenzio-assenso: chi non sceglie, il TFR va al fondo di categoria di default)
 - **Irrevocabile** una volta conferito: non si può tornare indietro
 - Si può cambiare fondo (dopo almeno 2 anni di permanenza) ma il TFR resta in regime complementare
 
 ### 2. Contributo volontario del lavoratore
 
-Quanto si vuole, sopra il TFR. **Massimo deducibile dal reddito IRPEF: €5.300/anno** (era €5.300 fino al 2025, alzato dalla Legge di Bilancio 2026).
+Quanto si vuole, sopra il TFR. **Massimo deducibile dal reddito IRPEF: €5.300/anno** (era €5.164,57 fino al 2025; L. 199/2025 art. 1 c. 201). Il plafond comprende anche il contributo del datore: vedi sotto.
 
 **Beneficio fiscale immediato**:
 
@@ -102,7 +103,7 @@ Esempio massimo: RAL €60.000 → aliquota marginale 43%. Contributo €5.300 �
 
 Se previsto da CCNL o accordo aziendale, il datore versa una quota di RAL al fondo del lavoratore (tipicamente 1-2% per CCNL metalmeccanici, fino al 4-6% per alcuni CCNL bancari/assicurativi/dirigenza).
 
-**Punto chiave**: il contributo datore **NON deduce dal plafond €5.300** del lavoratore. È un beneficio aggiuntivo. Ma è subordinato all'iscrizione del lavoratore al fondo e a un contributo minimo del lavoratore (spesso 1% della RAL).
+**Punto chiave**: il contributo datore **concorre al plafond di €5.300** insieme ai contributi del lavoratore (art. 8 c. 4 D.Lgs. 252/2005), quindi riduce lo spazio deducibile per i versamenti volontari. Resta un beneficio aggiuntivo, ma è subordinato all'iscrizione del lavoratore al fondo e a un contributo minimo del lavoratore (spesso 1% della RAL).
 
 **Regola pratica**: se il CCNL prevede contributo datore, **NON aderire al fondo è lasciare soldi sul tavolo**. Letteralmente. Si rinuncia a soldi che il datore avrebbe versato. Quantificare: 1,5% × RAL × anni di carriera = molto, anche prima di considerare rendimenti.
 
@@ -131,8 +132,8 @@ I rendimenti sono al netto dei costi di gestione (ISC) e della tassa annua sui r
 ### Fase 1 — Contributi
 
 - TFR conferito: NESSUNA tassazione in ingresso (era già a tassazione differita)
-- Contributo volontario lavoratore: deducibile fino a €5.300/anno
-- Contributo datore: NON deducibile dal lavoratore, ma non concorre a formare reddito imponibile (è "neutralizzato" all'origine)
+- Contributi del lavoratore e del datore: deducibili **insieme** fino a €5.300/anno (il datore li esclude dall'imponibile in busta paga entro il plafond)
+- Contributi oltre il plafond: non dedotti, vanno comunicati al fondo entro il 31/12 dell'anno successivo (o prima della prestazione), così in uscita non sono tassati di nuovo
 
 ### Fase 2 — Rendimenti annui (fase accumulo)
 
@@ -235,17 +236,17 @@ Più opzioni = rendita base più bassa.
 
 ## Heuristic per la skill
 
-1. **Identificare il fondo più adatto**: se Eugenio (developer in tlc/IT) ha accesso a un fondo negoziale di categoria (Telemaco per TLC, Cometa per metalmeccanici, oppure un fondo aziendale specifico), quello è quasi sempre la scelta. PIP solo se nessuna alternativa praticabile.
+1. **Identificare il fondo più adatto**: se l'utente ha accesso a un fondo negoziale di categoria (es. Cometa per i metalmeccanici, Telemaco per le telecomunicazioni, oppure un fondo aziendale specifico), quello è quasi sempre la scelta. PIP solo se nessuna alternativa praticabile.
 
-2. **Massimizzare il contributo datore**: se il CCNL prevede contributo datore (es. 1,5% RAL Telemaco), l'utente DEVE versare il contributo minimo (es. 1% RAL) per attivarlo. Non farlo è perdita netta.
+2. **Massimizzare il contributo datore**: se il CCNL prevede contributo datore (es. 1,5% della RAL), l'utente DEVE versare il contributo minimo (es. 1% RAL) per attivarlo. Non farlo è perdita netta.
 
-3. **Massimizzare il deducibile**: se il contributo TFR + lavoratore + datore non raggiunge i €5.300, l'utente può/dovrebbe aggiungere fino a saturare il plafond (€5.300 totali considerando solo TFR conferito e contributo lavoratore — datore e TFR contano ai fini deducibilità del lavoratore... no, attenzione: solo il contributo *volontario lavoratore* deduce. TFR conferito non deduce — è già defiscalizzato in altro modo).
+3. **Massimizzare il deducibile**: contributi del lavoratore (dovuti e volontari) e del datore concorrono insieme al plafond di €5.300; il TFR conferito no. Se insieme non lo saturano, l'utente può aggiungere versamenti volontari fino a saturarlo.
 
-   Quindi formula corretta: `deduzione_anno = min(5300, contributo_volontario_lavoratore)`. TFR e contributo datore non riducono il plafond, ma neanche aggiungono al deducibile.
+   Formula: `deduzione_anno = min(5300, contributo_lavoratore + contributo_datore)`; lo spazio per i volontari è `max(0, 5300 − contributo_datore − contributo_dovuto_lavoratore)`. Quel che eccede va comunicato al fondo entro il 31/12 dell'anno successivo.
 
 4. **Comparto in funzione orizzonte**: anni alla pensione < 5 → garantito/obbligazionario; 5-15 → obbligazionario/bilanciato; 15-25 → bilanciato; >25 → bilanciato/azionario.
 
-5. **Portabilità 2026**: se Eugenio ha un PIP esistente con ISC alti (>1,5%), la riforma di luglio 2026 sblocca la possibilità di trasferimento a un negoziale. Flaggare come opportunità prioritaria nel report.
+5. **Trasferimento**: se l'utente ha un PIP con ISC alti (>1,5%) e almeno 2 anni di partecipazione, valutare il trasferimento a un negoziale (possibile anche prima del 2026) e flaggarlo come opportunità prioritaria. Dal 31/10/2026 chi lascia un negoziale conserva il contributo del datore.
 
 6. **TFR ancora in azienda**: se non conferito, segnalare con priorità alta che il conferimento di solito risparmia 15-25% sulla parte TFR al pensionamento (effetto tassazione).
 
@@ -253,3 +254,4 @@ Più opzioni = rendita base più bassa.
 
 ---
 *Dati normativi (tetto di deducibilità €5.300 (L. 199/2025), aliquote e tassazione in uscita) — Verificato: 2026-06.*
+*Plafond condiviso con il contributo del datore, comunicazione dei non dedotti (art. 8 c. 4 D.Lgs. 252/2005), trasferimento con il contributo datoriale dal 31/10/2026 e adesione automatica dal 1/7/2026 — Verificato: 2026-10.*
