@@ -8,10 +8,11 @@ Questa reference è il punto di contatto tra `it-pianificazione` (IRPEF progress
 IRPEF (progressiva)              Imposta sostitutiva (flat 26%/12,5%)
 ─────────────────────            ──────────────────────────────────
 Stipendio                        Plus/minus azioni
-Pensione                         Plus/minus ETF non armonizzati
+Pensione                         Plus/minus certificates, ETC
 Affitti (ordinaria)              Plus/minus obbligazioni
 Lavoro autonomo                  Cedole, dividendi
-                                 ETF UCITS armonizzati (no compensaz.)
+Plus ETF non armonizzati         ETF UCITS armonizzati (no compensaz.)
+  extra UE/SEE (no compensaz.)
 Deducibili:
   Fondo pensione (€5.300)         (nessuna compensazione cross-regime)
   Contributi obbligatori

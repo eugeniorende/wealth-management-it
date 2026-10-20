@@ -1,6 +1,6 @@
 # Regime dichiarativo: broker esteri, quadro RT e RW, IVAFE
 
-Tutto il resto della skill assume il regime **amministrato**, dove l'intermediario italiano fa da sostituto d'imposta: trattiene il 26% a ogni realizzo, gestisce lo zainetto, e tu non dichiari nulla. Ma chi usa un **broker estero** (Interactive Brokers, Degiro, Trade Republic, Scalable) non ha un sostituto d'imposta italiano e finisce nel regime **dichiarativo**: deve fare tutto da sé in dichiarazione. Questa reference copre quel caso — ed è importante perché cambia la logica stessa della compensazione minus/plus. Non è consulenza; per la compilazione effettiva serve un commercialista.
+Tutto il resto della skill assume il regime **amministrato**, dove l'intermediario italiano fa da sostituto d'imposta: trattiene il 26% a ogni realizzo, gestisce lo zainetto, e tu non dichiari nulla. Ma chi usa un **broker estero** senza sostituto d'imposta italiano (Interactive Brokers, Degiro) finisce nel regime **dichiarativo**: deve fare tutto da sé in dichiarazione. Trade Republic fa da sostituto d'imposta dal 30/1/2025 e Scalable Capital offre il regime amministrato in opzione dal 1/9/2026: verificare il regime attivo sul proprio conto (le cripto detenute su Trade Republic restano comunque da dichiarare). Questa reference copre quel caso — ed è importante perché cambia la logica stessa della compensazione minus/plus. Non è consulenza; per la compilazione effettiva serve un commercialista.
 
 ## I tre regimi a confronto
 
@@ -16,7 +16,7 @@ Chi è in dichiarativo ha **due adempimenti distinti**, entrambi a suo carico:
 
 **Quadro RT — le plusvalenze (l'imposta sul reddito).** Si riportano le plus e minus realizzate nell'anno, si applicano le aliquote (26% ordinaria, 12,5% sui titoli di Stato white list) e si versa l'imposta. Le minus si compensano con le plus **all'interno del quadro**, e l'eccedenza si riporta avanti **4 anni** (come in amministrato), ma è il contribuente a tenerne traccia di anno in anno nel quadro RT. Le regole sostanziali sono identiche all'amministrato — stesse aliquote, stesso coefficiente 12,5/26 per le aliquote miste (vedi `aliquote-12-5-26.md`), stessa distinzione reddito diverso / reddito di capitale (le distribuzioni degli ETF armonizzati restano reddito di capitale non compensabile, vedi `etf-trap-redditi-capitale.md`). Cambia *chi* fa il calcolo.
 
-**Quadro RW — il monitoraggio e l'imposta patrimoniale.** Le attività finanziarie detenute all'estero vanno dichiarate nel quadro RW (o quadro W del 730, identico, dal 2024) per il **monitoraggio fiscale**: obbligatorio se il valore supera **€15.000** in qualunque momento dell'anno. Sul valore si paga l'**IVAFE** (Imposta sul Valore delle Attività Finanziarie Estere), l'equivalente estero dell'imposta di bollo:
+**Quadro RW — il monitoraggio e l'imposta patrimoniale.** Le attività finanziarie detenute all'estero vanno dichiarate nel quadro RW (o quadro W del 730, dal 2024) per il **monitoraggio fiscale** (art. 4 DL 167/1990). Per titoli, ETF, fondi e cripto presso un intermediario non residente l'obbligo vale **qualunque sia l'importo**. L'esonero sotto **€15.000** riguarda solo **depositi e conti correnti** esteri il cui valore massimo complessivo nel periodo d'imposta non supera la soglia, e anche allora il quadro va compilato se è dovuta l'IVAFE. Restano fuori i titoli tenuti tramite un intermediario residente che applica ritenute o imposte sostitutive. Dal 1/1/2027 la disciplina passa all'art. 58 del testo unico adempimenti e accertamento (D.Lgs. 141/2026), con la stessa soglia e la stessa esclusione. Sul valore si paga l'**IVAFE** (Imposta sul Valore delle Attività Finanziarie Estere), l'equivalente estero dell'imposta di bollo:
 - aliquota ordinaria **0,2%** (2 per mille) sul valore di mercato al 31/12;
 - maggiorata allo **0,4%** per attività detenute in Paesi **black list** (paradisi fiscali, DM 4.5.1999; la Svizzera è esclusa dal 2024);
 - conti correnti esteri: imposta fissa **€34,20** se la giacenza media supera €5.000 (sotto, esente).
@@ -42,7 +42,7 @@ A sfavore: l'**onere dichiarativo** (calcolo di plus/minus operazione per operaz
 
 ## Cripto e quadro RW
 
-Le cripto seguono la stessa logica di monitoraggio: se detenute su exchange esteri o su wallet personali (non presso un intermediario italiano che applichi il bollo), vanno nel **quadro RW** e scontano l'**imposta sul valore delle cripto-attività** (ICA/IVCA), anch'essa **0,2%**, mutuamente esclusiva col bollo. Le plusvalenze cripto restano un compartimento separato a sé (33% dal 2026, vedi `criptovalute.md`): il dichiarativo non le fa compensare con azioni o ETF, neanche a zainetto unificato. Il ravvedimento per RW cripto omessi negli anni passati è in `criptovalute-avanzate.md`.
+Le cripto vanno nel **quadro RW** qualunque sia l'importo, perché l'art. 4 DL 167/1990 le nomina espressamente e la soglia di €15.000 vale solo per i conti: se detenute su exchange esteri o su wallet personali (non presso un intermediario italiano che applichi il bollo), si dichiarano e scontano l'**imposta sul valore delle cripto-attività** (ICA/IVCA), anch'essa **0,2%**, mutuamente esclusiva col bollo. Le plusvalenze cripto restano un compartimento separato a sé (33% dal 2026, vedi `criptovalute.md`): il dichiarativo non le fa compensare con azioni o ETF, neanche a zainetto unificato. Il ravvedimento per RW cripto omessi negli anni passati è in `criptovalute-avanzate.md`.
 
 ## In sintesi
 
@@ -50,3 +50,4 @@ Il dichiarativo è il regime di chi usa broker esteri, e il suo vantaggio fiscal
 
 ---
 *Dati normativi (regole del regime dichiarativo e zainetto fiscale) — Verificato: 2026-06.*
+*Quadro RW: obbligo per titoli e cripto senza soglia, esonero dei soli conti fino a €15.000, IVAFE e sanzioni (art. 4-5 DL 167/1990, istruzioni Redditi PF 2026 e 730/2026) — Verificato: 2026-10.*

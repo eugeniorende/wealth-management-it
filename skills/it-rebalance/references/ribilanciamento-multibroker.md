@@ -13,7 +13,7 @@ Questo è già noto come anti-pattern ("lo zainetto è per-intermediario"), ma h
 Quando per ribilanciare devi ridurre una classe sovrappesata e sei costretto a realizzare plusvalenze (Leva 4), due dimensioni determinano il costo:
 
 1. **Il broker.** Una plusvalenza va realizzata, quando possibile, presso il broker che ha **zainetto capiente**, così la compensazione la azzera. Realizzare la stessa plus presso un broker senza zainetto la lascia tassata al 26%.
-2. **Il tipo fiscale dello strumento.** Lo zainetto compensa solo i **redditi diversi** (azioni dirette, ETF non armonizzati). Le plusvalenze su **ETF UCITS armonizzati** sono **reddito di capitale** e **non sono mai compensabili**, nemmeno se c'è zainetto sullo stesso broker. Quindi tra due posizioni della stessa classe sovrappesata, quella "diverso" presso un broker con zainetto è fiscalmente molto più economica da vendere di quella "capitale".
+2. **Il tipo fiscale dello strumento.** Lo zainetto compensa solo i **redditi diversi** (azioni dirette, certificates, ETC). Le plusvalenze su **ETF e fondi**, armonizzati UCITS e non armonizzati, sono **reddito di capitale** e **non sono mai compensabili**, nemmeno se c'è zainetto sullo stesso broker. Quindi tra due posizioni della stessa classe sovrappesata, quella "diverso" presso un broker con zainetto è fiscalmente molto più economica da vendere di quella "capitale".
 
 La combinazione delle due dà la regola di priorità per le vendite di Leva 4:
 
