@@ -136,6 +136,10 @@ POLICY_RIBILANCIAMENTO = [
      "Niente ribilanciamenti \u201ca calendario\u201d fini a sé stessi."),
 ]
 
+# Verificato: 2026-10 — plus ETF/fondi = redditi di capitale (art. 44 c. 1 lett. g TUIR; circ. 33/E/2011),
+# aliquote 26%/12,5% (art. 3 DL 66/2014), fondo pensione 20%/12,5% (art. 17 D.Lgs. 252/2005; L. 190/2014
+# c. 622), riporto delle minus 4 anni (art. 68 c. 5 TUIR), comunicazione dei non dedotti (art. 8 c. 4
+# D.Lgs. 252/2005). Non verificata su fonte primaria la compensabilità dei certificati.
 POLICY_FISCALITA = [
     ("**La \u201ctrappola degli ETF\u201d.** In Italia le plusvalenze da ETF e fondi sono redditi di "
      "capitale: NON compensabili con le minusvalenze dello zainetto fiscale. Le minusvalenze "
@@ -144,12 +148,13 @@ POLICY_FISCALITA = [
     ("**Aliquote.** 26% sulla generalità delle rendite finanziarie; 12,5% sui titoli di Stato "
      "italiani e white-list."),
     ("**Asset location.** Il fondo pensione tassa i rendimenti al 20% (12,5% sulla quota in titoli "
-     "di Stato) ed è illiquido fino alla pensione: è il contenitore della crescita di lunghissimo "
-     "periodo. Il conto titoli ospita i secchielli investibili."),
+     "di Stato) ed è poco liquido fino alla pensione, salvo anticipazioni e riscatti: è il contenitore "
+     "della crescita di lunghissimo periodo. Il conto titoli ospita i secchielli investibili."),
     ("**Zainetto.** Le minusvalenze scadono (anno di realizzo + 4): coordinare plus e minus nello "
      "stesso anno fiscale."),
-    ("**Fondo pensione.** Entro il 31/12 comunicare al fondo i contributi non dedotti dell'anno "
-     "precedente: senza comunicazione, in uscita sono tassati come se fossero stati dedotti."),
+    ("**Fondo pensione.** Entro il 31/12 dell'anno successivo al versamento (o prima, se nel "
+     "frattempo matura il diritto alla prestazione) comunicare al fondo i contributi non dedotti: "
+     "senza comunicazione, in uscita sono tassati come se fossero stati dedotti."),
 ]
 
 POLICY_GUARDRAIL = [

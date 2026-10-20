@@ -37,7 +37,7 @@ Per le scelte concrete di portafoglio e per una valutazione personalizzata, la s
 - ❌ Non raccomanda strumenti finanziari specifici
 - ❌ Non gestisce il ribilanciamento nel tempo (quello è `it-rebalance`)
 - ❌ Non fa la pianificazione pensionistica dettagliata (quella è `it-pianificazione`: il fondo pensione è un veicolo dedicato con fiscalità propria)
-- ❌ Non fa Monte Carlo (proiezione deterministica con rendimenti attesi)
+- ❌ Non fa previsioni puntuali: il Monte Carlo (`assets/montecarlo-obiettivi.py`) dà probabilità e distribuzioni sotto ipotesi dichiarate, non garanzie
 
 ## Il framework goals-based
 

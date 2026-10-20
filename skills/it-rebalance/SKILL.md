@@ -76,8 +76,10 @@ Quando si vende per ribilanciare:
 
 Ogni vendita/acquisto di ribilanciamento comporta:
 - **Commissioni di negoziazione** (variabili per broker)
-- **Tobin tax** solo su acquisti di **azioni italiane > €500M cap**: 0,20% su mercato regolamentato (raddoppiata dal 2026). **ETF, fondi, obbligazioni sono esenti** → per portafogli in ETF la Tobin tax sul ribilanciamento è zero.
+- **Tobin tax** a carico dell'acquirente di **azioni di società italiane**: **0,4%** fuori mercato, **0,2%** su mercati regolamentati e MTF (aliquote raddoppiate dal 1/1/2026, L. 199/2025); escluse le azioni quotate di società con capitalizzazione media **< €500M**. **ETF, fondi (OICR, comprese le SICAV) e obbligazioni sono esclusi** (DM 21/02/2013, artt. 2 e 15) → per portafogli in ETF la Tobin tax sul ribilanciamento è zero.
 - **Imposta di bollo**: 0,2% annuo sul controvalore al 31/12, indipendente dal ribilanciamento (ma vendite di fine anno riducono marginalmente la base)
+
+*Imposta sulle transazioni finanziarie 2026 (art. 1 c. 491-494 L. 228/2012, mod. L. 199/2025 c. 29-31; esclusione di OICR e obbligazioni, DM 21/02/2013) — Verificato: 2026-10. Dal 2027 la disciplina passa agli artt. 42 ss. del D.Lgs. 174/2024.*
 
 Per un portafoglio tipico in ETF UCITS, il costo di transazione del ribilanciamento è essenzialmente solo le commissioni del broker.
 
