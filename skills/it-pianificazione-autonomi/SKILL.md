@@ -1,6 +1,6 @@
 ---
 name: it-pianificazione-autonomi
-description: Pianificazione pensionistica per lavoratori autonomi e partite IVA italiane (regime forfettario e ordinario), iscritti alla Gestione Separata INPS o a casse professionali. Usa questa skill quando l'utente è un libero professionista, freelance, consulente, sviluppatore software con P.IVA, partita IVA forfettaria, autonomo senza cassa, o un professionista iscritto a un albo con cassa (ingegnere/architetto in Inarcassa, avvocato in Cassa Forense, medico in ENPAM, commercialista in CNPADC, psicologo in ENPAP, geometra in CIPAG, ecc.), e parla di: pensione da autonomo, Gestione Separata INPS, casse professionali, contributo soggettivo e integrativo, contributi minimi e massimale, deducibilità dei contributi cassa (anche in forfettario), contributi previdenziali partita IVA, coefficiente di redditività, imposta sostitutiva 15% o 5%, deducibilità contributi forfettario, fondo pensione per autonomi, "conviene il fondo pensione se sono forfettario?", quanto prenderò di pensione da freelance o da professionista, gap previdenziale autonomi. Trigger anche su confronto regime forfettario vs ordinario ai fini previdenziali. ATTENZIONE: per i forfettari il contributo volontario al fondo pensione NON è deducibile (regime sostitutivo, non IRPEF), mentre il contributo obbligatorio alla cassa o alla Gestione Separata SÌ — questo inverte la logica valida per i dipendenti. NON copre dipendenti privati (skill `it-pianificazione`) né dipendenti pubblici. NON sostituisce un commercialista o consulente previdenziale abilitato.
+description: Pianificazione pensionistica per lavoratori autonomi e partite IVA italiane (regime forfettario e ordinario), iscritti alla Gestione Separata INPS o a casse professionali. Usa questa skill quando l'utente è un libero professionista, freelance, consulente, sviluppatore software con P.IVA, partita IVA forfettaria, autonomo senza cassa, o un professionista iscritto a un albo con cassa (ingegnere/architetto in Inarcassa, avvocato in Cassa Forense, medico in ENPAM, commercialista in CNPADC, psicologo in ENPAP, geometra in CIPAG, ecc.), e parla di: pensione da autonomo, Gestione Separata INPS, casse professionali, contributo soggettivo e integrativo, contributi minimi e massimale, deducibilità dei contributi cassa (anche in forfettario), contributi previdenziali partita IVA, coefficiente di redditività, imposta sostitutiva 15% o 5%, deducibilità contributi forfettario, fondo pensione per autonomi, "conviene il fondo pensione se sono forfettario?", quanto prenderò di pensione da freelance o da professionista, gap previdenziale autonomi. Trigger anche su confronto regime forfettario vs ordinario ai fini previdenziali. ATTENZIONE: per i forfettari il contributo volontario al fondo pensione NON è deducibile (regime sostitutivo, non IRPEF), mentre il contributo obbligatorio alla cassa o alla Gestione Separata SÌ — questo inverte la logica valida per i dipendenti. NON copre dipendenti privati (skill `it-pianificazione`), dipendenti pubblici, né artigiani e commercianti iscritti alle gestioni IVS INPS (contributi fissi sul minimale e aliquote proprie). NON sostituisce un commercialista o consulente previdenziale abilitato.
 ---
 
 # it-pianificazione-autonomi
@@ -39,6 +39,7 @@ Fonte: Modello Redditi PF 2026, quadro LM — i contributi versati volontariamen
 **Cosa NON fa:**
 - ❌ Non copre lavoratori dipendenti privati → usa `it-pianificazione`
 - ❌ Non copre dipendenti pubblici
+- ❌ Non copre **artigiani e commercianti** (gestioni IVS INPS): hanno un contributo fisso sul minimale (€18.808 nel 2026), aliquote del 24% e 24,48%, riduzioni del 35% per i forfettari e del 50% per i nuovi iscritti, cioè una logica diversa dalla Gestione Separata. Se l'utente rientra lì, dirlo subito e rinviare a INPS o al commercialista. Attenzione ai coefficienti di redditività del 40% e del 62% (commercio, ristorazione, artigianato): riguardano attività di solito iscritte proprio a quelle gestioni
 - ❌ Non sostituisce il regolamento della singola cassa: dà il framework comune, i dati indicativi 2026 delle principali (Inarcassa, Cassa Forense, ENPAM, CNPADC, ENPAP, CIPAG) e le leve di pianificazione, ma coefficienti di trasformazione, riscatti, ricongiunzioni e casi particolari (STP, doppia iscrizione) vanno verificati con la cassa e un consulente
 - ❌ Non fa la dichiarazione dei redditi né il calcolo definitivo dell'imposta: stima a fini di pianificazione
 - ❌ Non sostituisce commercialista o consulente previdenziale
@@ -66,11 +67,11 @@ Per i professionisti **iscritti a un albo con cassa**: ingegneri/architetti (Ina
 
 Struttura comune a (quasi) tutte le casse — due pilastri più un piccolo contributo di maternità:
 - **Contributo soggettivo**: % sul reddito professionale netto, a carico del professionista, costruisce la pensione (montante). Ha un **minimo** dovuto anche con reddito basso/nullo e spesso un **massimale** di reddito. **È deducibile** (art. 10 TUIR), **anche in forfettario**.
-- **Contributo integrativo**: tipicamente **4%** sul volume d'affari IVA, **addebitato in fattura al cliente** (pass-through): il professionista lo incassa e lo riversa, non incide sul suo netto, e **non è deducibile** (non è un suo costo). Dal 2013 molte casse ne accreditano una quota sul montante.
+- **Contributo integrativo**: tipicamente **4%** (5% per alcune casse, come CIPAG) sul volume d'affari IVA, **addebitato in fattura al cliente** (pass-through): il professionista lo incassa e lo riversa, non incide sul suo netto, e **non è deducibile** (non è un suo costo). Dal 2013 molte casse ne accreditano una quota sul montante.
 
 ⚠️ **Il punto che si collega al forfettario**: il contributo *obbligatorio* alla cassa (soggettivo) è deducibile **anche in forfettario** (abbatte la base dell'imposta sostitutiva 5%/15%), a differenza del contributo *volontario* al fondo pensione complementare, che per il forfettario NON è deducibile. Sono due piani diversi (previdenza obbligatoria vs complementare).
 
-Aliquote 2026 (indicative): Inarcassa 14,5% soggettivo + 4% integrativo; Cassa Forense 17% (18% dal 2027) + 4%; CNPADC dal 12% al 100% (a scelta) + 4%; ENPAM Quota A fissa + Quota B proporzionale (la più complessa). Diverse casse permettono di **versare di più** (aliquota volontaria) per costruire un montante maggiore — anch'esso deducibile. Le cifre cambiano ogni anno e vanno verificate sul sito della cassa.
+Aliquote 2026 (indicative): Inarcassa 14,5% soggettivo + 4% integrativo; Cassa Forense 17% (18% dal 2027) + 4%; CNPADC dal 12% al 100% (a scelta) + 4%; ENPAM Quota A fissa per età + Quota B al 19,5% sul reddito libero-professionale (la più complessa); CIPAG 20% (22% dal 2027) + 5%. Diverse casse permettono di **versare di più** (aliquota volontaria) per costruire un montante maggiore — anch'esso deducibile. Le cifre cambiano ogni anno e vanno verificate sul sito della cassa.
 
 Per il dettaglio (le due cornici normative 509/1994 e 103/1996, la tabella delle casse principali, il calcolo contributivo con montante e coefficiente, deroghe e agevolazioni under 35, le leve di pianificazione) vedi `references/casse-professionali.md`. Per i casi specifici (coefficienti, riscatti, ricongiunzioni, STP) resta il rinvio al regolamento della cassa e a un consulente.
 
@@ -114,7 +115,7 @@ Vedi `references/fiscalita-forfettario.md` per esempi numerici completi e il con
 Raccogliere:
 
 **Profilo professionale:**
-- `tipo_cassa` — Gestione Separata / cassa professionale (quale) / artigiani-commercianti
+- `tipo_cassa` — Gestione Separata / cassa professionale (quale). Se l'utente è artigiano o commerciante (gestione IVS INPS), la skill non lo copre: vedi «Cosa NON fa»
 - `regime_fiscale` — forfettario / ordinario / forfettario 5% (primi 5 anni)
 - `codice_ateco` o tipo attività (per il coefficiente di redditività)
 - `coefficiente_redditivita` (se noto, altrimenti dedurre da attività: 78% per IT/professioni)
@@ -254,6 +255,6 @@ In quest'iterazione:
 - **Foglio Excel di proiezione dedicato agli autonomi** (`assets/proiezione-pensione-autonomi.xlsx`): aliquota 26,07%/cassa, no TFR, foglio Fiscalità con il confronto forfettario vs ordinario e la deducibilità corretta del fondo pensione
 
 Roadmap:
-- v0.4: gestione artigiani/commercianti (contributi fissi + variabili, riduzioni)
+- v0.4: gestione artigiani/commercianti (contributi fissi + variabili, riduzioni) — oggi fuori perimetro, da decidere (ROADMAP, T13)
 - v0.5: simulatore numerico del confronto forfettario vs ordinario ai fini previdenziali (oltre alla fotografia annua già nel foglio Excel)
 - Possibile: dettaglio per singola cassa con i coefficienti di trasformazione e le regole di rivalutazione specifiche (ENPAM Quota A/B, casse 103/1996)

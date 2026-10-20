@@ -71,7 +71,7 @@ Drift massimo: [classe] a [+/−]%. [entro le bande / da ribilanciare]. Se da ri
 
 ## 5. Prossima revisione
 
-Prossima revisione completa: **[mese/anno]**. Mini-revisione fiscale di fine anno: **novembre-dicembre [anno]** (per le scadenze minus e il versamento al fondo pensione entro il 31/12).
+Prossima revisione completa: **[mese/anno]**. Mini-revisione fiscale di fine anno: **novembre-dicembre [anno]** (per le scadenze minus, il versamento al fondo pensione e la comunicazione dei contributi non dedotti entro il 31/12).
 
 ---
 

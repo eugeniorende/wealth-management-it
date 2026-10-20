@@ -513,6 +513,68 @@ def t_ponte():
     assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
+@test("cruscotto TWR: con meno righe compilate le celle restano vuote, non −100%")
+def t_twr_parziale():
+    # REGRESSIONE F049 (b): le righe senza valore davano rendimento −100% e azzeravano l'indice.
+    from openpyxl import load_workbook
+    mod = ricalcolatore()
+    tmp = tempfile.mkdtemp()
+    try:
+        copia = os.path.join(tmp, "cruscotto.xlsx")
+        wb = load_workbook(asset("it-revisione", "cruscotto-patrimoniale.xlsx"))
+        ws = wb["Rendimento TWR"]
+        for r in range(11, 19):  # compilati solo i primi 5 mesi
+            for col in "ABC":
+                ws[f"{col}{r}"] = None
+        wb.save(copia)
+        (out,) = mod.ricalcola([copia], os.path.join(tmp, "out"))
+        ws = load_workbook(out, data_only=True)["Rendimento TWR"]
+        assert ws["E10"].value and ws["E10"].value > 0.5, f"indice dei mesi compilati alterato: {ws['E10'].value}"
+        for r in range(11, 19):
+            for col in "DE":
+                assert ws[f"{col}{r}"].value in (None, ""), f"{col}{r} = {ws[f'{col}{r}'].value!r} su riga vuota"
+        assert ws["B20"].value in (None, ""), f"TWR su serie incompleta: {ws['B20'].value!r}"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")
+def t_non_dedotti():
+    # REGRESSIONE F020: senza comunicazione al fondo entro il 31/12 dell'anno successivo,
+    # i contributi non dedotti vengono tassati di nuovo in uscita.
+    from openpyxl import load_workbook
+    for rel in ("skills/it-revisione/SKILL.md", "skills/it-revisione/references/metodo-revisione.md",
+                "skills/it-revisione/assets/template-revisione.md",
+                "skills/it-revisione/references/investment-policy-statement.md",
+                "skills/it-revisione/assets/genera-ips.py", "commands/revisione.md",
+                "skills/it-pianificazione-autonomi/references/fiscalita-forfettario.md"):
+        assert "non dedott" in open(os.path.join(ROOT, rel), encoding="utf-8").read(), f"{rel}: manca la comunicazione"
+    for nome, foglio, cella in (("cruscotto-patrimoniale.xlsx", "Azioni", "A2"),
+                                ("investment-policy-statement.xlsx", "IPS", "A47")):
+        testo = load_workbook(asset("it-revisione", nome))[foglio][cella].value
+        assert "non dedott" in testo, f"{nome} {foglio}!{cella}: manca la comunicazione"
+
+
+@test("autonomi: artigiani e commercianti fuori perimetro, casse CIPAG ed ENPAM aggiornate")
+def t_autonomi_perimetro():
+    # REGRESSIONE F016/F038/F009: artigiani-commercianti accettati e trattati come Gestione
+    # Separata; CIPAG integrativo al 4%; ENPAM senza aliquota di Quota B; soglie superate.
+    cartella = os.path.join(SKILLS, "it-pianificazione-autonomi")
+    skill = open(os.path.join(cartella, "SKILL.md"), encoding="utf-8").read()
+    assert "/ artigiani-commercianti" not in skill, "artigiani-commercianti ancora tra i tipi di cassa in input"
+    assert re.search(r"description:[^\n]*artigian", skill), "description senza l'esclusione di artigiani e commercianti"
+    comando = open(os.path.join(ROOT, "commands", "pensione-autonomi.md"), encoding="utf-8").read()
+    assert "artigian" in comando, "il comando non esclude artigiani e commercianti"
+    casse = open(os.path.join(cartella, "references", "casse-professionali.md"), encoding="utf-8").read()
+    cipag = next(r for r in casse.splitlines() if r.startswith("| **CIPAG**"))
+    enpam = next(r for r in casse.splitlines() if r.startswith("| **ENPAM**"))
+    assert "5%" in cipag and "Verificato: 2026-10" in cipag, f"riga CIPAG: {cipag[:120]}"
+    assert "19,5" in enpam and "Verificato: 2026-10" in enpam, f"riga ENPAM: {enpam[:120]}"
+    gs = open(os.path.join(cartella, "references", "previdenza-gestione-separata.md"), encoding="utf-8").read()
+    for superato in ("1,5× assegno sociale", "considerabile anche la rendita della complementare"):
+        assert superato not in gs, f"previdenza-gestione-separata.md: «{superato}»"
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 @test("freshness fiscale: marcatori 'Verificato: AAAA-MM' presenti (≥7) e ≤12 mesi")

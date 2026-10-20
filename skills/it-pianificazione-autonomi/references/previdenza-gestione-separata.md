@@ -67,11 +67,12 @@ Esempio: reddito €40.000/anno per 35 anni.
 ### Requisiti di accesso pensione (autonomi Gestione Separata)
 
 Gli stessi dei dipendenti contributivi puri:
-- **Vecchiaia**: 67 anni + 20 anni di contributi + importo soglia (1,5× assegno sociale)
-- **Anticipata ordinaria**: 64 anni + 20 anni di contribuzione effettiva (per i contributivi puri, con il requisito dell'importo soglia legato all'assegno sociale, e dal 2024 considerabile anche la rendita della complementare per raggiungere la soglia)
-- Adeguamenti speranza di vita dal 2027
+- **Vecchiaia**: 67 anni + 20 anni di contributi + importo soglia di 1× l'assegno sociale dal 2024 (€546,24 al mese nel 2026)
+- **Anticipata contributiva**: 64 anni + 20 anni di contribuzione effettiva + pensione ≥ 3 volte l'assegno sociale (€1.638,72 al mese nel 2026; 2,8 volte per le donne con un figlio, 2,6 con due o più)
+- **Anticipata ordinaria**: a qualunque età, con 42 anni e 10 mesi di contributi (uomini) o 41 anni e 10 mesi (donne)
+- Adeguamenti alla speranza di vita: nel 2027 vecchiaia a 67 anni e 1 mese, anticipata contributiva a 64 anni e 1 mese, anticipata ordinaria a 42 anni e 11 mesi (41 e 11 per le donne); dal 2028 67 anni e 3 mesi e 64 anni e 3 mesi (Circ. INPS 28/2026)
 
-⚠️ Per i contributivi puri (tutti gli autonomi iscritti dal 1996) l'accesso alla pensione anticipata a 64 anni richiede che la pensione maturata superi una certa soglia. La Legge 207/2024 ha previsto che si possa considerare **anche la rendita della previdenza complementare** per raggiungere gli importi soglia — un motivo in più per avere un fondo pensione, anche per chi non ha il vantaggio della deduzione.
+⚠️ Per i contributivi puri (tutti gli autonomi iscritti dal 1996) l'anticipata a 64 anni richiede che la pensione maturata superi 3 volte l'assegno sociale. La L. 207/2024 aveva permesso di contare anche la rendita della previdenza complementare per raggiungere la soglia, ma la L. 199/2025 ha abrogato questa possibilità (Circ. INPS 19/2026): non è più un argomento a favore del fondo pensione. *(Requisiti 2026-2028 — Verificato: 2026-10.)*
 
 ## Le casse professionali (cenni)
 
