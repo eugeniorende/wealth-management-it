@@ -10,7 +10,7 @@ Workflow:
 1. **Ingestion**: chiedere all'utente (se non già nel contesto):
    - Portafoglio attuale: per ogni posizione → broker, ISIN/ticker, descrizione, asset class, tipo fiscale (reddito diverso / reddito capitale), quantità, PMC (o lotti), prezzo/controvalore corrente
    - **Allocazione target** (input dell'utente, NON suggerita): peso obiettivo per asset class
-   - Soglia di tolleranza (default ±5% assoluto)
+   - Eventuali bande di tolleranza diverse dalla regola 5/25 (punto 2)
    - Nuovi versamenti disponibili (per Leva 1) e flussi attesi/dividendi (per Leva 2)
    - Fase: accumulo o decumulo
    - Zainetto fiscale disponibile per broker (per coordinamento con it-tax-optimization)
@@ -23,4 +23,4 @@ Workflow:
 
 5. **Quantificazione e output**: tabella drift, piano per leva con costo fiscale di ciascuna, impatto fiscale totale, allocazione risultante vs target, raccomandazioni.
 
-La skill NON raccomanda quale asset allocation scegliere (è input utente) e NON è consulenza di investimento. Se mancano dati essenziali (allocazione target, PMC, tipo fiscale), chiedere prima di procedere.
+La skill NON raccomanda quale asset allocation scegliere (è input utente). Disclaimer obbligatorio in fondo: non è consulenza di investimento; i CSV degli ordini sono una checklist da verificare sul portale del broker, non ordini da eseguire alla cieca. Se mancano dati essenziali (allocazione target, PMC, tipo fiscale), chiedere prima di procedere.

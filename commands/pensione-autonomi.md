@@ -22,6 +22,6 @@ Workflow:
 
 4. **Gap analysis tenore di vita**: scenari conservativo/base/ottimistico.
 
-5. **Raccomandazioni**: pattern A1-A5 (versare contributi obbligatori, valutare il fondo senza il falso mito della deduzione, sfruttare redditi IRPEF collaterali, valutare ordinario se conviene, massimizzare la complementare).
+5. **Leve da valutare**, come scenari quantificati e non come raccomandazioni personali: pattern A1-A5 (versare contributi obbligatori, valutare il fondo senza il falso mito della deduzione, sfruttare redditi IRPEF collaterali, valutare ordinario se conviene, massimizzare la complementare).
 
-Se mancano dati essenziali (ricavi, tipo cassa, regime), chiedere prima di procedere. Per casse professionali specifiche e scelta del regime, rinviare al commercialista.
+Se mancano dati essenziali (ricavi, tipo cassa, regime), chiedere prima di procedere. Per casse professionali specifiche e scelta del regime, rinviare al commercialista. Disclaimer obbligatorio in fondo: è una stima educativa, non consulenza previdenziale, fiscale o di investimento; per la scelta del regime, l'iscrizione alla gestione e i casi specifici rinviare a un commercialista o alla propria cassa.

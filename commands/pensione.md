@@ -24,8 +24,8 @@ Workflow:
 
 5. **Proiezione tenore di vita**: gap analysis tra pensione totale attesa e spesa proiettata. Identificare il gap in valore assoluto e in % del tenore desiderato.
 
-6. **Raccomandazioni d'azione**: pattern di copertura del gap (aumentare contributo, cambiare comparto, ritardare pensionamento, conferire TFR se non già fatto, risparmio non previdenziale).
+6. **Leve da valutare**: pattern di copertura del gap (aumentare contributo, cambiare comparto, ritardare pensionamento, conferire TFR se non già fatto, risparmio non previdenziale), presentati come scenari quantificati: la scelta resta all'utente.
 
 Output: report markdown strutturato + (opzionale, se richiesto) Excel di proiezione editabile con scenari conservativo/base/ottimistico.
 
-Se mancano dati essenziali, chiedere prima di procedere. Non inventare RAL o anzianità contributiva.
+Se mancano dati essenziali, chiedere prima di procedere. Non inventare RAL o anzianità contributiva. Disclaimer obbligatorio in fondo: è una stima educativa, non consulenza previdenziale, fiscale o di investimento; per adesioni, riscatti, uscite anticipate e casi specifici rinviare a un patronato o a un consulente previdenziale abilitato.
