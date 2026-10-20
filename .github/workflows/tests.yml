@@ -30,7 +30,14 @@ jobs:
           cache: pip
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
+      # LibreOffice per i test che ricalcolano gli Excel (scripts/ricalcola-excel.py).
+      - name: Installa LibreOffice Calc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libreoffice-calc
       - run: python tests/run_tests.py --skip freshness
+        env:
+          RICHIEDI_LIBREOFFICE: "1"   # in CI i test degli Excel non si saltano
 
   # Il manifest del plugin passa `claude plugin validate` (errori bloccano,
   # i warning no). Evita di scoprire un plugin.json rotto solo all'installazione.
