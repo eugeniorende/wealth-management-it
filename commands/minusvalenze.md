@@ -18,6 +18,6 @@ Workflow:
 
 4. **Calendario**: produrre timeline ordinata con scadenze critiche (zainetto in evaporazione, deadline 31/12 con T+2 settlement, eventuali cut-off broker).
 
-Output: report markdown in tre sezioni (Stato attuale / Opportunità / Calendario d'azione) + disclaimer obbligatorio in fondo.
+Output: report markdown in tre sezioni (Stato attuale / Opportunità / Calendario d'azione). Disclaimer obbligatorio in fondo: non è consulenza fiscale; prima di operare verificare saldi e zainetto sul portale del broker, e per i casi specifici rinviare a un commercialista.
 
 Se mancano dati essenziali, chiedere prima di procedere. Non inventare numeri.

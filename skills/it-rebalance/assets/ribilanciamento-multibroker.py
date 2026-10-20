@@ -209,6 +209,10 @@ def pianifica():
 
 CAMPI_CSV = ["broker", "operazione", "classe", "tipo_fiscale", "strumento_ISIN",
              "importo_eur", "plus_minus_eur", "imposta_eur", "compensazione_zainetto_eur", "nota"]
+# Ultima riga di ogni CSV: chi apre il file vede il disclaimer, e l'intestazione resta la prima riga.
+NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non costituisce consulenza "
+            "di investimento né un ordine. Verificare saldi, lotti e zainetto sul portale del broker "
+            "prima di operare.")
 
 
 def genera_ordini(plan):
@@ -257,14 +261,14 @@ def genera_ordini(plan):
             ordini.append({"broker": broker, "operazione": "ACQUISTO", "classe": cl,
                            "tipo_fiscale": "", "importo_eur": round(quota, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "",
-                           "nota": f"riempe sottopeso {cl}"})
+                           "nota": f"riempie sottopeso {cl}"})
             cassa[broker] -= quota
             rimanente -= quota
         if rimanente > 1e-6:   # cassa insufficiente ovunque: serve un versamento/trasferimento
             ordini.append({"broker": "(da finanziare)", "operazione": "ACQUISTO", "classe": cl,
                            "tipo_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "",
-                           "nota": f"riempe sottopeso {cl} — cassa insufficiente, richiede versamento o trasferimento"})
+                           "nota": f"riempie sottopeso {cl} — cassa insufficiente, richiede versamento o trasferimento"})
     return ordini
 
 
@@ -284,6 +288,7 @@ def scrivi_csv_per_broker(ordini, cartella=None):
                 row = dict(o)
                 row.setdefault("strumento_ISIN", "")   # colonna da compilare a mano
                 w.writerow(row)
+            w.writerow({"broker": b, "operazione": "NOTA", "nota": NOTA_CSV})
         scritti.append((path, len(righe)))
     return scritti
 
@@ -333,8 +338,14 @@ def stampa(plan):
 def main():
     plan = pianifica()
     stampa(plan)
-    if not GENERA_CSV:
-        return
+    if GENERA_CSV:
+        esporta_ordini(plan)
+    print("   Questo strumento è educativo e non costituisce consulenza di investimento o fiscale:")
+    print("   l'allocazione target è tua; saldi, lotti e zainetto vanno verificati sul portale del broker.")
+    print()
+
+
+def esporta_ordini(plan):
     ordini = genera_ordini(plan)
     scritti = scrivi_csv_per_broker(ordini)
     print(f"5) ORDINI ESPORTATI — un CSV per broker in ./{CARTELLA_OUTPUT}/")

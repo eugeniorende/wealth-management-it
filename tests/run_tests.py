@@ -367,6 +367,35 @@ def t_smoke_altri():
     assert rc == 0 and ("ETF" in out or "BTP" in out), "importatore broker: " + out[-200:]
 
 
+@test("postura: ogni comando chiede in fondo il disclaimer «non è consulenza»")
+def t_disclaimer_comandi():
+    cartella = os.path.join(ROOT, "commands")
+    for nome in sorted(os.listdir(cartella)):
+        testo = open(os.path.join(cartella, nome), encoding="utf-8").read()
+        assert re.search(r"[Dd]isclaimer obbligatorio[^:\n]*:[^\n]*consulenza", testo), \
+            f"commands/{nome}: manca «Disclaimer obbligatorio …: … consulenza …»"
+
+
+@test("ribilanciamento: CSV degli ordini e stdout portano il disclaimer, intestazione invariata")
+def t_disclaimer_csv():
+    import csv
+    import glob
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(asset("it-rebalance", "ribilanciamento-multibroker.py"), cwd=tmp)
+        assert rc == 0, out[-300:]
+        assert "non costituisce consulenza" in out, "stdout senza disclaimer"
+        files = glob.glob(os.path.join(tmp, "ordini", "ordini_*.csv"))
+        assert files, "nessun CSV degli ordini"
+        for path in files:
+            with open(path, encoding="utf-8", newline="") as f:
+                righe = list(csv.DictReader(f))
+            assert righe and righe[-1]["operazione"] == "NOTA", f"{os.path.basename(path)}: manca la riga NOTA finale"
+            assert "non costituisce consulenza" in righe[-1]["nota"], f"{os.path.basename(path)}: nota senza disclaimer"
+            assert all(r["operazione"] in ("VENDITA", "ACQUISTO") for r in righe[:-1]), "righe d'ordine alterate"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
 # ══════════════════════ motore bootstrap condiviso ══════════════════════
 
 @test("sincronia: motore_bootstrap.py e rendimenti-storici.csv identici tra le due skill")
