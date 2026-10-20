@@ -226,6 +226,24 @@ def t_mc_pensione():
     assert dev < 0.20, f"mediana devia dal deterministico del {dev:.0%} (>20%)"
 
 
+@test("serie storica: gli script la trovano anche lanciati dalla cartella di lavoro dell'utente")
+def t_cwd_esterna():
+    # REGRESSIONE F005: ponte e montecarlo-pensione aprivano rendimenti-storici.csv
+    # rispetto alla cwd e andavano in FileNotFoundError fuori da assets/.
+    tmp = tempfile.mkdtemp()
+    try:
+        for skill, nome, *args in (("it-pianificazione", "ponte-pensione.py"),
+                                   ("it-pianificazione", "montecarlo-pensione.py"),
+                                   ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py",
+                                    "--set", "MODELLO=bootstrap"),
+                                   ("it-pianificazione-obiettivi", "decumulo-obiettivi.py")):
+            rc, out = run_script(asset(skill, nome), *args, cwd=tmp)
+            assert rc == 0, f"{nome} da una cartella esterna: {out[-300:]}"
+            assert "serie storica non trovata" not in out, f"{nome}: serie storica non trovata"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════
 
 def _excel_test(obiettivi):
@@ -286,6 +304,52 @@ def t_mc_obiettivi():
     assert rc == 0, out[-400:]
     probs = [float(p) for p in re.findall(r"(\d+(?:[.,]\d+)?)\s*%", out.replace(",", "."))]
     assert probs and max(probs) > 85, f"nessuna probabilità alta trovata (max {max(probs) if probs else '—'})"
+
+
+def _sezioni_obiettivi(out):
+    """{nome: (anni, priorità, testo della sezione)} dall'output di montecarlo-obiettivi."""
+    sezioni = {}
+    for m in re.finditer(r"▸ (.+?)  \[[^,]+, (\d+) anni, priorità: ([^\]]*)\]\n(.*?)(?=\n▸ |\n={10,})", out, re.S):
+        sezioni[m.group(1)] = (int(m.group(2)), m.group(3).strip().lower(), m.group(4))
+    return sezioni
+
+
+@test("montecarlo-obiettivi: la leva di rischio è un'OPZIONE solo per i desiderabili oltre la finestra di de-risking")
+def t_leva_rischio():
+    # REGRESSIONE F017: sui default proponeva ~95% azionario per l'anticipo casa a 6 anni.
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"))
+    assert rc == 0, out[-400:]
+    sezioni = _sezioni_obiettivi(out)
+    assert "Anticipo casa" in sezioni, f"obiettivo d'esempio non trovato: {list(sezioni)}"
+    assert "INADATTA" in sezioni["Anticipo casa"][2], "anticipo casa a 6 anni: la leva deve essere INADATTA"
+    for nome, (anni, prio, testo) in sezioni.items():
+        if anni <= 7 or not prio.startswith("desider"):
+            assert "OPZIONE:" not in testo, f"{nome} ({anni} anni, {prio}): OPZIONE fuori dal gate"
+    # il gate non spegne la leva: un desiderabile lungo e sotto-finanziato la riceve ancora
+    xlsx = _excel_test([("Barca", 400000, 20, "Moderato", 0, "desiderabile", "terminante")])
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), xlsx)
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    assert rc == 0, out[-400:]
+    assert "OPZIONE:" in _sezioni_obiettivi(out)["Barca"][2], "desiderabile a 20 anni: OPZIONE attesa"
+
+
+@test("decumulo-obiettivi: il bootstrap a blocchi campiona ogni anno della serie, ultimo compreso")
+def t_decumulo_indici():
+    # REGRESSIONE F029: start = integers(0, n - BLOCCO) escludeva l'ultimo anno (2025).
+    import numpy as np
+    cartella = os.path.join(SKILLS, "it-pianificazione-obiettivi", "assets")
+    sys.path.insert(0, cartella)
+    try:
+        mod = carica_modulo(os.path.join(cartella, "decumulo-obiettivi.py"))
+    finally:
+        sys.path.remove(cartella)
+    n = 98
+    rng = np.random.default_rng(0)
+    visti = np.zeros(n, dtype=int)
+    for _ in range(3000):
+        for i in mod.percorso_bootstrap(np.arange(n, dtype=float), rng):
+            visti[int(i)] += 1
+    assert visti.min() > 0, f"anni mai campionati: {np.flatnonzero(visti == 0).tolist()}"
 
 
 @test("smoke: decumulo, asset-location, ribilanciamento, importa-estratto-broker girano")
@@ -360,6 +424,31 @@ def t_genera_ips():
     assert m and abs(int(m.group(1)) - 28) <= 1, "nota di rischio non calibrata sull'allocazione"
 
 
+@test("genera-ips: quota azionaria sommata su tutte le classi, mese in italiano in copertina")
+def t_ips_quota():
+    # REGRESSIONE F060: contava solo la prima classe che inizia per "azion" e scriveva il mese in inglese.
+    from docx import Document
+    mod = carica_modulo(asset("it-revisione", "genera-ips.py"))
+    mesi = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
+            "agosto", "settembre", "ottobre", "novembre", "dicembre")
+    tmp = tempfile.mkdtemp()
+    try:
+        for allocazione, attesa in (
+                ([("Azionario sviluppati", 45_000, 45.0), ("Azionario emergenti", 11_700, 11.7),
+                  ("Obbligazionario", 31_300, 31.3), ("Liquidità", 12_000, 12.0)], 57),
+                ([("ETF azionario globale", 60_000, 60.0), ("Obbligazioni", 40_000, 40.0)], 60)):
+            out = os.path.join(tmp, "ips.docx")
+            mod.genera({"allocazione": allocazione, "capitale": 100_000,
+                        "obiettivi": [o[:4] + (100_000 * o[4] / mod.DATI["capitale"],) + o[5:]
+                                      for o in mod.DATI["obiettivi"]]}, out)
+            testo = "\n".join(p.text for p in Document(out).paragraphs)
+            m = re.search(r"allocazione al (\d+)% azionario", testo)
+            assert m and int(m.group(1)) == attesa, f"quota azionaria {m.group(1) if m else '—'}%, attesa {attesa}%"
+        assert any(f"{mese.capitalize()} " in testo for mese in mesi), "mese della copertina non in italiano"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════════ fiscalità e tracker ══════════════════════
 
 @test("netto-pensione: IRPEF 2026, detrazioni e aliquota rendita FP (valori chiusi)")
@@ -415,6 +504,13 @@ def t_ponte():
     # e il capitale necessario per confidenza è monotono nel senso giusto: con RITA
     # ordinaria (5 anni) e capitale 0, la probabilità NON può essere 100
     assert prob("--set", "CAPITALE_PONTE=0.0", "--set", "ANNI_MAX_RITA=5") < 100.0
+    # REGRESSIONE F056: rendimento reale del fondo a zero → ZeroDivisionError. A r = 0 i
+    # versamenti mancati valgono versamento × anni (annuità lineare).
+    rc, out = run_script(sc, "--set", "RENDIMENTO_FP_REALE=0.0", "--set", "VERSAMENTO_FP_ANNUO=1000.0",
+                         "--set", "COEFF_TRASFORMAZIONE=0.05")
+    assert rc == 0, out[-300:]
+    anni = int(re.search(r"\((\d+) anni di contributi in meno", out).group(1))
+    assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
 # ══════════════════════ freshness · json · guardia ══════════════════════

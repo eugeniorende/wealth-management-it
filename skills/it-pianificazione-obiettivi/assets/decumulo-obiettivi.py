@@ -83,7 +83,7 @@ def percorso_bootstrap(returns, rng):
     n = len(returns)
     path = []
     while len(path) < ORIZZONTE_ANNI:
-        start = rng.integers(0, max(1, n - BLOCCO_BOOTSTRAP))
+        start = rng.integers(0, max(1, n - BLOCCO_BOOTSTRAP + 1))  # estremo escluso: l'ultimo blocco compreso
         path.extend(returns[start:start + BLOCCO_BOOTSTRAP].tolist())
     return path[:ORIZZONTE_ANNI]
 

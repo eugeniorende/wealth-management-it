@@ -83,7 +83,8 @@ C'è anche un punto controintuitivo: la relazione **non è monotòna**. Oltre un
 
 Quando la leva ha senso e quando no, lo strumento lo segnala:
 - **Inadatta** per un obiettivo **essenziale**: mancare ciò che non puoi permetterti di mancare non è un'opzione, e più rischio allarga proprio quella coda. Meglio versare di più o ridurre il target.
-- **Inadatta** su **orizzonte breve**: su pochi anni la volatilità domina il rendimento atteso, quindi più rischio è quasi solo downside.
+- **Inadatta** per un obiettivo **importante**: la leva è riservata ai desiderabili, dove mancare il target ha un costo che si può reggere.
+- **Inadatta** **entro la finestra di de-risking** (`FINESTRA_DERISK`, 7 anni come in `glidepath-obiettivi.py`): in quegli anni il glide path porta la quota azionaria verso l'atterraggio, quindi alzarla contraddirebbe il piano; e su pochi anni la volatilità domina il rendimento atteso, quindi più rischio è quasi solo downside.
 - **Controproducente** se sei **già in linea** (probabilità alta): aggiungi un downside che non ti serve — "quando hai vinto la partita, smetti di giocare" (Bernstein).
 - **Opzione reale** solo se sei **sotto-finanziato, con orizzonte lungo, su un obiettivo discrezionale**: lì il maggior rendimento atteso ha il tempo di dominare, e l'aumento di probabilità è significativo. Anche allora, lo strumento mostra di quanto peggiora il caso brutto, e lascia la scelta a chi quel downside lo deve reggere.
 

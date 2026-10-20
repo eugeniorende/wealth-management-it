@@ -49,10 +49,10 @@ Prese il 20/10/2026.
   - [ ] **F016 (testo) e F038.** Artigiani e commercianti dichiarati fuori perimetro; righe CIPAG ed ENPAM corrette.
   - [ ] **F020.** Comunicazione al fondo dei contributi non dedotti in tutte le superfici «Scadenza».
   - [ ] **F036 (a)-(d).** Reference cripto: pena, ravvedimento, amministrato dal 2023, Trade Republic.
-  - [ ] **F017.** Gate della OPZIONE legato a `FINESTRA_DERISK` e alla priorità «discrezionale», con test.
-  - [ ] **F005 e F056 (parte).** `rendimenti-storici.csv` ancorato a `__file__`; `RENDIMENTO_FP_REALE=0` gestito in ponte-pensione.
-  - [ ] **F029.** Off-by-one del bootstrap in decumulo-obiettivi.
-  - [ ] **F060 (b) e F049 (b).** Quota azionaria su tutte le classi in genera-ips; celle TWR vuote invece di −100%.
+  - [x] **F017.** Gate della OPZIONE legato a `FINESTRA_DERISK` e alla priorità «discrezionale», con test.
+  - [x] **F005 e F056 (parte).** `rendimenti-storici.csv` ancorato a `__file__`; `RENDIMENTO_FP_REALE=0` gestito in ponte-pensione.
+  - [x] **F029.** Off-by-one del bootstrap in decumulo-obiettivi.
+  - [ ] **F060 (b) e F049 (b).** Quota azionaria su tutte le classi in genera-ips; celle TWR vuote invece di −100%. F060 (a, b) fatto, con il mese in italiano; F049 (b) resta, sul cruscotto.
   - [ ] **F025 e riga comune:**
     - «Cosa il plugin NON fa» riscritto;
     - `/revisione` tra i comandi;

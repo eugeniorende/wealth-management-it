@@ -45,10 +45,11 @@ SEED = 42                  # per risultati riproducibili (rimuovere per casualit
 # È la "seconda strada" quando non si può versare di più. NON è un pasto gratis: più rischio
 # alza la mediana ma allarga la distribuzione, e il caso brutto (10°pct) può PEGGIORARE. Per
 # questo si mostra la distribuzione intera, non solo la probabilità, e si segnala quando la leva
-# è controproducente (obiettivo già in linea) o inadatta (essenziale o a breve termine).
+# è controproducente (obiettivo già in linea) o inadatta: obiettivo non desiderabile (essenziale o
+# importante) oppure dentro la finestra di de-risking, dove il glide path abbassa la quota azionaria.
 LEVA_RISCHIO    = True
 SOGLIA_ONTRACK  = 0.75     # prob col profilo attuale ≥ questa ⇒ alzare il rischio è controproducente
-ORIZZONTE_BREVE = 4        # orizzonte (anni) sotto cui alzare il rischio è inadatto (vince la volatilità)
+FINESTRA_DERISK = 7        # come glidepath-obiettivi.py: entro questi anni dalla scadenza il rischio scende
 
 # ---- Modello dei rendimenti ----
 MODELLO = "normale"        # "normale" (Normale i.i.d.) | "bootstrap" (ricampiona da serie storica reale)
@@ -332,15 +333,19 @@ def main():
         # ── Seconda strada: alzare il rischio invece del versamento (a versamento bloccato) ──
         if LEVA_RISCHIO:
             essenziale = "essenz" in g["priorita"].lower()
-            breve = g["orizzonte"] <= ORIZZONTE_BREVE
+            desiderabile = any(k in g["priorita"].lower() for k in ("desider", "discrez"))
+            breve = g["orizzonte"] <= FINESTRA_DERISK
             ontrack = p_succ >= SOGLIA_ONTRACK
             print(f"    — Seconda strada: alzare il rischio invece di versare di più (versamento fermo a {euro(pmt_det)}/mese) —")
             if essenziale:
                 print(f"        INADATTA per un obiettivo essenziale: più rischio allarga proprio la coda")
                 print(f"        sinistra, e mancare un essenziale non è un'opzione. Meglio versare di più o ridurre il target.")
+            elif not desiderabile:
+                print(f"        INADATTA per un obiettivo «{g['priorita']}»: la leva di rischio è un'opzione solo per")
+                print(f"        gli obiettivi desiderabili. Meglio versare di più, allungare l'orizzonte o ridurre il target.")
             elif breve:
-                print(f"        INADATTA su orizzonte di {g['orizzonte']} anni: troppo corto. Su orizzonti brevi")
-                print(f"        la volatilità domina sul rendimento atteso — più rischio aggiunge soprattutto downside.")
+                print(f"        INADATTA su orizzonte di {g['orizzonte']} anni: entro la finestra di de-risking")
+                print(f"        ({FINESTRA_DERISK} anni) la quota azionaria deve scendere verso la scadenza, non salire.")
             elif ontrack:
                 print(f"        CONTROPRODUCENTE: sei già in linea (prob {p_succ*100:.0f}%). Alzare il rischio")
                 print(f"        aggiunge un downside che non ti serve — quando hai (quasi) vinto, non rilanci.")
