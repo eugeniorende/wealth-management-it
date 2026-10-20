@@ -15,7 +15,7 @@ Due cornici normative:
 Quasi tutte le casse hanno la stessa struttura a due componenti (più un piccolo contributo di maternità/paternità fisso):
 
 1. **Contributo soggettivo** — è il contributo previdenziale vero e proprio, **a carico del professionista**, calcolato in percentuale sul **reddito professionale netto**. È quello che costruisce la pensione (alimenta il montante contributivo). Esiste sempre un **minimo** dovuto anche con reddito basso o nullo, e spesso un **massimale** di reddito oltre il quale l'aliquota piena non si applica.
-2. **Contributo integrativo** — una percentuale (tipicamente **4%**) applicata sul **volume d'affari IVA** e **addebitata in fattura al cliente** (la riga "cassa 4%" che si vede nelle parcelle). È un *pass-through*: il professionista lo incassa dal cliente e lo riversa alla cassa, quindi non incide sul suo netto. Storicamente finanziava la solidarietà/assistenza; dal 2013 molte casse ne accreditano **una quota sul montante individuale** del professionista (es. CNPADC riconosce il 37,5% dell'integrativo dal 2023).
+2. **Contributo integrativo** — una percentuale (tipicamente **4%**, 5% per alcune casse come CIPAG) applicata sul **volume d'affari IVA** e **addebitata in fattura al cliente** (la riga "cassa 4%" che si vede nelle parcelle). È un *pass-through*: il professionista lo incassa dal cliente e lo riversa alla cassa, quindi non incide sul suo netto. Storicamente finanziava la solidarietà/assistenza; dal 2013 molte casse ne accreditano **una quota sul montante individuale** del professionista (es. CNPADC riconosce il 37,5% dell'integrativo dal 2023).
 
 ## La deducibilità (il punto che conta per il forfettario)
 
@@ -44,10 +44,10 @@ Per chi ha anzianità nelle casse 509/1994 c'è una quota **retributiva** (pensi
 |---|---|---|---|---|
 | **Inarcassa** | ingegneri, architetti | 14,5% fino a ~€145.550 | 4% sul volume d'affari (min. ~€850) | + facoltativo modulare 1-8,5%; min. soggettivo ~€2.800 |
 | **Cassa Forense** | avvocati | **17% (2026)**, 18% dal 2027, fino a ~€130.000; 3% oltre | 4% (min. ~€355) | + volontario 1-10%; min. soggettivo ~€2.790 |
-| **ENPAM** | medici, odontoiatri | Quota A **fissa** (~€1.500-3.000, per età) + Quota B **proporzionale** sul reddito libero-professionale (aliquota significativa, variabile per categoria) | incluso nella struttura | la più articolata: verificare Quota A/B sul sito ENPAM |
+| **ENPAM** | medici, odontoiatri | Quota A **fissa** per età (2026: €304,73 sotto i 30 anni, €591,47 da 30 a 35, €1.109,92 da 35 a 40, €2.049,83 dai 40) + Quota B sul reddito libero-professionale: **19,5%** fino a €150.000, 1% oltre | incluso nella struttura | Quota B al 9,75% su richiesta (entro il 31/7) per convenzionati, iscritti INPS e pensionati di altri enti, automatica per i pensionati del Fondo generale; 2% per corsisti di medicina generale e intramoenia. Verificato: 2026-10 (enpam.it) |
 | **CNPADC** | dottori commercialisti | a scelta **dal 12% al 100%** del reddito (min. ~€3.180) | 4% (min. ~€954) | premialità sul montante + 37,5% dell'integrativo a montante |
 | **ENPAP** | psicologi | ~10% | ~2% | cassa 103/1996, interamente contributiva |
-| **CIPAG** | geometri | ~18% | 4% circa | — |
+| **CIPAG** | geometri | **20%** (2025-2026), 22% dal 2027, fino a €183.550; 3,5% oltre; min. €4.240 | **5%**, anche verso la PA (min. €1.955) | il 4% verso la PA valeva solo per le fatture 2015-2020; maternità €9. Verificato: 2026-10 (cassageometri.it) |
 
 Le aliquote, i minimi, i massimali e i coefficienti **cambiano ogni anno** e sono fissati dalle singole casse: questi valori sono indicativi per il 2026 e vanno **verificati sul sito della cassa specifica**. CNPADC (dottori commercialisti, Sez. A dell'albo) è cosa diversa da CNPR (ragionieri e periti commerciali). Per ENPAM in particolare la struttura Quota A + Quota B è complessa e va verificata caso per caso.
 

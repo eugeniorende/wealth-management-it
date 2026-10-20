@@ -135,7 +135,7 @@ Quando una conversazione tocca **entrambi** i domini:
    - L'aliquota marginale IRPEF stimata (`Input!aliquota_irpef_marginale` nel template Excel) è il parametro chiave per quantificare il pattern J1.
 
 3. **Anno fiscale di fine periodo (novembre-dicembre)**:
-   - Coordinare le due decisioni nello stesso ciclo: prima massimizzare deducibili (fondo, contributi volontari), poi gestire le minus in scadenza (entro 31/12 del 4° anno).
+   - Coordinare le due decisioni nello stesso ciclo: prima massimizzare deducibili (fondo, contributi volontari) e comunicare al fondo quelli eccedenti il plafond, poi gestire le minus in scadenza (entro 31/12 del 4° anno).
    - Le due operazioni sono fiscalmente indipendenti ma operativamente da fare prima di Capodanno.
 
 ## Anti-pattern (NON FARE)

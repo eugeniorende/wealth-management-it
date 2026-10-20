@@ -10,7 +10,7 @@ Esegui la pianificazione pensionistica per lavoratore autonomo seguendo la skill
 Workflow:
 
 1. **Ingestion**: chiedere all'utente (se non già nel contesto):
-   - Profilo: tipo cassa (Gestione Separata / cassa professionale), regime fiscale (forfettario / ordinario / forfettario 5%), codice ATECO o tipo attività, coefficiente di redditività (78% per IT/professioni)
+   - Profilo: tipo cassa (Gestione Separata / cassa professionale; artigiani e commercianti delle gestioni IVS INPS sono fuori perimetro: dirlo subito e rinviare a INPS o al commercialista), regime fiscale (forfettario / ordinario / forfettario 5%), codice ATECO o tipo attività, coefficiente di redditività (78% per IT/professioni)
    - Economici: ricavi annui incassati, crescita attesa, età corrente, età target pensionamento, anzianità contributiva
    - **Altri redditi IRPEF** (affitti IRPEF, lavoro dipendente part-time): rilevante per la deducibilità del fondo pensione
    - Fondo pensione esistente o in valutazione: montante, contributo, comparto, rendimento, anni partecipazione

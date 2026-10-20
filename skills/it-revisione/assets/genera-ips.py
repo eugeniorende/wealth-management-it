@@ -95,8 +95,9 @@ DATI = {
         ("**Il resto della capacità** alimenta il lungo termine, che compone per 30 anni, "
          "oppure resta come buffer."),
         ("**Fondo pensione**: versare almeno la quota minima a proprio carico per sbloccare "
-         "il contributo del datore (se il CCNL lo prevede); deducibilità fino a €5.300/anno "
-         "(Legge di Bilancio 2026, TFR escluso)."),
+         "il contributo del datore (se il CCNL lo prevede); deducibilità fino a €5.300/anno, "
+         "contributo del datore compreso e TFR escluso (Legge di Bilancio 2026). I contributi non "
+         "dedotti vanno comunicati al fondo entro il 31/12 dell'anno successivo."),
     ],
 
     "strumenti": [
@@ -147,6 +148,8 @@ POLICY_FISCALITA = [
      "periodo. Il conto titoli ospita i secchielli investibili."),
     ("**Zainetto.** Le minusvalenze scadono (anno di realizzo + 4): coordinare plus e minus nello "
      "stesso anno fiscale."),
+    ("**Fondo pensione.** Entro il 31/12 comunicare al fondo i contributi non dedotti dell'anno "
+     "precedente: senza comunicazione, in uscita sono tassati come se fossero stati dedotti."),
 ]
 
 POLICY_GUARDRAIL = [
@@ -188,6 +191,7 @@ POLICY_CHECKLIST = [
         "Registrare allocazione target e **bande 5/25** nello strumento di ribilanciamento.",
         "Attivare i **versamenti ricorrenti** decisi nella politica dei versamenti.",
         "Promemoria **trimestrale** per il controllo delle bande; **revisione annuale** dell'IPS.",
+        "Ogni anno entro il 31/12: comunicare al fondo pensione i contributi non dedotti dell'anno precedente.",
     ]),
 ]
 

@@ -37,7 +37,7 @@ Versamenti effettuati vs pianificati; andamento del periodo **separando il rendi
 
 ### 4. Azioni prioritizzate
 Si raccolgono le azioni emerse e si **ordinano**, secondo la logica di `references/metodo-revisione.md`:
-1. **Scadenza** prima di tutto (minus in scadenza al 31/12, versamento fondo pensione entro il 31/12 per la deduzione).
+1. **Scadenza** prima di tutto (minus in scadenza al 31/12, versamento fondo pensione entro il 31/12 per la deduzione, comunicazione al fondo dei contributi non dedotti dell'anno precedente entro il 31/12).
 2. **Impatto strutturale** poi (gap previdenziale, obiettivo a rischio): agire presto vale più che agire tanto.
 3. **Manutenzione** infine (ribilanciamento entro le bande, de-risking del glide path).
 
@@ -79,7 +79,7 @@ Validare con `python /mnt/skills/public/xlsx/scripts/recalc.py <file>` (atteso `
 - ❌ **Confondere versamenti e rendimento**: se il saldo è salito di €18.000 ma hai versato €9.000, non hai reso €18.000. Sempre la decomposizione (foglio Andamento).
 - ❌ **Spingere a intervenire su un calo di mercato**: i cali fanno parte del piano. La revisione corregge la rotta su scadenze, gap e drift, non insegue il mercato. Una revisione settimanale è un anti-pattern.
 - ❌ **Trattare i quattro domini come liste separate**: il valore è nelle azioni cross-dominio (ribilanciare usando le minus, versare dove rende di più). Cercarle sempre.
-- ❌ **Ignorare le scadenze di fine anno**: a novembre-dicembre le minus in scadenza e il versamento al fondo pensione hanno priorità operativa, vanno prima dell'impatto strutturale.
+- ❌ **Ignorare le scadenze di fine anno**: a novembre-dicembre le minus in scadenza, il versamento al fondo pensione e la comunicazione dei contributi non dedotti hanno priorità operativa, vanno prima dell'impatto strutturale.
 - ❌ **Promettere risultati o dare raccomandazioni di investimento personalizzate**: la revisione mette ordine e propone, ma rinvia al professionista per le decisioni.
 
 ## Riferimenti

@@ -68,6 +68,8 @@ Questo è il punto centrale. **Il contributo che versi volontariamente a un fond
 
 Fonte: Modello Redditi PF 2026, quadro LM. La prassi dell'Agenzia delle Entrate conferma che per i forfettari i contributi volontari a fondo pensione non sono deducibili (mentre i contributi obbligatori sì, perché espressamente previsti dalla legge istitutiva del forfettario).
 
+**Il contributo non dedotto non deve essere tassato due volte**: il forfettario puro deve **comunicare al fondo** i contributi non dedotti entro il 31/12 dell'anno successivo al versamento, o prima se matura il diritto alla prestazione (art. 8 c. 4 D.Lgs. 252/2005). Così in uscita quella parte è esente (art. 11 c. 6); senza comunicazione il fondo la tassa come se fosse stata dedotta. *(Verificato: 2026-10, Risposta AdE 154/2024.)*
+
 **Conseguenza pratica enorme**: per un dipendente nel secondo scaglione IRPEF, versare €5.000 al fondo pensione fa risparmiare €1.650 di IRPEF (33%). Per un forfettario puro, gli stessi €5.000 fanno risparmiare **€0**. Il motore principale della convenienza del fondo pensione per i dipendenti **non gira** per i forfettari.
 
 ### L'eccezione: forfettario CON altri redditi IRPEF
