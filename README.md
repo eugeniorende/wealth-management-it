@@ -24,6 +24,8 @@ Un overlay/extension avrebbe creato conflitti dove Claude pesca dalla skill sbag
 
 ## Stato del progetto (v0.9.6)
 
+> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producono numeri sbagliati sui percorsi principali (zainetto, quadro RW, fondo pensione, Excel previdenziali). Il piano di correzione, con la 0.10.0 entro il 31/12/2026, è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
+
 Sei skill operative: `it-pianificazione-obiettivi` (pianificazione goals-based — il pezzo a monte), `it-tax-optimization` (ottimizzazione minus/plus, titoli e cripto), `it-pianificazione` (pensione dipendenti), `it-pianificazione-autonomi` (pensione autonomi/forfettari), `it-rebalance` (ribilanciamento tax-aware), e `it-revisione` (revisione periodica di sintesi — il livello che tiene insieme tutto).
 
 ### Architettura
