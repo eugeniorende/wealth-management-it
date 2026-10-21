@@ -128,6 +128,10 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 - **Previdenza dei dipendenti** (PR #11): il contributo del datore conta nel plafond di €5.300; detrazione pensionati dell'Excel secondo l'art. 13 c. 3 TUIR (pensione netta d'esempio da €30.833 a €29.263); massimale €122.295 e prima fascia €56.224; Quota 103 e Opzione donna solo per requisiti già maturati, anticipata contributiva a 64 anni; trasferimento con il contributo del datore dal 31/10/2026 e adesione automatica dal 1/7/2026. Il capitale del fondo resta al 50%. Tolti i dati personali dell'autore dalle reference.
 - **Autonomi e revisione** (PR #12): artigiani e commercianti dichiarati fuori perimetro; CIPAG 20% + 5% (anche verso la PA) ed ENPAM con Quota B al 19,5%; requisiti 2026 nella Gestione Separata; la comunicazione al fondo dei contributi non dedotti entra in tutte le scadenze di fine anno; nel cruscotto il TWR non dà più −100% sulle righe non compilate.
 - **Freshness e documentazione** (PR #13): l'elenco `OBBLIGATI_FRESHNESS` rende obbligatorio il marcatore su 19 file normativi. I quattro che ne erano privi sono stati verificati alle fonti: in `criptovalute-casi-speciali.md` corretti gli importi del regime neo-residenti (€300.000 dal 2026), l'IVA del mining (fuori campo, non pro-rata), la localizzazione delle cripto (criteri della circ. 30/E/2023) e la riforma delle successioni (in vigore dal 2025); in it-pianificazione la sterilizzazione oltre €200.000; in it-rebalance la Tobin tax (0,4% fuori mercato, 0,2% sui mercati regolamentati). README: «Cosa il plugin NON fa» riscritto, `/revisione` tra i comandi, un solo conteggio dei test.
+- **Stato dei dati normativi** (PR #14): `python tests/run_tests.py --tabella-freshness` stampa per ogni file la verifica più vecchia e il mese fino a cui vale; nel README la tabella e il calendario dei parametri da riverificare nei prossimi 12 mesi.
+- **CI** (PR #15, #17): action fissate per SHA, claude-code a versione fissa, matrice Python 3.11 e 3.14, versioni minime delle dipendenze. Il minimo dichiarato passa a Python 3.11.
+- **Licenza** (PR #16): LICENSE e NOTICE (Apache-2.0) nel repository e nello zip di release, con l'attribuzione all'upstream fissata al commit `ef165e4160`.
+- **Revisione annuale** (PR #18): nel cruscotto il foglio TWR regge fino a 120 rilevazioni e legge da solo l'ultima; la Sintesi confronta la probabilità con la soglia della priorità; Allocazione e tracker usano la regola 5/25 per classe; costi dell'anno a scopo di confronto; foglio Leggimi con i limiti.
 
 **v0.9.6** (corrente):
 - **Integrazione GitHub**: repository su `github.com/eugeniorende/wealth-management-it` con `.gitignore`, campo `repository` e `author` strutturato nel manifest (passa `claude plugin validate`), `.claude-plugin/marketplace.json` effettivamente presente, istruzioni di installazione con il repository reale. Gitflow: feature su `develop`, release su `main`.
@@ -433,6 +437,15 @@ claude --plugin-dir /percorso/assoluto/wealth-management-it
 ### Cartella di lavoro (importante)
 
 Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cartella dedicata al piano (es. `~/piano-finanziario/`) e lavora sempre da lì: metti lì i file reali (estratto conto INPS, storico del fondo, CSV dei broker), **copia** lì gli Excel da compilare (`pianificatore-obiettivi.xlsx`, `tracker-secchielli.xlsx`, `cruscotto-patrimoniale.xlsx`, `investment-policy-statement.xlsx`, `proiezione-pensione.xlsx` o `proiezione-pensione-autonomi.xlsx` — mai editare quelli dentro il plugin), e lì finiranno gli output degli script (JSON della pipeline, CSV degli ordini, l'IPS generato). Il plugin resta immutabile e aggiornabile; la cartella di lavoro è la tua.
+
+### Dove vanno i tuoi dati
+
+Gli script del plugin girano **in locale** e non fanno chiamate di rete: leggono i file che indichi e scrivono gli output (JSON, CSV degli ordini, IPS in Word) nella cartella da cui li lanci. Però tutto ciò che scrivi in chat, che Claude legge dai tuoi file e che gli script stampano **entra nel contesto del modello** e nei transcript della sessione: in Claude Code i transcript restano sul tuo computer (`~/.claude/projects/`), in Cowork e su claude.ai sono gestiti secondo le impostazioni del tuo account Anthropic.
+
+Cosa conviene sapere:
+- `importa-previdenza.py` legge l'estratto conto INPS e il prospetto del fondo pensione. Stampa intestatario e data di nascita, perché servono a calcolare l'età, mentre le retribuzioni le stampa aggregate per anno, senza i datori di lavoro;
+- gli estratti dei broker contengono posizioni e importi; prima di passarli, togli quello che al calcolo non serve: intestatario, codice fiscale, IBAN, numero di dossier;
+- per i calcoli bastano età, importi e date: nomi e identificativi non servono a nessuno strumento del plugin.
 
 ### Verifica
 
