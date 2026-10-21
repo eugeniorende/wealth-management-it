@@ -2845,6 +2845,32 @@ def t_ponte():
     assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
+@test("obiettivi: il fondo pensione al plafond di €5.300 presuppone nessun contributo del datore (plafond condiviso)")
+def t_obiettivi_plafond_condiviso():
+    # Nota del § 4 dell'handoff (dopo T4 e T8): «€5.300 al 33%» vale solo senza contributo del datore,
+    # che conta nel plafond insieme al dovuto del lavoratore (art. 8 c. 4 D.Lgs. 252/2005).
+    cartella = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    for rel in ("SKILL.md", "references/asset-location.md", "assets/asset-location-optimizer.py"):
+        testo = open(os.path.join(cartella, rel), encoding="utf-8").read()
+        for par in testo.split("\n\n"):
+            if re.search(r"5\.300|CONTRIBUTO_ANNUO_FP = 5300", par):
+                assert "datore" in par, f"{rel}: €5.300 senza dire che il plafond è condiviso col datore: {par.strip()[:90]}"
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"))
+    assert rc == 0 and re.search(r"plafond[^\n]*datore", out), "lo stdout deve ricordare il plafond condiviso"
+    # oltre il plafond niente deduzione: con 8.000 €/anno il risparmio IRPEF è quello di 5.300 (revisione)
+    al = _modulo_obiettivi("asset-location-optimizer.py")
+    def driver(*sets):
+        rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
+                             "--set", "REINVESTI_RISPARMIO_IRPEF=False", *sets)
+        assert rc == 0, out[-300:]
+        return out, float(re.search(r"Driver: la deduzione IRPEF \(€([\d.]+)\)", out).group(1).replace(".", ""))
+    out8, d8 = driver("--set", "CONTRIBUTO_ANNUO_FP=8000")
+    _, d53 = driver("--set", "CONTRIBUTO_ANNUO_FP=5300")
+    atteso = 5_300 * al.ALIQUOTA_IRPEF_MARGINALE * al.ANNI_A_PENSIONE
+    assert abs(d8 - atteso) <= 1 and abs(d53 - atteso) <= 1, f"deduzione oltre il plafond: {d8} e {d53}, attesi {atteso:,.0f}"
+    assert "dedotti solo €5.300/anno" in out8
+
+
 @test("ponte-pensione: serie storica deflazionata anno per anno con la CPI USA, come il decumulo")
 def t_ponte_reale():
     # Nota del § 4 dell'handoff (dopo T8): il ponte confrontava rendimenti NOMINALI in dollari con una

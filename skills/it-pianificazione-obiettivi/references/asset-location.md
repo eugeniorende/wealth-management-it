@@ -25,7 +25,7 @@ Quindi l'asset location in Italia non è "distribuisci gli asset tra i conti age
 - **Massima flessibilità e liquidità, nessun vincolo temporale.** È il contenitore giusto per tutto ciò che non ha una ragione specifica per stare altrove.
 
 ### Fondo pensione (il contenitore agevolato per la PENSIONE)
-- Contributi **deducibili dall'IRPEF** (fino a €5.300/anno, vedi `it-pianificazione`), rendimenti tassati al **20%** (12,5% titoli di Stato), prestazione finale al **15%→9%**.
+- Contributi **deducibili dall'IRPEF** (fino a €5.300/anno insieme al contributo del datore, che usa una parte dello stesso plafond: vedi `it-pianificazione`), rendimenti tassati al **20%** (12,5% titoli di Stato), prestazione finale al **15%→9%**.
 - ⚠️ **Vincolato fino alla pensione** (con eccezioni: anticipo prima casa dopo 8 anni, spese sanitarie, RITA, ecc.).
 - È il contenitore **dominante per l'obiettivo pensione** (la deduzione + l'aliquota ridotta sui rendimenti + la tassazione agevolata della prestazione battono il dossier), ma proprio per il vincolo **non** è utilizzabile per obiettivi che si spendono prima (casa, università). Per i forfettari la deduzione non c'è (vedi `it-pianificazione-autonomi`).
 
