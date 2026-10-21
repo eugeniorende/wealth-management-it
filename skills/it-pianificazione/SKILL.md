@@ -161,14 +161,16 @@ Lo script `assets/proiezione-inps.py` implementa questo calcolo in forma paramet
 montante_oggi = montante_da_estratto_conto              # se disponibile
 
 #    FALLBACK se non disponibile (stima): tiene conto sia della RAL passata più bassa
-#    (cresciuta a g) sia della rivalutazione dei contributi già versati (a riv).
-#    q = (1 + rivalutazione) / (1 + crescita_RAL):
-montante_oggi ≈ RAL_attuale × 0,33 × Σ(k=1..anzianità) q^k
-#    Si riduce alla vecchia stima grezza (anzianità × RAL × 0,33) quando riv ≈ g, perché i
-#    due effetti si compensano; diverge (correttamente) quando rivalutazione e crescita differiscono.
+#    (cresciuta a g) sia della rivalutazione dei contributi già versati (a riv), anno per anno.
+#    k = anni fa (k=1 è l'anno scorso); il massimale è costante in euro di oggi e il contributo
+#    dell'anno scorso non si è ancora rivalutato (L. 335/1995):
+montante_oggi ≈ Σ(k=1..anzianità) min(RAL_attuale / (1+g)^k, massimale) × 0,33 × (1+riv)^(k-1)
+#    Senza massimale si avvicina alla vecchia stima grezza (anzianità × RAL × 0,33) quando
+#    riv ≈ g, perché i due effetti si compensano; diverge (correttamente) quando differiscono.
 
-# 2) Proiezione FUTURA anno per anno (foglio "Pubblica"): ogni anno il montante è
-#    rivalutato e vi si aggiunge il contributo dell'anno (RAL_crescente × 33%).
+# 2) Proiezione FUTURA anno per anno (foglio "Pubblica"), in euro di oggi: ogni anno il
+#    montante è rivalutato al PIL reale e vi si aggiunge il contributo dell'anno
+#    (min(RAL_crescente, massimale) × 33%), che si rivaluta solo dall'anno dopo.
 #    La rivalutazione si applica ANNO PER ANNO: ogni contributo futuro è rivalutato solo
 #    per gli anni che gli restano (una rivalutazione "in blocco" sull'intera somma sovrastima).
 anni_residui = eta_pensionamento_target - eta_corrente
@@ -319,19 +321,19 @@ Lista dei pattern applicabili, ordinati per impatto stimato:
 
 Il template `assets/proiezione-pensione.xlsx` (incluso nella skill) è il deliverable Excel pronto all'uso. Contiene 5 fogli:
 
-- **Input**: tutti i parametri editabili dall'utente (testo blu). Età, RAL, anzianità INPS, crescita retributiva, rivalutazione PIL, inflazione, **decadimento del coefficiente per biennio** (default 1,8%), stato TFR, parametri fondo pensione, spese. Le formule (testo nero) calcolano i valori derivati: anni residui, aliquota IRPEF marginale, aliquota fondo finale, spesa annua target, e il **coefficiente proiettato all'anno di pensionamento**.
+- **Input**: tutti i parametri editabili dall'utente (testo blu), in euro di oggi. Età, RAL, anzianità INPS, crescita retributiva reale, **PIL reale** (default 0,5%, come `proiezione-inps.py`), inflazione, **decadimento del coefficiente per biennio** (default 1,8%), stato TFR, parametri fondo pensione, spese, massimale contributivo 2026. Le formule (testo nero) calcolano i valori derivati: anni residui, aliquota IRPEF marginale, aliquota fondo finale, spesa annua target, e il **coefficiente proiettato all'anno di pensionamento**.
 
 - **Coefficienti**: tabella ufficiale completa DM 20/11/2024 (15 valori 57-71 anni) con note operative.
 
-- **Pubblica**: proiezione INPS anno per anno (50 righe), con risultati finali aggregati. Mostra **sia il coefficiente attuale 2025-2026** (come riferimento) **sia quello proiettato** all'anno di pensionamento (quello effettivamente usato per la pensione), così la differenza è visibile. Poi pensione lorda, IRPEF, detrazione pensionati, addizionali, pensione netta, tasso di sostituzione.
+- **Pubblica**: proiezione INPS anno per anno (50 righe), con risultati finali aggregati: contributi fino al massimale, rivalutazione dall'anno successivo al versamento (L. 335/1995). Mostra **sia il coefficiente attuale 2025-2026** (come riferimento) **sia quello proiettato** all'anno di pensionamento (quello effettivamente usato per la pensione), così la differenza è visibile. Poi pensione lorda, IRPEF, detrazione pensionati, addizionali, pensione netta, tasso di sostituzione.
 
 - **Complementare**: proiezione fondo pensione anno per anno (TFR, contributo volontario, contributo datore, rendimenti), con prestazione finale netta, rendita stimata, e risparmio IRPEF cumulato dalle deduzioni.
 
-- **Scenari**: confronto Conservativo / Base / Ottimistico con parametri variati, calcolo GAP (spesa target - reddito pensione) per ciascuno scenario.
+- **Scenari**: confronto Conservativo / Base / Ottimistico, tutto in euro di oggi. Base coincide con i fogli di calcolo; gli altri due ricalcolano pensione INPS e fondo con crescita RAL, PIL reale, decadimento del coefficiente e rendimento della propria colonna. GAP (spesa target − reddito pensione) in euro di oggi e, in una riga a parte, in € del pensionamento.
 
-Il template usa convenzioni industry-standard (blu = input, nero = formule, verde = cross-sheet) e si auto-aggiorna quando l'utente modifica le celle blu. 707 formule, zero errori. **Il coefficiente di trasformazione è proiettato in calo** all'anno di pensionamento (non usa quello attuale), così la pensione stimata è realistica anche su orizzonti lunghi.
+Il template usa convenzioni industry-standard (blu = input, nero = formule, verde = cross-sheet) e si auto-aggiorna quando l'utente modifica le celle blu. Il ricalcolo in locale italiano con LibreOffice (CI) verifica che nessuna cella vada in errore. **Il coefficiente di trasformazione è proiettato in calo** all'anno di pensionamento (non usa quello attuale), così la pensione stimata è realistica anche su orizzonti lunghi.
 
-✅ **Montante INPS iniziale (migliorato in v0.3)**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma `RAL × 33% × Σ q^k` con `q = (1+rivalutazione)/(1+crescita_RAL)`, che tiene conto della retribuzione passata più bassa e della rivalutazione dei contributi già versati (e si riduce alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis su mypensione.it via SPID/CIE).
+✅ **Montante INPS iniziale (migliorato in v0.3)**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma la somma anno per anno di `min(RAL/(1+g)^k, massimale) × 33% × (1+rivalutazione)^(k−1)`, che tiene conto della retribuzione passata più bassa, del massimale (costante in euro di oggi) e della rivalutazione dei contributi già versati (e si avvicina alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis sul portale INPS, www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo").
 
 ### Disclaimer (obbligatorio in fondo)
 
@@ -357,7 +359,7 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 - `references/proiezione-tenore-vita.md` — metodologia gap analysis, parametri scenari, strategie di copertura
 - `references/montecarlo-pensione.md` — la dimensione **stocastica** della proiezione: perché i due pilastri hanno rischi opposti (il pubblico INPS è rivalutato al PIL, non al mercato → àncora deterministica; il fondo pensione è esposto al mercato → Monte Carlo), e la lettura onesta che ne segue (tutta la dispersione del tasso di sostituzione viene dal complementare)
 - `references/integrazione-fiscale-joint.md` — pattern fiscali joint con `it-tax-optimization`: allocazione risparmio extra, realizzo plus + deduzione fondo, sterilizzazione redditi alti
-- `assets/proiezione-pensione.xlsx` — template Excel editabile con 5 fogli (Input, Coefficienti, Pubblica, Complementare, Scenari), 707 formule, deterministico, con coefficiente proiettato all'anno di pensionamento e cella dedicata per il **montante INPS reale da estratto conto** (con stima di ripiego migliorata se assente)
+- `assets/proiezione-pensione.xlsx` — template Excel editabile con 5 fogli (Input, Coefficienti, Pubblica, Complementare, Scenari), in euro di oggi, deterministico, con coefficiente proiettato all'anno di pensionamento e cella dedicata per il **montante INPS reale da estratto conto** (con stima di ripiego migliorata se assente)
 - `assets/montecarlo-pensione.py` — il **Monte Carlo** del tasso di sostituzione: àncora l'INPS al valore deterministico del foglio e simula solo il fondo pensione via block bootstrap sulla serie storica reale (stesso motore di obiettivi, media ricentrata sul rendimento del comparto). Restituisce i percentili del tasso di sostituzione, la probabilità di una soglia obiettivo, e la decomposizione àncora-pubblica / banda-di-mercato-complementare. Richiede numpy; usa `rendimenti-storici.csv`
 - `assets/rendimenti-storici.csv` — serie annuale azionario/obbligazionario (Damodaran/NYU Stern, 1928–2025) per il bootstrap; sostituibile con una propria serie
 

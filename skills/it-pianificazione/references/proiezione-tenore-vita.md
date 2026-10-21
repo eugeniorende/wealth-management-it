@@ -62,13 +62,17 @@ Per il PoC della skill, accettare entrambi gli approcci. Se l'utente non ha brea
 
 ### Inflazione e potere d'acquisto
 
-Critico: la pianificazione è in valori **nominali** (€ del giorno del pensionamento) ma il tenore di vita va calibrato in potere d'acquisto. Per orizzonti lunghi serve normalizzare:
+Critico: i due lati del gap vanno espressi nella **stessa unità**. La skill lavora in **euro di oggi** (potere d'acquisto attuale): RAL con crescita reale, montante INPS rivalutato al PIL reale (~0,5%), rendimento del fondo reale, spesa target senza inflazione. È l'impostazione di `proiezione-inps.py` e dell'Excel `proiezione-pensione.xlsx`.
+
+L'errore da evitare è mescolare le unità: una spesa inflazionata all'orizzonte confrontata con una pensione in euro di oggi gonfia il gap di 10-20 mila euro l'anno su orizzonti di 20-30 anni, e può cambiarne il segno.
+
+Se serve una vista nominale (€ del giorno del pensionamento), si inflazionano **entrambi** i lati con lo stesso tasso:
 
 ```
-spesa_target_nominal(t_pensione) = spesa_target_oggi × (1 + inflazione)^anni_residui
+valore_nominale(t_pensione) = valore_in_euro_di_oggi × (1 + inflazione)^anni_residui
 ```
 
-Tasso inflazione di default: **2%** (target BCE). Scenari: 1,5% conservativo (deflazione), 3% prudenziale (ondate inflattive). L'Italia 2021-2024 ha vissuto un episodio inflattivo significativo che ha eroso 8-12% di potere d'acquisto cumulativo: lezione di stress da considerare.
+Il segno del gap non cambia, cambia solo la scala. Tasso inflazione di default: **2%** (target BCE). Scenari: 1,5% e 2,5%. L'Italia 2021-2024 ha vissuto un episodio inflattivo significativo che ha eroso 8-12% di potere d'acquisto cumulativo: lezione di stress da considerare.
 
 **Importante**: le pensioni INPS sono rivalutate annualmente all'inflazione (perequazione), ma con meccanismi non perfetti — per pensioni alte la rivalutazione è parziale (es. 90% per pensioni 4-5x minimo INPS, 75% per pensioni 5-6x minimo, ecc.). Quindi su orizzonte lungo la pensione INPS reale tende a erodersi se l'inflazione è alta e prolungata.
 
@@ -116,12 +120,13 @@ La skill produce 3 scenari side-by-side con parametri variabili:
 | Parametro | Conservativo | Base | Ottimistico |
 |---|---|---|---|
 | Crescita RAL annua reale | 0,5% | 1,5% | 2,5% |
-| Rivalutazione PIL (montante INPS) | 1,0% | 1,8% | 2,5% |
-| Inflazione | 2,5% | 2,0% | 1,5% |
-| Rendimento netto comparto fondo | comparto-1% | comparto base | comparto+1% |
+| PIL reale (rivalutazione del montante INPS) | 0% | 0,5% | 1,0% |
+| Decadimento del coefficiente per biennio | 2,2% | 1,8% | 1,5% |
+| Rendimento netto reale del comparto | comparto−1% | comparto base | comparto+1% |
 | Tasso prelievo capitale finanziario | 3,0% | 3,5% | 4,0% |
+| Inflazione (solo per la vista nominale) | 2,5% | 2,0% | 1,5% |
 
-Tutti i tre scenari con stesse ipotesi di vita (es. orizzonte 30 anni post-pensione = vivere fino ai 97).
+Tutti i tre scenari con stesse ipotesi di vita (es. orizzonte 30 anni post-pensione = vivere fino ai 97). Ogni scenario ricalcola pensione e fondo con i propri parametri: il foglio Scenari dell'Excel lo fa per pensione INPS e fondo.
 
 ## Pattern di copertura del gap
 
@@ -197,7 +202,7 @@ A questo punto la skill rinvia a strumenti separati (PAC ETF, immobiliare a redd
 
 ## Heuristic per la skill
 
-1. **Spesa target sempre in valori reali (potere d'acquisto)**, poi proiettata nominale all'orizzonte. Mai chiedere all'utente "quanto spenderai a 67 anni" — chiedere "quanto spendi oggi" e applicare fattori.
+1. **Spesa target sempre in valori reali (potere d'acquisto)**, confrontata con una pensione anch'essa in euro di oggi. Mai chiedere all'utente "quanto spenderai a 67 anni" — chiedere "quanto spendi oggi" e applicare fattori. Non inflazionare la spesa se la pensione resta in euro di oggi.
 
 2. **3 scenari obbligatori** nel report: conservativo, base, ottimistico. Mai un singolo numero proiettato — orizzonte 30 anni rende la precisione apparente fuorviante.
 
@@ -207,7 +212,7 @@ A questo punto la skill rinvia a strumenti separati (PAC ETF, immobiliare a redd
 
 5. **Avversione al rischio della longevità**: in scenari conservativi, assumere aspettativa di vita lunga (es. 95 anni). È più costoso pianificare sotto-stimando la longevità che sovra-stimando.
 
-6. **Inflation drift**: per scenari multi-decennali, sempre mostrare valori sia nominali sia reali (al potere d'acquisto di oggi). I numeri nominali a 30+ anni di distanza sono enormi e fuorvianti se non normalizzati.
+6. **Inflation drift**: il calcolo si fa in euro di oggi; se si mostrano anche i valori nominali, si inflazionano entrambi i lati del gap con lo stesso tasso. I numeri nominali a 30+ anni di distanza sono enormi e fuorvianti se non normalizzati.
 
 7. **Patrimonio non finanziario**: la casa di proprietà è un asset rilevante per il tenore di vita (no affitto in pensione) ma NON va contata come reddito. Va tenuta separata nel report.
 

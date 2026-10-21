@@ -23,7 +23,16 @@ Regole fiscali incorporate (Verificato: 2026-07; periodo d'imposta 2026):
     reddito, poi decrescente, zero oltre 50.000 (no tax area 8.500 €)
   - detrazione lavoro dipendente (art. 13 TUIR): 1.955 € fino a 15.000, poi
     decrescente, zero oltre 50.000
-  - contributi IVS a carico del dipendente: 9,19% della RAL
+  - contributi IVS a carico del dipendente: 9,19% della RAL, +1% sulla parte
+    oltre la prima fascia di retribuzione pensionabile (€56.224), niente oltre
+    il massimale (€122.295, iscritti dal 1996)
+  - cuneo fiscale L. 207/2024 art. 1 c. 4-6 (solo lavoro dipendente, pensionati
+    esclusi): fino a 20.000 € di reddito una somma esente pari al 7,1% / 5,3% /
+    4,8% del reddito di lavoro (c. 4-5); tra 20.000 e 32.000 un'ulteriore
+    detrazione di 1.000 €, che scende a zero tra 32.000 e 40.000 (c. 6)
+    (Verificato: 2026-10: Normattiva L. 207/2024, Circ. AdE 4/E/2025, Circ. INPS 6/2026).
+    Il c. 6 vale fino al 2026: dal 1/1/2027 lo abroga il D.Lgs. 117/2026, che
+    riporta l'ulteriore detrazione nell'art. 13 del nuovo TUIR (comma da verificare)
   - addizionali regionale e comunale: parametriche (variano per territorio)
 
 ONESTÀ METODOLOGICA
@@ -57,6 +66,11 @@ ANNI_ISCRIZIONE_FP = 37          # anni di partecipazione al fondo alla decorren
 RAL_FINALE_LORDA = 58_000.0      # ultimo stipendio lordo (per il confronto netto/netto)
 
 ALIQ_CONTRIBUTI_DIP = 0.0919     # IVS a carico del dipendente (aliquota generalità)
+PRIMA_FASCIA_PENSIONABILE = 56_224.0   # oltre questa retribuzione, +1% di IVS a carico del dipendente
+ALIQ_AGGIUNTIVA_OLTRE_FASCIA = 0.01
+MASSIMALE_CONTRIBUTIVO = 122_295.0     # oltre, niente contributi (iscritti dal 1996, Circ. INPS 6/2026)
+CUNEO_L207 = True                # misure L. 207/2024 c. 4-6 sul netto dello stipendio (False = escluse)
+CUNEO_SOMMA_ESENTE = [(8_500, 0.071), (15_000, 0.053), (20_000, 0.048)]  # (reddito fino a, % del reddito)
 ADDIZIONALE_REGIONALE = 0.0173   # media nazionale indicativa; range reale ~1,23–3,33%
 ADDIZIONALE_COMUNALE = 0.005     # media indicativa; range reale 0–0,9%
 
@@ -109,13 +123,36 @@ def netto_pensionato(inps_lorda, add_reg, add_com):
     return inps_lorda - irpef - addiz, irpef, addiz
 
 
+def contributi_lavoratore(ral, aliq_contr):
+    """IVS a carico del dipendente: aliquota base, +1% oltre la prima fascia, niente oltre il massimale."""
+    base = min(ral, MASSIMALE_CONTRIBUTIVO)
+    return base * aliq_contr + max(0.0, base - PRIMA_FASCIA_PENSIONABILE) * ALIQ_AGGIUNTIVA_OLTRE_FASCIA
+
+
+def cuneo_l207(reddito):
+    """L. 207/2024 art. 1 c. 4-6: (somma esente, ulteriore detrazione) per il lavoro dipendente.
+
+    Il reddito di lavoro è anche il reddito complessivo (nessun altro reddito, come nel resto dello script)."""
+    if not CUNEO_L207:
+        return 0.0, 0.0
+    if reddito <= 20_000:
+        pct = next(p for lim, p in CUNEO_SOMMA_ESENTE if reddito <= lim)
+        return reddito * pct, 0.0
+    if reddito <= 32_000:
+        return 0.0, 1_000.0
+    if reddito <= 40_000:
+        return 0.0, 1_000.0 * (40_000 - reddito) / 8_000
+    return 0.0, 0.0
+
+
 def netto_lavoratore(ral, aliq_contr, add_reg, add_com):
-    """Netto dello stipendio: contributi IVS, poi IRPEF con detrazione lavoro, addizionali."""
-    contributi = ral * aliq_contr
+    """Netto dello stipendio: contributi IVS, IRPEF con detrazione lavoro e cuneo L. 207/2024, addizionali."""
+    contributi = contributi_lavoratore(ral, aliq_contr)
     imponibile = ral - contributi
-    irpef = max(0.0, irpef_lorda(imponibile) - detrazione_lavoro(imponibile))
+    somma_esente, ulteriore = cuneo_l207(imponibile)
+    irpef = max(0.0, irpef_lorda(imponibile) - detrazione_lavoro(imponibile) - ulteriore)
     addiz = imponibile * (add_reg + add_com) if irpef > 0 else 0.0
-    return ral - contributi - irpef - addiz, contributi, irpef, addiz
+    return ral - contributi - irpef - addiz + somma_esente, contributi, irpef, addiz
 
 
 def main():
@@ -134,6 +171,9 @@ def main():
     print(f"  − IRPEF (netto detrazione lavoro) € {irpef_lav:>9,.0f}")
     print(f"  − addizionali ({(ADDIZIONALE_REGIONALE+ADDIZIONALE_COMUNALE):.2%})"
           f"        € {add_lav:>9,.0f}")
+    esente = cuneo_l207(RAL_FINALE_LORDA - contr)[0]
+    if esente:
+        print(f"  + somma esente L. 207/2024     € {esente:>9,.0f}")
     print(f"  = NETTO            € {netto_lav:>10,.0f}   (aliquota effettiva "
           f"{1-netto_lav/RAL_FINALE_LORDA:.1%})")
 

@@ -50,6 +50,8 @@ montante_contributivo = Σ (reddito_anno × 0,2607) rivalutato (media PIL 5 anni
 pensione_lorda_annua = montante × coefficiente_trasformazione(età)
 ```
 
+Per legge la rivalutazione segue il PIL nominale. In una proiezione in euro di oggi si usa il PIL reale (~0,5%), e il contributo dell'anno si rivaluta solo dall'anno dopo, come in `it-pianificazione/references/previdenza-obbligatoria.md`.
+
 I **coefficienti di trasformazione sono gli stessi** dei dipendenti (sono fissati per legge a livello di sistema, non per categoria). Vedi la tabella ufficiale completa DM 20/11/2024 in `it-pianificazione/references/previdenza-obbligatoria.md`. A 67 anni = 5,608% per il biennio 2025-2026.
 
 ### La differenza che conta: aliquota 26,07% vs 33%
@@ -70,7 +72,7 @@ Gli stessi dei dipendenti contributivi puri:
 - **Vecchiaia**: 67 anni + 20 anni di contributi + importo soglia di 1× l'assegno sociale dal 2024 (€546,24 al mese nel 2026)
 - **Anticipata contributiva**: 64 anni + 20 anni di contribuzione effettiva + pensione ≥ 3 volte l'assegno sociale (€1.638,72 al mese nel 2026; 2,8 volte per le donne con un figlio, 2,6 con due o più)
 - **Anticipata ordinaria**: a qualunque età, con 42 anni e 10 mesi di contributi (uomini) o 41 anni e 10 mesi (donne)
-- Adeguamenti alla speranza di vita: nel 2027 vecchiaia a 67 anni e 1 mese, anticipata contributiva a 64 anni e 1 mese, anticipata ordinaria a 42 anni e 11 mesi (41 e 11 per le donne); dal 2028 67 anni e 3 mesi e 64 anni e 3 mesi (Circ. INPS 28/2026)
+- Adeguamenti alla speranza di vita: nel 2027 vecchiaia a 67 anni e 1 mese, anticipata contributiva a 64 anni e 1 mese con 20 anni e 1 mese di contribuzione effettiva, anticipata ordinaria a 42 anni e 11 mesi (41 anni e 11 mesi per le donne); dal 2028 vecchiaia a 67 anni e 3 mesi, anticipata contributiva a 64 anni e 3 mesi con 20 anni e 3 mesi, anticipata ordinaria a 43 anni e 1 mese (42 anni e 1 mese per le donne) (Circ. INPS 28/2026, All. 2). Le anticipate decorrono tre mesi dopo la maturazione dei requisiti
 
 ⚠️ Per i contributivi puri (tutti gli autonomi iscritti dal 1996) l'anticipata a 64 anni richiede che la pensione maturata superi 3 volte l'assegno sociale. La L. 207/2024 aveva permesso di contare anche la rendita della previdenza complementare per raggiungere la soglia, ma la L. 199/2025 ha abrogato questa possibilità (Circ. INPS 19/2026): non è più un argomento a favore del fondo pensione. *(Requisiti 2026-2028 — Verificato: 2026-10.)*
 
@@ -109,5 +111,5 @@ Frequente nel mondo tech: dipendente che ha anche una P.IVA per attività extra 
 4. **Nessun contributo minimo**: non assumere minimi per la Gestione Separata (a differenza di artigiani/commercianti).
 5. **Coefficienti di trasformazione**: stessi dei dipendenti (tabella DM 20/11/2024 in `it-pianificazione/references/previdenza-obbligatoria.md`). Non duplicare, rinviare.
 6. **Tasso di sostituzione più basso**: per via dell'aliquota 26,07%, evidenziare che l'autonomo ha una pensione pubblica più magra a parità di reddito → la complementare è più necessaria.
-7. **Anzianità contributiva**: l'autonomo la verifica sull'estratto conto INPS (mypensione.it via SPID/CIE). Se non disponibile, stimare ma flaggare.
+7. **Anzianità contributiva**: l'autonomo la verifica sull'estratto conto INPS (www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo"). Se non disponibile, stimare ma flaggare.
 8. **Rinvio al patronato/consulente**: per ricostruzione posizione, cumulo, totalizzazione, casse, sempre rinviare a professionista abilitato (servizi spesso gratuiti via patronato).
