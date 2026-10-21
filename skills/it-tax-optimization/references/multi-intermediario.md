@@ -72,8 +72,8 @@ Il coefficiente del 48,08% per i titoli di Stato vale anche in dichiarativo (art
 
 - **Carico amministrativo**: devi compilare il quadro RT (o farlo fare dal commercialista, con costi). Per portafogli attivi è non banale.
 - **Calcolo manuale**: in amministrato il broker certifica plus/minus pronte all'uso. In dichiarativo ricostruisci tu (a partire dalle "certificazioni" del broker), con i lotti in ordine LIFO e i cambi del giorno per i titoli in valuta (vedi `regime-dichiarativo.md`).
-- **Modello Redditi obbligatorio**: anche se non hai altri redditi che richiedono dichiarazione, il quadro RT ti obbliga al Modello Redditi (non 730). Per chi normalmente fa 730, è cambio di paradigma.
-- **Liquidità tempistiche**: se realizzi plus, paghi in F24 a saldo entro 30/6 e in acconto. In amministrato la ritenuta è alla fonte, "out of sight".
+- **Dichiarazione obbligatoria**: anche se non hai altri redditi da dichiarare, devi presentarla: il 730 (quadri T, M e W, dal 730/2025) oppure il Redditi PF (quadri RT, RM e RW). Vedi la checklist di `regime-dichiarativo.md`.
+- **Liquidità tempistiche**: se realizzi plus, paghi l'imposta del quadro RT a saldo con la dichiarazione (30/6, o in busta paga con il 730), senza acconti. In amministrato la ritenuta è alla fonte, "out of sight".
 - **Irrevocabile per l'anno e solo dall'anno successivo**: non puoi cambiare idea a metà strada, e le minus che scadono quest'anno non si salvano passando al dichiarativo l'anno prossimo.
 
 ### Quando conviene optare per dichiarativo
@@ -165,7 +165,7 @@ I tre rapporti hanno lo stesso intestatario. Directa è il conto di trading atti
 **Scenario (c) — dichiarativo dall'anno N+1 (Pattern D)**:
 - L'opzione comunicata entro il 31/12/N vale dal 1/1/N+1: le €1.500 di Banca Sella, che scadono il 31/12/N, **non si salvano**.
 - Con tutti i rapporti in dichiarativo nel N+1, le €2.400 di Directa compensano nel quadro RT le plus realizzate su Fineco: +€624, oltre ai €208 dello scenario (a).
-- Costi: commercialista per il quadro RT, €200-400 l'anno, Modello Redditi obbligatorio e onere personale ricorrente.
+- Costi: commercialista per il quadro RT, €200-400 l'anno, dichiarazione obbligatoria e onere personale ricorrente.
 - **Risparmio: €832, netto circa €430-630.**
 
 | Scenario | Risparmio | Costi | Note |

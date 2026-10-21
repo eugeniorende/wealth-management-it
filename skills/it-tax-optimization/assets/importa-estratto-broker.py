@@ -42,7 +42,7 @@ Regole fiscali applicate (vedi SKILL.md e le reference):
 Limiti dichiarati: legge CSV, non i PDF della certificazione; lo zainetto è un secondo CSV;
 per le obbligazioni con nominale e prezzo in percentuale serve la colonna del valore di carico
 (altrimenti costo = quantità × prezzo); i numeri valgono solo per l'amministrato:
-in dichiarativo (broker esteri) si applicano il LIFO e il cambio del giorno, non calcolati qui.
+in dichiarativo (Interactive Brokers, Degiro) si applicano il LIFO e il cambio del giorno, non calcolati qui.
 
 Uso:
     python importa-estratto-broker.py estratto.csv [zainetto.csv] [--anno AAAA]
