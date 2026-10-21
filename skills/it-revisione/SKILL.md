@@ -62,16 +62,16 @@ Report in markdown, cinque sezioni che ricalcano il workflow. C'è un **template
 
 ## Lo strumento: il cruscotto patrimoniale
 
-`assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa della revisione. Sei fogli:
+`assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa della revisione. Un foglio Leggimi con istruzioni e limiti, poi sei fogli:
 
 - **Patrimonio**: attività per contenitore fiscale (dossier, fondo pensione, conto deposito, liquidità, polizze, immobili, cripto) meno passività → patrimonio netto e composizione.
-- **Allocazione**: per classe (azionario, obbligazionario, liquidità, immobiliare, alternativi), % attuale vs target, **drift** e segnale di ribilanciamento oltre la banda impostata.
-- **Andamento**: la decomposizione del periodo — **rendimento di mercato separato dai versamenti**, rendimento money-weighted semplificato (Dietz) e rendimento **reale** al netto dell'inflazione. È il foglio che impedisce di scambiare i versamenti per rendimento.
-- **Sintesi**: avanzamento di obiettivi (capitale attuale vs target, probabilità, stato on track/a rischio) e pensione (tasso di sostituzione proiettato vs obiettivo, gap), da compilare tirando i numeri dagli strumenti dedicati.
+- **Allocazione**: per classe (azionario, obbligazionario, liquidità, immobiliare, alternativi), % attuale vs target, **drift** e segnale di ribilanciamento oltre la soglia della **regola 5/25** (la minore tra la banda assoluta e il 25% del target della classe, come in `it-rebalance`).
+- **Andamento**: la decomposizione del periodo — **rendimento di mercato separato dai versamenti**, rendimento money-weighted semplificato (Dietz) e rendimento **reale** al netto dell'inflazione. È il foglio che impedisce di scambiare i versamenti per rendimento. Sotto, i **costi dell'anno** (bollo, commissioni e Tobin tax, TER medio ponderato, ISC del fondo pensione) a scopo di confronto: il rendimento calcolato sui valori di mercato li incorpora già, quindi non vanno sottratti di nuovo.
+- **Sintesi**: avanzamento di obiettivi (capitale attuale vs target, probabilità Monte Carlo, **priorità** e stato rispetto alla soglia della priorità: 85% essenziali, 75% importanti, 60% desiderabili) e pensione (tasso di sostituzione proiettato vs obiettivo, gap), da compilare tirando i numeri dagli strumenti dedicati.
 - **Azioni**: il tracker delle azioni emerse dalla revisione (azione, dominio, priorità, scadenza, stato), con la legenda della logica di prioritizzazione. È il ponte tra il report e l'esecuzione.
-- **Rendimento TWR**: il **time-weighted return** della strategia (rendimenti dei sotto-periodi tra un flusso e l'altro, incatenati), affiancato al **money-weighted esatto** (XIRR) sugli stessi dati. La differenza tra i due è l'effetto del timing dei versamenti; il TWR è il numero da confrontare con un benchmark. Si compila una riga per data di rilevazione (valore + flusso netto).
+- **Rendimento TWR**: il **time-weighted return** della strategia (rendimenti dei sotto-periodi tra un flusso e l'altro, incatenati), affiancato al **money-weighted esatto** (XIRR) sugli stessi dati. La differenza tra i due è l'effetto del timing dei versamenti; il TWR è il numero da confrontare con un benchmark. Si compila una riga per data di rilevazione (valore + flusso netto), dall'alto e senza righe vuote, fino a 120 righe: il riepilogo legge da solo l'ultima.
 
-Validare con `python /mnt/skills/public/xlsx/scripts/recalc.py <file>` (atteso `total_errors: 0`). Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
+Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo; dal repository del plugin, `python scripts/ricalcola-excel.py <file>` lo ricalcola in locale italiano e segnala le celle in errore. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
 
 ## Anti-pattern (NON FARE MAI)
 
