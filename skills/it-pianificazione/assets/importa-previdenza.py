@@ -20,7 +20,8 @@ Uso:
 
 ONESTÀ METODOLOGICA
 - La ricostruzione del montante è un'approssimazione (±qualche %): l'estratto conto elenca i
-  contributi ma non li capitalizza, e i tassi degli anni più vecchi possono mancare dalla tabella.
+  contributi ma non li capitalizza. La tabella dei tassi copre 1996-2025; l'anno in corso non ha
+  ancora un tasso, quindi i suoi contributi restano al valore nominale.
   Il valore ESATTO è nel servizio "La mia pensione futura" sul portale INPS: se lo hai, usa quello.
 - La stima del mix azionario del fondo è EURISTICA (dal nome del comparto): verificala sulla
   nota informativa del fondo.
@@ -36,18 +37,33 @@ from collections import defaultdict
 
 ALIQUOTA_COMPUTO = 0.33   # aliquota IVS dipendenti (autonomi ~0,24; gestione separata ~0,2607)
 
-# Tassi di capitalizzazione del montante (fonte: ISTAT/Ministero del Lavoro, L.335/1995 art.1 c.9).
-# Convenzione: TASSO[X] rivaluta al 31/12/X il montante accumulato fino al 31/12/(X-1).
-# Verificato: 2026-06:
+# Tassi di capitalizzazione del montante (L. 335/1995 art. 1 c. 8-9: variazione media quinquennale
+# del PIL nominale calcolata dall'ISTAT, mai sotto 1 dal DL 65/2015 art. 5, con recupero sugli anni
+# successivi, tranne per il 2014).
+# Convenzione: TASSO[X] rivaluta al 31/12/X il montante accumulato fino al 31/12/(X-1); vale per le
+# pensioni con decorrenza dall'anno X+1. Le tabelle INPS etichettano lo stesso valore col 31/12/(X-1).
+# Tassi ISTAT 1996-2025 dalla nota ISTAT del 16/10/2025 (lavoro.gov.it), regola del minimo e del
+# recupero dal DL 65/2015 — Verificato: 2026-10. I valori applicati da INPS per 2014, 2021 e 2022
+# (minimo e recupero) vengono dai messaggi INPS 840/2024 e 707/2026, letti in copia.
 TASSI_CAPITALIZZAZIONE = {
-    2021: 1.000000,   # floor a 1 (PIL quinquennale negativo post-COVID; recupero nel 2022)
-    2022: 1.009758,   # tasso pieno 1,009973 ridotto per recupero del 2021
+    1996: 1.062054,   # INPS parte dal 1997: per i contributivi puri il montante al 31/12/1995 è zero
+    1997: 1.055871, 1998: 1.053597, 1999: 1.056503, 2000: 1.051781, 2001: 1.047781,
+    2002: 1.043698, 2003: 1.041614, 2004: 1.039272, 2005: 1.040506, 2006: 1.035386,
+    2007: 1.033937, 2008: 1.034625, 2009: 1.033201, 2010: 1.017935, 2011: 1.016165,
+    2012: 1.011344, 2013: 1.001643,
+    2014: 1.000000,   # ISTAT 0,998073: minimo a 1, senza recupero (DL 65/2015 art. 5 c. 1-bis)
+    2015: 1.005058, 2016: 1.004684, 2017: 1.005205, 2018: 1.013478, 2019: 1.018254,
+    2020: 1.019199,
+    2021: 1.000000,   # ISTAT 0,999785: minimo a 1, da recuperare
+    2022: 1.009756,   # ISTAT 1,009973 × 0,999785 (recupero del 2021)
     2023: 1.023082,
     2024: 1.036622,
     2025: 1.040445,   # rivaluta il montante al 31/12/2024 (decorrenze 2026)
 }
-# Per gli anni assenti dalla tabella (tipicamente i più vecchi) si usa questo default:
-TASSO_CAP_DEFAULT = 1.010  # ~media PIL nominale quinquennale pre-COVID; i primi anni pesano poco
+# Anni senza tasso: quelli dopo l'ultimo pubblicato (l'ISTAT lo comunica in ottobre-novembre
+# dell'anno stesso) e quelli prima del 1996 (sistema retributivo o misto, fuori dal perimetro).
+# Nessuna rivalutazione inventata: i contributi di quegli anni restano al valore nominale.
+TASSO_CAP_DEFAULT = 1.000
 
 # Stima euristica della quota azionaria di un comparto dal suo nome (keyword → % azioni).
 # Prima corrispondenza vince: le keyword SPECIFICHE precedono le generiche
@@ -263,9 +279,16 @@ def main():
     print(f"\nContributi nominali (retribuzioni × {ALIQUOTA_COMPUTO:.0%}): € {nominali:,.0f}")
     print(f"MONTANTE CONTRIBUTIVO RICOSTRUITO: ≈ € {montante:,.0f}")
     print(f"  rivalutazione con tassi ufficiali ISTAT (PIL nominale quinquennale)")
-    if anni_def:
-        print(f"  ⚠ tasso di default {TASSO_CAP_DEFAULT} usato per gli anni {anni_def} "
-              f"(assenti dalla tabella: impatto piccolo, sono i primi anni)")
+    ultimo = max(TASSI_CAPITALIZZAZIONE)
+    dopo = [a for a in anni_def if a > ultimo]
+    prima = [a for a in anni_def if a < min(TASSI_CAPITALIZZAZIONE)]
+    if dopo:
+        print(f"  ⚠ tasso {ultimo + 1}{'-' + str(max(dopo)) if max(dopo) > ultimo + 1 else ''} "
+              f"non ancora pubblicato: il montante è quello al 31/12/{ultimo}, "
+              f"i contributi successivi sono al valore nominale")
+    if prima:
+        print(f"  ⚠ contributi prima del 1996 ({prima[0]}-{prima[-1]}): sistema retributivo o misto, "
+              "fuori dal perimetro dello script; qui non sono rivalutati")
     print("  ⚠ ricostruzione ±qualche %: il valore esatto è ne \"La mia pensione futura\" (portale INPS)")
 
     # -------------------------- FONDO PENSIONE --------------------------

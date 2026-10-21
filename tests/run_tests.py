@@ -256,6 +256,259 @@ def t_cwd_esterna():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ══════════════════════ previdenza (T5, T4, T6) ══════════════════════
+
+def _modulo_previdenza(nome):
+    """Importa uno script di it-pianificazione/assets (importano motore_bootstrap dalla loro cartella)."""
+    cartella = os.path.join(SKILLS, "it-pianificazione", "assets")
+    sys.path.insert(0, cartella)
+    try:
+        return carica_modulo(os.path.join(cartella, nome))
+    finally:
+        sys.path.remove(cartella)
+
+
+def _per_etichetta(ws, testo, col="B"):
+    """Valore della colonna col nella riga la cui etichetta in A contiene testo (layout-indipendente)."""
+    for r in range(1, ws.max_row + 1):
+        if testo.lower() in str(ws[f"A{r}"].value or "").lower():
+            return ws[f"{col}{r}"].value
+    raise AssertionError(f"{ws.title}: nessuna riga con etichetta «{testo}»")
+
+
+_VARIANTI = {}
+
+
+def _varianti(skill, nome_xlsx, varianti):
+    """Copie ricalcolate di un xlsx con input modificati, una sola volta per suite.
+
+    varianti: {nome: {(foglio, cella): valore}} → {nome: workbook data_only}.
+    Le copie sono temporanee: l'originale non viene mai salvato con openpyxl."""
+    from openpyxl import load_workbook
+    chiave = (skill, nome_xlsx, repr(sorted((k, sorted(v.items())) for k, v in varianti.items())))
+    if chiave not in _VARIANTI:
+        mod = ricalcolatore()
+        tmp = tempfile.mkdtemp()
+        try:
+            percorsi = []
+            for nome, celle in varianti.items():
+                wb = load_workbook(asset(skill, nome_xlsx))
+                for (foglio, cella), v in celle.items():
+                    wb[foglio][cella] = v
+                percorsi.append(os.path.join(tmp, f"{nome}.xlsx"))
+                wb.save(percorsi[-1])
+            prodotti = mod.ricalcola(percorsi, os.path.join(tmp, "out"))
+            _VARIANTI[chiave] = {n: load_workbook(p, data_only=True) for n, p in zip(varianti, prodotti)}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return _VARIANTI[chiave]
+
+
+def _pensione_contributiva(m0, ral, g, r, n, massimale, aliquota, coeff):
+    """Replica indipendente della meccanica L. 335/1995 in euro di oggi: il montante si rivaluta
+    al PIL reale r, il contributo dell'anno entra senza rivalutazione, la retribuzione oltre il
+    massimale non versa contributi."""
+    m = m0
+    for t in range(n):
+        m = m * (1 + r) + min(ral * (1 + g) ** t, massimale) * aliquota
+    return m * coeff
+
+
+def _coeff_excel(wb, eta):
+    c = wb["Coefficienti"]
+    return next(c[f"C{r}"].value for r in range(5, 20) if c[f"A{r}"].value == eta)
+
+
+PP = ("it-pianificazione", "proiezione-pensione.xlsx")
+VARIANTI_PP = {"ral150k": {("Input", "B10"): 150_000, ("Input", "B12"): 0.0},
+               "ral8k": {("Input", "B10"): 8_000}}
+
+
+@test("proiezione-pensione.xlsx: Pubblica in euro di oggi = proiezione-inps.py (PIL reale, massimale, contributo dell'anno)")
+def t_pubblica_vs_script():
+    # REGRESSIONE F013/F002: Pubblica!F rivalutava anche il contributo dell'anno, il PIL era
+    # nominale (1,8%) su una RAL reale, e né l'Excel né lo script applicavano il massimale.
+    from openpyxl import load_workbook
+    inps = _modulo_previdenza("proiezione-inps.py")
+    base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
+    assert base["Input"]["B16"].value == inps.PIL_REALE, \
+        f"PIL dell'Excel {base['Input']['B16'].value} ≠ PIL_REALE di proiezione-inps.py {inps.PIL_REALE}"
+    for nome, wb in (("default", base), ("ral150k", _varianti(*PP, VARIANTI_PP)["ral150k"])):
+        i, p = wb["Input"], wb["Pubblica"]
+        massimale = _per_etichetta(i, "Massimale contributivo")
+        n = int(i["B6"].value - i["B5"].value)
+        atteso = _pensione_contributiva(p["E5"].value, i["B10"].value, i["B12"].value, i["B16"].value,
+                                        n, massimale, i["B13"].value, p["B60"].value)
+        assert abs(p["B61"].value - atteso) <= 1e-6 * atteso, \
+            f"{nome}: Pubblica!B61 = {p['B61'].value:,.2f}, meccanica L. 335/1995 = {atteso:,.2f}"
+        sets = (f"MONTANTE_ATTUALE={p['E5'].value!r}", f"RAL_ATTUALE={float(i['B10'].value)!r}",
+                f"ETA_ATTUALE={float(i['B5'].value)!r}", f"ETA_PENSIONAMENTO={float(i['B6'].value)!r}",
+                f"CRESCITA_REALE_RAL={float(i['B12'].value)!r}", f"PIL_REALE={float(i['B16'].value)!r}",
+                f"COEFF_ESPLICITO={p['B60'].value!r}", f"MASSIMALE_CONTRIBUTIVO={float(massimale)!r}")
+        rc, out = run_script(asset("it-pianificazione", "proiezione-inps.py"),
+                             *[x for s in sets for x in ("--set", s)])
+        assert rc == 0, out[-300:]
+        pens = euro(out, "PENSIONE LORDA ANNUA")
+        assert abs(pens - p["B61"].value) <= 1.0, f"{nome}: script {pens:,.0f} ≠ Excel {p['B61'].value:,.0f}"
+    p = _varianti(*PP, VARIANTI_PP)["ral150k"]["Pubblica"]
+    assert abs(p["D5"].value - 122_295 * 0.33) < 0.01, f"RAL 150k: contributo {p['D5'].value:,.2f} senza massimale"
+    # lo script da solo, valore chiuso: 30 anni sopra il massimale, PIL 0, coefficiente 5%
+    rc, out = run_script(asset("it-pianificazione", "proiezione-inps.py"),
+                         "--set", "MONTANTE_ATTUALE=0.0", "--set", "RAL_ATTUALE=150_000.0",
+                         "--set", "ETA_ATTUALE=37.0", "--set", "ETA_PENSIONAMENTO=67.0",
+                         "--set", "CRESCITA_REALE_RAL=0.0", "--set", "PIL_REALE=0.0",
+                         "--set", "COEFF_ESPLICITO=0.05")
+    assert rc == 0, out[-300:]
+    assert abs(euro(out, "PENSIONE LORDA ANNUA") - 30 * 122_295 * 0.33 * 0.05) <= 1, out[-500:]
+
+
+@test("proiezione-pensione.xlsx: IRPEF, addizionali e netto di Pubblica = netto_pensionato() di netto-pensione.py")
+def t_pubblica_netto():
+    # Deliverable T5: Pubblica!B63:B66 ricostruite dallo script sugli stessi input, anche sotto
+    # la no tax area (addizionali dovute solo se c'è IRPEF, come nello script).
+    from openpyxl import load_workbook
+    netto = _modulo_previdenza("netto-pensione.py")
+    base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
+    for nome, wb in (("default", base), ("ral8k", _varianti(*PP, VARIANTI_PP)["ral8k"])):
+        p = wb["Pubblica"]
+        lorda = p["B61"].value
+        n, irpef, addiz = netto.netto_pensionato(lorda, 0.02, 0.0)
+        assert abs(max(0.0, p["B63"].value - p["B64"].value) - irpef) < 0.01, f"{nome}: IRPEF netta"
+        assert abs(p["B65"].value - addiz) < 0.01, f"{nome}: addizionali {p['B65'].value:.2f} ≠ {addiz:.2f} (lorda {lorda:,.0f})"
+        assert abs(p["B66"].value - n) < 0.01, f"{nome}: netto {p['B66'].value:,.2f} ≠ {n:,.2f}"
+
+
+@test("proiezione-pensione.xlsx: Scenari in euro di oggi, Base = fogli di calcolo, parametri di colonna usati davvero")
+def t_scenari_reali():
+    # REGRESSIONE F013: spesa target inflazionata contro pensione in euro di oggi (il gap cambiava
+    # segno) e righe crescita RAL / PIL / rendimento decorative.
+    from openpyxl import load_workbook
+    wb = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
+    s, i, p, c = wb["Scenari"], wb["Input"], wb["Pubblica"], wb["Complementare"]
+    for col in "BCD":
+        assert abs(s[f"{col}18"].value - i["B39"].value) < 0.01, \
+            f"Scenari!{col}18 = {s[f'{col}18'].value:,.0f}: la spesa target va in euro di oggi ({i['B39'].value:,.0f})"
+    for riga, (foglio, cella) in ((11, ("Pubblica", "B61")), (12, ("Pubblica", "B66")),
+                                  (13, ("Complementare", "B58")), (14, ("Complementare", "B61")),
+                                  (15, ("Complementare", "B62"))):
+        assert abs(s[f"C{riga}"].value - wb[foglio][cella].value) < 0.01, \
+            f"Base Scenari!C{riga} ≠ {foglio}!{cella}"
+    n = int(i["B6"].value - i["B5"].value)
+    massimale = _per_etichetta(i, "Massimale contributivo")
+    coeff = _coeff_excel(wb, i["B6"].value)
+    netto = _modulo_previdenza("netto-pensione.py")
+    for col in "BD":
+        g, r, d, rend = (s[f"{col}{k}"].value for k in (5, 6, 8, 9))
+        atteso = _pensione_contributiva(p["E5"].value, i["B10"].value, g, r, n, massimale, i["B13"].value,
+                                        coeff * (1 - d) ** (n / 2))
+        assert abs(s[f"{col}11"].value - atteso) <= 1e-6 * atteso, \
+            f"Scenari!{col}11 = {s[f'{col}11'].value:,.0f}, ricalcolo con i parametri di colonna = {atteso:,.0f}"
+        assert abs(s[f"{col}12"].value - netto.netto_pensionato(atteso, 0.02, 0.0)[0]) < 0.01, f"Scenari!{col}12"
+        fondo = _fondo_scenario(wb, g, rend, n)
+        assert abs(s[f"{col}13"].value - fondo) <= 1e-6 * fondo, \
+            f"Scenari!{col}13 = {s[f'{col}13'].value:,.0f}, fondo col rendimento di colonna = {fondo:,.0f}"
+    assert s["B11"].value < s["C11"].value < s["D11"].value and s["B13"].value < s["C13"].value < s["D13"].value
+
+
+def _fondo_scenario(wb, g, rend, n):
+    """Montante del fondo (foglio Complementare) ricalcolato con crescita RAL g e rendimento rend."""
+    i = wb["Input"]
+    m = i["B22"].value + i["B25"].value
+    for t in range(n):
+        ral = i["B10"].value * (1 + g) ** t
+        m = m * (1 + rend) + ral * 0.0691 * i["B21"].value + min(i["B26"].value, 5300) + ral * i["B27"].value
+    return m
+
+
+@test("importa-previdenza: tassi di capitalizzazione ufficiali 1997-2025, carriera dal 1998 senza tassi inventati")
+def t_tassi_capitalizzazione():
+    # REGRESSIONE F062: tabella limitata al 2021-2025, default 1,01 per gli anni precedenti
+    # (sottostima ~8% per chi ha iniziato a fine anni '90) e anche per l'anno in corso, non pubblicato.
+    ufficiali = {  # nota ISTAT 16/10/2025 (lavoro.gov.it); 2014 e 2021 a 1, 2022 con recupero (DL 65/2015 art. 5)
+        1997: 1.055871, 1998: 1.053597, 1999: 1.056503, 2000: 1.051781, 2001: 1.047781, 2002: 1.043698,
+        2003: 1.041614, 2004: 1.039272, 2005: 1.040506, 2006: 1.035386, 2007: 1.033937, 2008: 1.034625,
+        2009: 1.033201, 2010: 1.017935, 2011: 1.016165, 2012: 1.011344, 2013: 1.001643, 2014: 1.000000,
+        2015: 1.005058, 2016: 1.004684, 2017: 1.005205, 2018: 1.013478, 2019: 1.018254, 2020: 1.019199,
+        2021: 1.000000, 2022: 1.009756, 2023: 1.023082, 2024: 1.036622, 2025: 1.040445}
+    m = carica_modulo(asset("it-pianificazione", "importa-previdenza.py"))
+    for anno, tasso in ufficiali.items():
+        assert m.TASSI_CAPITALIZZAZIONE.get(anno) == tasso, f"tasso {anno}: {m.TASSI_CAPITALIZZAZIONE.get(anno)} ≠ {tasso}"
+    retrib = {a: 30_000.0 for a in range(1998, 2026)}
+    montante, _, mancanti = m.ricostruisci_montante(retrib, 2026)
+    atteso = 0.0
+    for anno in range(1998, 2027):  # il 2026 non ha ancora un tasso: nessuna rivalutazione
+        atteso = atteso * ufficiali.get(anno, 1.0) + retrib.get(anno, 0.0) * m.ALIQUOTA_COMPUTO
+    assert abs(montante - atteso) < 0.01, f"montante {montante:,.2f} ≠ {atteso:,.2f}"
+    assert mancanti == [2026], f"anni senza tasso pubblicato: {mancanti}"
+    rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"),
+                         os.path.join(FIXTURES, "estratto-inps-test.xml"))
+    assert rc == 0, out[-300:]
+    assert "sono i primi anni" not in out and "non ancora pubblicat" in out, out[-600:]
+
+
+@test("netto-pensione: netto dello stipendio con le misure L. 207/2024 c. 4-6 e il contributo IVS aggiuntivo")
+def t_netto_stipendio():
+    netto = _modulo_previdenza("netto-pensione.py")
+    # RAL 30.000: reddito 27.243 → ulteriore detrazione di 1.000 € (c. 6, reddito tra 20.000 e 32.000)
+    _, contr, irpef, _ = netto.netto_lavoratore(30_000, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)
+    imponibile = 30_000 - 30_000 * 0.0919
+    atteso = imponibile * 0.23 - (1_910 + 1_190 * (28_000 - imponibile) / 13_000) - 1_000
+    assert abs(irpef - atteso) < 0.01, f"RAL 30k: IRPEF {irpef:,.2f} ≠ {atteso:,.2f}"
+    # RAL 36.000: reddito 32.692,40 → detrazione decrescente 1.000 × (40.000 − R) / 8.000
+    _, _, irpef, _ = netto.netto_lavoratore(36_000, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)
+    r = 36_000 * (1 - 0.0919)
+    atteso = 6_440 + (r - 28_000) * 0.33 - 1_910 * (50_000 - r) / 22_000 - 1_000 * (40_000 - r) / 8_000
+    assert abs(irpef - atteso) < 0.01, f"RAL 36k: IRPEF {irpef:,.2f} ≠ {atteso:,.2f}"
+    # RAL 18.000: reddito 16.345,80 ≤ 20.000 → somma esente del 4,8% del reddito di lavoro (c. 4)
+    n18, _, irpef18, _ = netto.netto_lavoratore(18_000, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)
+    r = 18_000 * (1 - 0.0919)
+    assert abs(n18 - (r - irpef18 + r * 0.048)) < 0.01, f"RAL 18k: netto {n18:,.2f} senza la somma del c. 4"
+    # RAL 80.000: 1% aggiuntivo sulla parte oltre la prima fascia di €56.224
+    _, contr, _, _ = netto.netto_lavoratore(80_000, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)
+    assert abs(contr - (80_000 * 0.0919 + (80_000 - 56_224) * 0.01)) < 0.01, f"RAL 80k: contributi {contr:,.2f}"
+
+
+def _file_testo(*basi):
+    for base in basi:
+        for cartella, _, files in os.walk(base):
+            for f in sorted(files):
+                if f.endswith((".md", ".py")):
+                    p = os.path.join(cartella, f)
+                    yield os.path.relpath(p, ROOT), open(p, encoding="utf-8").read()
+
+
+@test("coerenza tra skill: massimale, prima fascia, plafond e assegno sociale 2026 uguali in tutte le copie")
+def t_coerenza_parametri_2026():
+    # Decisione 5 della roadmap: copie dei dati normativi in ogni skill, con un test di coerenza.
+    from openpyxl import load_workbook
+    regole = {
+        "massimale": r"(?:[Mm]assimale(?: annuo)?(?: contributivo)?(?: 2026)?|[Tt]etto contributivo(?: annuo)?(?: 2026)?)"
+                     r"\**:?\**\s*(?:di\s*)?€\s*(\d{3}\.\d{3})|massimale_(\d{6})",
+        "prima fascia": r"prima fascia[^€\n]{0,60}€\s*(\d{2}\.\d{3})(?![\d.,])",
+        "plafond": r"(?:[Dd]educibil\w*|plafond|[Tt]etto di deducibilità)[^€\n]{0,40}€\s*(\d\.\d{3}(?:,\d{2})?)(?![\d.])",
+        "assegno sociale": r"assegno sociale[^€\n]{0,60}€\s*(\d{3},\d{2}) al mese",
+    }
+    trovati = {k: {} for k in regole}
+    for rel, testo in _file_testo(SKILLS, os.path.join(ROOT, "commands")):
+        for riga in testo.splitlines():
+            if "120.607" in riga:
+                assert "2025" in riga, f"{rel}: 120.607 (massimale 2025) senza l'anno: {riga.strip()[:120]}"
+            for nome, rx in regole.items():
+                for m in re.finditer(rx, riga):
+                    v = next(g for g in m.groups() if g)
+                    v = v.replace(".", "").replace(",", ".")
+                    trovati[nome].setdefault(float(v), set()).add(rel)
+    for nome, valori in trovati.items():
+        assert len(valori) == 1, f"{nome}: valori diversi tra le copie {valori}"
+    massimale = next(iter(trovati["massimale"]))
+    prima_fascia = next(iter(trovati["prima fascia"]))
+    assert _modulo_previdenza("proiezione-inps.py").MASSIMALE_CONTRIBUTIVO == massimale
+    np_ = _modulo_previdenza("netto-pensione.py")
+    assert np_.MASSIMALE_CONTRIBUTIVO == massimale and np_.PRIMA_FASCIA_PENSIONABILE == prima_fascia
+    wb = load_workbook(asset(*PP))
+    assert _per_etichetta(wb["Input"], "Massimale contributivo") == massimale, "massimale dell'Excel dipendenti"
+
+
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════
 
 def _excel_test(obiettivi):

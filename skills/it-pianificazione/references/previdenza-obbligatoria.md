@@ -18,12 +18,15 @@ Step 1: Contributo annuo accreditato
   aliquota_di_computo (lavoratore dipendente) = 33%
 
 Step 2: Rivalutazione montante
-  Ogni anno il montante accumulato viene rivalutato in base alla 
-  media quinquennale del PIL nominale (con minimo 1)
-  
-  montante(t+1) = (montante(t) + contributo_anno(t+1)) × (1 + tasso_PIL)
-  
-  Storicamente tasso medio: 1,5-2,5% annuo (più alto in fasi inflattive)
+  Al 31 dicembre di ogni anno il montante accumulato fino all'anno prima
+  si rivaluta con la media quinquennale del PIL nominale (mai sotto 1);
+  il contributo dell'anno entra senza rivalutazione (L. 335/1995 art. 1 c. 8-9)
+
+  montante(t) = montante(t-1) × (1 + tasso_PIL(t)) + contributo_anno(t)
+
+  Tasso nominale: 1,5-2,5% annuo negli ultimi decenni (più alto in fasi
+  inflattive, 1,0 nel 2014 e nel 2021). In euro di oggi conta il PIL REALE,
+  cioè il nominale meno l'inflazione: ~0,5% annuo
 
 Step 3: Pensione lorda annua
   pensione_lorda = montante_finale × coefficiente_trasformazione(età)
@@ -34,7 +37,7 @@ Step 3: Pensione lorda annua
 - **Aliquota di computo (totale)**: 33% (FPLD - Fondo Pensioni Lavoratori Dipendenti)
 - **A carico lavoratore**: 9,19% sulla retribuzione lorda fino alla prima fascia di retribuzione pensionabile (€56.224 nel 2026); 10% sulla parte eccedente
 - **A carico azienda**: 23,81%
-- **Tetto contributivo annuo 2026**: €122.295 (Circ. INPS 6/2026; era €120.607 nel 2025). Oltre questa soglia, per chi è interamente contributivo post-1995, **non si versa più contributo obbligatorio** sulla parte eccedente — e quindi non matura ulteriore montante)
+- **Tetto contributivo annuo 2026**: €122.295 (Circ. INPS 6/2026; era €120.607 nel 2025). Oltre questa soglia, per chi è interamente contributivo post-1995, **non si versa più contributo obbligatorio** sulla parte eccedente — e quindi non matura ulteriore montante. Il foglio Pubblica dell'Excel e `proiezione-inps.py` lo applicano
 
 Implicazione importante per RAL alti: per chi guadagna oltre il tetto, la pensione INPS smette di crescere col reddito. Diventa critico massimizzare la complementare per la parte sopra il tetto.
 
@@ -151,7 +154,7 @@ Dal 2027: 42 anni e 11 mesi per gli uomini, 41 anni e 11 mesi per le donne (Circ
 
 ### Misure sperimentali / Quota X
 
-In vigore o di prossima introduzione:
+Stato nel 2026:
 
 - **Quota 103**: non prorogata per il 2026; resta solo per chi ha maturato i requisiti (62 anni + 41 di contributi) entro il 31/12/2025, con calcolo interamente contributivo (Circ. INPS 19/2026)
 - **Opzione donna**: non prorogata; resta solo per chi ha maturato i requisiti entro il 31/12/2024, con calcolo contributivo (Circ. INPS 19/2026)
@@ -225,7 +228,7 @@ Per questa ragione la **complementare diventa strutturalmente necessaria**, non 
 
 3. **Coefficienti aggiornati**: usare i valori 2025-2026 nei calcoli ma raccomandare **sempre** all'utente di verificare sul sito INPS per la propria età esatta al momento del pensionamento. Per chi si pensiona oltre il 2026, i coefficienti saranno diversi (più bassi) — quindi le proiezioni sono ottimistiche.
 
-4. **Rivalutazione PIL**: usare 1,8% di default (media storica) come scenario base. Permettere all'utente di variare in scenari (1,5% conservativo, 2,5% ottimistico).
+4. **Rivalutazione PIL**: la proiezione è in euro di oggi (RAL reale, spesa reale), quindi il montante si rivaluta al PIL **reale**: 0,5% di default, come `proiezione-inps.py` e l'Excel; scenari 0% (stagnazione) e 1%. Il PIL nominale (~1,8-2%) applicato a una RAL reale gonfia la pensione di oltre il 20%: si usa solo se anche RAL e spesa sono espresse in valori nominali.
 
 5. **Disclaimer obbligatori**: orizzonte temporale lungo + variabilità normativa + variabilità macroeconomica = range, non puntuale. Non promettere mai.
 
@@ -233,3 +236,4 @@ Per questa ragione la **complementare diventa strutturalmente necessaria**, non 
 
 ---
 *Massimale e prima fascia 2026 (Circ. INPS 6/2026), requisiti di vecchiaia e anticipata 2026-2028 (Circ. INPS 19/2026 e 28/2026), detrazione pensionati (art. 13 c. 3 TUIR) — Verificato: 2026-10.*
+*Meccanica di rivalutazione del montante (L. 335/1995 art. 1 c. 8-9, minimo 1 dal DL 65/2015 art. 5) e tassi 2014 e 2021 (nota ISTAT del 16/10/2025) — Verificato: 2026-10.*
