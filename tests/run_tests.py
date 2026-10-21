@@ -2705,6 +2705,17 @@ def t_serie_pensione_nominale():
         assert "serie storica reale" not in testo and "FORMA reale" not in testo, f"{rel}: serie storica detta reale"
         assert re.search(r"nominale in dollari", testo, re.I) and "ricentrat" in testo, \
             f"{rel}: dire che la serie è nominale in dollari e che se ne usa solo la forma (media ricentrata)"
+    # senza ricentratura la serie si deflaziona: mai la media nominale in dollari contro euro di oggi
+    import numpy as np
+    mc = _modulo_previdenza("montecarlo-pensione.py")
+    righe = open(asset("it-pianificazione", "rendimenti-storici.csv"), encoding="utf-8").read().splitlines()
+    dati = np.array([[float(x) / 100 for x in r.split(",")[1:]] for r in righe if r and r[0].isdigit()])
+    az, ob, inf = dati[:, 0], dati[:, 1], dati[:, 2]
+    w = mc.FP_PESO_AZIONARIO
+    assert abs(mc.serie_portafoglio(az, ob).mean() - mc.FP_RENDIMENTO_ATTESO_REALE) < 1e-12, "media ricentrata"
+    mc.RICENTRA_MEDIA = False
+    reale = w * ((1 + az) / (1 + inf) - 1) + (1 - w) * ((1 + ob) / (1 + inf) - 1)
+    assert np.allclose(mc.serie_portafoglio(az, ob), reale, atol=1e-12), "RICENTRA_MEDIA=False: serie non deflazionata"
 
 
 @test("cruscotto TWR: ultima riga dinamica (5 o 14 rilevazioni), righe vuote senza −100%")

@@ -47,9 +47,10 @@ complementare conta di più.
 Sotto il cofano è lo stesso **block bootstrap** di `it-pianificazione-obiettivi/montecarlo-obiettivi.py`,
 sulla stessa serie storica Damodaran (S&P 500 + Treasury decennale, 1928–2025), che è **nominale in
 dollari**: ricampiona blocchi di anni *consecutivi*, così le code grasse, le correlazioni e la mean
-reversion sono quelle storiche e non quelle lisce di una Normale. Della serie usa solo la *forma*: la
-media viene **ricentrata** sul rendimento atteso reale del comparto che imposti tu, che fissa il
-*livello* (idealmente non USA-centrico). Il ponte (`ponte-pensione.py`) non ricentra la media, e per
+reversion sono quelle storiche e non quelle lisce di una Normale. Di default della serie usa solo la *forma*:
+la media viene **ricentrata** sul rendimento atteso reale del comparto che imposti tu, che fissa il
+*livello* (idealmente non USA-centrico). Con `RICENTRA_MEDIA = False` la serie si deflaziona anno per
+anno con l'inflazione USA e resta in termini reali. Il ponte (`ponte-pensione.py`) non ricentra la media, e per
 questo deflaziona la serie anno per anno con l'inflazione USA. La mediana del montante simulato sta sotto il valore deterministico calcolato col
 rendimento medio: è il **volatility drag**, ed è giusto che ci sia.
 

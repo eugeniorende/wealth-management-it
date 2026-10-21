@@ -66,7 +66,9 @@ ETA_PENSIONE_VECCHIAIA = 69.0 # età in cui INPS + fondo ti coprono (da proiezio
 
 SPESA_ANNUA_PONTE = 25_000.0  # tenore di vita NETTO annuo nel ponte (€ reali di oggi)
 CAPITALE_PONTE = 45_000.0     # capitale-ponte disponibile ALL'USCITA (€ reali) — tipicamente
-                              # il secchiello "libertà finanziaria" proiettato a quella data
+                              # il secchiello "libertà finanziaria" proiettato a quella data, che
+                              # it-pianificazione-obiettivi dà in nominale: dividerlo per
+                              # (1 + inflazione)^anni all'uscita per riportarlo a euro di oggi
 PESO_AZIONARIO_PONTE = 0.30   # quota azionaria durante il ponte (de-risked: il glide path
                               # della libertà finanziaria atterra proprio verso l'uscita)
 DRAG_FISCALE_ANNUO = 0.004    # attrito fiscale sui prelievi (26% sui gain realizzati), approssimato
@@ -199,7 +201,7 @@ def main():
         eta = ETA_USCITA + y
         print(f"  {eta:.0f} → {eta+1:.0f} anni: € {prelievi[y]:>8,.0f}"
               + ("   (RITA attiva)" if prelievi[y] < SPESA_ANNUA_PONTE - 0.01 else ""))
-    print(f"  totale nominale: € {prelievi.sum():,.0f}")
+    print(f"  totale (euro di oggi, non scontato): € {prelievi.sum():,.0f}")
 
     print(f"\nMONTE CARLO ({N_SIM:,} percorsi, {PESO_AZIONARIO_PONTE:.0%} azioni, "
           f"drag fiscale {DRAG_FISCALE_ANNUO:.1%}):")
