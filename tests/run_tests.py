@@ -513,6 +513,32 @@ def t_tassi_capitalizzazione():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("importa-previdenza: con --anonimo non stampa intestatario né data di nascita")
+def t_importa_anonimo():
+    # Pre-pubblicazione, privacy: tutto ciò che lo script stampa entra nel contesto del modello.
+    xml = os.path.join(FIXTURES, "estratto-inps-test.xml")
+    rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), xml)
+    assert rc == 0 and "ROSSI" in out and "15/03/1990" in out, "senza il flag lo script resta com'era"
+    for args in ((xml, "--anonimo"), ("--anonimo", xml)):
+        rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
+        assert rc == 0, out[-300:]
+        for dato in ("ROSSI", "MARIO", "15/03/1990", "1990)"):
+            assert dato not in out, f"--anonimo: stampato «{dato}»"
+        eta = re.search(r"ETA_ATTUALE\s*=\s*([\d.]+)", out)
+        assert eta and "." not in eta.group(1), "con --anonimo l'età resta, in anni interi"
+        assert "MONTANTE_ATTUALE" in out and "omesso" in out
+    # età arrotondata, non troncata: proiezione-inps.py usa round(ETA_PENSIONAMENTO − ETA_ATTUALE)
+    m = carica_modulo(asset("it-pianificazione", "importa-previdenza.py"))
+    assert m.eta_stampata(36.6, True) == 37 and m.eta_stampata(36.4, True) == 36 and m.eta_stampata(36.6, False) == 36.6
+    # un flag sbagliato non deve stampare i dati personali (revisione delle note del § 4)
+    csv_fondo = os.path.join(FIXTURES, "storico-fondo-test.csv")
+    for args in ((xml, "--anonymous"), (xml, "-anonimo"), (xml, "—anonimo"), (xml, csv_fondo, "--anonimi"),
+                 (xml, csv_fondo, "altro.csv")):
+        rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
+        assert rc != 0 and "ROSSI" not in out and "15/03/1990" not in out and "Uso:" in out, \
+            f"argomenti {args[1:]}: rc {rc}, output «{out.strip()[:120]}»"
+
+
 @test("netto-pensione: netto dello stipendio con le misure L. 207/2024 c. 4-6 e il contributo IVS aggiuntivo")
 def t_netto_stipendio():
     netto = _modulo_previdenza("netto-pensione.py")
@@ -2946,6 +2972,21 @@ def t_revisione_testi():
         f = os.path.join(SKILLS, nome, "SKILL.md")
         if os.path.exists(f):
             assert "/mnt/skills" not in open(f, encoding="utf-8").read(), f"{nome}/SKILL.md cita recalc.py del sandbox claude.ai"
+
+
+@test("revisione: spazio deducibile residuo del fondo (plafond − datore − dovuto) e perdita sui non dedotti non comunicati")
+def t_revisione_spazio_deducibile():
+    # Nota del § 4 dell'handoff (T10 dopo T4): la revisione di fine anno deve dire quanto resta
+    # deducibile e quanto costa non comunicare i non dedotti.
+    for rel in ("skills/it-revisione/SKILL.md", "skills/it-revisione/references/metodo-revisione.md",
+                "skills/it-revisione/assets/template-revisione.md", "commands/revisione.md"):
+        testo = " ".join(open(os.path.join(ROOT, rel), encoding="utf-8").read().split())
+        assert "spazio deducibile residuo" in testo, f"{rel}: manca lo spazio deducibile residuo"
+        assert "max(0, €5.300 − datore − dovuto − volontari già versati nell'anno)" in testo, \
+            f"{rel}: lo spazio residuo è max(0, plafond − datore − dovuto − volontari già versati)"
+        assert "forfettario" in testo and "altri redditi IRPEF" in testo, f"{rel}: manca il caso del forfettario"
+        assert re.search(r"non dedott[^.]*9-15%[^.]*23%", testo), \
+            f"{rel}: perdita sui non dedotti non comunicati: 9-15%, 23% con anticipazioni e riscatti per altre cause"
 
 
 @test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")
