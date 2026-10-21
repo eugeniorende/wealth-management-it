@@ -508,6 +508,8 @@ def t_coerenza_parametri_2026():
     assert np_.MASSIMALE_CONTRIBUTIVO == massimale and np_.PRIMA_FASCIA_PENSIONABILE == prima_fascia
     wb = load_workbook(asset(*PP))
     assert _per_etichetta(wb["Input"], "Massimale contributivo") == massimale, "massimale dell'Excel dipendenti"
+    assert _per_etichetta(load_workbook(asset(*PA))["Input"], "Massimale contributivo") == massimale, \
+        "massimale dell'Excel autonomi"
     plafond = next(iter(trovati["plafond"]))
     for skill, nome in (PP, ("it-pianificazione-autonomi", "proiezione-pensione-autonomi.xlsx")):
         assert _per_etichetta(load_workbook(asset(skill, nome))["Input"], "Plafond deducibilità") == plafond, \
@@ -691,6 +693,118 @@ def t_testi_fondo():
     for rel in ("it-pianificazione/SKILL.md", "it-pianificazione-autonomi/SKILL.md"):
         testo = open(os.path.join(SKILLS, rel), encoding="utf-8").read()
         assert "tassazione agevolata della prestazione finale (15→9%)" not in testo, f"{rel}: uscita del forfettario"
+
+
+VARIANTI_PA_T6 = {
+    "ord150k": {("Input", "B19"): 2, ("Input", "B21"): 150_000, ("Input", "B22"): 0},
+    "forf_altri12k": {("Input", "B19"): 1, ("Input", "B28"): 3_000, ("Input", "B52"): 12_000},
+    "forf_altri2k": {("Input", "B19"): 1, ("Input", "B28"): 3_000, ("Input", "B52"): 2_000},
+    "fondo3k": {("Input", "B28"): 3_000, ("Input", "B31"): 10_000, ("Input", "B32"): 30},
+}
+
+
+def _pensione_autonomi(i, g, r, n, massimale, coeff):
+    """Previdenza autonomi: stessa meccanica L. 335/1995 dei dipendenti, sul reddito professionale."""
+    return _pensione_contributiva(i["B13"].value, i["B23"].value, g, r, n, massimale, i["B12"].value, coeff)
+
+
+@test("proiezione-pensione-autonomi.xlsx: massimale (150k in ordinario → contributo €31.882,31) e rivalutazione L. 335/1995")
+def t_autonomi_massimale():
+    # REGRESSIONE F015: nessuna cella applicava il massimale (contributo 39.105 invece di 31.882,
+    # pensione +38,8%); Previdenza!F rivalutava anche il contributo dell'anno.
+    from openpyxl import load_workbook
+    base = load_workbook(xlsx_ricalcolati()[asset(*PA)], data_only=True)
+    v = _varianti(*PA, VARIANTI_PA_T6)
+    p, f = v["ord150k"]["Previdenza"], v["ord150k"]["Fiscalità"]
+    assert abs(p["D5"].value - 122_295 * 0.2607) < 0.01, f"Previdenza!D5 = {p['D5'].value:,.2f}"
+    assert abs(f["C7"].value - 122_295 * 0.2607) < 0.01, f"Fiscalità!C7 = {f['C7'].value:,.2f} senza massimale"
+    formule = load_workbook_formule(asset(*PA))
+    assert "Input!$B$51" in formule["Previdenza"]["D5"].value and "MIN(" in formule["Previdenza"]["D5"].value
+    for nome, wb in (("default", base), ("ord150k", v["ord150k"])):
+        i, p = wb["Input"], wb["Previdenza"]
+        n = int(i["B7"].value)
+        atteso = _pensione_autonomi(i, i["B24"].value, i["B14"].value, n, _per_etichetta(i, "Massimale contributivo"), 1.0)
+        assert abs(p["B58"].value - atteso) <= 1e-6 * atteso, f"{nome}: montante {p['B58'].value:,.0f} ≠ {atteso:,.0f}"
+
+
+@test("proiezione-pensione-autonomi.xlsx: il forfettario deduce il fondo solo fino agli altri redditi IRPEF")
+def t_autonomi_altri_redditi():
+    # REGRESSIONE F039: Fiscalità!B8 = MIN(versamento; 5.300) × 0, cablato: l'eccezione del forfettario
+    # con affitti o lavoro dipendente part-time non era calcolabile.
+    from openpyxl import load_workbook
+    base = load_workbook(xlsx_ricalcolati()[asset(*PA)], data_only=True)
+    v = _varianti(*PA, VARIANTI_PA_T6)
+    for nome, wb, dedotto in (("altri 12k", v["forf_altri12k"], 3_000), ("altri 2k", v["forf_altri2k"], 2_000),
+                              ("default", base, 0)):
+        i, f = wb["Input"], wb["Fiscalità"]
+        altri = _per_etichetta(i, "Altri redditi IRPEF")
+        assert _per_etichetta(i, "Versamento dedotto") == min(dedotto, i["B28"].value), f"{nome}: versamento dedotto"
+        risparmio = _irpef(altri) - _irpef(altri - min(i["B28"].value, 5_300, altri))
+        assert abs(f["B15"].value - risparmio) < 0.01, f"{nome}: risparmio forfettario {f['B15'].value:,.2f} ≠ {risparmio:,.2f}"
+    assert abs(v["forf_altri12k"]["Fiscalità"]["B15"].value - 690) < 0.01
+
+
+@test("proiezione-pensione-autonomi.xlsx: pensione netta e tre scenari sul gap rispetto alla spesa target")
+def t_autonomi_scenari():
+    # REGRESSIONE F039: nessun netto, gap solo rispetto al reddito, «Scenari» = due righe.
+    from openpyxl import load_workbook
+    wb = load_workbook(xlsx_ricalcolati()[asset(*PA)], data_only=True)
+    i, p, c, r = wb["Input"], wb["Previdenza"], wb["Complementare"], wb["Riepilogo"]
+    netto = _modulo_previdenza("netto-pensione.py")
+    lorda = p["B60"].value
+    assert abs(_per_etichetta(p, "NETTA annua") - netto.netto_pensionato(lorda, 0.02, 0.0)[0]) < 0.01, "pensione netta"
+    spesa = _per_etichetta(i, "Spesa mensile attuale") * 12 * _per_etichetta(i, "Fattore riduzione spesa")
+    righe = {str(r[f"A{k}"].value): k for k in range(1, r.max_row + 1) if r[f"A{k}"].value}
+    def riga(testo):
+        return next(k for e, k in righe.items() if e.startswith(testo))
+    intest = riga("Voce")
+    assert [r[f"{x}{intest}"].value for x in "BCD"] == ["Conservativo", "Base", "Ottimistico"]
+    assert abs(r[f"C{riga('Pensione obbligatoria lorda')}"].value - lorda) < 0.01
+    assert abs(r[f"C{riga('Pensione obbligatoria netta')}"].value - _per_etichetta(p, "NETTA annua")) < 0.01
+    assert abs(r[f"C{riga('Rendita fondo')}"].value - c["B62"].value) < 0.01
+    n, massimale = int(i["B7"].value), _per_etichetta(i, "Massimale contributivo")
+    coeff = _coeff_excel(wb, i["B6"].value)
+    for col in "BCD":
+        assert abs(r[f"{col}{riga('Spesa target')}"].value - spesa) < 0.01, f"{col}: spesa target in euro di oggi"
+        g, rv, d = (r[f"{col}{riga(t)}"].value for t in ("Crescita reddito", "Rivalutazione montante", "Decadimento"))
+        attesa = _pensione_autonomi(i, g, rv, n, massimale, coeff * (1 - d) ** (n / 2))
+        assert abs(r[f"{col}{riga('Pensione obbligatoria lorda')}"].value - attesa) <= 1e-6 * attesa, f"{col}: pensione"
+        tot = r[f"{col}{riga('Pensione totale netta')}"].value
+        assert abs(r[f"{col}{riga('GAP')}"].value - (spesa - tot)) < 0.01, f"{col}: gap = spesa target − pensione netta"
+    lorde = [r[f"{x}{riga('Pensione obbligatoria lorda')}"].value for x in "BCD"]
+    assert lorde[0] < lorde[1] < lorde[2], f"scenari non ordinati: {lorde}"
+    # fondo: con versamenti, la rendita di ogni colonna = (montante col rendimento della colonna −
+    # tassa in uscita sui soli dedotti) × coefficiente della colonna
+    wb = _varianti(*PA, VARIANTI_PA_T6)["fondo3k"]
+    i, c, r = wb["Input"], wb["Complementare"], wb["Riepilogo"]
+    righe = {str(r[f"A{k}"].value): k for k in range(1, r.max_row + 1) if r[f"A{k}"].value}
+    assert c["B62"].value > 0 and abs(r[f"C{riga('Rendita fondo')}"].value - c["B62"].value) < 0.01, "Base ≠ Complementare!B62"
+    n, infl = int(i["B7"].value), i["B39"].value
+    for col in "BD":
+        rend, d = r[f"{col}{riga('Rendimento netto fondo')}"].value, r[f"{col}{riga('Decadimento')}"].value
+        montante = i["B31"].value * (1 + rend) ** n + sum(i["B28"].value * (1 + rend) ** (n - t) for t in range(n))
+        tassa = (i["B31"].value * (1 + infl) ** -n + sum(_per_etichetta(i, "Versamento dedotto") * (1 + infl) ** (t - n)
+                                                         for t in range(n))) * i["B38"].value
+        attesa = (montante - tassa) * coeff * (1 - d) ** (n / 2)
+        assert abs(r[f"{col}{riga('Rendita fondo')}"].value - attesa) <= 1e-6 * attesa, f"{col}: rendita del fondo"
+
+
+@test("casse professionali: ogni riga della tabella ha una fonte ufficiale e il marcatore, dati 2026 corretti")
+def t_casse_fonti():
+    # F038/T6: tabella «indicativa, da verificare» senza fonti; Inarcassa con un 3% oltre il massimale
+    # abolito dal 2013, Forense con il volontario all'1-10% (è 1-20%).
+    testo = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "references", "casse-professionali.md"),
+                 encoding="utf-8").read()
+    righe = [r for r in testo.splitlines() if r.startswith("| **")]
+    assert len(righe) >= 6, f"tabella casse: {len(righe)} righe"
+    for riga in righe:
+        nome = riga.split("**")[1]
+        assert "https://" in riga, f"{nome}: manca il link ufficiale"
+        assert "Verificato: 2026-10" in riga, f"{nome}: manca il marcatore"
+    per_nome = {r.split("**")[1]: r for r in righe}
+    assert "2.785" in per_nome["Inarcassa"] and "3%" not in per_nome["Inarcassa"], per_nome["Inarcassa"][:160]
+    assert "20%" in per_nome["Cassa Forense"] and "131.800" in per_nome["Cassa Forense"], per_nome["Cassa Forense"][:160]
+    assert "209.300" in per_nome["CNPADC"] and "856" in per_nome["ENPAP"], "CNPADC/ENPAP"
 
 
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════

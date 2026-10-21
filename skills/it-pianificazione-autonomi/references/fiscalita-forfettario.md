@@ -32,6 +32,8 @@ L'imposta sostitutiva **sostituisce**: IRPEF, addizionali regionali e comunali, 
 
 Per developer/consulenti IT il coefficiente è **78%**: il 78% dei ricavi è reddito tassabile, il 22% è abbattimento forfettario che rappresenta le "spese" riconosciute a forfait.
 
+⚠️ I coefficienti del 40% e del 62% (commercio, alimentari, ristorazione, intermediari) riguardano attività di solito iscritte alle gestioni INPS di artigiani e commercianti, che hanno contributi fissi sul minimale e sono fuori dal perimetro della skill: in quel caso rinviare a INPS o al commercialista.
+
 ### Requisiti 2026
 
 - Ricavi anno precedente ≤ **€85.000** (uscita immediata al superamento di €100.000 in corso d'anno)

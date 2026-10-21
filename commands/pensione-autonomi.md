@@ -20,7 +20,7 @@ Workflow:
 
 3. **Previdenza complementare**: analisi CORRETTA della deducibilità (zero per forfettario puro; fino a capienza se ha redditi IRPEF; piena se ordinario). Confronto onesto fondo pensione vs PAC ETF per il forfettario puro: in uscita i versamenti non dedotti non sono tassati se comunicati al fondo entro il 31/12 dell'anno successivo.
 
-4. **Gap analysis tenore di vita**: scenari conservativo/base/ottimistico.
+4. **Gap analysis tenore di vita**: gap tra spesa target (in euro di oggi) e pensione netta, negli scenari conservativo/base/ottimistico (tabella «Scenari» del Riepilogo nell'Excel). Se l'utente ha altri redditi IRPEF, il foglio Fiscalità mostra quanto del versamento al fondo deduce.
 
 5. **Leve da valutare**, come scenari quantificati e non come raccomandazioni personali: pattern A1-A5 (versare contributi obbligatori, valutare il fondo senza il falso mito della deduzione, sfruttare redditi IRPEF collaterali, valutare ordinario se conviene, massimizzare la complementare).
 
