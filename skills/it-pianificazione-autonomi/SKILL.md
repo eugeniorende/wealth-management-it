@@ -16,7 +16,7 @@ Per un **dipendente** (skill `it-pianificazione`), versare al fondo pensione è 
 Per un **forfettario puro**, questo beneficio **NON esiste**. Il motivo:
 - Il reddito forfettario è tassato con **imposta sostitutiva** (15%, o 5% i primi 5 anni), NON con IRPEF
 - Il reddito forfettario **non concorre a formare il reddito complessivo IRPEF**
-- La deduzione del fondo pensione (art. 10 TUIR) opera **solo** sul reddito complessivo IRPEF
+- La deduzione del fondo pensione (art. 10 c. 1 lett. e-bis TUIR; dal 2027 art. 10 c. 1 lett. h D.Lgs. 117/2026) opera **solo** sul reddito complessivo IRPEF
 - Quindi: un forfettario senza altri redditi IRPEF che versa €5.000 al fondo pensione ottiene **€0 di risparmio fiscale** dalla deduzione
 
 Fonte: Modello Redditi PF 2026, quadro LM — i contributi versati volontariamente a un fondo pensione **non sono deducibili** per i forfettari (a differenza dei contributi INPS obbligatori, che invece lo sono).
@@ -25,7 +25,7 @@ Fonte: Modello Redditi PF 2026, quadro LM — i contributi versati volontariamen
 - Il fondo pensione per un forfettario puro resta utile per la **capitalizzazione** (rendimenti tassati al 20% invece del 26%) e perché in uscita i **versamenti non dedotti non sono tassati**, a patto di comunicarli al fondo entro il 31/12 dell'anno successivo (art. 8 c. 4 D.Lgs. 252/2005). Perde però il vantaggio della deduzione in ingresso, che è il motore principale della convenienza per i dipendenti.
 - Per un forfettario, prima di versare al fondo pensione, va valutato se non sia altrettanto (o più) efficiente un investimento in un PAC di ETF sul dossier titoli ordinario, che ha più liquidità e flessibilità.
 
-**Eccezione**: il forfettario che ha **anche altri redditi IRPEF** (es. affitti tassati IRPEF, un lavoro dipendente part-time, redditi occasionali) può dedurre il contributo al fondo pensione **fino a capienza di quei redditi IRPEF**. In quel caso una parte del vantaggio deduzione torna disponibile. Il risparmio pieno vale per redditi senza detrazioni proprie, come gli affitti a IRPEF ordinaria: con un lavoro dipendente o redditi occasionali le detrazioni dell'art. 13 TUIR riducono già l'IRPEF, e quindi il risparmio, fino ad azzerarlo per redditi piccoli.
+**Eccezione**: il forfettario che ha **anche altri redditi IRPEF** (es. affitti tassati IRPEF, un lavoro dipendente part-time, redditi occasionali) può dedurre il contributo al fondo pensione **fino a capienza di quei redditi IRPEF**. In quel caso una parte del vantaggio deduzione torna disponibile. Il risparmio pieno vale per redditi senza detrazioni proprie, come gli affitti a IRPEF ordinaria: con un lavoro dipendente o redditi occasionali le detrazioni dell'art. 13 TUIR (dal 2027 art. 13 D.Lgs. 117/2026) riducono già l'IRPEF, e quindi il risparmio, fino ad azzerarlo per redditi piccoli.
 
 ## Scope esplicito
 
@@ -66,7 +66,7 @@ Il sistema è **contributivo puro**, identico a quello dei dipendenti: montante 
 Per i professionisti **iscritti a un albo con cassa**: ingegneri/architetti (Inarcassa), avvocati (Cassa Forense), medici (ENPAM), commercialisti (CNPADC), psicologi (ENPAP), geometri (CIPAG), notai, veterinari, periti industriali, biologi, infermieri, ecc.
 
 Struttura comune a (quasi) tutte le casse — due pilastri più un piccolo contributo di maternità:
-- **Contributo soggettivo**: % sul reddito professionale netto, a carico del professionista, costruisce la pensione (montante). Ha un **minimo** dovuto anche con reddito basso/nullo e spesso un **massimale** di reddito. **È deducibile** (art. 10 TUIR), **anche in forfettario**.
+- **Contributo soggettivo**: % sul reddito professionale netto, a carico del professionista, costruisce la pensione (montante). Ha un **minimo** dovuto anche con reddito basso/nullo e spesso un **massimale** di reddito. **È deducibile** (art. 10 c. 1 lett. e TUIR; dal 2027 lett. f D.Lgs. 117/2026), **anche in forfettario**.
 - **Contributo integrativo**: tipicamente **4%** (2% ENPAP, 5% CIPAG) sul volume d'affari IVA, **addebitato in fattura al cliente** (pass-through): il professionista lo incassa e lo riversa, non incide sul suo netto, e **non è deducibile** (non è un suo costo). Dal 2013 molte casse ne accreditano una quota sul montante.
 
 ⚠️ **Il punto che si collega al forfettario**: il contributo *obbligatorio* alla cassa (soggettivo) è deducibile **anche in forfettario** (abbatte la base dell'imposta sostitutiva 5%/15%), a differenza del contributo *volontario* al fondo pensione complementare, che per il forfettario NON è deducibile. Sono due piani diversi (previdenza obbligatoria vs complementare).
@@ -77,7 +77,7 @@ Per il dettaglio (le due cornici normative 509/1994 e 103/1996, la tabella delle
 
 ## La fiscalità del forfettario (e perché conta per la pensione)
 
-Il regime forfettario (L. 190/2014) determina il reddito così:
+Il regime forfettario (L. 190/2014 c. 54-89; dal 2027 artt. 232-243 D.Lgs. 117/2026) determina il reddito così:
 
 ```
 reddito_lordo_forfettario = ricavi_incassati × coefficiente_redditività
@@ -127,7 +127,7 @@ Raccogliere:
 - `crescita_ricavi_attesa` (default 2%/anno)
 - `eta_corrente`, `eta_target_pensionamento` (default 67)
 - `anni_anzianita_contributiva_correnti`
-- `altri_redditi_irpef` (affitti a IRPEF ordinaria, lavoro dipendente part-time, ecc.) — **rilevante per la deducibilità del fondo pensione**; con lavoro dipendente o occasionale il beneficio va ridotto delle detrazioni dell'art. 13 TUIR
+- `altri_redditi_irpef` (affitti a IRPEF ordinaria, lavoro dipendente part-time, ecc.) — **rilevante per la deducibilità del fondo pensione**; con lavoro dipendente o occasionale il beneficio va ridotto delle detrazioni dell'art. 13 TUIR (dal 2027 stesso articolo)
 
 **Fondo pensione (se presente o in valutazione):**
 - `montante_fondo_accumulato`
@@ -160,7 +160,7 @@ contributi_futuri = Σ min(reddito_anno, massimale) × 0,25 fino al pensionament
 montante_finale = capitalizza in euro di oggi al PIL reale (~0,5%): il contributo
                   dell'anno si rivaluta dall'anno dopo (L. 335/1995)
 pensione_lorda = montante_finale × coefficiente_trasformazione_proiettato(età)
-pensione_netta = pensione_lorda − IRPEF (detrazione pensionati art. 13 c. 3 TUIR) − addizionali
+pensione_netta = pensione_lorda − IRPEF (detrazione pensionati art. 13 c. 3 TUIR, dal 2027 stesso articolo e comma) − addizionali
 ```
 
 ⚠️ **Differenza chiave vs dipendenti**: l'aliquota di computo è 25% invece di 33%. A parità di reddito, l'autonomo accantona **meno** del dipendente (≈24% in meno di montante), quindi a parità di reddito avrà una **pensione pubblica più bassa**. Questo rende la previdenza complementare ancora più importante per gli autonomi — ma senza il vantaggio fiscale della deduzione (per i forfettari).

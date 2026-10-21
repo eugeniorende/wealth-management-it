@@ -2,7 +2,7 @@
 
 Questa reference affronta il tema fiscalmente più delicato e frainteso della pianificazione previdenziale per autonomi: **come il regime forfettario cambia (e spesso annulla) la convenienza fiscale del fondo pensione**.
 
-## Come funziona il forfettario (L. 190/2014)
+## Come funziona il forfettario (L. 190/2014; dal 2027 artt. 232-243 D.Lgs. 117/2026)
 
 ```
 Step 1: reddito lordo forfettario
@@ -65,7 +65,7 @@ Esempio: consulente IT, ricavi €40.000, coefficiente 78%
 Questo è il punto centrale. **Il contributo che versi volontariamente a un fondo pensione NON è deducibile** se sei un forfettario senza altri redditi IRPEF.
 
 **Perché**:
-- La deduzione del fondo pensione (art. 10, comma 1, lett. e-bis TUIR) opera sul **reddito complessivo IRPEF**
+- La deduzione del fondo pensione (art. 10, comma 1, lett. e-bis TUIR; dal 2027 lett. h D.Lgs. 117/2026) opera sul **reddito complessivo IRPEF**
 - Il reddito forfettario è tassato con imposta sostitutiva e **non concorre** al reddito complessivo IRPEF
 - Quindi non c'è un reddito IRPEF da cui dedurre → la deduzione vale **zero**
 
@@ -77,7 +77,7 @@ Fonte: Modello Redditi PF 2026, quadro LM. La prassi dell'Agenzia delle Entrate 
 
 ### L'eccezione: forfettario CON altri redditi IRPEF
 
-Se il forfettario ha **anche** redditi soggetti a IRPEF — affitti tassati IRPEF (non cedolare secca), un lavoro dipendente part-time, redditi occasionali, ecc. — allora il contributo al fondo pensione **deduce da quei redditi IRPEF**, fino a capienza. Il risparmio pieno vale per redditi senza detrazioni proprie (affitti a IRPEF ordinaria): con un lavoro dipendente o redditi occasionali le detrazioni dell'art. 13 TUIR riducono già l'IRPEF, e quindi il risparmio, fino ad azzerarlo per redditi piccoli.
+Se il forfettario ha **anche** redditi soggetti a IRPEF — affitti tassati IRPEF (non cedolare secca), un lavoro dipendente part-time, redditi occasionali, ecc. — allora il contributo al fondo pensione **deduce da quei redditi IRPEF**, fino a capienza. Il risparmio pieno vale per redditi senza detrazioni proprie (affitti a IRPEF ordinaria): con un lavoro dipendente o redditi occasionali le detrazioni dell'art. 13 TUIR (dal 2027 art. 13 D.Lgs. 117/2026) riducono già l'IRPEF, e quindi il risparmio, fino ad azzerarlo per redditi piccoli.
 
 ```
 Esempio: forfettario IT con €30.000 di reddito forfettario

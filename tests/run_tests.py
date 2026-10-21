@@ -2885,8 +2885,7 @@ _NORME_2027 = re.compile(
     r"|art\.\s?(?:17|11 c\.\s?(?:6|4-ter|4-quater|4-quinquies))\s?D\.\s?Lgs\.\s?252/2005"
     r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?24 L\.\s?207/2024|lett(?:era|\.)\s?\*{0,2}c-(?:bis|ter|quater|quinquies|sexies)")
 _SUCCESSORE_2027 = re.compile(r"2027|117/2026|141/2026|173/2024|174/2024|33/2025|123/2025|\bTU\b|testo unico")
-# T6 riscrive i testi degli autonomi: le loro doppie citazioni arrivano dopo il suo merge.
-_RINVIATI_T11 = ("skills/it-pianificazione-autonomi/",)
+_RINVIATI_T11 = ()
 
 
 @test("T11: ogni norma che cambia dal 2027 è citata anche col testo unico che la sostituisce")
