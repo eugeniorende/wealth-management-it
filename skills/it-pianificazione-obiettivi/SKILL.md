@@ -199,7 +199,7 @@ Il framework, per obiettivo:
 - **Fondo emergenza / breve** → **conto deposito** (liquidità, FITD).
 - **Lungo termine (crescita)** → **dossier amministrato** con ETF ad accumulazione (default flessibile); una *quota* in **PIR** solo se si accetta consapevolmente la concentrazione su PMI italiane e il vincolo di 5 anni, in cambio dello 0% di tasse (e dell'esenzione successoria).
 - **Parte sicura a medio termine** → **BTP nel dossier** (12,5%): location vantaggiosa senza vincoli aggiuntivi.
-- **Finalità successoria** → polizza vita / BTP / PIR (esenti da imposta di successione), solo se la successione è prioritaria e i costi accettabili.
+- **Finalità successoria** → polizza vita / BTP / PIR (esenti da imposta di successione), solo se la successione è prioritaria e i costi accettabili. Per azioni e obbligazioni dirette il costo degli eredi riparte dal valore di successione; per fondi ed ETF non è garantito: vedi `it-tax-optimization/references/successione-donazione.md`.
 
 Principio: il **dossier amministrato è il default**; si devia verso un contenitore vincolato solo quando il suo vincolo coincide con la natura dell'obiettivo e il vantaggio fiscale supera costi e perdita di flessibilità/diversificazione. Tensioni da comunicare sempre: il fondo pensione è dominante ma vincolato; il PIR azzera le tasse ma costa concentrazione italiana (≈2% del mondo) e commissioni che possono annullare il beneficio; le polizze hanno vantaggio successorio ma costi spesso elevati. Per i **numeri** del beneficio netto c'è lo script `assets/asset-location-optimizer.py` (vedi sotto). Vedi `references/asset-location.md`.
 
