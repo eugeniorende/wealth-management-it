@@ -33,32 +33,64 @@ si prende da un **report che scarichi tu**, senza credenziali in giro.
 `assets/importa-estratto-broker.py` ingerisce un **estratto del portafoglio in CSV** che esporti dal
 broker, e:
 
-1. calcola le **plus/minus latenti** per ogni posizione (valore di mercato − costo di carico);
-2. separa le **minus latenti** (candidate all'harvesting: venderle realizza una minus che ricarica
-   lo zainetto) dalle **plus latenti** (venderle genera imposta, salvo compensazione);
-3. se gli passi anche un CSV con lo **zainetto** (un secondo file, perché vive nella certificazione,
-   non nell'estratto delle posizioni), incrocia le due cose e ti dice **quanta plus puoi realizzare
-   a imposta zero** compensandola con le minus disponibili;
-4. produce un report leggibile e un **JSON strutturato** che alimenta il workflow di `/minusvalenze`.
+1. calcola le **plus/minus latenti** per ogni posizione (valore di mercato − costo di carico, cioè il
+   PMC del broker, che in amministrato è la base fiscale);
+2. assegna a ogni posizione la **categoria fiscale**: dalla colonna «tipo fiscale» se c'è, altrimenti
+   dalla descrizione (vedi sotto). Le plus di ETF e fondi sono reddito di capitale e non entrano tra
+   le compensabili; quelle degli OICR fuori UE/SEE sono segnalate come IRPEF (quadro RL);
+3. deduce l'**aliquota**: 12,5% per i titoli di Stato italiani (ISIN IT e BTP/BOT/CCT/CTZ in
+   descrizione), 26% per il resto, salvo una colonna «aliquota» nel file;
+4. se gli passi anche un CSV con lo **zainetto** (un secondo file, perché vive nella certificazione),
+   calcola la **scadenza** di ogni minus (31/12 del quarto anno successivo), esclude quelle scadute
+   rispetto a `--anno`, converte il 12,5% in «26%-equivalente» nei due versi e ti dice **quanta plus
+   compensabile puoi realizzare a imposta zero**, broker per broker se i file hanno la colonna
+   `broker` (lo zainetto non si compensa tra intermediari);
+5. stampa un report leggibile e, con `--json`, scrive il **JSON completo** (posizioni, zainetto con
+   scadenze, analisi per broker, avvisi) che il workflow di `/minusvalenze` può rileggere.
 
 Uso:
 
 ```
-python importa-estratto-broker.py estratto.csv [zainetto.csv]
+python importa-estratto-broker.py estratto.csv [zainetto.csv] [--anno 2026] [--broker Fineco] [--json risultato.json]
 ```
 
-Solo libreria standard, nessuna dipendenza.
+`--json -` stampa solo il JSON su stdout. Gli errori sui file (mancanti, vuoti, colonne non
+riconosciute, aliquote ignote) escono con un messaggio leggibile e codice 2. Solo libreria standard.
+
+### Come classifica senza la colonna «tipo fiscale»
+
+La categoria si deduce dalla **descrizione**, non dal prefisso dell'ISIN: DE, FR, IE e LU coprono anche
+azioni singole come SAP o LVMH, ed ETC ed ETN con ISIN IE o JE non sono fondi.
+- ETC, ETN, ETP e certificate → reddito diverso.
+- «ETF», «UCITS», «fondo», «SICAV» o il nome di un emittente di ETF (iShares, Vanguard, Xtrackers,
+  Amundi, Lyxor, SPDR, Invesco, VanEck, WisdomTree) → OICR: reddito di capitale se l'ISIN è di un
+  Paese UE/SEE, `reddito_capitale_irpef` se è di un altro Paese (per esempio un ETF domiciliato negli
+  USA), da classificare se la descrizione dice «non armonizzato» (dipende dal gestore).
+- Azioni riconoscibili dalla forma societaria (SpA, SE, AG, SA, NV, PLC, Inc) → reddito diverso.
+- Obbligazioni e titoli di Stato → reddito diverso, al netto di ratei e scarto di emissione maturati.
+  BOT, CTZ e zero coupon restano **da classificare**: la loro plus latente è in gran parte scarto di
+  emissione, cioè reddito di capitale.
+- Nessun indizio → **da classificare**: la plus non viene contata tra le compensabili e il report
+  chiede di indicarne la categoria. Non si assume mai «reddito diverso».
+
+Valori accettati nella colonna «tipo fiscale»: `reddito_diverso`, `reddito_capitale`,
+`reddito_capitale_irpef`, `da_classificare` (o le forme brevi «diverso», «capitale»).
 
 ## Il parser è tollerante ai formati (deve esserlo)
 
 La difficoltà vera non è leggere *un* formato, è che i tre broker hanno **layout diversi e non
 standard**. Per questo il parser non assume colonne fisse: riconosce i nomi-colonna tipici dei
 dossier italiani con un dizionario di sinonimi e un matching tollerante (ignora maiuscole, accenti,
-spazi, e gestisce sia i numeri all'italiana `1.234,56` sia all'inglese `1,234.56`). Riconosce per
-esempio `ISIN`/`Codice ISIN`, `Descrizione`/`Strumento`/`Titolo`, `Quantità`/`Pezzi`,
+spazi, e gestisce sia i numeri all'italiana `1.234,56` sia all'inglese `1,234.56`). Il formato si
+decide **per file**: se in una colonna numerica compare una virgola decimale (`12,40`), il file è
+all'italiana e `1.000` o `1.234.567` sono migliaia; se il file non dà indizi, `1.000` è letto come
+mille e il report lo segnala. Le righe senza costo o valore leggibili sono scartate con un avviso,
+mai in silenzio. Riconosce per esempio `ISIN`/`Codice ISIN`, `Descrizione`/`Strumento`/`Titolo`, `Quantità`/`Pezzi`,
 `Prezzo medio di carico`/`PMC`/`Prezzo di carico`, `Controvalore`/`Valore di mercato`. Se il tuo
 export usa nomi che non riconosce, li aggiungi ai dizionari `SINONIMI` in testa allo script — è una
-riga. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il formato atteso.
+riga. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il formato atteso: sugli
+esempi le uniche plus sono di un ETF, quindi l'importatore risponde «€ 0 a imposta zero».
+Lo zainetto accetta le colonne anno, importo, aliquota e, se serve, broker.
 
 ## Come esportare da ciascun broker
 
@@ -83,9 +115,19 @@ pilota.
   parser dedicato per ciascun broker ed è rimandato.
 - **Lo zainetto è un input separato.** Sta in un documento diverso (la certificazione) rispetto
   all'estratto delle posizioni, quindi è un secondo CSV opzionale, non ricavabile dalle posizioni.
-- **La classificazione fiscale è semplificata.** La plus/minus su vendita è reddito diverso
-  (compensabile) e il parser la tratta così. La trappola dei proventi degli ETF armonizzati (reddito
-  di **capitale**, non compensabile con le minus) è un'altra cosa: vedi `etf-trap-redditi-capitale.md`.
+- **La classificazione dalla descrizione è un'euristica.** La plus da vendita di ETF e fondi è reddito
+  di **capitale** e non compensa lo zainetto (art. 44 c. 1 lett. g TUIR; circ. AdE 21/E/2014); solo
+  la minus è reddito diverso (vedi `etf-trap-redditi-capitale.md`). Lo script lo applica, ma
+  riconosce gli strumenti dalla descrizione: quando sbaglia o non sa, la colonna «tipo fiscale»
+  nel CSV ha la precedenza, e le posizioni senza indizi restano da classificare.
+- **Scarto di emissione e ratei non sono scorporati.** La plus latente di un'obbligazione include lo
+  scarto maturato: per i BTP emessi vicino alla pari conta poco, per BOT, CTZ e zero coupon è quasi
+  tutto (per questo restano da classificare). Vedi l'Esempio D di `aliquote-12-5-26.md`.
+- **Obbligazioni a nominale.** Se l'export dà il nominale e il prezzo in percentuale senza il valore
+  di carico, il costo calcolato come quantità × prezzo è sbagliato di un fattore 100: serve la
+  colonna del valore di carico.
+- **Solo amministrato.** Per i conti in dichiarativo (broker esteri) i numeri non valgono: lì si
+  applicano il LIFO e il cambio del giorno, che lo script non calcola (vedi `regime-dichiarativo.md`).
 - **Niente credenziali a tool.** Il flusso è volutamente "scarichi tu, dai in pasto il file": nessuna
   password, nessun 2FA, nessun reverse-engineering. È la scelta che tiene insieme robustezza,
   conformità alle condizioni d'uso e sicurezza.

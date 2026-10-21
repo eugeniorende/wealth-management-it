@@ -461,7 +461,7 @@ Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazion
 
 L'utente deve fornire:
 
-1. **Snapshot portafoglio** in CSV o testo. Schema:
+1. **Snapshot portafoglio** in CSV o testo (l'estratto CSV del broker si legge con `skills/it-tax-optimization/assets/importa-estratto-broker.py`, che classifica le posizioni, esclude le minus scadute e incrocia lo zainetto broker per broker). Schema:
    ```
    isin,descrizione,quantita,pmc,prezzo_corrente,categoria_fiscale
    IE00B4L5Y983,iShares Core MSCI World,100,75.20,89.50,reddito_capitale
