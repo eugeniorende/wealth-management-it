@@ -64,7 +64,7 @@ Come per le minus tradizionali, le minusvalenze cripto vanno **indicate in dichi
 
 - **Monitoraggio fiscale — Quadro RW (Redditi PF) o Quadro W (730)**: obbligatorio per la **sola detenzione** di cripto-attività, **indipendentemente dall'importo** e anche in assenza di plusvalenze. Vale per exchange italiani ed esteri, **wallet self-custody** (Ledger, MetaMask, ecc.) e qualsiasi forma di cripto — anche se le chiavi private sono su un dispositivo in Italia. Non c'è soglia minima. Confermato da Circ. AdE 30/E/2023 e risposte a interpello 75/2025 e 135/2025.
 - **Plusvalenze — Quadro RT (Redditi) o Quadro T (730)**: da compilare se si sono realizzate operazioni rilevanti (cessioni, permute tra cripto diverse, staking). Consigliato anche senza plus, per documentare le minusvalenze riportabili.
-- Dal 730/2025 (redditi 2024) i non titolari di P.IVA possono dichiarare cripto (oltre ad azioni/ETF/derivati) direttamente nel 730, con i nuovi Quadri **T** (plus), **W** (monitoraggio), **M** (imposte sostitutive), **D** (redditi di capitale) — equivalenti a RT, RW, RM, RL del modello Redditi.
+- Dal 730/2025 (redditi 2024) i non titolari di P.IVA possono dichiarare cripto (oltre ad azioni/ETF/derivati) direttamente nel 730, con i nuovi Quadri **T** (plus) e **M** (imposte sostitutive), oltre al **W** (monitoraggio, già dal 730/2024) e al **D** (redditi di capitale) — equivalenti a RT, RW, RM, RL del modello Redditi.
 - **DAC8**: la cooperazione UE e gli obblighi di comunicazione degli exchange rendono l'Agenzia sempre più informata. Il "tanto non si scopre" non regge.
 - **ISEE**: dal 2026 il patrimonio in cripto entra nel calcolo dell'ISEE (riportando il Quadro RW). Rilevante se si chiedono agevolazioni legate all'ISEE.
 
