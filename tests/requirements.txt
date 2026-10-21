@@ -1,5 +1,6 @@
 # Dipendenze degli script del plugin (le stesse dei Prerequisiti nel README).
 # Usato dalla CI; in locale: pip install -r tests/requirements.txt
-numpy
-openpyxl
-python-docx
+# Versioni minime provate; la CI installa le più recenti compatibili.
+numpy>=1.26
+openpyxl>=3.1
+python-docx>=1.1
