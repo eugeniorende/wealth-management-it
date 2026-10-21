@@ -101,9 +101,17 @@ I percorsi esatti cambiano con gli aggiornamenti delle interfacce, ma in linea d
   nella certificazione annuale.
 - **Fineco**: la situazione fiscale e lo zainetto sono in *Portafoglio > Fiscalità*; il portafoglio
   e i movimenti sono esportabili dall'area titoli (con il filtro Trading sui movimenti).
-- **Trade Republic**: dal 30/1/2025 è sostituto d'imposta in Italia (regime amministrato), quindi lo
-  zainetto lo gestisce internamente e fornisce un **report fiscale PDF annuale**. L'estratto delle
-  posizioni si ricava dall'app; il report fiscale è il documento di riferimento per i dati per anno.
+- **Trade Republic**: dal 30/1/2025, con la succursale italiana, fa da sostituto d'imposta (regime
+  amministrato) per i nuovi clienti; chi ha aperto il conto prima verifichi nell'app il regime attivo.
+  In amministrato lo zainetto lo gestisce il broker, che fornisce un **report fiscale PDF annuale**.
+  L'estratto delle posizioni si ricava dall'app; il report fiscale è il documento di riferimento per
+  i dati per anno. Le cripto detenute su Trade Republic restano da dichiarare.
+- **Scalable Capital**: dal 1/9/2026, con la succursale di Milano, il regime amministrato si attiva su
+  richiesta; vale dall'attivazione e i periodi precedenti restano da dichiarare.
+- **Interactive Brokers e Degiro**: nessun sostituto d'imposta italiano, quindi regime dichiarativo.
+  L'importatore non li copre per scelta di perimetro (il motore resta sull'amministrato): i loro report
+  servono per i quadri RT, RM e RW del dichiarativo, con il LIFO e i cambi del giorno, non per lo zainetto. Vedi
+  `regime-dichiarativo.md`, con lo stato dei broker a ottobre 2026.
 
 Quando l'export è in PDF (es. la certificazione, o il report di Trade Republic), per ora va
 convertito in CSV a mano — il parsing diretto dei PDF è il passo successivo, non incluso in questo
@@ -134,3 +142,7 @@ pilota.
 
 Per la logica fiscale a valle (compensazione, gerarchia delle leve, regime dichiarativo) vedi il
 resto della skill; questo modulo si limita a trasformare un estratto grezzo nei numeri che servono.
+
+---
+*Categorie fiscali applicate dall'importatore (artt. 44 c. 1 lett. g e 67 TUIR, art. 10-ter L. 77/1983, Circ. AdE 21/E/2014), scadenza e certificazione delle minus (art. 6 c. 5 D.Lgs. 461/97), coefficiente 48,08% (art. 6 c. 1 D.Lgs. 461/97) — Verificato: 2026-10.*
+*Stato dei broker a ottobre 2026: comunicato stampa di Trade Republic del 30/1/2025 e help center di Scalable Capital; per Interactive Brokers e Degiro fonti di settore, da riverificare sul sito del broker.*

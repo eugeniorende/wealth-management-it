@@ -693,6 +693,63 @@ def t_t2_broker_json_errori():
     assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
 
 
+@test("T3: quadro RW senza soglia per i titoli, stato dei broker esteri con data di verifica")
+def t_t3_rw_broker():
+    # REGRESSIONE F006/F053/F036: la soglia di €15.000 vale solo per conti e depositi; Trade
+    # Republic e Scalable non sono più broker «senza sostituto d'imposta» per tutti.
+    for rel, testo in _testi_regole().items():
+        for frase in _frasi(testo):
+            if "15.000" in frase and re.search(r"\bRW\b|monitoraggio|soglia", frase):
+                assert re.search(r"\bconti\b|\bconto\b|deposit", frase), f"{rel}: «{frase.strip()[:120]}»"
+            if re.search(r"senza (alcun |un )?sostituto|nessun sostituto", frase):
+                assert not re.search(r"Trade Republic|Scalable", frase), f"{rel}: «{frase.strip()[:120]}»"
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    stato = dich.split("## Quali broker")[1].split("\n## ")[0] if "## Quali broker" in dich else ""
+    for broker in ("Interactive Brokers", "Degiro", "Trade Republic", "Scalable"):
+        assert f"| {broker}" in stato, f"regime-dichiarativo.md: {broker} assente dalla tabella dei broker"
+    assert "ottobre 2026" in stato, "tabella dei broker senza data di verifica"
+    imp = open(os.path.join(TAX, "references", "import-dati-broker.md"), encoding="utf-8").read()
+    assert "Scalable" in imp and "Interactive Brokers" in imp and "Verificato: 2026-10" in imp, \
+        "import-dati-broker.md: stato dei broker esteri o marcatore mancanti"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    assert "soglie RW" not in skill, "SKILL.md: «soglie RW» verificate (non esistono soglie per i titoli)"
+
+
+@test("T3: dichiarativo con cambio del giorno, conti in valuta, minus in RT e plus di ETF nel quadro RM")
+def t_t3_dichiarativo():
+    # REGRESSIONE F053: plus in euro al cambio del giorno (art. 9 c. 2 TUIR), soglia di
+    # €51.645,69 per 7 giorni lavorativi sui conti in valuta, minus da indicare in RT nell'anno.
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    for atteso in ("art. 9 c. 2", "51.645,69", "sette giorni lavorativi", "60/E", "quadro RM",
+                   "anno di realizzo", "4043"):
+        assert atteso in dich, f"regime-dichiarativo.md senza «{atteso}»"
+    # l'esempio in dollari deve tornare: 100 azioni da $100 a $110, cambio 1,10 → 1,25
+    euro = 100 * 110 / 1.25 - 100 * 100 / 1.10
+    atteso = f"{abs(euro):,.2f}".replace(",", "§").replace(".", ",").replace("§", ".")
+    assert euro < 0 and atteso in dich, f"esempio USD: attesa una minus di €{atteso}"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    pattern_d = skill.split("**Pattern D")[1].split("**Pattern E")[0]
+    assert "cambio" in pattern_d, "Pattern D senza il rischio di cambio"
+    calendario = skill.split("### Step 4")[1].split("## Formato output")[0]
+    assert "dichiarativo" in calendario and "Redditi PF" in calendario, "calendario senza le scadenze del dichiarativo"
+
+
+@test("T3: cripto con leva ETN/ETC al 26% (con cautela) e reference marcate")
+def t_t3_cripto():
+    # REGRESSIONE F036: manca il confronto tra 33% della detenzione diretta e 26% degli
+    # strumenti finanziari con sottostante cripto; pene e ravvedimento restano quelli verificati.
+    cripto = open(os.path.join(TAX, "references", "criptovalute.md"), encoding="utf-8").read()
+    leve = cripto.split("## Leve di pianificazione")[1].split("\n## ")[0]
+    assert re.search(r"ETN|ETC|ETP", leve) and "26%" in leve and "zainetto" in leve, "leva ETN/ETC assente"
+    assert "verificare" in leve.lower(), "leva ETN/ETC senza cautela sulla qualificazione"
+    assert "l'AdE applica il LIFO" not in cripto
+    avanzate = open(os.path.join(TAX, "references", "criptovalute-avanzate.md"), encoding="utf-8").read()
+    assert "da 2 a 5 anni" in avanzate and "1-3 anni" not in avanzate, "pena dell'omessa dichiarazione"
+    for f in ("criptovalute.md", "criptovalute-avanzate.md", "criptovalute-casi-speciali.md",
+              "regime-dichiarativo.md", "import-dati-broker.md"):
+        assert "Verificato: 2026-10" in open(os.path.join(TAX, "references", f), encoding="utf-8").read(), f
+
+
 # ══════════════════════ fiscalità e tracker ══════════════════════
 
 @test("netto-pensione: IRPEF 2026, detrazioni e aliquota rendita FP (valori chiusi)")
