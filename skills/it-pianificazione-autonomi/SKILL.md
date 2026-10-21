@@ -22,7 +22,7 @@ Per un **forfettario puro**, questo beneficio **NON esiste**. Il motivo:
 Fonte: Modello Redditi PF 2026, quadro LM — i contributi versati volontariamente a un fondo pensione **non sono deducibili** per i forfettari (a differenza dei contributi INPS obbligatori, che invece lo sono).
 
 **Implicazione pratica**:
-- Il fondo pensione per un forfettario puro resta utile per la **capitalizzazione** e per la **tassazione agevolata della prestazione finale** (15→9%), ma perde il vantaggio della deduzione in ingresso — che è il motore principale della convenienza per i dipendenti.
+- Il fondo pensione per un forfettario puro resta utile per la **capitalizzazione** (rendimenti tassati al 20% invece del 26%) e perché in uscita i **versamenti non dedotti non sono tassati**, a patto di comunicarli al fondo entro il 31/12 dell'anno successivo (art. 8 c. 4 D.Lgs. 252/2005). Perde però il vantaggio della deduzione in ingresso, che è il motore principale della convenienza per i dipendenti.
 - Per un forfettario, prima di versare al fondo pensione, va valutato se non sia altrettanto (o più) efficiente un investimento in un PAC di ETF sul dossier titoli ordinario, che ha più liquidità e flessibilità.
 
 **Eccezione**: il forfettario che ha **anche altri redditi IRPEF** (es. affitti tassati IRPEF, un lavoro dipendente part-time, redditi occasionali) può dedurre il contributo al fondo pensione **fino a capienza di quei redditi IRPEF**. In quel caso una parte del vantaggio deduzione torna disponibile.
@@ -174,7 +174,7 @@ dove aliquota_deduzione =
 
 Per il forfettario puro, il fondo pensione va valutato **solo** su:
 - Capitalizzazione (rendimento netto del comparto, tassato 20%/12,5% come per tutti)
-- Tassazione agevolata della prestazione finale (15→9%)
+- Uscita esente sui versamenti non dedotti, se comunicati al fondo entro il 31/12 dell'anno successivo; senza comunicazione il fondo li tassa al 9-15% come se fossero stati dedotti
 - Protezione patrimoniale e impignorabilità relativa
 
 E confrontato onestamente con l'alternativa (PAC di ETF su dossier ordinario), che offre più liquidità. Vedi `references/fiscalita-forfettario.md` per il confronto numerico fondo pensione vs ETF per un forfettario.
@@ -188,7 +188,7 @@ Identica metodologia di `it-pianificazione/references/proiezione-tenore-vita.md`
 Pattern specifici per autonomi:
 
 - **Pattern A1 — Versare i contributi INPS regolarmente e per intero**: sono deducibili dal forfettario e costruiscono pensione. Non saltarli quando il fatturato cala (in Gestione Separata non c'è minimo, ma versare poco = montante basso).
-- **Pattern A2 — Valutare onestamente il fondo pensione SENZA il falso mito della deduzione**: per il forfettario puro, confrontare fondo vs ETF/PAC a parità di importo, considerando liquidità, tassazione finale, costi.
+- **Pattern A2 — Valutare onestamente il fondo pensione SENZA il falso mito della deduzione**: per il forfettario puro, confrontare fondo vs ETF/PAC a parità di importo, considerando liquidità, tassazione in uscita (zero sui non dedotti comunicati), costi. Se versa, ricordare la comunicazione annuale dei non dedotti al fondo.
 - **Pattern A3 — Sfruttare i redditi IRPEF collaterali per la deduzione**: se l'autonomo ha affitti o altri redditi IRPEF, il fondo pensione deduce fino a capienza di quelli.
 - **Pattern A4 — Considerare il passaggio a ordinario se conviene**: in alcuni casi (costi reali alti, necessità di dedurre), il regime ordinario può essere più efficiente — ma è una valutazione fiscale complessa, da fare con un commercialista.
 - **Pattern A5 — Massimizzare la complementare proprio perché la pubblica è più magra**: l'autonomo ha più bisogno della complementare del dipendente, anche senza il vantaggio deduzione.
@@ -201,7 +201,7 @@ Pattern specifici per autonomi:
 - **Coefficienti**: tabella ufficiale DM 20/11/2024, con la nota che le casse possono usare coefficienti propri.
 - **Previdenza**: proiezione del montante contributivo anno per anno → pensione obbligatoria lorda e tasso di sostituzione. Usa il coefficiente **proiettato** all'anno di pensionamento.
 - **Fiscalità**: confronto **forfettario vs ordinario** dell'anno corrente, che rende esplicita la deducibilità: i **contributi obbligatori** si deducono in entrambi i regimi; il **versamento al fondo pensione** è deducibile **solo in ordinario** (in forfettario il risparmio fiscale in ingresso è ~zero, evidenziato in una riga dedicata).
-- **Complementare**: accumulo del fondo pensione (rendimento netto dell'ISC), tassazione finale 15→9%, rendita stimata.
+- **Complementare**: accumulo del fondo pensione (rendimento netto dell'ISC), tassa in uscita 15→9% sui soli versamenti dedotti (zero per il forfettario che comunica i non dedotti al fondo), rendita stimata.
 - **Riepilogo**: pensione obbligatoria + complementare, tasso di sostituzione totale, gap annuo/mensile, scenari.
 
 Validare con `python /mnt/skills/public/xlsx/scripts/recalc.py <file>` (atteso `total_errors: 0`). Tutto in termini reali (euro di oggi). Il foglio Fiscalità è il punto in cui la regola centrale della skill — la deducibilità dei contributi obbligatori ma non del fondo pensione per il forfettario — diventa un numero che l'utente vede.
