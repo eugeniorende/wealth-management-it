@@ -177,11 +177,11 @@ Prese il 20/10/2026.
 ## Dopo — da decidere
 
 - [ ] **T13 Estensioni** (P1, L): F021, F054, F055, F063.
-  - Reference sui dividendi esteri e su successione e donazione.
-  - Sezione sul riscatto della laurea.
-  - Casi frequenti del freelance.
+  - [x] Reference sui dividendi esteri e su successione e donazione (F021, F054), anticipate nella 0.10.0 con l'indice, i rimandi da it-rebalance e it-pianificazione-obiettivi e i test sui numeri.
+  - [ ] Sezione sul riscatto della laurea (F055); la correzione della description di it-pianificazione si può anticipare con T14.
+  - [ ] Casi frequenti del freelance (F063).
 
-  La proposta dell'audit, non ancora decisa, è: sì alle due reference; riscatto solo come sezione e con `--set`. Il confronto TFR contro fondo (F037) e il prelievo in decumulo (F046) sono già in T4 e T7.
+  Per le due voci aperte la proposta dell'audit, non ancora decisa, è: riscatto solo come sezione e con `--set`. Il confronto TFR contro fondo (F037) e il prelievo in decumulo (F046) sono già in T4 e T7.
 
 ## Fuori dal codice
 

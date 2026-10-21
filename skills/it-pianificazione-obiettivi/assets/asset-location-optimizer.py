@@ -57,7 +57,11 @@ TASSA_PLUS_DOSSIER = 0.26         # plusvalenze nel dossier (alla realizzazione)
 TASSA_PLUS_PIR = 0.00             # plusvalenze nel PIR dopo 5 anni
 
 # Scenario PENSIONE (il fondo pensione è vincolato → si valuta sull'obiettivo pensione, non sui goal a scadenza)
-CONTRIBUTO_ANNUO_FP = 5300        # versamento annuo deducibile (max deducibile 2026: €5.300)
+CONTRIBUTO_ANNUO_FP = 5300        # versamento annuo del lavoratore; si deduce fino al plafond (PLAFOND_FP).
+                                  # Il plafond è condiviso con il contributo del datore e con il dovuto
+                                  # da CCNL: con un datore qui va lo spazio residuo (5.300 − datore − dovuto)
+PLAFOND_FP = 5300                 # tetto di deducibilità 2026 (art. 8 c. 4 D.Lgs. 252/2005); oltre, il
+                                  # versamento non è dedotto e, se comunicato al fondo, in uscita non è tassato
 ANNI_A_PENSIONE = 30             # anni al pensionamento
 
 # Rendimento LORDO di mercato (prima di costi e imposte), uguale per tutti i contenitori.
@@ -221,17 +225,22 @@ def main():
     print("\n" + "-" * 80)
     print(f"1) FONDO PENSIONE vs DOSSIER  —  €{CONTRIBUTO_ANNUO_FP:,}/anno per {ANNI_A_PENSIONE} anni "
           f"@ {r_pensione*100:.1f}% lordo".replace(",", "."))
+    if CONTRIBUTO_ANNUO_FP > PLAFOND_FP:
+        print(f"   dedotti solo €{PLAFOND_FP:,}/anno (plafond): l'eccedenza non dà risparmio IRPEF".replace(",", "."))
+    print(f"   dedotto per intero solo se il datore non versa: il plafond di €{PLAFOND_FP:,} è condiviso col datore, "
+          f"quindi con un datore qui va lo spazio residuo".replace(",", "."))
     print("-" * 80)
 
     c = CONTRIBUTO_ANNUO_FP
     H = ANNI_A_PENSIONE
     versato = c * H
+    dedotto = min(c, PLAFOND_FP)                    # oltre il plafond niente deduzione (e niente tassa in uscita)
 
     m_fp = montante_fondo_pensione(c, H, r_pensione)
     aliq_fin = aliquota_finale_fp(H)
-    tassa_finale_fp = versato * aliq_fin            # base ~ contributi dedotti
+    tassa_finale_fp = dedotto * H * aliq_fin        # base: i soli contributi dedotti
     fp_netto = m_fp - tassa_finale_fp
-    risparmio_annuo = c * ALIQUOTA_IRPEF_MARGINALE
+    risparmio_annuo = dedotto * ALIQUOTA_IRPEF_MARGINALE
     if REINVESTI_RISPARMIO_IRPEF:
         # il risparmio IRPEF annuo viene reinvestito nel dossier (cresce, plus 26% alla fine)
         risparmio_irpef = dossier_netto(risparmio_annuo, H, r_pensione)

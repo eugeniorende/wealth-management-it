@@ -135,7 +135,7 @@ I rendimenti sono al netto dei costi di gestione (ISC) e della tassa annua sui r
 
 - TFR conferito: NESSUNA tassazione in ingresso (era già a tassazione differita)
 - Contributi del lavoratore e del datore: deducibili **insieme** fino a €5.300/anno (il datore li esclude dall'imponibile in busta paga entro il plafond)
-- Contributi oltre il plafond: non dedotti, vanno comunicati al fondo entro il 31/12 dell'anno successivo (o prima della prestazione), così in uscita non sono tassati di nuovo. Senza comunicazione il fondo li tassa come se fossero stati dedotti: si perde il 9-15% di quella parte
+- Contributi oltre il plafond: non dedotti, vanno comunicati al fondo entro il 31/12 dell'anno successivo (o prima della prestazione), così in uscita non sono tassati di nuovo. Senza comunicazione il fondo li tassa come se fossero stati dedotti: si perde il 9-15% di quella parte (23% se la posizione esce con un'anticipazione non sanitaria o un riscatto per altre cause)
 
 ### Fase 2 — Rendimenti annui (fase accumulo)
 
