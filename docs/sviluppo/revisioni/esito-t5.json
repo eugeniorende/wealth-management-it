@@ -1,0 +1,30 @@
+{
+ "branch": "feature/t5-pensione-pubblica",
+ "applicati": [
+  "Confermati 0 e 2 + non verificato 1 (importa-previdenza, contributi prima del 1996): le retribuzioni prima del 1996 restano fuori dal montante contributivo (quota retributiva, L. 335/1995 art. 1 c. 12-13); l'avviso si costruisce dalle retribuzioni, primo anno compreso, e dice che la quota retributiva non è calcolata (oltre 18 anni: fino al 2011); docstring sul tasso mancante dell'anno in corso, commento del 1996 e nome del test allineati su 1996-2025 — skills/it-pianificazione/assets/importa-previdenza.py, t_tassi_capitalizzazione",
+  "Confermato 1 (Pubblica!E5): stima del montante anno per anno con il massimale costante in euro di oggi e il contributo dell'anno scorso non rivalutato (esponente k-1); sui default E5 da 243.625 a 242.413, pensione lorda da 31.007 a 30.945; variante ral150k_g (RAL 150.000, crescita 1,5%) con replica Python indipendente — proiezione-pensione.xlsx, SKILL.md (pseudocodice e nota v0.3), previdenza-obbligatoria.md 2-bis, t_pubblica_vs_script",
+  "Conteso 5 (massimale negli Scenari non verificato): t_scenari_reali anche sulla variante ral150k, dove il tetto scatta in tutte le colonne; il mutante senza MIN in B11/D11 ora fallisce",
+  "Conteso 6 (t_netto_stipendio debole): casi a valore chiuso RAL 150.000 (massimale), 9.000 (7,1%), 12.000 (5,3%) e limiti di fascia inclusi; mutanti «base = ral» e fasce tutte al 4,8% catturati",
+  "Conteso 1 (requisiti 2027-2028): anticipata ordinaria 43a1m/42a1m dal 2028, vecchiaia contributivi puri a 71a1m/71a3m, precoci 41a1m/41a3m salvo attività gravose, contributi dell'anticipata contributiva adeguati anche nella copia autonomi — previdenza-obbligatoria.md, previdenza-gestione-separata.md, t_requisiti_e_link_inps",
+  "Non verificato 0 (ponte-pensione): anticipata contributiva con 20a1m/20a3m di contributi e finestra di tre mesi, ETA_PENSIONE_VECCHIAIA 64,25/64,33/64,5 per il ponte",
+  "Conteso 4 (mypensione.it, dominio che non è dell'INPS, e PIN dismesso): rimandi al portale INPS (www.inps.it, area riservata con SPID, CIE o CNS) in SKILL.md, previdenza-obbligatoria.md (2) e previdenza-gestione-separata.md; il test vieta «mypensione» e «PIN/CIE/SPID»",
+  "Non verificato 2 (cuneo L. 207/2024): c. 6 vigente fino al 2026, dal 2027 abrogato dal D.Lgs. 117/2026 che riporta l'ulteriore detrazione nell'art. 13 del nuovo TUIR (comma da verificare su Normattiva) — netto-pensione.py",
+  "Non verificato 3 (tassi nominali storici): medie geometriche ~2,8% 1996-2025 e ~1,8% 2006-2025 calcolate dalla tabella ufficiale, coefficiente 1 nel 2014 e nel 2021 spiegato; il test le ricalcola dalla tabella dello script",
+  "In più: contributo IVS del lavoratore oltre la prima fascia scritto come 9,19% + 1% = 10,19% (era «10%»), coerente con netto-pensione.py; nota sul PIL reale nella proiezione in euro di oggi in previdenza-gestione-separata.md"
+ ],
+ "scartati": [
+  {
+   "titolo": "Contesi 0 e 3 (Excel autonomi con PIL nominale e contributo dell'anno rivalutato)",
+   "motivo": "Corretto in feature/t6-autonomi (Input!B14 = 0,005 reale, Previdenza!F5 = E5*B14, t_autonomi_massimale), impilato su T5 e mergiato subito dopo: da verificare nella revisione di T6"
+  },
+  {
+   "titolo": "Conteso 2 (rendimento del fondo non dichiarato reale)",
+   "motivo": "Foglio Complementare e Input!B28 sono il perimetro di T4: si applica lì (Input!A28/C28, Scenari!A9, nota del Complementare)"
+  },
+  {
+   "titolo": "Non verificato 4 (Scenari!B13 con MIN(B26;5300) e imposta sull'intero montante)",
+   "motivo": "Stessa regola del foglio Complementare corretta da T4 (plafond condiviso, uscita sui soli dedotti): si estende agli Scenari in T4"
+  }
+ ],
+ "note": "Fonti: Normattiva e i PDF INPS non sono raggiungibili da questa sessione (rete), quindi le conferme normative vengono dalle letture su fonte primaria registrate dai verificatori in review-t5.json (Circ. INPS 28/2026 All. 2, L. 335/1995, DL 201/2011 art. 24 c. 11, L. 207/2024) e da ricerche web; il comma dell'art. 13 del nuovo TUIR resta da verificare."
+}
