@@ -10,23 +10,35 @@ motore_bootstrap.py — motore comune dei Monte Carlo del plugin (block bootstra
   tests/run_tests.py verifica l'identità delle due copie e fallisce se divergono.
 
 Contenuto:
-  - carica_storico(path_csv): serie annuali reali (azionario, obbligazionario); un
-    percorso relativo si risolve rispetto a questa cartella, non alla cwd
+  - carica_storico(path_csv): serie annuali NOMINALI in dollari USA (azionario,
+    obbligazionario); un percorso relativo si risolve rispetto a questa cartella, non alla cwd
+  - carica_inflazione(path_csv) / deflaziona(rendimenti, inflazione): inflazione USA
+    storica (CPI-U dicembre su dicembre) e rendimenti reali anno per anno
   - indici_bootstrap(n_hist, n_sim, anni, blocco): campionamento a blocchi circolari
   - blocchi_bootstrap(port, n_sim, anni, blocco): rendimenti di portafoglio campionati
   - pctl(a, p): percentile come float
   - applica_override(spazio): override '--set NOME=VALORE' delle costanti da riga di comando
   - percorso_json / scrivi_json: flag '--json <file>' per l'output machine-readable (pipeline)
   - verifica_intestazioni_obiettivi(ws): guardia sul layout del pianificatore Excel
+  - quota_glide / frazioni_glide / pmt_glide / crescita_glide / leggi_finestra_derisk: il glide
+    path del pianificatore obiettivi, unica definizione per foglio, Monte Carlo, glide path e
+    allocatore
+
+Natura della serie (rendimenti-storici.csv): rendimenti NOMINALI in dollari USA di un
+investitore USA (S&P 500 con dividendi, T-Bond decennale), senza componente di cambio. Chi
+ricentra la media su un rendimento atteso (Monte Carlo obiettivi e pensione) ne usa solo la
+forma; chi usa la serie grezza in termini reali la deflaziona anno per anno con la colonna
+inflazione (deflaziona), non con un'inflazione costante che cancellerebbe gli anni '70.
 
 Il campionamento usa np.random (generatore legacy): il seed fissato dagli script
 con np.random.seed(...) governa anche il motore. La sequenza di chiamate random è
 UNA randint per blocco — invariante da preservare nei refactor (i risultati con seed
 devono restare riproducibili).
 
-Nota di perimetro: decumulo-obiettivi.py usa una variante propria (Generator con
-blocchi non circolari); unificarla cambierebbe i suoi percorsi simulati, quindi
-resta deliberatamente fuori da questo motore.
+Nota di perimetro: decumulo-obiettivi.py usa da qui il caricamento e la deflazione della
+serie, ma una variante propria del campionamento (Generator con blocchi non circolari);
+unificarla cambierebbe i suoi percorsi simulati, quindi resta deliberatamente fuori.
+Le funzioni del glide path non usano numeri casuali: non toccano l'invariante sopra.
 """
 
 import ast
@@ -36,8 +48,8 @@ import sys
 import numpy as np
 
 
-def carica_storico(path_csv):
-    """Carica la serie annuale (azionario, obbligazionario) dal CSV. Valori in % → frazioni.
+def _righe_storico(path_csv):
+    """Righe di dati del CSV (commenti e intestazione esclusi), già divise sulle virgole.
 
     Un percorso relativo si risolve rispetto alla cartella del motore, dove stanno anche gli
     script e rendimenti-storici.csv: così gli script funzionano lanciati dalla cartella di
@@ -45,23 +57,47 @@ def carica_storico(path_csv):
     """
     if not os.path.isabs(path_csv):
         path_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), path_csv)
-    az, ob = [], []
-    with open(path_csv) as f:
+    righe = []
+    with open(path_csv, encoding="utf-8") as f:
         for riga in f:
             riga = riga.strip()
             if not riga or riga.startswith("#") or riga.lower().startswith("anno"):
                 continue
-            parti = riga.split(",")
-            az.append(float(parti[1]) / 100.0)
-            ob.append(float(parti[2]) / 100.0)
-    return np.array(az), np.array(ob)
+            righe.append(riga.split(","))
+    return righe
+
+
+def carica_storico(path_csv):
+    """Carica la serie annuale (azionario, obbligazionario) dal CSV. Valori in % → frazioni.
+
+    Sono rendimenti NOMINALI in dollari USA (vedi l'intestazione del CSV): per ragionare in
+    termini reali usare carica_inflazione + deflaziona.
+    """
+    righe = _righe_storico(path_csv)
+    return (np.array([float(p[1]) / 100.0 for p in righe]),
+            np.array([float(p[2]) / 100.0 for p in righe]))
+
+
+def carica_inflazione(path_csv):
+    """Colonna 'inflazione' del CSV (CPI USA dicembre su dicembre), in frazioni; None se la
+    serie non la ha (una serie propria può fermarsi a due colonne)."""
+    righe = _righe_storico(path_csv)
+    if not righe or any(len(p) < 4 or not p[3].strip() for p in righe):
+        return None
+    return np.array([float(p[3]) / 100.0 for p in righe])
+
+
+def deflaziona(rendimenti, inflazione):
+    """Rendimenti reali anno per anno: (1 + nominale) / (1 + inflazione) − 1.
+    `inflazione` è un array allineato alla serie (storica) o una costante."""
+    return (1.0 + np.asarray(rendimenti)) / (1.0 + np.asarray(inflazione)) - 1.0
 
 
 def indici_bootstrap(n_hist, n_sim, anni, blocco):
     """Matrice (n_sim, anni) di INDICI nella serie storica, a blocchi consecutivi circolari.
 
     Ogni blocco parte da un anno storico casuale e prosegue in sequenza (wrap sul fondo
-    della serie): preserva l'autocorrelazione di breve periodo dei rendimenti reali.
+    della serie): preserva l'autocorrelazione di breve periodo dei rendimenti storici.
     Restituire gli indici (e non i valori) permette di condividere la STESSA estrazione
     di anni tra più serie/obiettivi (shock di mercato comuni, per il rischio congiunto).
     """
@@ -174,3 +210,75 @@ def verifica_intestazioni_obiettivi(ws, riga=4):
                 f"Struttura del pianificatore NON riconosciuta: in colonna {col} (riga {riga}) "
                 f"attendevo un'intestazione contenente '{kw}', trovato {val!r}. Gli script leggono "
                 f"le colonne per posizione: se il layout è stato modificato, ripristinalo.")
+
+
+# ── Glide path del pianificatore obiettivi ──────────────────────────────────
+# Un'unica definizione per il foglio Excel (Obiettivi, colonne O, P e I), il Monte Carlo, il
+# calendario del glide path e l'allocatore. Gli obiettivi TERMINANTI tengono la quota del
+# profilo finché mancano più di `finestra` anni alla scadenza, poi scendono fino alla quota di
+# atterraggio. Il calendario è annuale: nell'anno y (da 0) vale la quota a inizio anno, con
+# anni residui = anni − y, tenuta per tutto l'anno (it-rebalance riallinea i target una volta
+# l'anno). Durante la rampa il secchiello è una miscela del portafoglio del profilo e di quello
+# di atterraggio: rendimento atteso e volatilità sono lineari nella frazione trattenuta.
+
+FINESTRA_DERISK_DEFAULT = 7
+
+
+def quota_glide(anni_residui, quota_partenza, finestra, atterraggio=0.0, curvatura=1.0):
+    """Quota azionaria target dato il tempo residuo all'obiettivo."""
+    if quota_partenza <= atterraggio:
+        return quota_partenza                  # già conservativo: niente da de-riskare
+    if anni_residui <= 0:
+        return atterraggio
+    if anni_residui >= finestra:
+        return quota_partenza                  # ancora lontano: tiene la quota piena
+    frazione = (anni_residui / finestra) ** curvatura
+    return atterraggio + (quota_partenza - atterraggio) * frazione
+
+
+def frazioni_glide(anni, finestra, curvatura=1.0):
+    """Per ogni anno y = 0..anni−1 la frazione trattenuta della distanza tra la quota del profilo
+    e l'atterraggio (1 = quota piena, 0 = atterraggio), con finestra effettiva min(finestra, anni)."""
+    w = min(finestra, anni)
+    return np.array([quota_glide(anni - y, 1.0, w, 0.0, curvatura) for y in range(anni)])
+
+
+def _fattore_versamenti(r, anni):
+    """Valore a fine periodo di un versamento mensile unitario (fine mese) per `anni` anni."""
+    if anni <= 0:
+        return 0.0
+    if r == 0:
+        return 12.0 * anni
+    return ((1 + r) ** anni - 1) / ((1 + r) ** (1 / 12) - 1)
+
+
+def pmt_glide(target_nom, gia, rend, rend_atterraggio, anni, finestra, curvatura=1.0):
+    """Versamento mensile per arrivare a target_nom lungo il glide path: la formula del foglio
+    (Obiettivi!I). Due fasi: gli anni a quota piena al rendimento del profilo, poi gli anni di
+    rampa al loro rendimento medio (con rampa lineare, la media tra profilo e atterraggio:
+    Obiettivi!P). Con rend_atterraggio = rend (permanenti, profili senza azionario) è la formula
+    classica del valore futuro di una rendita. Rispetto al calcolo anno per anno sbaglia per
+    difetto di meno dell'1,5%."""
+    f = frazioni_glide(anni, finestra, curvatura)
+    m = int(np.sum(f < 1.0))               # anni di rampa
+    k = anni - m                           # anni a quota piena
+    r2 = (rend_atterraggio + (rend - rend_atterraggio) * float(np.mean(f[k:]))) if m else rend
+    crescita_rampa = (1 + r2) ** m
+    return ((target_nom - gia * (1 + rend) ** k * crescita_rampa)
+            / (_fattore_versamenti(rend, k) * crescita_rampa + _fattore_versamenti(r2, m)))
+
+
+def crescita_glide(rend, rend_atterraggio, anni, finestra, curvatura=1.0):
+    """Fattore di crescita lungo il glide path di un capitale investito oggi: Π(1 + r_y)."""
+    f = frazioni_glide(anni, finestra, curvatura)
+    return float(np.prod(1 + rend_atterraggio + (rend - rend_atterraggio) * f))
+
+
+def leggi_finestra_derisk(ws_parametri, default=FINESTRA_DERISK_DEFAULT):
+    """Finestra di de-risking dal foglio Parametri del pianificatore (A7:B7); il default se il
+    foglio non la porta (pianificatori compilati prima che esistesse)."""
+    etichetta = str(ws_parametri["A7"].value or "").lower()
+    valore = ws_parametri["B7"].value
+    if "finestra" in etichetta and isinstance(valore, (int, float)) and valore >= 0:
+        return int(valore)
+    return default

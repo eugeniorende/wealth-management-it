@@ -15,6 +15,14 @@ dà tipicamente ~50% di probabilità di successo. Per avere più confidenza serv
 versare di più (o ridurre il rischio, o allungare l'orizzonte). Il Monte Carlo
 rende esplicito questo che il calcolo deterministico nasconde.
 
+Convenzioni, le stesse del foglio:
+  - il rendimento del profilo è NETTO di costi e imposte ed è la media ARITMETICA
+    annua attesa: la crescita composta mediana è circa rendimento − volatilità²/2;
+  - gli obiettivi TERMINANTI seguono il glide path (GLIDE = True): quota del profilo
+    finché mancano più di FINESTRA_DERISK anni, poi discesa fino all'atterraggio, anno
+    per anno come in glidepath-obiettivi.py. Il versamento deterministico è quello del
+    foglio (colonna I), che tiene conto del de-risking. I permanenti non de-riskano.
+
 Dipendenze: numpy, openpyxl  (pip install numpy openpyxl)
 Uso:        python montecarlo-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]
 
@@ -34,12 +42,22 @@ import os
 import numpy as np
 from openpyxl import load_workbook
 
-from motore_bootstrap import applica_override, carica_storico, indici_bootstrap, blocchi_bootstrap, verifica_intestazioni_obiettivi
+from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_storico, frazioni_glide,
+                              indici_bootstrap, leggi_finestra_derisk, pmt_glide,
+                              verifica_intestazioni_obiettivi)
 
 # ---- Parametri della simulazione ----
 N_SIM = 20000              # numero di percorsi simulati
 CONFIDENZA_TARGET = 0.85   # livello di confidenza per il calcolo del versamento "robusto"
 SEED = 42                  # per risultati riproducibili (rimuovere per casualità piena)
+
+# Glide path: gli obiettivi terminanti de-riskano verso la scadenza, come nel calendario di
+# glidepath-obiettivi.py che it-rebalance esegue. Vale nel versamento e nella simulazione.
+GLIDE           = True     # False: quota fissa del profilo fino alla scadenza (versamento e simulazione)
+FINESTRA_DERISK = None     # None = dal foglio (Parametri!B7, 7 anni nell'esempio): entro questi anni
+                           # dalla scadenza la quota azionaria scende
+ATTERRAGGIO_AZ  = 0.00     # quota azionaria alla scadenza (0% = profilo Preservazione), come il glide path
+CURVATURA       = 1.0      # forma della rampa (1 = lineare, come il foglio)
 
 # Leva di rischio: a versamento BLOCCATO, alzare la quota azionaria può alzare la probabilità?
 # È la "seconda strada" quando non si può versare di più. NON è un pasto gratis: più rischio
@@ -47,16 +65,17 @@ SEED = 42                  # per risultati riproducibili (rimuovere per casualit
 # questo si mostra la distribuzione intera, non solo la probabilità, e si segnala quando la leva
 # è controproducente (obiettivo già in linea) o inadatta: obiettivo non desiderabile (essenziale o
 # importante) oppure dentro la finestra di de-risking, dove il glide path abbassa la quota azionaria.
+# Accanto all'OPZIONE si mostrano sia il percorso glide sia la quota fissa fino alla scadenza.
 LEVA_RISCHIO    = True
 SOGLIA_ONTRACK  = 0.75     # prob col profilo attuale ≥ questa ⇒ alzare il rischio è controproducente
-FINESTRA_DERISK = 7        # come glidepath-obiettivi.py: entro questi anni dalla scadenza il rischio scende
 
 # ---- Modello dei rendimenti ----
-MODELLO = "normale"        # "normale" (Normale i.i.d.) | "bootstrap" (ricampiona da serie storica reale)
-FILE_STORICO = "rendimenti-storici.csv"  # serie annuale azionario/obbligazionario (stessa cartella)
+MODELLO = "normale"        # "normale" (Normale i.i.d.) | "bootstrap" (ricampiona dalla serie storica)
+FILE_STORICO = "rendimenti-storici.csv"  # S&P 500 e T-Bond USA, nominali in dollari (stessa cartella)
 BLOCCO_BOOTSTRAP = 5       # lunghezza blocco (anni consecutivi) nel bootstrap: preserva la sequenza
 RICENTRA_MEDIA = True      # ricentra la media storica sul rendimento atteso del profilo
-                           # (calibra la MEDIA sull'ipotesi del profilo, mantiene FORMA/volatilità/code reali)
+                           # (calibra la MEDIA sull'ipotesi del profilo, mantiene FORMA/volatilità/code
+                           # della storia: per questo una serie nominale in dollari va bene qui)
 
 _AZ_HIST = None            # caricati a runtime se MODELLO == "bootstrap"
 _OB_HIST = None
@@ -78,6 +97,7 @@ def leggi_excel(path):
 
     capacita = par.cell(row=CAP_ROW, column=2).value or 0
     inflazione = par.cell(row=INFL_ROW, column=2).value or 0
+    finestra = leggi_finestra_derisk(par)
 
     profili = {}
     for i in range(PROF_N):
@@ -98,6 +118,7 @@ def leggi_excel(path):
         prof = obj.cell(row=r, column=4).value
         gia = obj.cell(row=r, column=6).value
         prio = obj.cell(row=r, column=7).value
+        tipo = obj.cell(row=r, column=14).value
         if nome and imp and oriz and prof:
             obiettivi.append({
                 "nome": nome,
@@ -106,12 +127,15 @@ def leggi_excel(path):
                 "profilo": prof,
                 "gia": float(gia) if gia else 0.0,
                 "priorita": prio or "",
+                # default terminante (il caso comune), come glidepath-obiettivi.py
+                "permanente": str(tipo or "").strip().lower() == "permanente",
             })
-    return capacita, inflazione, profili, obiettivi
+    return capacita, inflazione, finestra, profili, obiettivi
 
 
 def pmt_deterministico(target_nom, gia, rend_ann, anni):
-    """Versamento mensile del foglio Excel (valore futuro di una rendita, ramo per r=0)."""
+    """Versamento mensile a quota fissa (valore futuro di una rendita, ramo per r=0): è la
+    colonna I del foglio per gli obiettivi che non de-riskano; col glide path vale pmt_glide."""
     n = anni
     if rend_ann == 0:
         return (target_nom - gia) / (n * 12)
@@ -119,14 +143,28 @@ def pmt_deterministico(target_nom, gia, rend_ann, anni):
     return (target_nom - gia * (1 + rend_ann) ** n) / fattore
 
 
-def simula_bootstrap(gia, pmt_mensile, rend_ann, peso_az, anni, n_sim=N_SIM):
-    """Percorsi annuali via block bootstrap dalla serie storica reale, per il peso azionario dato.
+def percorso_glide(rend_ann, vol_ann, anni, glide):
+    """Rendimento atteso e volatilità di ciascun anno. glide = (frazioni, rend_atterraggio,
+    vol_atterraggio) oppure None (quota fissa). Durante la rampa il secchiello è una miscela
+    del portafoglio del profilo e di quello di atterraggio: entrambi lineari nella frazione."""
+    if glide is None:
+        return np.full(anni, rend_ann), np.full(anni, vol_ann)
+    frazioni, rend_l, vol_l = glide
+    return rend_l + (rend_ann - rend_l) * frazioni, vol_l + (vol_ann - vol_l) * frazioni
+
+
+def simula_bootstrap(gia, pmt_mensile, rend_ann, peso_az, anni, n_sim=N_SIM, glide=None):
+    """Percorsi annuali via block bootstrap dalla serie storica, per il peso azionario dato.
     Se RICENTRA_MEDIA, la media storica è riportata al rendimento atteso del profilo
-    (si calibra la media, si mantengono volatilità, asimmetria e code reali)."""
+    (si calibra la media, si mantengono volatilità, asimmetria e code della storia).
+    Col glide path la parte de-riskata rende il rendimento (certo) dell'atterraggio."""
     port = peso_az * _AZ_HIST + (1.0 - peso_az) * _OB_HIST     # serie storica del portafoglio
     if RICENTRA_MEDIA:
         port = port - port.mean() + rend_ann
     rendimenti = blocchi_bootstrap(port, n_sim, anni, BLOCCO_BOOTSTRAP)
+    if glide is not None:
+        frazioni, rend_l, _ = glide
+        rendimenti = frazioni * rendimenti + (1.0 - frazioni) * rend_l
     saldi = np.full(n_sim, gia, dtype=float)
     for y in range(anni):
         R = rendimenti[:, y]
@@ -135,39 +173,44 @@ def simula_bootstrap(gia, pmt_mensile, rend_ann, peso_az, anni, n_sim=N_SIM):
     return saldi
 
 
-def simula(target_nom, gia, pmt_mensile, rend_ann, vol_ann, anni, peso_az=0.0, n_sim=N_SIM):
+def simula(target_nom, gia, pmt_mensile, rend_ann, vol_ann, anni, peso_az=0.0, n_sim=N_SIM, glide=None):
     """Simula n_sim percorsi. Restituisce array dei capitali finali.
     MODELLO='normale': passi mensili, rendimenti Normali i.i.d.
-    MODELLO='bootstrap': passi annuali, ricampionati dalla serie storica reale."""
+    MODELLO='bootstrap': passi annuali, ricampionati dalla serie storica.
+    glide: vedi percorso_glide (None = quota fissa fino alla scadenza)."""
     if MODELLO == "bootstrap" and _AZ_HIST is not None:
-        return simula_bootstrap(gia, pmt_mensile, rend_ann, peso_az, anni, n_sim)
-    mesi = anni * 12
-    mu_m = (1 + rend_ann) ** (1 / 12) - 1          # media mensile (geometrica)
-    sigma_m = vol_ann / np.sqrt(12)                 # volatilità mensile (scaling sqrt-tempo)
+        return simula_bootstrap(gia, pmt_mensile, rend_ann, peso_az, anni, n_sim, glide)
+    medie, vols = percorso_glide(rend_ann, vol_ann, anni, glide)
     saldi = np.full(n_sim, gia, dtype=float)
-    for _ in range(mesi):
-        r = np.random.normal(mu_m, sigma_m, n_sim)
-        saldi = saldi * (1 + r) + pmt_mensile
+    for y in range(anni):
+        # media mensile tale che il rendimento annuo ATTESO (media aritmetica) sia quello
+        # dell'anno: (1 + mu_m)^12 = 1 + rendimento. La mediana composta resta sotto (σ²/2).
+        mu_m = (1 + medie[y]) ** (1 / 12) - 1
+        sigma_m = vols[y] / np.sqrt(12)             # volatilità mensile (scaling sqrt-tempo)
+        for _ in range(12):
+            r = np.random.normal(mu_m, sigma_m, n_sim)
+            saldi = saldi * (1 + r) + pmt_mensile
     return saldi
 
 
-def prob_successo(target_nom, gia, pmt_mensile, rend_ann, vol_ann, anni, peso_az=0.0, n_sim=N_SIM):
-    finali = simula(target_nom, gia, pmt_mensile, rend_ann, vol_ann, anni, peso_az, n_sim)
+def prob_successo(target_nom, gia, pmt_mensile, rend_ann, vol_ann, anni, peso_az=0.0, n_sim=N_SIM,
+                  glide=None):
+    finali = simula(target_nom, gia, pmt_mensile, rend_ann, vol_ann, anni, peso_az, n_sim, glide)
     return float(np.mean(finali >= target_nom)), finali
 
 
-def pmt_per_confidenza(target_nom, gia, rend_ann, vol_ann, anni, conf, pmt_det, peso_az=0.0):
+def pmt_per_confidenza(target_nom, gia, rend_ann, vol_ann, anni, conf, pmt_det, peso_az=0.0, glide=None):
     """Cerca (bisezione) il versamento mensile che dà la probabilità di successo = conf."""
     lo, hi = 0.0, max(pmt_det * 4, 50.0)
     # garantisci che hi sia sufficiente
     for _ in range(20):
-        p_hi, _ = prob_successo(target_nom, gia, hi, rend_ann, vol_ann, anni, peso_az, n_sim=4000)
+        p_hi, _ = prob_successo(target_nom, gia, hi, rend_ann, vol_ann, anni, peso_az, 4000, glide)
         if p_hi >= conf:
             break
         hi *= 1.5
     for _ in range(22):
         mid = (lo + hi) / 2
-        p, _ = prob_successo(target_nom, gia, mid, rend_ann, vol_ann, anni, peso_az, n_sim=4000)
+        p, _ = prob_successo(target_nom, gia, mid, rend_ann, vol_ann, anni, peso_az, 4000, glide)
         if p < conf:
             lo = mid
         else:
@@ -199,11 +242,17 @@ def nome_profilo_vicino(w, profili):
     return min(profili.items(), key=lambda kv: abs(kv[1][2] - w))[0]
 
 
-def leva_di_rischio(target_nom, gia, pmt_fisso, anni, peso_attuale, profili, n_sim=6000):
-    """A versamento BLOCCATO, fa lo sweep della quota azionaria dalla attuale verso l'alto.
-    Per ogni livello calcola probabilità e distribuzione (P10/P50/P90). Ritorna la lista dei
-    risultati e l'indice del massimo di probabilità — così si vede sia se la prob sale, sia il
-    prezzo sul caso brutto (volutamente NON si guarda solo la probabilità)."""
+def glide_per_quota(w, glide):
+    """Il glide path vale solo per quote sopra l'atterraggio (come quota_glide del motore)."""
+    return glide if glide is not None and w > ATTERRAGGIO_AZ + 1e-9 else None
+
+
+def leva_di_rischio(target_nom, gia, pmt_fisso, anni, peso_attuale, profili, n_sim=6000, glide=None):
+    """A versamento BLOCCATO, fa lo sweep della quota azionaria (di partenza, se c'è il glide
+    path) dalla attuale verso l'alto. Per ogni livello calcola probabilità e distribuzione
+    (P10/P50/P90). Ritorna la lista dei risultati e l'indice del massimo di probabilità — così
+    si vede sia se la prob sale, sia il prezzo sul caso brutto (volutamente NON si guarda solo
+    la probabilità)."""
     pesi_max = max(p[2] for p in profili.values())
     hi = min(1.0, max(pesi_max, peso_attuale))
     griglia = sorted({round(peso_attuale + k * 0.05, 2) for k in range(0, 21)} | {round(pesi_max, 2)})
@@ -213,7 +262,8 @@ def leva_di_rischio(target_nom, gia, pmt_fisso, anni, peso_attuale, profili, n_s
     ris = []
     for w in griglia:
         rend, vol = interp_profilo(w, profili)
-        p, finali = prob_successo(target_nom, gia, pmt_fisso, rend, vol, anni, w, n_sim)
+        p, finali = prob_successo(target_nom, gia, pmt_fisso, rend, vol, anni, w, n_sim,
+                                  glide_per_quota(w, glide))
         p10, p50, p90 = np.percentile(finali, [10, 50, 90])
         ris.append((w, rend, vol, p, p10, p50, p90))
     i_best = max(range(len(ris)), key=lambda i: ris[i][3])
@@ -237,6 +287,9 @@ def simula_congiunta(obiettivi_def, n_sim=N_SIM):
         saldi = np.full(n_sim, o["gia"], dtype=float)
         for y in range(anni):
             R = port_full[idx[:, y]] + shift     # stesso anno storico per tutti → correlazione
+            if o["glide"] is not None:           # lo stesso glide path della simulazione singola
+                frazioni, rend_l, _ = o["glide"]
+                R = frazioni[y] * R + (1.0 - frazioni[y]) * rend_l
             saldi = saldi * (1 + R) + 12 * o["pmt"] * np.sqrt(np.maximum(1 + R, 1e-4))
         maschere[o["nome"]] = saldi >= o["target_nom"]
     return maschere
@@ -262,7 +315,9 @@ def main():
         print("Uso: python montecarlo-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]")
         sys.exit(1)
 
-    capacita, inflazione, profili, obiettivi = leggi_excel(path)
+    capacita, inflazione, finestra_foglio, profili, obiettivi = leggi_excel(path)
+    finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
+    rend_l, vol_l = interp_profilo(ATTERRAGGIO_AZ, profili)    # il portafoglio di atterraggio
 
     # carica la serie storica se il modello è bootstrap
     global _AZ_HIST, _OB_HIST
@@ -287,6 +342,11 @@ def main():
         print(f"Modello rendimenti: BOOTSTRAP storico ({len(_AZ_HIST)} anni, blocchi da {BLOCCO_BOOTSTRAP}, {ric})")
     else:
         print(f"Modello rendimenti: Normale i.i.d.")
+    if GLIDE:
+        print(f"Glide path: i terminanti de-riskano da {finestra} anni prima della scadenza fino a "
+              f"{ATTERRAGGIO_AZ*100:.0f}% azionario (versamento e simulazione)")
+    else:
+        print("Glide path: spento (GLIDE=False), quota fissa del profilo fino alla scadenza")
     print("-" * 78)
 
     totale_pmt_det = 0.0
@@ -298,26 +358,40 @@ def main():
             print(f"\n⚠️  {g['nome']}: profilo '{g['profilo']}' non in tabella. Salto.")
             continue
         rend, vol, peso_az = profili[g["profilo"]]
-        target_nom = g["target_oggi"] * (1 + inflazione) ** g["orizzonte"]
-        pmt_det_raw = pmt_deterministico(target_nom, g["gia"], rend, g["orizzonte"])
+        anni = g["orizzonte"]
+        target_nom = g["target_oggi"] * (1 + inflazione) ** anni
+        # il glide path del piano: solo per i terminanti con quota sopra l'atterraggio
+        de_risk = not g["permanente"] and peso_az > ATTERRAGGIO_AZ + 1e-9
+        glide_piano = (frazioni_glide(anni, finestra, CURVATURA), rend_l, vol_l) if de_risk else None
+        glide = glide_piano if GLIDE else None
+        if glide is not None:
+            pmt_det_raw = pmt_glide(target_nom, g["gia"], rend, rend_l, anni, finestra, CURVATURA)
+        else:
+            pmt_det_raw = pmt_deterministico(target_nom, g["gia"], rend, anni)
         # Un versamento negativo significa che il capitale esistente sovra-finanzia
         # l'obiettivo ALLA MEDIA: non si "preleva" per raggiungere un obiettivo, si versa 0.
         sovra_finanziato = pmt_det_raw < 0
         pmt_det = max(0.0, pmt_det_raw)
-        p_succ, finali = prob_successo(target_nom, g["gia"], pmt_det, rend, vol, g["orizzonte"], peso_az)
+        p_succ, finali = prob_successo(target_nom, g["gia"], pmt_det, rend, vol, anni, peso_az, N_SIM, glide)
         p10, p50, p90 = np.percentile(finali, [10, 50, 90])
-        pmt_conf = pmt_per_confidenza(target_nom, g["gia"], rend, vol, g["orizzonte"], CONFIDENZA_TARGET, max(pmt_det, 50.0), peso_az)
+        pmt_conf = pmt_per_confidenza(target_nom, g["gia"], rend, vol, anni, CONFIDENZA_TARGET,
+                                      max(pmt_det, 50.0), peso_az, glide)
 
         totale_pmt_det += pmt_det
         totale_pmt_conf += pmt_conf
         obiettivi_def.append({
             "nome": g["nome"], "gia": g["gia"], "pmt": pmt_det, "target_nom": target_nom,
-            "anni": g["orizzonte"], "peso_az": peso_az, "rend": rend, "priorita": g["priorita"],
+            "anni": anni, "peso_az": peso_az, "rend": rend, "priorita": g["priorita"],
+            "glide": glide,
         })
 
-        print(f"\n▸ {g['nome']}  [{g['profilo']}, {g['orizzonte']} anni, priorità: {g['priorita']}]")
+        print(f"\n▸ {g['nome']}  [{g['profilo']}, {anni} anni, priorità: {g['priorita']}]")
         print(f"    Target nominale (con inflazione):   {euro(target_nom)}")
         print(f"    Rendimento {rend*100:.1f}% · volatilità {vol*100:.1f}%")
+        if glide is not None:
+            rampa = int(np.sum(glide[0] < 1.0))
+            print(f"    Glide path: {peso_az*100:.0f}% azionario, ridotto ogni anno negli ultimi {rampa} anni "
+                  f"fino a {ATTERRAGGIO_AZ*100:.0f}% alla scadenza")
         if sovra_finanziato:
             print(f"    Versamento necessario:              €0/mese  (capitale esistente già sufficiente ALLA MEDIA)")
         else:
@@ -334,7 +408,7 @@ def main():
         if LEVA_RISCHIO:
             essenziale = "essenz" in g["priorita"].lower()
             desiderabile = any(k in g["priorita"].lower() for k in ("desider", "discrez"))
-            breve = g["orizzonte"] <= FINESTRA_DERISK
+            breve = anni <= finestra
             ontrack = p_succ >= SOGLIA_ONTRACK
             print(f"    — Seconda strada: alzare il rischio invece di versare di più (versamento fermo a {euro(pmt_det)}/mese) —")
             if essenziale:
@@ -344,18 +418,37 @@ def main():
                 print(f"        INADATTA per un obiettivo «{g['priorita']}»: la leva di rischio è un'opzione solo per")
                 print(f"        gli obiettivi desiderabili. Meglio versare di più, allungare l'orizzonte o ridurre il target.")
             elif breve:
-                print(f"        INADATTA su orizzonte di {g['orizzonte']} anni: entro la finestra di de-risking")
-                print(f"        ({FINESTRA_DERISK} anni) la quota azionaria deve scendere verso la scadenza, non salire.")
+                print(f"        INADATTA su orizzonte di {anni} anni: entro la finestra di de-risking")
+                print(f"        ({finestra} anni) la quota azionaria deve scendere verso la scadenza, non salire.")
             elif ontrack:
                 print(f"        CONTROPRODUCENTE: sei già in linea (prob {p_succ*100:.0f}%). Alzare il rischio")
                 print(f"        aggiunge un downside che non ti serve — quando hai (quasi) vinto, non rilanci.")
             else:
-                ris, ib = leva_di_rischio(target_nom, g["gia"], pmt_det, g["orizzonte"], peso_az, profili)
+                ris, ib = leva_di_rischio(target_nom, g["gia"], pmt_det, anni, peso_az, profili, glide=glide)
                 wb, rb, vb, pb, p10b, p50b, p90b = ris[ib]
                 if wb > peso_az + 1e-6 and pb > p_succ + 0.03:
                     peggiora = p10b < p10 - 1
-                    print(f"        OPZIONE: portando la quota azionaria a ~{wb*100:.0f}% (≈ {nome_profilo_vicino(wb, profili)}),")
-                    print(f"        la probabilità sale dal {p_succ*100:.0f}% al {pb*100:.0f}% SENZA versare di più.")
+                    partenza = " di partenza" if de_risk else ""
+                    print(f"        OPZIONE: portando la quota azionaria{partenza} a ~{wb*100:.0f}% "
+                          f"(≈ {nome_profilo_vicino(wb, profili)}),")
+                    if de_risk:
+                        # F017: accanto all'OPZIONE i due percorsi, a parità di versamento. Conta il
+                        # glide path, che è il piano che it-rebalance esegue.
+                        altro = None if GLIDE else glide_piano
+                        p_alt0, _ = prob_successo(target_nom, g["gia"], pmt_det, rend, vol, anni, peso_az,
+                                                  6000, altro)
+                        p_altb, _ = prob_successo(target_nom, g["gia"], pmt_det, rb, vb, anni, wb,
+                                                  6000, glide_per_quota(wb, altro))
+                        (pg0, pgb), (pf0, pfb) = (((p_succ, pb), (p_alt0, p_altb)) if GLIDE
+                                                  else ((p_alt0, p_altb), (p_succ, pb)))
+                        print(f"        la probabilità sale SENZA versare di più:")
+                        print(f"          sul percorso glide (de-risking da {finestra} anni dalla scadenza): "
+                              f"dal {pg0*100:.0f}% al {pgb*100:.0f}%")
+                        print(f"          a quota fissa fino alla scadenza (senza de-risking):       "
+                              f"dal {pf0*100:.0f}% al {pfb*100:.0f}%")
+                        print(f"        Conta la prima riga: il glide path è il piano che it-rebalance esegue.")
+                    else:
+                        print(f"        la probabilità sale dal {p_succ*100:.0f}% al {pb*100:.0f}% SENZA versare di più.")
                     print(f"        Ma il prezzo è sul caso brutto: il 10°pct va da {euro(p10)} a {euro(p10b)} "
                           f"({'PEGGIORA' if peggiora else 'tiene'}).")
                     print(f"        È un rilancio: più probabilità di centrare il target, worst case "
@@ -379,14 +472,17 @@ def main():
         print(f"\n✓  La capacità copre anche i versamenti per {CONFIDENZA_TARGET*100:.0f}% di confidenza su tutti.")
 
     print("\n" + "-" * 78)
-    print("Nota: il versamento deterministico centra la MEDIA → ~50% di probabilità.")
+    print("Nota: il versamento deterministico centra la MEDIA del capitale finale → ~50% di probabilità.")
+    print("Il rendimento del profilo è la media aritmetica annua attesa (netta di costi e imposte):")
+    print("la crescita composta mediana è circa rendimento − volatilità²/2, per questo sugli orizzonti")
+    print("lunghi e volatili la probabilità scende sotto il 50% (volatility drag).")
     print("Per gli obiettivi essenziali (es. fondo emergenza) si vuole confidenza alta,")
     print("quindi un versamento più alto del deterministico. Vedi monte-carlo.md.")
     print("NON è consulenza di investimento.")
     if MODELLO == "bootstrap":
-        print("Modello: BOOTSTRAP a blocchi da serie storica reale (code grasse e correlazioni")
-        print("azionario/obbligazionario reali). Media calibrata sul profilo; il passato non")
-        print("predice il futuro. Limiti e metodologia in monte-carlo.md.")
+        print("Modello: BOOTSTRAP a blocchi dalla serie storica USA (S&P 500 e T-Bond, nominali in")
+        print("dollari): code grasse e correlazioni azionario/obbligazionario della storia. Media")
+        print("calibrata sul profilo; il passato non predice il futuro. Limiti in monte-carlo.md.")
     else:
         print("Modello a rendimenti normali i.i.d., con i limiti descritti in monte-carlo.md")
         print("(no code grasse, no correlazioni). Per code più realistiche: MODELLO='bootstrap'.")

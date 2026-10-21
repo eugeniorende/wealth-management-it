@@ -13,6 +13,12 @@ italiano, per due decisioni dove il beneficio è quantificabile:
 
 Mostra anche il TER di pareggio del PIR: sotto quel costo il PIR conviene, sopra no.
 
+Rendimento LORDO: i profili del pianificatore sono rendimenti NETTI di costi e imposte
+(netto ≈ (lordo − costi) × (1 − 26%)); qui invece costi e imposte si tolgono contenitore
+per contenitore, quindi lo script parte dal rendimento lordo di mercato. Se
+RENDIMENTO_LORDO è None lo ricava dal netto del profilo con la conversione inversa
+(lordo_da_netto); si può fissare esplicitamente con --set RENDIMENTO_LORDO=0.07.
+
 Dipendenze: openpyxl  (pip install openpyxl)
 Uso:        python asset-location-optimizer.py [percorso/pianificatore-obiettivi.xlsx]
 
@@ -49,6 +55,11 @@ TASSA_PLUS_PIR = 0.00             # plusvalenze nel PIR dopo 5 anni
 # Scenario PENSIONE (il fondo pensione è vincolato → si valuta sull'obiettivo pensione, non sui goal a scadenza)
 CONTRIBUTO_ANNUO_FP = 5300        # versamento annuo deducibile (max deducibile 2026: €5.300)
 ANNI_A_PENSIONE = 30             # anni al pensionamento
+
+# Rendimento LORDO di mercato (prima di costi e imposte), uguale per tutti i contenitori.
+# None = ricavato dal netto del profilo (Crescita per la pensione, il profilo dell'obiettivo
+# per il PIR): lordo = netto / (1 − TASSA_PLUS_DOSSIER) + TER_DOSSIER + BOLLO.
+RENDIMENTO_LORDO = None
 
 # Soglia: gli obiettivi con orizzonte >= questa sono valutati per il PIR
 ORIZZONTE_MIN_PIR = 7
@@ -90,6 +101,17 @@ def leggi_excel(path):
                 "gia": float(gia) if gia else 0.0,
             })
     return inflazione, profili, obiettivi
+
+
+def lordo_da_netto(netto):
+    """Inverso della convenzione dei profili, netto ≈ (lordo − costi) × (1 − 26%): il
+    rendimento lordo di mercato da cui l'ottimizzatore toglie costi e imposte di ogni
+    contenitore. Prudente: tratta il netto come tassato ogni anno."""
+    return netto / (1 - TASSA_PLUS_DOSSIER) + TER_DOSSIER + BOLLO
+
+
+def rendimento_lordo(netto_profilo):
+    return RENDIMENTO_LORDO if RENDIMENTO_LORDO is not None else lordo_da_netto(netto_profilo)
 
 
 def aliquota_finale_fp(anni_iscrizione):
@@ -160,20 +182,30 @@ def main():
     inflazione, profili, obiettivi = (0.02, {}, [])
     if os.path.exists(path):
         inflazione, profili, obiettivi = leggi_excel(path)
-    # rendimento di riferimento per lo scenario pensione: profilo Crescita se presente
-    r_pensione = profili.get("Crescita", 0.055)
+    # rendimento di riferimento per lo scenario pensione: profilo Crescita se presente, portato
+    # al LORDO (i profili sono netti di costi e imposte, qui si tolgono contenitore per contenitore)
+    netto_crescita = profili.get("Crescita", 0.055)
+    r_pensione = rendimento_lordo(netto_crescita)
 
     print("=" * 80)
     print("OTTIMIZZATORE ASSET LOCATION — beneficio fiscale netto per contenitore")
     print("=" * 80)
     print(f"Aliquota IRPEF marginale: {ALIQUOTA_IRPEF_MARGINALE*100:.0f}%  |  "
           f"TER dossier {TER_DOSSIER*100:.1f}%  ·  ISC fondo pensione {ISC_FONDO_PENSIONE*100:.1f}%  ·  TER PIR {TER_PIR*100:.1f}%")
+    if RENDIMENTO_LORDO is None:
+        print(f"Rendimento lordo di mercato {r_pensione*100:.1f}% = netto del profilo Crescita "
+              f"{netto_crescita*100:.1f}% / (1 − {TASSA_PLUS_DOSSIER*100:.0f}%) + TER {TER_DOSSIER*100:.1f}% "
+              f"+ bollo {BOLLO*100:.1f}%")
+        print("  (i profili sono netti di costi e imposte; qui si tolgono contenitore per contenitore)")
+    else:
+        print(f"Rendimento lordo di mercato {r_pensione*100:.1f}% (RENDIMENTO_LORDO esplicito)")
 
     # ---------------------------------------------------------
     # 1) FONDO PENSIONE vs DOSSIER (pensione)
     # ---------------------------------------------------------
     print("\n" + "-" * 80)
-    print(f"1) FONDO PENSIONE vs DOSSIER  —  €{CONTRIBUTO_ANNUO_FP:,}/anno per {ANNI_A_PENSIONE} anni @ {r_pensione*100:.1f}%".replace(",", "."))
+    print(f"1) FONDO PENSIONE vs DOSSIER  —  €{CONTRIBUTO_ANNUO_FP:,}/anno per {ANNI_A_PENSIONE} anni "
+          f"@ {r_pensione*100:.1f}% lordo".replace(",", "."))
     print("-" * 80)
 
     c = CONTRIBUTO_ANNUO_FP
@@ -224,14 +256,14 @@ def main():
         print("  (nessun obiettivo idoneo nel foglio: uso uno scenario di esempio)")
 
     for g in lunghi:
-        r = profili.get(g["profilo"], 0.055)
+        r = rendimento_lordo(profili.get(g["profilo"], 0.055))
         gia = g["gia"]
         H = g["orizzonte"]
         doss = dossier_netto(0, H, r, gia)
         pir = pir_netto(gia, H, r, TER_PIR)
         netto = pir - doss
         ter_par = ter_pareggio_pir(gia, H, r)
-        print(f"\n  ▸ {g['nome']}  ({euro(gia)} di capitale, {H} anni @ {r*100:.1f}%, profilo {g['profilo']})")
+        print(f"\n  ▸ {g['nome']}  ({euro(gia)} di capitale, {H} anni @ {r*100:.1f}% lordo, profilo {g['profilo']})")
         print(f"      DOSSIER (plus 26%, TER {TER_DOSSIER*100:.1f}%):      {euro(doss)}")
         print(f"      PIR (plus 0%, TER {TER_PIR*100:.1f}%):           {euro(pir)}")
         segno = "VANTAGGIO PIR" if netto >= 0 else "SVANTAGGIO PIR"
@@ -248,6 +280,9 @@ def main():
     print("  effettivo del prodotto rispetto al TER di pareggio.")
     print("- ⚠️ La comparazione PIR/dossier assume lo STESSO rendimento: NON include il costo di")
     print("  concentrazione del PIR (PMI italiane). È un rischio in più che il fisco deve ripagare.")
+    print("- Il verdetto PIR dipende dal rendimento LORDO: più è alto, più vale l'esenzione delle")
+    print("  plus. Trattare come lordo il rendimento netto dei profili lo ribalterebbe; per un'altra")
+    print("  ipotesi: --set RENDIMENTO_LORDO=0.07.")
     print("\nNON è consulenza. Calcoli illustrativi, parametri editabili in cima allo script.")
     print("Vedi asset-location.md. Verificare con consulente abilitato e commercialista.")
 
