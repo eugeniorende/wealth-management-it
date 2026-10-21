@@ -41,10 +41,10 @@ Le cripto-attività rientrano tra i **beni e diritti** soggetti all'**imposta di
 - **Territorialità**: se il de cuius o il donante era **residente in Italia**, l'imposta colpisce **tutto** il patrimonio cripto, **anche** quello su exchange esteri o hardware wallet. Se **non residente**, solo i beni esistenti in Italia: per l'AdE rilevano le cripto presso prestatori di servizi **residenti in Italia** o su supporti che **si trovano in Italia**; quelle su exchange esteri o dispositivi all'estero **restano fuori**.
 - **Costo di carico per eredi e donatari** (decisivo per le plusvalenze **future**, art. 68 co. 9-bis TUIR): in caso di **successione** il costo è il valore **definito o dichiarato ai fini dell'imposta di successione**; in caso di **donazione** è il **costo sostenuto dal donante** (quello che il donante avrebbe usato cedendo a titolo oneroso).
 - ⚠️ **Documentazione = tutto**: se manca la prova del costo, il costo è assunto **pari a zero** (art. 68 c. 9-bis TUIR; in amministrato anche la risposta AdE 135/2025) e l'**intera** plusvalenza futura è tassata. Conservare la documentazione di acquisto — e **trasmetterla agli eredi** — è ciò che evita di regalare al fisco l'intero controvalore alla successiva vendita.
-- **Aliquote** (art. 7 D.Lgs. 346/1990):
+- **Aliquote** (art. 7 per la successione e art. 56 per la donazione, D.Lgs. 346/1990; dal 2027 artt. 93 e 133 D.Lgs. 123/2025): le stesse di ogni altro bene, con la tabella completa in `successione-donazione.md`:
   - 4% per coniuge e parenti in linea retta oltre la franchigia di €1.000.000 ciascuno;
   - 6% per fratelli e sorelle oltre €100.000;
-  - 6%, senza franchigia, per gli altri parenti fino al quarto grado e per gli affini;
+  - 6%, senza franchigia, per gli altri parenti fino al quarto grado, gli affini in linea retta e gli affini in linea collaterale fino al terzo grado;
   - 8% per gli altri soggetti;
   - franchigia di €1.500.000 per i disabili gravi.
 
@@ -57,4 +57,4 @@ Anche qui la reference dà i principi e segnala le incertezze: l'applicazione de
 
 Cross-reference: `criptovalute.md` (il quadro base) e `criptovalute-avanzate.md` (DeFi, NFT, ravvedimento). Insieme, le tre reference coprono la fiscalità cripto della persona fisica residente dal caso ordinario fino ai confini con impresa, internazionalità e passaggio generazionale.
 
-*Aliquota 33% e compartimento separato (L. 207/2024 c. 24; art. 68 c. 9-bis TUIR), costo di carico e costo zero senza documentazione (art. 68 c. 9-bis TUIR; risp. AdE 135/2025), irrilevanza delle valutazioni IRES/IRAP (art. 110 c. 3-bis TUIR), IVA sulle cripto e mining (CGUE C-264/14; circ. 30/E/2023; risp. AdE 515/2022), art. 24-bis TUIR 2026 (L. 199/2025 c. 25-26; L. 232/2016 c. 153 e 158), localizzazione e successioni delle cripto (circ. 30/E/2023, par. 3.7.4 e 5; artt. 2 e 7 D.Lgs. 346/1990) — Verificato: 2026-10.*
+*Aliquota 33% e compartimento separato (L. 207/2024 c. 24; art. 68 c. 9-bis TUIR), costo di carico e costo zero senza documentazione (art. 68 c. 9-bis TUIR; risp. AdE 135/2025), irrilevanza delle valutazioni IRES/IRAP (art. 110 c. 3-bis TUIR), IVA sulle cripto e mining (CGUE C-264/14; circ. 30/E/2023; risp. AdE 515/2022), art. 24-bis TUIR 2026 (L. 199/2025 c. 25-26; L. 232/2016 c. 153 e 158), localizzazione e successioni delle cripto (circ. 30/E/2023, par. 3.7.4 e 5; artt. 2, 7 e 56 D.Lgs. 346/1990) — Verificato: 2026-10.*

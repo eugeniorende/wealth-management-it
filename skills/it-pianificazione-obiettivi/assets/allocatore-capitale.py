@@ -62,6 +62,8 @@ CAPITALE_DA_ALLOCARE = 130000.0   # la somma liquida da distribuire (€)
 PROFILO_CAPITALE_LIBERO = "Crescita"  # profilo dell'eccedenza se NON si usa lo split sotto
 # Se il capitale libero (eccedenza) alimenta più obiettivi di lungo termine "il più possibile"
 # (es. integrazione pensione + eredità), specificarne qui la ripartizione: (nome, peso, profilo).
+# Fiscalità dell'eredità: it-tax-optimization/references/successione-donazione.md (per fondi
+# ed ETF l'azzeramento della plusvalenza non è garantito).
 # I pesi si normalizzano. Lista vuota -> un unico bucket a PROFILO_CAPITALE_LIBERO (retro-compatibile).
 CAPITALE_LIBERO_SPLIT = [
     ("Libertà finanziaria", 0.30, "Crescita"),
