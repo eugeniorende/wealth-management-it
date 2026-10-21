@@ -513,6 +513,32 @@ def t_tassi_capitalizzazione():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("importa-previdenza: con --anonimo non stampa intestatario né data di nascita")
+def t_importa_anonimo():
+    # Pre-pubblicazione, privacy: tutto ciò che lo script stampa entra nel contesto del modello.
+    xml = os.path.join(FIXTURES, "estratto-inps-test.xml")
+    rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), xml)
+    assert rc == 0 and "ROSSI" in out and "15/03/1990" in out, "senza il flag lo script resta com'era"
+    for args in ((xml, "--anonimo"), ("--anonimo", xml)):
+        rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
+        assert rc == 0, out[-300:]
+        for dato in ("ROSSI", "MARIO", "15/03/1990", "1990)"):
+            assert dato not in out, f"--anonimo: stampato «{dato}»"
+        eta = re.search(r"ETA_ATTUALE\s*=\s*([\d.]+)", out)
+        assert eta and "." not in eta.group(1), "con --anonimo l'età resta, in anni interi"
+        assert "MONTANTE_ATTUALE" in out and "omesso" in out
+    # età arrotondata, non troncata: proiezione-inps.py usa round(ETA_PENSIONAMENTO − ETA_ATTUALE)
+    m = carica_modulo(asset("it-pianificazione", "importa-previdenza.py"))
+    assert m.eta_stampata(36.6, True) == 37 and m.eta_stampata(36.4, True) == 36 and m.eta_stampata(36.6, False) == 36.6
+    # un flag sbagliato non deve stampare i dati personali (revisione delle note del § 4)
+    csv_fondo = os.path.join(FIXTURES, "storico-fondo-test.csv")
+    for args in ((xml, "--anonymous"), (xml, "-anonimo"), (xml, "—anonimo"), (xml, csv_fondo, "--anonimi"),
+                 (xml, csv_fondo, "altro.csv")):
+        rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
+        assert rc != 0 and "ROSSI" not in out and "15/03/1990" not in out and "Uso:" in out, \
+            f"argomenti {args[1:]}: rc {rc}, output «{out.strip()[:120]}»"
+
+
 @test("netto-pensione: netto dello stipendio con le misure L. 207/2024 c. 4-6 e il contributo IVS aggiuntivo")
 def t_netto_stipendio():
     netto = _modulo_previdenza("netto-pensione.py")
