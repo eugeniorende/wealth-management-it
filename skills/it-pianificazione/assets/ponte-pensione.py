@@ -28,8 +28,8 @@ Uso:
 ONESTÀ METODOLOGICA
 - Tutto in termini REALI (€ di oggi). La RITA è modellata a rate costanti
   (capitale destinato al comparto garantito, ~0% reale: prassi prudente) e con
-  l'aliquota agevolata sull'INTERO importo (leggermente conservativo: la parte
-  di rendimenti già tassati sarebbe esente).
+  l'aliquota agevolata sull'INTERO importo (conservativo: la parte di
+  rendimenti già tassati, che può valere il 30-45% del montante, sarebbe esente).
 - I canali PUBBLICI di anticipo (pensione anticipata ordinaria, anticipata
   contributiva, APE…) NON sono modellati: se ne maturi i requisiti, il ponte
   si accorcia e questo calcolo diventa un limite superiore del fabbisogno.

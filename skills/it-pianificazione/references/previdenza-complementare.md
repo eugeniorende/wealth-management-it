@@ -71,7 +71,7 @@ Se conferito al fondo, l'accantonamento TFR (~6,91% della RAL annua, vedi formul
 | Pignorabilità simile a stipendio | Maggiore protezione da esecuzione forzata |
 | Liquidazione solo a fine rapporto | Anticipazioni più flessibili (vedi sotto) |
 
-**Conferimento è quasi sempre conveniente** per ragioni fiscali — la differenza tra 27% medio e 9-15% al pensionamento è 12-18 punti percentuali, che su un TFR cumulato di 30+ anni significa decine di migliaia di euro.
+**Il vantaggio certo del conferimento è fiscale**: l'aliquota media della tassazione separata sul reddito di riferimento (~23-27% nei casi tipici) contro il 9-15% del fondo, applicate entrambe alle sole quote (le rivalutazioni sono escluse in tutti e due i casi), cioè circa 8-18 punti. Con RAL €40.000 per 30 anni sono ~€7.700 in euro di oggi, a scaglioni di oggi (esempio sotto); di più con redditi alti e carriere lunghe. Il resto della differenza viene dal rendimento del comparto, che è incerto.
 
 **Quando il conferimento NON è ovviamente conveniente:**
 - Orizzonte breve al pensionamento (<10 anni): l'aliquota 15% non si è ancora abbassata (serve ≥15 anni di partecipazione) e i costi del fondo erodono il margine
@@ -81,6 +81,7 @@ Se conferito al fondo, l'accantonamento TFR (~6,91% della RAL annua, vedi formul
 - Neoassunti del settore privato dal 1/7/2026: **adesione automatica** alla forma negoziale di riferimento, con possibilità di rinuncia entro 60 giorni (L. 199/2025 c. 204-205; art. 8 c. 7 e 7-quater D.Lgs. 252/2005); il comparto di default è un percorso life-cycle tarato su età e orizzonte
 - Assunti prima: scelta entro 6 mesi dall'assunzione (silenzio-assenso: chi non sceglie, il TFR va al fondo di categoria di default)
 - **Irrevocabile** una volta conferito: non si può tornare indietro
+- Si conferisce il TFR **maturando**: quello già maturato di regola resta in azienda (art. 8 c. 7 D.Lgs. 252/2005), quindi la decisione riguarda le quote future
 - Si può cambiare fondo (dopo almeno 2 anni di permanenza) ma il TFR resta in regime complementare
 
 ### 2. Contributo volontario del lavoratore
@@ -96,7 +97,7 @@ Risparmio_IRPEF_annuo = quota_deducibile_volontario × aliquota_marginale_IRPEF
 
 Esempio: RAL €40.000 → aliquota marginale 33% (secondo scaglione 2026). Contributo €3.000/anno → risparmio IRPEF = €3.000 × 33% = **€990/anno** che torna in busta paga (o a conguaglio 730).
 
-Esempio massimo: RAL €60.000 → aliquota marginale 43%, nessun contributo del datore. Contributo €5.300 → risparmio IRPEF = **€2.279/anno**. Su 30 anni di carriera: **€68.370 di risparmio fiscale cumulato** (in valore nominale, non scontato). Con un datore al 2% (€1.200) lo spazio per i volontari scende a €4.100 e il risparmio a €1.763 l'anno: il foglio Complementare dell'Excel mostra lo spazio residuo e la quota deducibile anno per anno.
+Esempio massimo: RAL €60.000 → aliquota marginale 43%, nessun contributo del datore. Contributo €5.300 → risparmio IRPEF ≈ **€2.194/anno**: l'imponibile, al netto dei contributi INPS, è ~€54.450, quindi gli ultimi ~€850 della deduzione scendono nello scaglione al 33%. Su 30 anni di carriera: **≈ €65.800 di risparmio fiscale cumulato** (in valore nominale, non scontato). Con un datore al 2% (€1.200) lo spazio per i volontari scende a €4.100 e il risparmio a €1.763 l'anno: il foglio Complementare dell'Excel mostra lo spazio residuo e la quota deducibile anno per anno.
 
 **Importante**: il contributo volontario va al fondo *in aggiunta* al TFR, non lo sostituisce. È un risparmio aggiuntivo, deducibile.
 
@@ -160,7 +161,7 @@ aliquota_finale = max(9%, 15% - 0,30% × max(0, anni_partecipazione - 15))
 
 **Importante**: gli "anni di partecipazione" si contano dalla prima iscrizione a una qualsiasi forma di previdenza complementare. Trasferimenti tra fondi conservano l'anzianità.
 
-La base imponibile esclude i redditi già tassati (art. 11 c. 6 D.Lgs. 252/2005): i rendimenti, già colpiti ogni anno dal 20% (12,5% sulla quota in titoli di Stato), e i contributi non dedotti comunicati al fondo. In pratica l'aliquota 15→9% si applica al TFR conferito e ai contributi dedotti. Calcolo gestito dall'intermediario.
+La base imponibile esclude i redditi già tassati (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026): i rendimenti, già colpiti ogni anno dal 20% (12,5% sulla quota in titoli di Stato), e i contributi non dedotti comunicati al fondo. In pratica l'aliquota 15→9% si applica al TFR conferito e ai contributi dedotti. Calcolo gestito dall'intermediario.
 
 **Confronto netto rispetto a TFR azienda alla liquidazione:**
 
@@ -168,9 +169,9 @@ La base imponibile esclude i redditi già tassati (art. 11 c. 6 D.Lgs. 252/2005)
 |---|---|---|
 | Aliquota tassazione | aliquota media sul reddito di riferimento (~23-27%), sulle quote | 9-15%, sulle sole quote (rendimenti esclusi) |
 | Rendimento netto periodo | 1,5% + 75% dell'inflazione, meno il 17% (~2,5% nominale con inflazione al 2%) | Variabile per comparto (3-5% bilanciato/azionario) |
-| Differenza nominale stimata su 30 anni | base | +30-80% di prestazione netta |
+| Differenza stimata su 30 anni | base | +30-90% di prestazione netta |
 
-Il foglio Complementare dell'Excel (blocco «Confronto TFR») fa il conto completo con le ipotesi dell'utente. Con RAL €40.000 costante per 30 anni, inflazione al 2% e comparto al 3,5% reale, in euro di oggi il TFR in azienda vale ~€74.700 netti e nel fondo ~€136.200: circa €7.700 della differenza vengono dalla tassazione, il resto dal rendimento atteso del comparto, che nel fondo è incerto. È un'illustrazione, non una raccomandazione.
+Il foglio Complementare dell'Excel (blocco «Confronto TFR») fa il conto completo con le ipotesi dell'utente. Con RAL €40.000 costante per 30 anni, inflazione al 2% e comparto al 2,5% reale, in euro di oggi il TFR in azienda vale ~€74.700 netti e nel fondo ~€114.800 (+54%): circa €7.700 della differenza vengono dalla tassazione, il resto dal rendimento atteso del comparto, che nel fondo è incerto. Gli scaglioni sono quelli di oggi applicati a importi in euro di oggi, come nel resto del foglio: se la legge non li aggiorna, l'imposta della tassazione separata sale e il vantaggio fiscale del fondo cresce. È un'illustrazione, non una raccomandazione.
 
 ## Anticipazioni e riscatti
 
@@ -222,10 +223,10 @@ Erogato in un'unica soluzione. Tassato 15→9% (in base ad anni partecipazione).
 
 ### Rendita vitalizia
 
-Convertita dal fondo o da società assicurativa partner. Tasso di conversione tipico 5-6% del capitale (varia per età, sesso, opzioni di reversibilità). Versata mensilmente, con la ritenuta 15→9% sulla parte imponibile (TFR e contributi dedotti), fuori dall'IRPEF progressiva (art. 11 c. 6 D.Lgs. 252/2005).
+Convertita dal fondo o da società assicurativa partner. Tasso di conversione tipico 5-6% del capitale (varia per età, sesso, opzioni di reversibilità). Versata mensilmente, con la ritenuta 15→9% sulla parte imponibile (TFR e contributi dedotti), fuori dall'IRPEF progressiva (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026). La parte della rata che viene dai rendimenti maturati durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR) è tassata a parte, al 26% (12,5% sui titoli di Stato).
 
 **Pro**: copre tutta la vita (rischio longevità), integra la pensione INPS in modo coerente
-**Contro**: niente lascito (in opzione standard; le nuove forme a durata definita vanno valutate sul regolamento del fondo), tasso di conversione poco favorevole storicamente
+**Contro**: niente lascito nella vitalizia standard (nelle nuove forme del c. 3-bis il montante residuo va invece ai beneficiari indicati, c. 3-quinquies), tasso di conversione poco favorevole storicamente
 
 Opzioni di rendita:
 - Vitalizia immediata semplice
@@ -239,12 +240,24 @@ Più opzioni = rendita base più bassa.
 
 La L. 199/2025 ha aggiunto il comma 3-bis all'art. 11 D.Lgs. 252/2005: la parte che non si prende in capitale, invece della rendita vitalizia, può andare in:
 - **rendita a durata definita** (dal 1/7/2026), con rate calcolate sulla speranza di vita residua;
-- **prelievi liberamente determinabili** (dal 1/7/2026);
+- **prelievi liberamente determinabili** (dal 1/7/2026), di volta in volta entro la somma delle rate maturate e non ancora riscosse di una rendita teorica a durata definita (c. 3-quater): non un accesso libero al montante;
 - **erogazione frazionata** in almeno 5 anni (dal 31/10/2026).
 
 Fiscalità: rendita a durata definita e prelievi come il capitale (15% ridotto di 0,30 punti per anno oltre il 15° di partecipazione, fino al 9%); erogazione frazionata al 20%, ridotto di 0,25 punti per anno oltre il 15°, fino al 15% (art. 11 c. 6-ter). Dal 1/1/2027 le stesse regole sono nell'art. 258 del nuovo testo unico (D.Lgs. 117/2026). La COVIP ha adeguato le istruzioni con la delibera del 25/6/2026: condizioni e tempi di avvio vanno letti nel regolamento del proprio fondo.
 
-**Regola pratica**: per chi ha **patrimonio finanziario significativo** oltre al fondo pensione, prendere il **50% in capitale** ha senso (flessibilità). Per chi ha **poche altre risorse** e teme rischio longevità, prendere **tutta in rendita** ha senso. Per la maggior parte: mix 50/50.
+Vincoli (art. 11 c. 3-quater e 3-quinquies; delibera COVIP 25/6/2026):
+- le tre forme sono alternative alla vitalizia e non si combinano tra loro né con la vitalizia; a ciascuna si può affiancare il capitale fino al 50%;
+- una volta avviata l'erogazione la scelta è irrevocabile: resta solo la conversione del residuo in rendita vitalizia, anche presso un altro fondo; prima del primo pagamento la richiesta si può revocare;
+- il montante resta investito nel fondo (si può solo cambiare comparto), non si versa più e le nuove forme non sono cumulabili con una RITA in corso;
+- in caso di decesso il montante residuo va ai beneficiari indicati (c. 3-quinquies);
+- periodo transitorio fino al 31/12/2026: i fondi raccolgono le richieste ma possono liquidarle dopo l'adeguamento.
+
+**Come confrontare le scelte** (scenari, non una raccomandazione):
+- **capitale fino al 50%**: flessibilità e lascito, ma rischio di consumarlo troppo presto;
+- **rendita vitalizia**: copre il rischio di longevità, niente lascito nell'opzione standard;
+- **durata definita, prelievi o frazionata**: il residuo resta investito e va ai beneficiari, ma non copre la vita oltre quella attesa; la frazionata è tassata al 20→15%.
+
+Pesano il patrimonio fuori dal fondo, il timore di vivere più a lungo dell'attesa e il desiderio di lasciare qualcosa.
 
 ## Heuristic per la skill
 
@@ -260,10 +273,10 @@ Fiscalità: rendita a durata definita e prelievi come il capitale (15% ridotto d
 
 5. **Trasferimento**: se l'utente ha un PIP con ISC alti (>1,5%) e almeno 2 anni di partecipazione, valutare il trasferimento a un negoziale (possibile anche prima del 2026) e flaggarlo come opportunità prioritaria. Dal 31/10/2026 chi lascia un negoziale conserva il contributo del datore.
 
-6. **TFR ancora in azienda**: se non conferito, segnalare con priorità alta che il conferimento di solito risparmia 15-25% sulla parte TFR al pensionamento (effetto tassazione).
+6. **TFR ancora in azienda**: mostrare il blocco «Confronto TFR» del foglio Complementare con le ipotesi dell'utente, separando il vantaggio fiscale (certo: ~23-27% contro 9-15% sulle quote, ~€7.700 nell'esempio a RAL €40.000 per 30 anni) da quello di rendimento (incerto). Il conferimento è irrevocabile e riguarda il TFR futuro: presentarlo come scenario, non come raccomandazione.
 
 7. **Mai consigliare il fondo come "investimento" alternativo a un PAC**: il fondo è specificamente uno strumento previdenziale con vincoli di accesso (no liquidità ordinaria fino al pensionamento). Va integrato con risparmio non vincolato per esigenze di liquidità di medio termine.
 
 ---
-*Tetto di deducibilità €5.300 (L. 199/2025 c. 201), capitale al 50% e caso del 100% (art. 11 c. 3, DL 62/2026 art. 16-ter), base imponibile e aliquote in uscita (art. 11 c. 6 e 6-ter), nuove forme di erogazione (c. 3-bis), tassazione dei rendimenti (art. 17, L. 190/2014 c. 622), TFR in azienda (art. 2120 c.c., D.Lgs. 47/2000 art. 11 c. 3, art. 19 TUIR); commi 201-204 L. 199/2025 e delibera COVIP 25/6/2026 — Verificato: 2026-10.*
+*Tetto di deducibilità €5.300 (L. 199/2025 c. 201), capitale al 50% e caso del 100% (art. 11 c. 3, DL 62/2026 art. 16-ter), base imponibile e aliquote in uscita (art. 11 c. 6 e 6-ter), nuove forme di erogazione e loro vincoli (c. 3-bis, 3-quater e 3-quinquies), tassazione dei rendimenti (art. 17, L. 190/2014 c. 622), TFR in azienda (art. 2120 c.c., D.Lgs. 47/2000 art. 11 c. 3, art. 19 TUIR); commi 201-204 L. 199/2025 e delibera COVIP 25/6/2026 — Verificato: 2026-10.*
 *Plafond condiviso con il contributo del datore, comunicazione dei non dedotti (art. 8 c. 4 D.Lgs. 252/2005), trasferimento con il contributo datoriale dal 31/10/2026 e adesione automatica dal 1/7/2026 — Verificato: 2026-10.*
