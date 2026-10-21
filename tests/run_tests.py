@@ -513,6 +513,32 @@ def t_tassi_capitalizzazione():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("importa-previdenza: con --anonimo non stampa intestatario né data di nascita")
+def t_importa_anonimo():
+    # Pre-pubblicazione, privacy: tutto ciò che lo script stampa entra nel contesto del modello.
+    xml = os.path.join(FIXTURES, "estratto-inps-test.xml")
+    rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), xml)
+    assert rc == 0 and "ROSSI" in out and "15/03/1990" in out, "senza il flag lo script resta com'era"
+    for args in ((xml, "--anonimo"), ("--anonimo", xml)):
+        rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
+        assert rc == 0, out[-300:]
+        for dato in ("ROSSI", "MARIO", "15/03/1990", "1990)"):
+            assert dato not in out, f"--anonimo: stampato «{dato}»"
+        eta = re.search(r"ETA_ATTUALE\s*=\s*([\d.]+)", out)
+        assert eta and "." not in eta.group(1), "con --anonimo l'età resta, in anni interi"
+        assert "MONTANTE_ATTUALE" in out and "omesso" in out
+    # età arrotondata, non troncata: proiezione-inps.py usa round(ETA_PENSIONAMENTO − ETA_ATTUALE)
+    m = carica_modulo(asset("it-pianificazione", "importa-previdenza.py"))
+    assert m.eta_stampata(36.6, True) == 37 and m.eta_stampata(36.4, True) == 36 and m.eta_stampata(36.6, False) == 36.6
+    # un flag sbagliato non deve stampare i dati personali (revisione delle note del § 4)
+    csv_fondo = os.path.join(FIXTURES, "storico-fondo-test.csv")
+    for args in ((xml, "--anonymous"), (xml, "-anonimo"), (xml, "—anonimo"), (xml, csv_fondo, "--anonimi"),
+                 (xml, csv_fondo, "altro.csv")):
+        rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
+        assert rc != 0 and "ROSSI" not in out and "15/03/1990" not in out and "Uso:" in out, \
+            f"argomenti {args[1:]}: rc {rc}, output «{out.strip()[:120]}»"
+
+
 @test("netto-pensione: netto dello stipendio con le misure L. 207/2024 c. 4-6 e il contributo IVS aggiuntivo")
 def t_netto_stipendio():
     netto = _modulo_previdenza("netto-pensione.py")
@@ -1387,6 +1413,7 @@ def t_t7_gate_rientro():
     m, p = _ribilancia(ZAINETTO={"Fineco": 2000, "Directa": 0})
     assert [(v["broker"], v["tipo"], round(v["vendi"])) for v in p["vendite"]] == [("Fineco", "diverso", 5000)], p["vendite"]
     assert p["imposta"] == 0 and round(p["drift"]["azionario"]["residuo_non_corretto"]) == 3000, p["drift"]["azionario"]
+    assert round(p["acquisti"]["obbligazionario"]) == 5000 and round(p["acquisti"]["monetario"]) == 0, p["acquisti"]
     testo = _stampato(m, p)
     assert "nessuna vendita necessaria" not in testo and re.search(r"rinviat[^\n]*3,000|3,000[^\n]*rinviat", testo), testo[-800:]
     # drift +18% oltre la banda larga, nessuna vendita gratis: si vende con imposta fino a metà banda
@@ -1423,6 +1450,7 @@ def t_t7_prelievo_input():
     venduto = sum(v["vendi"] for v in p["vendite"])
     assert venduto >= 3000 - 0.01 and abs(venduto - p["imposta"] - sum(p["acquisti"].values()) - 3000) < 0.01, p
     assert all(v["forzata"] for v in p["vendite"]), p["vendite"]
+    assert all(abs(p["risultante"][c] - t) < 0.001 for c, t in target.items()), p["risultante"]
     # instradamento: il broker trattiene l'imposta, il prelievo non può superare la cassa netta
     piano = {"vendite": [{"broker": "A", "classe": "azionario", "tipo": "capitale", "aliquota": 0.26, "vendi": 10000,
                           "plus_real": 7692.31, "comp": 0, "tassa": 2000, "forzata": True},
@@ -1447,6 +1475,246 @@ def t_t7_prelievo_input():
         raise AssertionError(f"input non valido accettato: {errato}")
 
 
+@test("T7 ribilanciamento: Leva 3 di tutte le classi prima della Leva 4, piano indipendente dall'ordine di TARGET")
+def t_t7_ordine_leve():
+    # REGRESSIONE (revisione T7): la minus di una classe elaborata dopo non compensava la plus
+    # venduta prima sullo stesso broker, e piano e imposta dipendevano dall'ordine delle chiavi.
+    pos = [{"broker": "X", "asset_class": "azionario", "tipo": "diverso", "valore": 68000, "plus": 20000},
+           {"broker": "X", "asset_class": "obbligazionario", "tipo": "capitale", "valore": 24000, "plus": -3000},
+           {"broker": "X", "asset_class": "monetario", "tipo": "capitale", "valore": 8000, "plus": 0}]
+    classi = ("azionario", "obbligazionario", "monetario")
+    for pesi, imposta, residuo in (((0.60, 0.15, 0.25), 0.0, 4175), ((0.55, 0.15, 0.30), 6675 * 20000 / 68000 * 0.26, 2500)):
+        esiti = []
+        for ordine in (classi, ("obbligazionario", "azionario", "monetario"), ("monetario", "obbligazionario", "azionario")):
+            pesi_cl = dict(zip(classi, pesi))
+            m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET={c: pesi_cl[c] for c in ordine})
+            assert abs(p["imposta"] - imposta) < 0.01, (ordine, p["imposta"], p["vendite"])
+            assert abs(p["drift"]["azionario"]["residuo_non_corretto"] - residuo) < 0.01, (ordine, p["drift"]["azionario"])
+            vendite = {v["classe"]: (round(v["vendi"], 2), round(v["comp"], 2)) for v in p["vendite"]}
+            assert vendite["obbligazionario"] == (9000, 0) and vendite["azionario"][1] == 1125, (ordine, vendite)
+            esiti.append((sorted(vendite.items()), round(p["imposta"], 2), round(p["zainetto"]["X"], 2),
+                          {c: round(w, 6) for c, w in p["risultante"].items()}))
+            # nel CSV di X la vendita in minus viene prima di quella in plus, e la nota lo dice
+            vendite_x = [o for o in m.genera_ordini(p) if o["operazione"] == "VENDITA"]
+            assert [o["classe"] for o in vendite_x] == ["obbligazionario", "azionario"], vendite_x
+            assert "prima delle vendite in plus" in vendite_x[0]["nota"], vendite_x[0]["nota"]
+        assert esiti[0] == esiti[1] == esiti[2], esiti
+    # la minus venduta per riempire una sottopesata (dopo la plus decisa per la sovrappesata) va
+    # comunque eseguita per prima, e l'imposta si calcola in quell'ordine
+    pos = [{"broker": "X", "asset_class": "azionario", "tipo": "diverso", "valore": 70000, "plus": 21000},
+           {"broker": "X", "asset_class": "obbligazionario", "tipo": "capitale", "valore": 25000, "plus": -2500},
+           {"broker": "X", "asset_class": "monetario", "tipo": "capitale", "valore": 5000, "plus": 0}]
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET={"azionario": 0.55, "obbligazionario": 0.21, "monetario": 0.24})
+    assert [(v["classe"], round(v["vendi"], 2)) for v in p["vendite"]] == [("obbligazionario", 4000), ("azionario", 13833.33)], p["vendite"]
+    assert abs(p["imposta"] - 12500 * 0.3 * 0.26) < 0.01 and abs(p["zainetto"]["X"]) < 0.01, (p["imposta"], p["zainetto"])
+    # due sottopesate fuori banda in concorrenza per la stessa vendita a costo zero: prima la più grave
+    pos = [{"broker": "X", "asset_class": c, "tipo": "capitale", "valore": v, "plus": pl}
+           for c, v, pl in (("azionario", 64000, 16000), ("obbligazionario", 26000, 0), ("monetario", 6000, 0), ("oro", 4000, 0))]
+    pesi = {"azionario": 0.60, "obbligazionario": 0.22, "monetario": 0.10, "oro": 0.08}
+    for ordine in (list(pesi), ["monetario", "oro", "azionario", "obbligazionario"]):
+        m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET={c: pesi[c] for c in ordine})
+        assert round(p["acquisti"]["oro"]) == 4000 and round(p["drift"]["monetario"]["residuo_non_corretto"]) == 4000, \
+            (ordine, p["acquisti"], p["drift"]["monetario"])
+    # la cassa che non basta per tutte le sottopesate fuori banda si divide in proporzione al fabbisogno
+    pos = [{"broker": "X", "asset_class": c, "tipo": "capitale", "valore": v, "plus": pl}
+           for c, v, pl in (("azionario", 70500, 0), ("obbligazionario", 19500, 4000), ("monetario", 6000, 0), ("oro", 4000, 0))]
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET={"azionario": 0.60, "obbligazionario": 0.16, "monetario": 0.14, "oro": 0.10})
+    assert {c: round(x) for c, x in p["acquisti"].items()} == {"azionario": 0, "obbligazionario": 0, "monetario": 6000, "oro": 4500}, p["acquisti"]
+
+
+@test("T7 ribilanciamento: una sottopesata fuori banda si riempie vendendo dalle classi sopra il target, anche in banda")
+def t_t7_sottopesata():
+    # REGRESSIONE (revisione T7): con il solo monetario fuori banda (sottopeso) lo script non
+    # vendeva nulla e stampava «nessuna vendita necessaria (… o tutto in banda)».
+    target = {"azionario": 0.64, "obbligazionario": 0.21, "monetario": 0.15}
+    m, p = _ribilancia(TARGET=target)
+    assert [d["fuori_banda"] for d in p["drift"].values()] == [False, False, True], p["drift"]
+    assert sorted((v["broker"], v["classe"], v["tipo"], round(v["vendi"])) for v in p["vendite"]) == \
+        [("Fineco", "azionario", "diverso", 4000), ("Fineco", "obbligazionario", "capitale", 3000)], p["vendite"]
+    assert p["imposta"] == 0 and round(p["acquisti"]["monetario"]) == 7000, (p["imposta"], p["acquisti"])
+    assert all(abs(p["risultante"][c] - t) < 1e-6 for c, t in target.items()), p["risultante"]
+    assert "nessuna vendita necessaria" not in _stampato(m, p)
+    pos = [{"broker": "X", "asset_class": c, "tipo": "capitale", "valore": v, "plus": 0}
+           for c, v in (("azionario", 44000), ("obbligazionario", 44000), ("monetario", 12000))]
+    target = {"azionario": 0.40, "obbligazionario": 0.40, "monetario": 0.20}
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET=target)
+    assert sorted((v["classe"], round(v["vendi"])) for v in p["vendite"]) == [("azionario", 4000), ("obbligazionario", 4000)]
+    assert all(abs(p["risultante"][c] - t) < 1e-6 for c, t in target.items()), p["risultante"]
+    # sottopesata entro la banda larga e niente a costo zero: si rinvia, con il costo dichiarato
+    m, p = _ribilancia(ZAINETTO={"Fineco": 0, "Directa": 0})
+    ob = p["drift"]["obbligazionario"]
+    assert round(ob["residuo_non_corretto"]) == 6000 and abs(ob["costo_a_target"] - 6000 * 3000 / 18000 * 0.26) < 0.01, ob
+    # dopo la cassa delle vendite già decise la sottopesata è in banda: nessuna vendita tassata in più
+    pos = [{"broker": "X", "asset_class": "azionario", "tipo": "capitale", "valore": 30000, "plus": 6000},
+           {"broker": "Y", "asset_class": "azionario", "tipo": "diverso", "valore": 40000, "plus": 12000, "aliquota": 0.125},
+           {"broker": "X", "asset_class": "obbligazionario", "tipo": "capitale", "valore": 30000, "plus": 0}]
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0, "Y": 0}, TARGET={"azionario": 0.5, "obbligazionario": 0.5})
+    assert [(v["broker"], v["aliquota"], round(v["vendi"], 2)) for v in p["vendite"]] == [("Y", 0.125, 17500)], p["vendite"]
+    assert abs(p["imposta"] - 17500 * 0.3 * 0.125) < 0.01, p["imposta"]      # Leva 4 per imposta effettiva (F044)
+    # sottopesata ancora oltre la banda larga dopo cassa e costo zero: vendite tassate dalle classi
+    # sopra il target (anche in banda), le più economiche per prime, fino a metà banda (o a target)
+    pos = [{"broker": "X", "asset_class": c, "tipo": "capitale", "valore": v, "plus": pl}
+           for c, v, pl in (("azionario", 34000, 6800), ("obbligazionario", 24000, 2400), ("oro", 24000, 4800), ("monetario", 18000, 0))]
+    target = {"azionario": 0.30, "obbligazionario": 0.20, "oro": 0.20, "monetario": 0.30}
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET=target)
+    lordo = (9500 - 4000 * (0.052 - 0.026)) / (1 - 0.052)        # obbligazionario al 2,6% per euro, poi il 5,2%
+    assert abs(p["acquisti"]["monetario"] - 9500) < 0.01 and abs(sum(v["vendi"] for v in p["vendite"]) - lordo) < 0.01, p["vendite"]
+    assert [v["classe"] for v in p["vendite"]][0] == "obbligazionario" and abs(p["imposta"] - (lordo - 9500)) < 0.01, p["vendite"]
+    mon = p["drift"]["monetario"]
+    assert "rientro a metà banda" in mon["motivo"] and f"così €{p['imposta']:,.0f}" in mon["motivo"], mon["motivo"]
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET=target, OBIETTIVO_RIENTRO="target")
+    assert round(sum(v["vendi"] for v in p["vendite"])) == 12000 and abs(p["imposta"] - 520) < 0.01, p["vendite"]
+    assert "metà banda" not in p["drift"]["monetario"]["motivo"], p["drift"]["monetario"]
+    # nessuna vendita, classi fuori banda corrette dai versamenti: il messaggio lo dice
+    m, p = _ribilancia(NUOVI_VERSAMENTI=20000)
+    testo = _stampato(m, p)
+    assert "si correggono con versamenti e flussi" in testo and "tutto in banda" not in testo, testo
+
+
+@test("T7 ribilanciamento: minus al 12,5% nello zainetto al 48,08%, quota a costo zero scalata, etichette del consumo")
+def t_t7_coefficiente():
+    # REGRESSIONE (revisione T7, F044): tre mutanti che cambiano l'imposta passavano i test.
+    pos = [{"broker": "X", "asset_class": "obbligazionario", "tipo": "diverso", "valore": 20000, "plus": -2000, "aliquota": 0.125},
+           {"broker": "X", "asset_class": "azionario", "tipo": "diverso", "valore": 20000, "plus": 4000},
+           {"broker": "X", "asset_class": "monetario", "tipo": "capitale", "valore": 60000, "plus": 0}]
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET={"azionario": 0.0, "obbligazionario": 0.0, "monetario": 1.0})
+    zero = 2000 * 12.5 / 26 / 0.2                                 # euro di azionario coperti dalla minus del BTP
+    assert abs(p["imposta"] - (20000 - zero) * 0.2 * 0.26) < 0.01, p["imposta"]
+    az = [v for v in p["vendite"] if v["classe"] == "azionario"][0]
+    assert abs(az["comp"] - 2000 * 12.5 / 26) < 0.01, az
+    testo = _stampato(m, p)
+    assert re.search(r"minus €2,000[^\n]*€962[^\n]*48,08%", testo), testo
+    pos = [{"broker": "X", "asset_class": "obbligazionario", "tipo": "diverso", "valore": 38000, "plus": 3800, "aliquota": 0.125},
+           {"broker": "X", "asset_class": "azionario", "tipo": "capitale", "valore": 62000, "plus": 0}]
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 300}, TARGET={"obbligazionario": 0.30, "azionario": 0.70})
+    assert [round(v["vendi"], 2) for v in p["vendite"]] == [round(300 / (12.5 / 26 * 0.1), 2)] and p["imposta"] == 0, p["vendite"]
+    assert abs(p["zainetto"]["X"]) < 0.01, p["zainetto"]
+    btp = [{"broker": "X", "asset_class": "obbligazionario", "tipo": "diverso", "valore": 13000, "plus": 3000, "aliquota": 0.125},
+           {"broker": "X", "asset_class": "azionario", "tipo": "capitale", "valore": 7000, "plus": 0}]
+    # l'imposta pagata esce dal portafoglio: non è un sottopeso dell'azionario (100% del patrimonio finale)
+    m, p = _ribilancia(POSITIONS=btp, ZAINETTO={"X": 0}, TARGET={"azionario": 1.0, "obbligazionario": 0.0})
+    assert p["drift"]["azionario"]["residuo_non_corretto"] == 0 and p["risultante"]["azionario"] == 1.0, p["drift"]["azionario"]
+    m, p = _ribilancia(POSITIONS=btp, ZAINETTO={"X": 5000}, TARGET={"azionario": 1.0, "obbligazionario": 0.0})
+    testo = _stampato(m, p)
+    assert re.search(r"compensata €3,000[^\n]*€1,442[^\n]*48,08%", testo), testo
+    nota = [o for o in m.genera_ordini(p) if o["operazione"] == "VENDITA"][0]["nota"]
+    assert "1,442" in nota and "48,08%" in nota, nota
+
+
+@test("T7 ribilanciamento: OBIETTIVO_RIENTRO «banda» e residui dichiarati (nessuna vendita, sezione 5 senza ordini)")
+def t_t7_rientro_banda_residui():
+    # REGRESSIONE (revisione T7): «rinviata per imposta €0» in modalità «banda»; caso EC3 (zainetto 0,
+    # nessuna vendita) mai testato; sezione 5 «ORDINI ESPORTATI» stampata senza ordini.
+    m, p = _ribilancia(OBIETTIVO_RIENTRO="banda")
+    assert [round(v["vendi"]) for v in p["vendite"]] == [5500] and p["imposta"] == 0, p["vendite"]
+    # la cassa oltre il rientro va prima alla classe fuori banda, poi alle altre
+    assert {c: round(x) for c, x in p["acquisti"].items()} == {"azionario": 0, "obbligazionario": 5500, "monetario": 0}, p["acquisti"]
+    az = p["drift"]["azionario"]
+    assert round(az["residuo_non_corretto"]) == 2500 and "rinviat" not in az["motivo"] and "OBIETTIVO_RIENTRO" in az["motivo"], az
+    m, p = _ribilancia(OBIETTIVO_RIENTRO="banda", ZAINETTO={"Fineco": 2000, "Directa": 0})
+    az = p["drift"]["azionario"]
+    assert "€22 " in az["motivo"] and "€130" not in az["motivo"], az["motivo"]
+    m, p = _ribilancia(ZAINETTO={"Fineco": 0, "Directa": 0})
+    assert p["vendite"] == [] and p["imposta"] == 0, (p["vendite"], p["imposta"])
+    assert round(p["drift"]["azionario"]["residuo_non_corretto"]) == 8000, p["drift"]["azionario"]
+    testo = _stampato(m, p)
+    assert "nessuna vendita necessaria" not in testo and re.search(r"rinviat[^\n]*8,000|8,000[^\n]*rinviat", testo), testo[-800:]
+    import contextlib
+    import io
+    tmp = tempfile.mkdtemp()
+    try:
+        m.CARTELLA_OUTPUT = os.path.join(tmp, "ordini")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            m.esporta_ordini(p)
+        assert "NESSUN ORDINE" in buf.getvalue() and "ORDINI ESPORTATI" not in buf.getvalue(), buf.getvalue()
+        assert not os.path.exists(m.CARTELLA_OUTPUT), "cartella ordini/ creata senza ordini"
+        assert m.scrivi_csv_per_broker([], m.CARTELLA_OUTPUT) == [] and not os.path.exists(m.CARTELLA_OUTPUT)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    # MARGINE_RIENTRO diverso da 0,5: la stampa non dice «metà banda»
+    m, p = _ribilancia(ZAINETTO={"Fineco": 0, "Directa": 0}, MARGINE_RIENTRO=0.2,
+                       TARGET={"azionario": 0.50, "obbligazionario": 0.40, "monetario": 0.10})
+    assert round(sum(v["vendi"] for v in p["vendite"])) == 17000, p["vendite"]
+    testo = _stampato(m, p)
+    assert "metà banda" not in testo and "20% della banda stretta" in testo, testo
+
+
+@test("T7 ribilanciamento: prelievo con imposta in una sola vendita per posizione, residui ricalcolati, prelievo non finanziabile")
+def t_t7_prelievo_imposta():
+    # REGRESSIONE (revisione T7): il gross-up del prelievo aggiungeva una riga a ogni giro (fino a
+    # €0,01), vendeva per intero la posizione con una piccola quota a costo zero, lasciava il residuo
+    # calcolato prima delle vendite forzate e dichiarava eseguito un prelievo non finanziabile.
+    zero = {"Fineco": 0, "Directa": 0}
+    for prelievo, target in ((2000, None), (3000, {"azionario": 0.68, "obbligazionario": 0.24, "monetario": 0.08})):
+        parametri = {"PRELIEVO": prelievo, "ZAINETTO": zero}
+        if target:
+            parametri["TARGET"] = target
+        m, p = _ribilancia(**parametri)
+        venduto = sum(v["vendi"] for v in p["vendite"])
+        assert p["imposta"] > 0 and abs(venduto - p["imposta"] - sum(p["acquisti"].values()) - prelievo) < 0.01, p
+        chiavi = [(v["broker"], v["classe"], v["tipo"]) for v in p["vendite"]]
+        assert len(chiavi) == len(set(chiavi)), chiavi
+        ordini, saldo = _cassa_per_broker(m, p)
+        assert all(o["importo_eur"] >= 1 for o in ordini if o["operazione"] == "VENDITA"), ordini
+        assert all(v >= -0.01 for v in saldo.values()), saldo
+        testo = _stampato(m, p)
+        assert "il resto è reinvestito" not in testo, testo
+        if target:
+            assert all(abs(p["risultante"][c] - t) < 0.001 for c, t in target.items()), p["risultante"]
+            # per euro lordo: 68% dall'azionario, di cui la parte coperta dalla minus dell'ETF obbligazionario
+            # Fineco (24% × 500/15.000, sul diverso Fineco con plus al 40%) a costo zero, il resto
+            # dall'ETF Directa (plus 3.000/18.000 al 26%)
+            k = (0.68 - 0.24 * 500 / 15000 / 0.4) * 3000 / 18000 * 0.26
+            assert abs(p["imposta"] - prelievo * k / (1 - k)) < 0.01, p["imposta"]
+        else:
+            az = p["drift"]["azionario"]
+            atteso = 9200 - sum(v["vendi"] for v in p["vendite"] if v["classe"] == "azionario")
+            assert abs(az["residuo_non_corretto"] - atteso) < 0.01, (az, atteso)
+            assert f"{atteso:,.0f}" in testo and "9,200" not in testo and "prelievo" in az["motivo"], testo
+    # la quota a costo zero va per prima, il resto della posizione dopo le tassate più economiche
+    imposte = []
+    for z in (0, 200, 1000):
+        m, p = _ribilancia(PRELIEVO=5000, ZAINETTO={"Fineco": z, "Directa": 0},
+                           TARGET={"azionario": 0.68, "obbligazionario": 0.24, "monetario": 0.08})
+        imposte.append(p["imposta"])
+        if z == 200:
+            div = [v for v in p["vendite"] if v["tipo"] == "diverso" and v["classe"] == "azionario"]
+            assert div and div[0]["tassa"] == 0 and div[0]["vendi"] < 1000, p["vendite"]
+    assert imposte[0] > imposte[1] > imposte[2], imposte
+    # una classe appena sopra il livello del water-filling: nessuna vendita da centesimi
+    # (o una minus minuscola che renderebbe a costo zero pochi centesimi di plus)
+    for indice, meno, prelievi in ((5, 10, (112, 116, 123)), (4, 20, (100,))):
+        pos = [dict(x) for x in carica_modulo(asset("it-rebalance", "ribilanciamento-multibroker.py")).POSITIONS]
+        pos[indice]["valore"] -= meno
+        for prelievo in prelievi:
+            m, p = _ribilancia(PRELIEVO=prelievo, POSITIONS=pos, ZAINETTO={"Fineco": 0, "Directa": 0},
+                               TARGET={"azionario": 0.68, "obbligazionario": 0.24, "monetario": 0.08})
+            assert all(o["importo_eur"] >= 1 for o in m.genera_ordini(p) if o["operazione"] == "VENDITA"), (prelievo, p["vendite"])
+    pos = [{"broker": "X", "asset_class": "azionario", "tipo": "capitale", "valore": 70000, "plus": 0},
+           {"broker": "X", "asset_class": "azionario", "tipo": "capitale", "valore": 0.6, "plus": -0.1},
+           {"broker": "X", "asset_class": "obbligazionario", "tipo": "capitale", "valore": 30000, "plus": 0}]
+    m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET={"azionario": 0.6, "obbligazionario": 0.4})
+    assert [(v["vendi"] > 1, round(v["vendi"])) for v in p["vendite"]] == [(True, 10000)], p["vendite"]
+    m, p = _ribilancia(PRELIEVO=20000, ZAINETTO={"Fineco": 1000, "Directa": 0})
+    ordini, saldo = _cassa_per_broker(m, p)
+    assert all(o["importo_eur"] >= 1 for o in ordini if o["operazione"] == "VENDITA"), ordini
+    chiavi = [(v["broker"], v["classe"], v["tipo"]) for v in p["vendite"]]
+    assert len(chiavi) == len(set(chiavi)), chiavi
+    # prelievo oltre il netto di liquidazione: errore; pari al netto: tutto venduto, pesi a zero
+    m = carica_modulo(asset("it-rebalance", "ribilanciamento-multibroker.py"))
+    m.PRELIEVO = 99000
+    try:
+        m.pianifica()
+        raise AssertionError("prelievo non finanziabile accettato")
+    except m.ErroreInput as e:
+        assert "96,620" in str(e), e
+    m, p = _ribilancia(PRELIEVO=96620)
+    assert all(0 <= w <= 1 for w in p["risultante"].values()), p["risultante"]
+    assert round(sum(o["importo_eur"] for o in m.genera_ordini(p) if o["operazione"] == "PRELIEVO"), 2) == 96620
+    assert "interamente liquidato" in _stampato(m, p)
+
+
 @test("T7 ribilanciamento: una sola regola di rientro e di banda in skill, reference e comando")
 def t_t7_testi():
     # REGRESSIONE F045/F046/F030: «a target» contro «in banda», prelievo promesso e non fatto,
@@ -1454,14 +1722,20 @@ def t_t7_testi():
     reb = os.path.join(SKILLS, "it-rebalance")
     testi = {rel: open(os.path.join(reb, rel), encoding="utf-8").read()
              for rel in ("SKILL.md", "references/gerarchia-leve.md", "references/bande-dinamiche.md",
-                         "references/sequenza-liquidazione.md", "references/ribilanciamento-multibroker.md")}
+                         "references/sequenza-liquidazione.md", "references/ribilanciamento-multibroker.md",
+                         "references/coordinamento-zainetto.md")}
     testi["commands/ribilancia.md"] = open(os.path.join(ROOT, "commands", "ribilancia.md"), encoding="utf-8").read()
     regola = re.compile(r"a target[^\n]*costo (netto )?zero[^\n]*metà (della )?banda", re.I)
     for rel in ("SKILL.md", "references/gerarchia-leve.md", "references/bande-dinamiche.md", "commands/ribilancia.md"):
         assert regola.search(testi[rel]), f"{rel}: manca la regola di rientro mista"
     vietate = [r"raccomandare quella in banda", r"\"In banda\" batte", r"banda fissa\*\* \(±5% assoluto\)",
                r"prevista per v0\.5", r"Lo strumento fa esattamente così", r"PMC \(o lotti\)",
-               r"Ribilanciare \"a target esatto\" quando"]
+               r"Ribilanciare \"a target esatto\" quando",
+               # revisione T7: banda fissa, Leva 4 per plus latente, vendita tassata senza gate,
+               # «capitale per ultime», OBIETTIVO_RIENTRO a due valori, frase citata che non esiste più
+               r"banda ±5%", r"plus latente minore", r"accettando la tassa", r"per ultime le posizioni",
+               r"permette di scegliere «target» o «banda»", r"ribilanciamento parziale o attesa\"",
+               r"Risparmio dal coordinamento: €582"]
     for rel, testo in testi.items():
         for v in vietate:
             assert not re.search(v, testo), f"{rel}: «{v}»"
@@ -1469,6 +1743,27 @@ def t_t7_testi():
     assert "MODULA_VOLATILITA = False" in testi["references/bande-dinamiche.md"] or \
         "spenta di default" in testi["references/bande-dinamiche.md"], "bande-dinamiche: modulazione spenta di default"
     assert "aliquota" in testi["SKILL.md"].split("### Step 1")[1].split("### Step 2")[0], "Step 1 senza l'aliquota per posizione"
+    # revisione T7: Leva 4 per imposta per euro venduto, minus eseguite per prime, sottopesate,
+    # tre valori di OBIETTIVO_RIENTRO, gate nel coordinamento di fine anno, unità dello zainetto
+    for rel in ("SKILL.md", "references/ribilanciamento-multibroker.md", "references/sequenza-liquidazione.md",
+                "references/gerarchia-leve.md", "commands/ribilancia.md"):
+        assert re.search(r"imposta per euro venduto", testi[rel]), f"{rel}: Leva 4 senza l'imposta per euro venduto"
+    for rel in ("SKILL.md", "references/gerarchia-leve.md", "references/ribilanciamento-multibroker.md"):
+        assert re.search(r"minus[^\n]*(prima delle plus|eseguit[ao] per prim|per prim[ae][^\n]*CSV)", testi[rel]), \
+            f"{rel}: manca l'ordine di esecuzione (le minus prima delle plus)"
+    assert "art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027" in testi["SKILL.md"]
+    for rel in ("SKILL.md", "references/bande-dinamiche.md", "references/ribilanciamento-multibroker.md", "commands/ribilancia.md"):
+        assert re.search(r"[Ss]ottopesat[ae] fuori banda", testi[rel]), f"{rel}: manca la regola delle sottopesate fuori banda"
+    for rel in ("SKILL.md", "references/bande-dinamiche.md"):
+        assert all(x in testi[rel] for x in ("«misto»", "«target»", "«banda»", "MARGINE_RIENTRO")), f"{rel}: OBIETTIVO_RIENTRO"
+    coord = testi["references/coordinamento-zainetto.md"]
+    fase4 = coord.split("### Fase 4")[1].split("## Esempio")[0]
+    assert "banda larga" in fase4 and "metà banda" in fase4, "coordinamento-zainetto: Leva 4 senza gate"
+    assert "0,4808" in coord.split("### Fase 3")[1].split("### Fase 4")[0], "coordinamento-zainetto: Fase 3 senza il 48,08%"
+    assert re.search(r"\+7%[^\n]*sotto la banda larga[^\n]*rinvia", coord), "coordinamento-zainetto: esempio senza gate"
+    for rel in ("SKILL.md", "commands/ribilancia.md"):
+        assert "26%-equivalenti" in testi[rel], f"{rel}: zainetto senza unità"
+    assert re.search(r"reddito_diverso` \([^)]*obbligazioni", testi["SKILL.md"]), "SKILL.md: tipo_fiscale senza obbligazioni"
 
 # ══════════════════════ obiettivi (T8) ══════════════════════
 
@@ -3032,6 +3327,82 @@ def t_ponte():
     assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
+@test("obiettivi: il fondo pensione al plafond di €5.300 presuppone nessun contributo del datore (plafond condiviso)")
+def t_obiettivi_plafond_condiviso():
+    # Nota del § 4 dell'handoff (dopo T4 e T8): «€5.300 al 33%» vale solo senza contributo del datore,
+    # che conta nel plafond insieme al dovuto del lavoratore (art. 8 c. 4 D.Lgs. 252/2005).
+    cartella = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    for rel in ("SKILL.md", "references/asset-location.md", "assets/asset-location-optimizer.py"):
+        testo = open(os.path.join(cartella, rel), encoding="utf-8").read()
+        for par in testo.split("\n\n"):
+            if re.search(r"5\.300|CONTRIBUTO_ANNUO_FP = 5300", par):
+                assert "datore" in par, f"{rel}: €5.300 senza dire che il plafond è condiviso col datore: {par.strip()[:90]}"
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"))
+    assert rc == 0 and re.search(r"plafond[^\n]*datore", out), "lo stdout deve ricordare il plafond condiviso"
+    # oltre il plafond niente deduzione: con 8.000 €/anno il risparmio IRPEF è quello di 5.300 (revisione)
+    al = _modulo_obiettivi("asset-location-optimizer.py")
+    def driver(*sets):
+        rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
+                             "--set", "REINVESTI_RISPARMIO_IRPEF=False", *sets)
+        assert rc == 0, out[-300:]
+        return out, float(re.search(r"Driver: la deduzione IRPEF \(€([\d.]+)\)", out).group(1).replace(".", ""))
+    out8, d8 = driver("--set", "CONTRIBUTO_ANNUO_FP=8000")
+    _, d53 = driver("--set", "CONTRIBUTO_ANNUO_FP=5300")
+    atteso = 5_300 * al.ALIQUOTA_IRPEF_MARGINALE * al.ANNI_A_PENSIONE
+    assert abs(d8 - atteso) <= 1 and abs(d53 - atteso) <= 1, f"deduzione oltre il plafond: {d8} e {d53}, attesi {atteso:,.0f}"
+    assert "dedotti solo €5.300/anno" in out8
+
+
+@test("ponte-pensione: serie storica deflazionata anno per anno con la CPI USA, come il decumulo")
+def t_ponte_reale():
+    # Nota del § 4 dell'handoff (dopo T8): il ponte confrontava rendimenti NOMINALI in dollari con una
+    # spesa in euro di oggi. Sui default la probabilità scende da circa 44% a circa 21%.
+    righe = open(asset("it-pianificazione", "rendimenti-storici.csv"), encoding="utf-8").read().splitlines()
+    dati = {int(r.split(",")[0]): [float(x) / 100 for x in r.split(",")[1:]] for r in righe if r and r[0].isdigit()}
+    mod = _modulo_previdenza("ponte-pensione.py")
+    assert mod.INFLAZIONE is None and mod.INFLAZIONE_RIPIEGO == 0.02
+    peso = mod.PESO_AZIONARIO_PONTE
+    port = mod.rendimenti_reali_ponte()
+    for anno in (1974, 1980, 2008, 2022):
+        az, ob, inf = dati[anno]
+        atteso = peso * ((1 + az) / (1 + inf) - 1) + (1 - peso) * ((1 + ob) / (1 + inf) - 1)
+        assert abs(port[anno - 1928] - atteso) < 1e-12, f"{anno}: reale {port[anno - 1928]:.4f}, atteso {atteso:.4f}"
+    mod.INFLAZIONE = 0.02  # override esplicito: inflazione costante
+    az, ob, _ = dati[1974]
+    assert abs(mod.rendimenti_reali_ponte()[1974 - 1928] - (peso * ((1 + az) / 1.02 - 1) + (1 - peso) * ((1 + ob) / 1.02 - 1))) < 1e-12
+    # valore chiuso sui default (seed 42): la serie reale, non quella nominale
+    rc, out = run_script(asset("it-pianificazione", "ponte-pensione.py"))
+    assert rc == 0, out[-300:]
+    prob = float(re.search(r"PROBABILITÀ di coprire il ponte: ([\d.]+)%", out).group(1))
+    assert prob == PROB_PONTE_DEFAULT, f"probabilità sui default {prob}% ≠ {PROB_PONTE_DEFAULT}%"
+    assert "CPI" in out, "lo stdout deve dire con quale inflazione è deflazionata la serie"
+
+
+PROB_PONTE_DEFAULT = 21.1
+
+
+@test("pensione: la serie storica è dichiarata nominale in dollari, non «reale», in script, SKILL e reference")
+def t_serie_pensione_nominale():
+    # Nota del § 4 dell'handoff (critica dell'audit a T8): montecarlo-pensione e it-pianificazione
+    # chiamavano «reale» una serie nominale in USD.
+    for rel in ("assets/montecarlo-pensione.py", "SKILL.md", "references/montecarlo-pensione.md"):
+        testo = " ".join(open(os.path.join(SKILLS, "it-pianificazione", rel), encoding="utf-8").read().split())
+        assert "serie storica reale" not in testo and "FORMA reale" not in testo, f"{rel}: serie storica detta reale"
+        assert re.search(r"nominale in dollari", testo, re.I) and "ricentrat" in testo, \
+            f"{rel}: dire che la serie è nominale in dollari e che se ne usa solo la forma (media ricentrata)"
+    # senza ricentratura la serie si deflaziona: mai la media nominale in dollari contro euro di oggi
+    import numpy as np
+    mc = _modulo_previdenza("montecarlo-pensione.py")
+    righe = open(asset("it-pianificazione", "rendimenti-storici.csv"), encoding="utf-8").read().splitlines()
+    dati = np.array([[float(x) / 100 for x in r.split(",")[1:]] for r in righe if r and r[0].isdigit()])
+    az, ob, inf = dati[:, 0], dati[:, 1], dati[:, 2]
+    w = mc.FP_PESO_AZIONARIO
+    assert abs(mc.serie_portafoglio(az, ob).mean() - mc.FP_RENDIMENTO_ATTESO_REALE) < 1e-12, "media ricentrata"
+    mc.RICENTRA_MEDIA = False
+    reale = w * ((1 + az) / (1 + inf) - 1) + (1 - w) * ((1 + ob) / (1 + inf) - 1)
+    assert np.allclose(mc.serie_portafoglio(az, ob), reale, atol=1e-12), "RICENTRA_MEDIA=False: serie non deflazionata"
+
+
 @test("cruscotto TWR: ultima riga dinamica (5 o 14 rilevazioni), righe vuote senza −100%")
 def t_twr_dinamico():
     # REGRESSIONE F049: il foglio funzionava solo con 13 righe esatte (meno → −100%,
@@ -3109,6 +3480,21 @@ def t_revisione_testi():
         f = os.path.join(SKILLS, nome, "SKILL.md")
         if os.path.exists(f):
             assert "/mnt/skills" not in open(f, encoding="utf-8").read(), f"{nome}/SKILL.md cita recalc.py del sandbox claude.ai"
+
+
+@test("revisione: spazio deducibile residuo del fondo (plafond − datore − dovuto) e perdita sui non dedotti non comunicati")
+def t_revisione_spazio_deducibile():
+    # Nota del § 4 dell'handoff (T10 dopo T4): la revisione di fine anno deve dire quanto resta
+    # deducibile e quanto costa non comunicare i non dedotti.
+    for rel in ("skills/it-revisione/SKILL.md", "skills/it-revisione/references/metodo-revisione.md",
+                "skills/it-revisione/assets/template-revisione.md", "commands/revisione.md"):
+        testo = " ".join(open(os.path.join(ROOT, rel), encoding="utf-8").read().split())
+        assert "spazio deducibile residuo" in testo, f"{rel}: manca lo spazio deducibile residuo"
+        assert "max(0, €5.300 − datore − dovuto − volontari già versati nell'anno)" in testo, \
+            f"{rel}: lo spazio residuo è max(0, plafond − datore − dovuto − volontari già versati)"
+        assert "forfettario" in testo and "altri redditi IRPEF" in testo, f"{rel}: manca il caso del forfettario"
+        assert re.search(r"non dedott[^.]*9-15%[^.]*23%", testo), \
+            f"{rel}: perdita sui non dedotti non comunicati: 9-15%, 23% con anticipazioni e riscatti per altre cause"
 
 
 @test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")

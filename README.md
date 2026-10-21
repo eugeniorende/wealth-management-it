@@ -132,6 +132,7 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 - **CI** (PR #15, #17): action fissate per SHA, claude-code a versione fissa, matrice Python 3.11 e 3.14, versioni minime delle dipendenze. Il minimo dichiarato passa a Python 3.11.
 - **Licenza** (PR #16): LICENSE e NOTICE (Apache-2.0) nel repository e nello zip di release, con l'attribuzione all'upstream fissata al commit `ef165e4160`.
 - **Revisione annuale** (PR #18): nel cruscotto il foglio TWR regge fino a 120 rilevazioni e legge da solo l'ultima; la Sintesi confronta la probabilità con la soglia della priorità; Allocazione e tracker usano la regola 5/25 per classe; costi dell'anno a scopo di confronto; foglio Leggimi con i limiti.
+- **Ponte pensionistico in euro di oggi**: `ponte-pensione.py` deflaziona anno per anno la serie storica (nominale in dollari) con l'inflazione USA dello stesso anno, come il decumulo degli obiettivi; prima confrontava rendimenti nominali con una spesa reale. **Output cambiati a parità di seed**: sui default la probabilità di coprire il ponte scende dal 44,0% al 21,1%, e il capitale necessario sale da €49.335 a €53.167 (85%) e da €52.750 a €58.619 (95%). Monte Carlo pensione e reference dicono che la serie è nominale in dollari e che se ne usa solo la forma.
 
 **v0.9.6** (corrente):
 - **Integrazione GitHub**: repository su `github.com/eugeniorende/wealth-management-it` con `.gitignore`, campo `repository` e `author` strutturato nel manifest (passa `claude plugin validate`), `.claude-plugin/marketplace.json` effettivamente presente, istruzioni di installazione con il repository reale. Gitflow: feature su `develop`, release su `main`.
@@ -443,7 +444,7 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 Gli script del plugin girano **in locale** e non fanno chiamate di rete: leggono i file che indichi e scrivono gli output (JSON, CSV degli ordini, IPS in Word) nella cartella da cui li lanci. Però tutto ciò che scrivi in chat, che Claude legge dai tuoi file e che gli script stampano **entra nel contesto del modello** e nei transcript della sessione: in Claude Code i transcript restano sul tuo computer (`~/.claude/projects/`), in Cowork e su claude.ai sono gestiti secondo le impostazioni del tuo account Anthropic.
 
 Cosa conviene sapere:
-- `importa-previdenza.py` legge l'estratto conto INPS e il prospetto del fondo pensione. Stampa intestatario e data di nascita, perché servono a calcolare l'età, mentre le retribuzioni le stampa aggregate per anno, senza i datori di lavoro;
+- `importa-previdenza.py` legge l'estratto conto INPS e il prospetto del fondo pensione. Di default stampa intestatario e data di nascita, da cui calcola l'età; con `--anonimo` li omette e stampa l'età arrotondata all'anno. Le retribuzioni le stampa aggregate per anno, senza i datori di lavoro;
 - gli estratti dei broker contengono posizioni e importi; prima di passarli, togli quello che al calcolo non serve: intestatario, codice fiscale, IBAN, numero di dossier;
 - per i calcoli bastano età, importi e date: nomi e identificativi non servono a nessuno strumento del plugin.
 

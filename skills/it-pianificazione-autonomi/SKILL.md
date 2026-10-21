@@ -180,7 +180,7 @@ dove aliquota_deduzione =
 
 Per il forfettario puro, il fondo pensione va valutato **solo** su:
 - Capitalizzazione (rendimento netto del comparto, tassato 20%/12,5% come per tutti)
-- Uscita esente sui versamenti non dedotti, se comunicati al fondo entro il 31/12 dell'anno successivo; senza comunicazione il fondo li tassa al 9-15% come se fossero stati dedotti
+- Uscita esente sui versamenti non dedotti, se comunicati al fondo entro il 31/12 dell'anno successivo; senza comunicazione il fondo li tassa al 9-15% come se fossero stati dedotti (23% con anticipazioni non sanitarie o riscatti per altre cause)
 - Protezione patrimoniale e impignorabilità relativa
 
 E confrontato onestamente con l'alternativa (PAC di ETF su dossier ordinario), che offre più liquidità. Vedi `references/fiscalita-forfettario.md` per il confronto numerico fondo pensione vs ETF per un forfettario.
