@@ -331,7 +331,9 @@ def _montante_stimato(ral, g, r, anzianita, massimale, aliquota):
 PP = ("it-pianificazione", "proiezione-pensione.xlsx")
 VARIANTI_PP = {"ral150k": {("Input", "B10"): 150_000, ("Input", "B12"): 0.0},
                "ral150k_g": {("Input", "B10"): 150_000, ("Input", "B12"): 0.015},
-               "ral8k": {("Input", "B10"): 8_000}}
+               "ral8k": {("Input", "B10"): 8_000},
+               # coefficiente congelato: le colonne degli Scenari restano ordinate (offset dalla Base)
+               "decadimento_zero": {("Input", "B18"): 0.0}}
 
 
 @test("proiezione-pensione.xlsx: Pubblica in euro di oggi = proiezione-inps.py (PIL reale, massimale, contributo dell'anno)")
@@ -404,7 +406,8 @@ def t_scenari_reali():
     from openpyxl import load_workbook
     base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
     netto = _modulo_previdenza("netto-pensione.py")
-    for nome, wb in (("default", base), ("ral150k", _varianti(*PP, VARIANTI_PP)["ral150k"])):
+    var = _varianti(*PP, VARIANTI_PP)
+    for nome, wb in (("default", base), ("ral150k", var["ral150k"]), ("decadimento_zero", var["decadimento_zero"])):
         s, i, p = wb["Scenari"], wb["Input"], wb["Pubblica"]
         for col in "BCD":
             assert abs(s[f"{col}18"].value - i["B39"].value) < 0.01, \
@@ -910,6 +913,10 @@ VARIANTI_PA_T6 = {
     "fondo3k": {("Input", "B28"): 3_000, ("Input", "B31"): 10_000, ("Input", "B32"): 30},
     # cassa con coefficiente proprio, scritto sopra Input!B43 come dice il foglio Coefficienti
     "cassa_coeff": {("Input", "B11"): 2, ("Input", "B43"): 0.045, ("Input", "B28"): 3_000, ("Input", "B31"): 10_000},
+    # cassa che imposta solo la soggettiva: l'aliquota di computo la segue (revisione delle correzioni T6)
+    "cassa_inarcassa": {("Input", "B11"): 2, ("Input", "B12"): 0.145},
+    "gs_24": {("Input", "B12"): 0.24},
+    "decadimento_zero": {("Input", "B15"): 0.0},
     "forf8k": {("Input", "B21"): 8_000},
 }
 
@@ -1005,7 +1012,11 @@ def _scenari_autonomi(wb, nome):
     assert abs(r[f"C{riga('Rendita fondo')}"].value - c["B62"].value) < 0.01, f"{nome}: Base ≠ Complementare!B62"
     spesa = _per_etichetta(i, "Spesa mensile attuale") * 12 * _per_etichetta(i, "Fattore riduzione spesa")
     n, massimale = int(i["B7"].value), _per_etichetta(i, "Massimale contributivo")
-    coeff, dec_base = i["B43"].value, i["B15"].value
+    dec_base = i["B15"].value
+    # coefficiente replicato dalla tabella (o quello della cassa scritto nella variante), mai letto da Input!B43
+    coeff = VARIANTI_PA_T6["cassa_coeff"][("Input", "B43")] if nome == "cassa_coeff" else \
+        _coeff_excel(wb, i["B6"].value) * (1 - dec_base) ** (n / 2)
+    assert abs(p["B59"].value - coeff) < 1e-12, f"{nome}: coefficiente proiettato {p['B59'].value} ≠ {coeff}"
     tassa = _tassa_uscita_autonomi(i)
     lorde = []
     for col in "BCD":
@@ -1045,8 +1056,13 @@ def t_autonomi_scenari():
     assert i["B23"].value > _per_etichetta(i, "Massimale contributivo"), "ord150k: il massimale deve scattare dall'anno 0"
     for nome, w in (("default", wb), ("ord150k", v6["ord150k"]), ("fondo3k", v6["fondo3k"]),
                     ("cassa_coeff", v6["cassa_coeff"]), ("ordinario", v4["ordinario"]),
-                    ("forf_non_comunica", v4["forf_non_comunica"])):
+                    ("forf_non_comunica", v4["forf_non_comunica"]), ("decadimento_zero", v6["decadimento_zero"])):
         _scenari_autonomi(w, nome)
+    # aliquota di computo: segue la soggettiva della cassa; in Gestione Separata è l'IVS (25%, o 24%)
+    for nome, attesa in (("cassa_inarcassa", 0.145), ("gs_24", 0.24)):
+        i, p = v6[nome]["Input"], v6[nome]["Previdenza"]
+        assert abs(_per_etichetta(i, "Aliquota di computo") - attesa) < 1e-12, f"{nome}: aliquota di computo"
+        assert abs(p["D5"].value - p["C5"].value * attesa) < 0.01, f"{nome}: contributo a montante"
     assert v6["fondo3k"]["Complementare"]["B62"].value > 0 and v4["forf_non_comunica"]["Complementare"]["B60"].value > 0
 
 
@@ -1060,11 +1076,13 @@ def t_casse_fonti():
     assert len(righe) >= 6, f"tabella casse: {len(righe)} righe"
     for riga in righe:
         nome = riga.split("**")[1]
-        assert re.search(r"https://[^/)\s]+/[^)\s]+", riga), f"{nome}: manca il link alla pagina ufficiale (non la homepage)"
+        link = re.findall(r"\]\((https://[^)]+)\)", riga)
+        assert link and all(re.match(r"https://[^/]+/\S+", u) for u in link), \
+            f"{nome}: ogni link deve puntare a una pagina ufficiale, non alla homepage: {link}"
         assert "Verificato: 2026-10" in riga, f"{nome}: manca il marcatore"
     per_nome = {r.split("**")[1]: r for r in righe}
     assert "2.785" in per_nome["Inarcassa"] and "3%" not in per_nome["Inarcassa"], per_nome["Inarcassa"][:160]
-    assert "46.306" in per_nome["Inarcassa"] and "non oltre i 35" in per_nome["Inarcassa"], "Inarcassa: limiti dell'agevolazione under 35"
+    assert "reddito medio" in per_nome["Inarcassa"] and "non oltre i 35" in per_nome["Inarcassa"], "Inarcassa: limiti dell'agevolazione under 35"
     assert "20%" in per_nome["Cassa Forense"] and "131.800" in per_nome["Cassa Forense"], per_nome["Cassa Forense"][:160]
     assert "209.300" in per_nome["CNPADC"] and "856" in per_nome["ENPAP"], "CNPADC/ENPAP"
 
@@ -2060,12 +2078,17 @@ def t_autonomi_perimetro():
     assert "19,5" in enpam and "Verificato: 2026-10" in enpam, f"riga ENPAM: {enpam[:120]}"
     ff = open(os.path.join(cartella, "references", "fiscalita-forfettario.md"), encoding="utf-8").read()
     for testo, rel in ((skill, "SKILL.md"), (ff, "fiscalita-forfettario.md")):
-        avviso = next((p for p in testo.split("\n\n") if "artigian" in p and "coefficienti del" in p), "")
-        for coeff in ("40%", "54%", "62%", "86%"):
-            assert coeff in avviso, f"{rel}: l'avviso su artigiani e commercianti non cita il coefficiente {coeff}"
+        avvisi = [r for p in testo.split("\n\n") for r in p.splitlines() if "artigian" in r and re.search(r"coefficient\w* (?:di redditività )?del \d+%", r)]
+        assert avvisi, f"{rel}: manca l'avviso su artigiani e commercianti accanto ai coefficienti"
+        for avviso in avvisi:
+            for coeff in ("40%", "54%", "62%", "86%"):
+                assert coeff in avviso, f"{rel}: l'avviso «{avviso.strip()[:60]}…» non cita il coefficiente {coeff}"
     gs = open(os.path.join(cartella, "references", "previdenza-gestione-separata.md"), encoding="utf-8").read()
     assert "Σ (reddito_anno × 0,25)" in gs and "0,2607) rivalutato" not in gs, "Gestione Separata: a montante va il 25% IVS"
     assert "× 0,25 fino al pensionamento" in skill, "SKILL.md: montante al 26,07% invece del 25% di IVS"
+    for rel, testo in _file_testo(cartella, os.path.join(SKILLS, "it-pianificazione"), os.path.join(ROOT, "commands")):
+        for riga in testo.splitlines():
+            assert not re.search(r"aliquota 26,07% vs 33%|separata ~0,2607", riga), f"{rel}: 26,07% come aliquota del montante: {riga.strip()[:100]}"
     for superato in ("1,5× assegno sociale", "considerabile anche la rendita della complementare"):
         assert superato not in gs, f"previdenza-gestione-separata.md: «{superato}»"
 

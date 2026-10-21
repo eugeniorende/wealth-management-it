@@ -12,8 +12,14 @@
   "Non verificato 2: controllo «/mnt/skills» su tutte le SKILL.md; rivalutazione di default degli autonomi legata a PIL_REALE di proiezione-inps.py",
   "Non verificato 3 (montante al 26,07%): nuova Input!B16 «Aliquota di computo (montante)» al 25% di IVS (Circ. INPS 8/2026: 26,07% = 25% IVS + 0,72% + 0,35% ISCRO) usata in Previdenza!D e negli Scenari; il 26,07% resta come aliquota versata e dedotta; sui default la pensione lorda passa da €14.193 a €13.661; testi allineati (montante ~24% più basso del dipendente, non 21%)",
   "Non verificato 4 (avviso sui coefficienti): 40%, 54%, 62% e 86% nell'avviso su artigiani e commercianti, riga del 54% nelle tabelle; decide la gestione di iscrizione, non il coefficiente",
-  "Non verificato 5 (Inarcassa under 35): cinque anni solari ma non oltre i 35, con il limite del reddito medio degli iscritti (€46.306 per il 2025), RGP art. 4.4"
+  "Non verificato 5 (Inarcassa under 35): cinque anni solari ma non oltre i 35, con il limite del reddito medio degli iscritti (€46.306 per il 2025), RGP art. 4.4",
+  "Revisione delle correzioni (revisore avversariale sul commit d1d2a9a): f-string compatibili con Python 3.11; coefficiente degli scenari verificato contro la tabella e non letto da Input!B43; aliquota di computo calcolata (Gestione Separata min(versata; 25%), cassa = soggettiva) con varianti cassa_inarcassa e gs_24; decadimento degli scenari come offset dalla Base (autonomi B34/D34 e, per propagazione, crescita, PIL, inflazione e decadimento negli Scenari dei dipendenti) con varianti a coefficiente congelato; avviso 40/54/62/86% anche in «Cosa NON fa» e test su ogni avviso; 26,07% tolto come aliquota del montante in SKILL.md e nei commenti di proiezione-inps.py e importa-previdenza.py; ogni link della tabella casse con percorso; Inarcassa senza la soglia di reddito non riscontrata (€46.306)"
  ],
- "scartati": [],
+ "scartati": [
+  {
+   "titolo": "Soglia Inarcassa €46.306 per il 2025",
+   "motivo": "Non riscontrata dal secondo revisore (la ricerca dà €39.653 per un altro anno): il testo dice che il limite è il reddito medio del biennio precedente, aggiornato ogni anno, da verificare sul regolamento"
+  }
+ ],
  "note": "Normattiva, INPS e i siti delle casse non sono raggiungibili da questa sessione: i dati normativi nuovi (Circ. INPS 8/2026 sull'aliquota di computo, Allegato 4 L. 190/2014, RGP Inarcassa art. 4.4, pagine ENPAM e CIPAG) vengono dalle letture su fonte primaria registrate dai revisori in review-t6.json."
 }
