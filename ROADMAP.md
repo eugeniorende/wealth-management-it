@@ -157,9 +157,9 @@ Prese il 20/10/2026.
   - SHA dell'upstream fissato: l'ultimo commit prima della rimozione è `ef165e4160`; il confronto non trova righe di testo in comune con l'upstream;
   - sezione Licenza riscritta e link all'upstream fissato al commit. Il campo `upstream` di `plugin.json` resta a T14.
 - [ ] **Privacy dei dati utente:**
-  - inventario dei campi che ogni script stampa;
-  - flag `--anonimo`, perché importa-previdenza stampa nome e data di nascita;
-  - sezione «Dove vanno i tuoi dati» nel README.
+  - [x] inventario dei campi che ogni script stampa: nessuna chiamata di rete; solo importa-previdenza stampa dati identificativi (intestatario e data di nascita);
+  - [ ] flag `--anonimo` in importa-previdenza (dopo il filone previdenza, che ha quel file);
+  - [x] sezione «Dove vanno i tuoi dati» nel README.
 - [ ] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: oggi 6 script su 7 vanno in crash con cp1252.
 - [ ] **Formati italiani:**
   - punto per le migliaia in tutti gli script;
