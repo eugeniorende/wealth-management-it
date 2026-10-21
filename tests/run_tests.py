@@ -510,6 +510,22 @@ def t_tassi_capitalizzazione():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("importa-previdenza: con --anonimo non stampa intestatario né data di nascita")
+def t_importa_anonimo():
+    # Pre-pubblicazione, privacy: tutto ciò che lo script stampa entra nel contesto del modello.
+    xml = os.path.join(FIXTURES, "estratto-inps-test.xml")
+    rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), xml)
+    assert rc == 0 and "ROSSI" in out and "15/03/1990" in out, "senza il flag lo script resta com'era"
+    for args in ((xml, "--anonimo"), ("--anonimo", xml)):
+        rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
+        assert rc == 0, out[-300:]
+        for dato in ("ROSSI", "MARIO", "15/03/1990", "1990)"):
+            assert dato not in out, f"--anonimo: stampato «{dato}»"
+        eta = re.search(r"ETA_ATTUALE\s*=\s*([\d.]+)", out)
+        assert eta and "." not in eta.group(1), "con --anonimo l'età resta, in anni interi"
+        assert "MONTANTE_ATTUALE" in out and "omesso" in out
+
+
 @test("netto-pensione: netto dello stipendio con le misure L. 207/2024 c. 4-6 e il contributo IVS aggiuntivo")
 def t_netto_stipendio():
     netto = _modulo_previdenza("netto-pensione.py")
