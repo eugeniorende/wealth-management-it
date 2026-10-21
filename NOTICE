@@ -1,0 +1,19 @@
+wealth-management-it
+Copyright 2026 Eugenio Rende
+
+Distribuito con licenza Apache 2.0: vedi il file LICENSE.
+
+Questo progetto è nato come fork del plugin «wealth-management» del
+repository anthropics/financial-services di Anthropic
+(https://github.com/anthropics/financial-services), distribuito con licenza
+Apache 2.0. Riferimento: ef165e4160 (21/05/2026), ultimo commit
+dell'upstream che conteneva il plugin, in
+plugins/vertical-plugins/wealth-management. Il plugin è stato rimosso
+dall'upstream l'11/09/2026 (commit 734150c2d9).
+
+Modifiche rispetto all'upstream: skill, comandi, script, reference ed
+Excel sono stati riscritti da zero per la fiscalità e la previdenza
+italiane. Il confronto del 21/10/2026 tra i file dell'upstream a
+ef165e4160 e quelli di questo repository non trova righe di testo in
+comune. Dell'upstream restano la struttura del plugin (manifest, skill e
+comandi) e l'impostazione generale dei flussi di wealth management.

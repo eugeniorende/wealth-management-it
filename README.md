@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/eugeniorende/wealth-management-it/actions/workflows/tests.yml/badge.svg)](https://github.com/eugeniorende/wealth-management-it/actions/workflows/tests.yml)
 
-Fork community-driven del plugin [`wealth-management`](https://github.com/anthropics/financial-services/tree/main/plugins/vertical-plugins/wealth-management) di Anthropic, adattato alla fiscalità italiana (regime amministrato).
+Fork del plugin [`wealth-management`](https://github.com/anthropics/financial-services/tree/ef165e4160/plugins/vertical-plugins/wealth-management) di Anthropic (all'ultimo commit che lo conteneva: l'upstream l'ha rimosso l'11/09/2026), adattato alla fiscalità italiana (regime amministrato).
 
 > ⚠️ **Non costituisce consulenza fiscale, finanziaria o di investimento.** È uno strumento di pianificazione personale. Per casi specifici consultare un commercialista o consulente abilitato.
 
@@ -520,7 +520,7 @@ Il workflow si può avviare a mano senza tag (Actions → release → Run workfl
 
 ## Licenza
 
-Apache-2.0 (eredita dall'upstream).
+Apache-2.0: il testo è in [LICENSE](LICENSE), l'attribuzione all'upstream e le modifiche sono in [NOTICE](NOTICE). Entrambi i file entrano nello zip di release. Il progetto è nato come fork del plugin `wealth-management` di anthropics/financial-services (commit `ef165e4160`), ma skill, comandi, script ed Excel sono stati riscritti da zero per la fiscalità italiana: il confronto con l'upstream non trova righe di testo in comune.
 
 ## Disclaimer (di nuovo, perché conta)
 
