@@ -10,7 +10,8 @@ Uso (dalla radice del repository):
     python scripts/pacchetto.py --tag vX.Y.Z     → fallisce se il tag ≠ versione del manifest
 
 Nello zip entra solo ciò che serve al plugin installato: manifest, comandi,
-skill e README, sotto la cartella wealth-management-it/. Restano fuori test,
+skill, README, LICENSE e NOTICE (Apache-2.0 chiede di distribuire licenza e
+attribuzione), sotto la cartella wealth-management-it/. Restano fuori test,
 workflow, script di build, cache e file di sistema.
 """
 
@@ -24,7 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NOME = "wealth-management-it"
 
 # Cosa entra nello zip (relativo alla radice del repository).
-INCLUDI = [".claude-plugin", "commands", "skills", "README.md"]
+INCLUDI = [".claude-plugin", "commands", "skills", "README.md", "LICENSE", "NOTICE"]
 # Cosa resta fuori anche se dentro una cartella inclusa.
 ESCLUDI_DIR = {"__pycache__", ".git", "ordini"}
 ESCLUDI_FILE = {".DS_Store"}

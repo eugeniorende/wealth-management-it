@@ -867,6 +867,7 @@ def t_pacchetto():
         radice = "wealth-management-it/"
         assert all(n.startswith(radice) for n in nomi), "tutto deve stare sotto wealth-management-it/"
         for atteso in (radice + ".claude-plugin/plugin.json", radice + "README.md",
+                       radice + "LICENSE", radice + "NOTICE",  # Apache-2.0 §4: licenza e attribuzione
                        radice + "commands/pensione.md",
                        radice + "skills/it-tax-optimization/SKILL.md",
                        radice + "skills/it-pianificazione/assets/proiezione-inps.py"):
