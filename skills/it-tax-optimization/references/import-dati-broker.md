@@ -69,20 +69,29 @@ riconosciute, aliquote ignote) escono con un messaggio leggibile e codice 2. Sol
 La categoria si deduce dalla **descrizione**, non dal prefisso dell'ISIN: DE, FR, IE e LU coprono anche
 azioni singole come SAP o LVMH, ed ETC ed ETN con ISIN IE o JE non sono fondi. Le regole, nell'ordine:
 - ETC, ETN, ETP e certificate → reddito diverso.
+- «Physical» o «fisico» senza le parole ETF o UCITS (per esempio «WisdomTree Physical Gold», «iShares
+  Physical Gold», «ETFS Physical Gold») → ETC fisico, reddito diverso. «ETFS», tutto maiuscolo, è il
+  marchio storico degli ETC di ETF Securities, non un ETF.
 - «ETF», «UCITS», «fondo», «fund(s)» o «SICAV» → OICR: reddito di capitale se l'ISIN è di un Paese
   UE/SEE, `reddito_capitale_irpef` se è di un altro Paese (per esempio un ETF domiciliato negli USA),
   da classificare se la descrizione dice «non armonizzato» (dipende dal gestore) o se è un fondo
-  immobiliare (plus e minus seguono regole proprie, art. 7 DL 351/2001).
-- «Physical» o «fisico» senza la parola ETF (per esempio «WisdomTree Physical Gold», «iShares Physical
-  Gold») → ETC fisico, reddito diverso.
+  immobiliare non UCITS: la plus da vendita delle quote sul mercato è reddito diverso, quella al
+  riscatto o alla liquidazione reddito di capitale (art. 7 DL 351/2001; circ. AdE 2/E/2012). Un ETF
+  UCITS sul settore immobiliare («… Real Estate UCITS ETF») resta un ETF.
 - Il solo nome di un emittente (iShares, Vanguard, Xtrackers, Amundi, Lyxor, SPDR, Invesco, VanEck,
   WisdomTree) non basta, perché gli stessi emittenti fanno anche ETC, e alcuni hanno azioni quotate:
   con un indice nella descrizione (MSCI, FTSE, S&P, STOXX…) e ISIN UE/SEE è un ETF, reddito di capitale;
   altrimenti resta **da classificare**. Dal solo nome non si deduce mai la tassazione IRPEF.
 - Azioni riconoscibili dalla forma societaria (SpA, SE, AG, SA, NV, PLC, Inc) → reddito diverso, ma non
-  se la descrizione contiene un indice: «… High Dividend Yield Inc» è la classe a distribuzione di un
-  ETF, e resta da classificare.
+  se la descrizione contiene un fornitore di indici dopo il nome: «HSBC MSCI World Inc» è la classe a
+  distribuzione di un ETF, e resta da classificare. «MSCI Inc» o «S&P Global Inc», dove l'indice è il
+  nome della società, restano azioni.
+- Un fornitore di indici (MSCI, FTSE, Bloomberg, iBoxx…) o una fascia di durata («1-10», «0-1 yr») nel
+  nome, senza la parola ETF, indicano un ETF: la posizione resta da classificare, anche se nel nome c'è
+  un emittente pubblico («UBS Bloomberg US Treasury Bond 1-10»).
 - Obbligazioni e titoli di Stato → reddito diverso, al netto di ratei e scarto di emissione maturati.
+  Serve un indizio di obbligazione (cedola in %, «obbligazione», «bond») oppure la sigla di un titolo di
+  Stato italiano (BTP, CCT): il solo nome di uno Stato o di un ente non basta.
   BOT, CTZ, BTF, T-Bill e zero coupon restano **da classificare**: la loro plus latente è in gran parte
   scarto di emissione, cioè reddito di capitale.
 - Nessun indizio → **da classificare**: la plus non viene contata tra le compensabili e il report
@@ -104,6 +113,9 @@ decide **per file**: se in una colonna numerica compare una virgola decimale (`1
 all'italiana e `1.000` o `1.234.567` sono migliaia. Se il file non dà indizi (nessun decimale) o dà
 indizi in conflitto, decide il delimitatore: con `;` il file è all'italiana, con `,` all'inglese
 (`"1,000"` vale mille); in ogni caso il report elenca le celle il cui valore dipende dal formato.
+Nelle colonne degli importi in euro (controvalori, minus dello zainetto) un solo separatore seguito da
+tre cifre indica sempre le migliaia, in entrambi i formati: `1.500` e `1,500` valgono millecinquecento,
+perché un importo in euro con tre decimali non è plausibile. Prezzi e quantità seguono il formato del file.
 Le righe senza costo o valore leggibili sono scartate con un avviso, mai in silenzio. Riconosce per esempio `ISIN`/`Codice ISIN`, `Descrizione`/`Strumento`/`Titolo`, `Quantità`/`Pezzi`,
 `Prezzo medio di carico`/`PMC`/`Prezzo di carico`, `Controvalore`/`Valore di mercato`. Se il tuo
 export usa nomi che non riconosce, li aggiungi ai dizionari `SINONIMI` in testa allo script — è una
@@ -111,10 +123,13 @@ riga. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il
 esempi le uniche plus sono di un ETF, quindi l'importatore risponde «€ 0 a imposta zero».
 Lo zainetto accetta le colonne anno di **realizzo** (non di scadenza), importo residuo, aliquota e,
 se serve, broker. Le varianti della certificazione sono gestite con un avviso:
-- solo l'anno di scadenza («Anno di scadenza», «Utilizzabile fino al»): l'anno di realizzo è la
-  scadenza meno 4;
-- la minus lorda accanto al residuo («Minusvalenza» e «Residuo»): vale il residuo;
-- la minus lorda e l'utilizzato, senza residuo: residuo = lorda − utilizzato.
+- solo l'anno di scadenza («Anno di scadenza», «Esercizio di scadenza», «Utilizzabile fino al»):
+  l'anno di realizzo è la scadenza meno 4;
+- la minus lorda accanto al residuo («Minusvalenza» e «Residuo», «Minusvalenze compensabili»,
+  «Utilizzabili», «Saldo»): vale il residuo;
+- la minus lorda e l'utilizzato, senza residuo: residuo = lorda − utilizzato;
+- due colonne che possono essere entrambe l'importo, senza un residuo riconoscibile: l'import si ferma e
+  chiede di rinominare la colonna giusta, invece di sceglierne una a caso.
 
 Le righe senza anno sono escluse (scadenza ignota); un'aliquota vuota, «-» o «n.d.» vale 26% con un
 avviso, mentre un numero diverso da 26 e 12,5 ferma l'import con il nome del file e la riga.

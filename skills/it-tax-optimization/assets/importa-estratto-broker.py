@@ -25,8 +25,9 @@ Regole fiscali applicate (vedi SKILL.md e le reference):
   descrizione non dà indizi la posizione resta «da classificare» e la sua plus non viene contata.
   Il solo nome di un emittente (iShares, WisdomTree…) non basta: emettono sia ETF sia ETC.
 - BOT, CTZ e zero coupon: la plus latente è in gran parte scarto di emissione (reddito di
-  capitale), quindi restano «da classificare». Lo stesso per i fondi immobiliari (art. 7 DL
-  351/2001) e per gli OICR non armonizzati UE/SEE.
+  capitale), quindi restano «da classificare». Restano da classificare anche gli OICR non
+  armonizzati UE/SEE e i fondi immobiliari, la cui plus è reddito diverso se le quote si vendono
+  sul mercato e reddito di capitale al riscatto o alla liquidazione (art. 7 DL 351/2001).
 - Aliquota 12,5% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) riconosciuta dalla
   descrizione: titoli di Stato italiani (BTP/BOT/CCT/CTZ) ed enti territoriali italiani, Bund,
   OAT, Bonos, Treasury, Gilt e JGB, BEI/BERS/BIRS e le altre banche multilaterali. Le altre
@@ -90,7 +91,8 @@ SINONIMI_ZAIN = {
     "anno_scadenza": ["scadenza", "anno di scadenza", "anno scadenza", "data scadenza",
                       "utilizzabile fino", "scade"],
     "residuo":  ["residuo", "residua", "residue", "residui", "importo residuo", "minusvalenza residua",
-                 "minusvalenze residue", "disponibile", "da utilizzare"],
+                 "minusvalenze residue", "disponibile", "da utilizzare", "compensabile", "compensabili",
+                 "utilizzabile", "utilizzabili", "riportabile", "riportabili", "ancora", "saldo"],
     "importo":  ["importo", "minusvalenza", "minusvalenze", "minus", "valore", "ammontare"],
     "utilizzato": ["utilizzato", "utilizzata", "utilizzate", "utilizzati", "compensato", "compensata"],
     "aliquota": ["aliquota", "aliquota fiscale", "%", "perc"],
@@ -107,19 +109,27 @@ UE_SEE = set("AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL 
 # ETF; senza, la posizione resta da classificare.
 EMITTENTI_OICR = ("ishares", "vanguard", "xtrackers", "amundi", "lyxor", "spdr", "invesco",
                   "vaneck", "wisdomtree")
-RE_OICR = re.compile(r"\b(ETFs?|UCITS|SICAV|OICR|OICVM|fond[oi]|funds?)\b", re.I)
+# «ETF» senza re.I: «ETFS» è il marchio storico degli ETC di ETF Securities, non un fondo.
+RE_ETF = re.compile(r"\b(ETFs?|Etfs?|etfs?)\b")
+RE_OICR = re.compile(r"\b(UCITS|SICAV|OICR|OICVM|fond[oi]|funds?)\b", re.I)
 RE_INDICE = re.compile(r"\b(MSCI|FTSE|S&P|STOXX|DAX|Nasdaq|Russell|Dow Jones|Bloomberg|iBoxx|Markit|"
                        r"Solactive|Morningstar|All[- ]World|World|Emerging|Govt|Government|Corporate|"
                        r"Aggregate|Index)\b", re.I)
 RE_ETC_FISICO = re.compile(r"\b(physical|fisic[oi])\b", re.I)
+# Fornitori di indici e fasce di durata («1-10», «0-1 yr»): con un emittente pubblico nel nome
+# indicano un ETF obbligazionario, con una forma societaria la classe di un ETF («… Inc»).
+RE_FORNITORE_INDICE = re.compile(r"\b(MSCI|FTSE|S&P|STOXX|DAX|Nasdaq|Russell|Dow Jones|Bloomberg|iBoxx|"
+                                 r"Markit|Solactive|Morningstar|ICE|BetaBuilders)\b", re.I)
+RE_FASCIA = re.compile(r"(?<![\d/.-])\d{1,2}\s?-\s?\d{1,2}(?![\d/.-])")
 # Emittenti al 12,5%: Stato italiano ed enti territoriali, Stati white list (DM 4/9/1996),
 # organismi internazionali (art. 31 DPR 601/73). Il riconoscimento è per nome: il resto avvisa.
 RE_STATO_IT = re.compile(r"\b(BTP\w*|BOT|CCT\w*|CTZ)\b", re.I)
 RE_ENTE_IT = re.compile(r"\b(Comune|Regione|Provincia|Citt[aà] metropolitana)\b", re.I)
-RE_STATO_ESTERO = re.compile(r"\b(Bund\w*|Bobl|Schatz\w*|Bubills?|Gilts?|JGBs?|Bonos|Letras|"
+RE_STATO_ESTERO = re.compile(r"\b(Bunds?|Bundesrepublik|Bundesanleihen?|Bundesobligation(en)?|"
+                             r"Bundesschatzanweisung(en)?|Bobl|Schatz|Bubills?|Gilts?|JGBs?|Bonos|Letras|"
                              r"Obligaciones del Estado|T-?Bills?|T-?Notes?|T-?Bonds?|"
                              r"(US|U\.S\.|United States) Treasury|Japan Government)\b", re.I)
-RE_STATO_ESTERO_SIGLE = re.compile(r"\b(OAT\w*|BTF|UST)\b")
+RE_STATO_ESTERO_SIGLE = re.compile(r"\b(OAT|OATi|OAT€i|BTF|UST)(?![\w€])")
 RE_SOVRANAZIONALE = re.compile(r"\b(BEI|EIB|BERS|EBRD|BIRS|IBRD|IADB|ADB|AfDB|AFDB|AIIB)\b")
 RE_SOVRANAZIONALE_NOME = re.compile(r"European Investment Bank|Banca Europea per gli Investimenti|"
                                     r"World Bank|Banca Mondiale|International Bank for Reconstruction|"
@@ -194,10 +204,12 @@ def rileva_locale(valori, delimitatore=None):
     return {";": "it", ",": "en"}.get(delimitatore), ("indizi in conflitto" if it else "nessun indizio")
 
 
-def _num(x, locale, ambigui=None):
+def _num(x, locale, ambigui=None, importo=False):
     """Converte un numero in formato italiano o inglese. `locale` è quello del file (None:
     «1.000» vale mille, «1,5» uno e mezzo). Se il formato del file è incerto il chiamante passa
-    `ambigui`, dove finiscono le celle il cui valore dipende dal formato («1.000», «1,500»)."""
+    `ambigui`, dove finiscono le celle il cui valore dipende dal formato («1.000», «1,500»).
+    Con `importo` (controvalori e minus in euro) un solo separatore seguito da tre cifre indica
+    sempre le migliaia: un importo in euro con tre decimali non è plausibile."""
     if x is None:
         return None
     s = _pulisci(x)
@@ -208,7 +220,9 @@ def _num(x, locale, ambigui=None):
     migliaia_punto = re.fullmatch(r"[+-]?\d{1,3}(\.\d{3})+", s)
     migliaia_virgola = re.fullmatch(r"[+-]?\d{1,3}(,\d{3})+", s)
     dubbia = (migliaia_punto and s.count(".") == 1) or (migliaia_virgola and s.count(",") == 1)
-    if "," in s and "." in s:
+    if importo and dubbia:
+        s = s.replace(".", "").replace(",", "")
+    elif "," in s and "." in s:
         s = s.replace(".", "").replace(",", ".") if s.rfind(",") > s.rfind(".") else s.replace(",", "")
     elif "," in s:
         if migliaia_virgola and (locale == "en" or s.count(",") > 1):
@@ -311,12 +325,16 @@ def classifica(isin, descrizione):
     paese = (isin or "")[:2].upper()
     if re.search(r"\b(ETC|ETN|ETP)\b", d, re.I) or "certificate" in dl:
         return "reddito_diverso", 26.0, "ETC/ETN/certificate: reddito diverso"
-    if RE_OICR.search(d):
+    ucits = RE_ETF.search(d) or re.search(r"\bUCITS\b", d, re.I)
+    if RE_ETC_FISICO.search(d) and not ucits:
+        return "reddito_diverso", 26.0, "ETC fisico (dal nome): reddito diverso"
+    if RE_ETF.search(d) or RE_OICR.search(d):
         if not isin:
             return "da_classificare", 26.0, "OICR senza ISIN: domicilio ignoto"
-        if re.search(r"immobiliar|real estate", d, re.I):
+        if re.search(r"fond[oi] immobiliar|FIA immobiliar|real estate fund", d, re.I) and not ucits:
             return ("da_classificare", 26.0,
-                    "fondo immobiliare: plus e minus seguono regole proprie (art. 7 DL 351/2001)")
+                    "fondo immobiliare: plus da vendita sul mercato reddito diverso, al riscatto o alla "
+                    "liquidazione reddito di capitale (art. 7 DL 351/2001)")
         if paese not in UE_SEE:
             return ("reddito_capitale_irpef", 26.0,
                     "OICR fuori UE/SEE: plus a IRPEF progressiva, quadro RL anche in amministrato")
@@ -324,20 +342,22 @@ def classifica(isin, descrizione):
             return ("da_classificare", 26.0,
                     "OICR non armonizzato UE/SEE: 26% solo con gestore vigilato, altrimenti IRPEF")
         return "reddito_capitale", 26.0, "ETF/fondo: plus reddito di capitale, non compensabile"
-    if RE_ETC_FISICO.search(d):
-        return "reddito_diverso", 26.0, "ETC fisico (dal nome): reddito diverso"
     if any(e in dl for e in EMITTENTI_OICR):
         if RE_INDICE.search(d) and paese in UE_SEE:
             return "reddito_capitale", 26.0, "ETF (emittente e indice nel nome): plus reddito di capitale"
         return ("da_classificare", 26.0,
                 "emittente di ETF ed ETC senza «ETF», «ETC» o un indice nel nome: indicare la categoria")
-    if _sembra_azione(d) and not RE_INDICE.search(d):
+    indice = RE_FORNITORE_INDICE.search(d)
+    if _sembra_azione(d) and not (indice and indice.start() > 0):     # «MSCI Inc» è un'azione
         return "reddito_diverso", 26.0, "azione: reddito diverso"
+    if indice or RE_FASCIA.search(d):
+        return ("da_classificare", 26.0,
+                "indice o fascia di durata nel nome, senza «ETF»: probabile ETF, indicare la categoria")
     pubblico = _dodici_e_mezzo(d, paese)
     if RE_ZERO_COUPON.search(d):
         return ("da_classificare", 12.5 if pubblico else 26.0,
                 "zero coupon: la plus è in gran parte scarto di emissione (reddito di capitale)")
-    if pubblico or re.search(r"obblig|\bbond\b|\d+([.,]\d+)?\s?%", d, re.I):
+    if RE_STATO_IT.search(d) or re.search(r"obblig|\bbond\b|\d+([.,]\d+)?\s?%", d, re.I):
         return ("reddito_diverso", 12.5 if pubblico else 26.0 if paese == "IT" else None,
                 "obbligazione: reddito diverso al netto di ratei e scarto di emissione maturati")
     return "da_classificare", 26.0, "nessun indizio dalla descrizione"
@@ -366,9 +386,9 @@ def parse_estratto(path, broker_default=None, avvisi=None):
         nome = descr or isin or f"riga {n}"
         qta = _num(get("quantita"), locale, ambigui)
         prezzo_c = _num(get("prezzo_carico"), locale, ambigui)
-        val_c = _num(get("valore_carico"), locale, ambigui)
+        val_c = _num(get("valore_carico"), locale, ambigui, importo=True)
         prezzo_a = _num(get("prezzo_attuale"), locale, ambigui)
-        val_a = _num(get("valore_attuale"), locale, ambigui)
+        val_a = _num(get("valore_attuale"), locale, ambigui, importo=True)
         costo = val_c if val_c is not None else (qta * prezzo_c if qta is not None and prezzo_c is not None else None)
         valore = val_a if val_a is not None else (qta * prezzo_a if qta is not None and prezzo_a is not None else None)
         if costo is None or valore is None:
@@ -409,7 +429,16 @@ def parse_zainetto(path, anno_rif, broker_default=None, avvisi=None):
     avvisi = [] if avvisi is None else avvisi
     intest, righe, delim = _leggi_csv(path)
     m = _mappa_colonne(intest, SINONIMI_ZAIN)
+    if "anno" in m and "anno_scadenza" not in m and re.search(r"scad|fino al|entro", _norm(intest[m["anno"]])):
+        m["anno_scadenza"] = m.pop("anno")        # «Esercizio di scadenza», «Annualità di scadenza»
     colonna = "residuo" if "residuo" in m else "importo" if "importo" in m else None
+    if colonna == "importo":
+        altre = set(m.values()) - {m["importo"]}
+        concorrenti = [h for i, h in enumerate(intest) if i not in altre
+                       and any(_norm(a) in _norm(h) for a in SINONIMI_ZAIN["importo"])]
+        if len(concorrenti) > 1:
+            raise ErroreInput(f"{path}: colonna dell'importo ambigua ({', '.join(concorrenti)}): "
+                              "rinomina la colonna della minus residua, per esempio «Residuo»")
     if colonna is None:
         raise ErroreInput(f"{path}: zainetto non riconosciuto, manca la colonna dell'importo")
     nome_col = lambda campo: intest[m[campo]].strip()
@@ -432,11 +461,11 @@ def parse_zainetto(path, anno_rif, broker_default=None, avvisi=None):
     for n, r in enumerate(righe, start=2):
         def get(campo):
             return r[m[campo]].strip() if campo in m and m[campo] < len(r) else ""
-        imp = _num(get(colonna), locale, ambigui)
+        imp = _num(get(colonna), locale, ambigui, importo=True)
         if imp is None and get(colonna):
             avvisi.append(f"zainetto riga {n} scartata: importo «{get(colonna)}» non leggibile")
         if imp is not None and sottrai:
-            imp = abs(imp) - abs(_num(get("utilizzato"), locale, ambigui) or 0)
+            imp = abs(imp) - abs(_num(get("utilizzato"), locale, ambigui, importo=True) or 0)
         if imp is None or imp == 0:
             continue
         trovato = re.search(r"(19|20)\d{2}", get("anno_scadenza" if da_scadenza else "anno"))
@@ -444,7 +473,7 @@ def parse_zainetto(path, anno_rif, broker_default=None, avvisi=None):
         aliquota = _aliquota(get("aliquota"), f"{path} riga {n}: ")
         if aliquota is None:
             aliquota = 26.0
-            if get("aliquota"):
+            if "aliquota" in m:
                 avvisi.append(f"zainetto riga {n}: aliquota «{get('aliquota')}» non indicata, assunto il 26%")
         if anno is None:
             stato, scade = "anno_mancante", None
