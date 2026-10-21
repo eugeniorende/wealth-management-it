@@ -120,10 +120,10 @@ Prese il 20/10/2026.
 ### Trasversale, entro il 31/12
 
 - [ ] **T11 Governance normativa** (P1, M): F024, F035.
-  - Elenco dei file obbligati al marcatore.
-  - `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 in vigore dal 1/1/2027.
-  - Tabella dello stato dei dati nel README.
-  - Calendario dei parametri annuali: coefficienti di trasformazione 2027-28, legge di bilancio 2027, massimale e requisiti 2027.
+  - [x] Elenco dei file obbligati al marcatore (PR #13).
+  - [ ] `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 in vigore dal 1/1/2027.
+  - [x] Tabella dello stato dei dati nel README, generata da `run_tests.py --tabella-freshness` (PR #14).
+  - [x] Calendario dei parametri annuali: coefficienti di trasformazione 2027-28, legge di bilancio 2027, massimale e requisiti 2027 (PR #14).
 
 ### Linea di taglio e rilascio
 
@@ -136,24 +136,26 @@ Prese il 20/10/2026.
   - Test strutturali su ogni xlsx.
   - `--json` con valori chiusi.
   - Fixture realistiche.
-  - Matrice Python 3.11 e 3.14.
-  - Versione fissata di claude-code nel job validate.
+  - [x] Matrice Python 3.11 e 3.14, con versioni minime delle dipendenze (PR #17).
+  - [x] Versione fissata di claude-code nel job validate (PR #15).
 - [ ] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059.
   - Helper `cli()` comune: `--help`, `--set`, `--json`, `--from`.
   - Lettore unico del pianificatore.
   - `--dati` per genera-ips e per il ribilanciamento.
   - Catena `--json` → `--from` tra gli script.
-- [ ] **T10 Revisione annuale** (P1, M): F049, F050, F060, F064. Dipende da T4, T7 e T9.
-  - TWR con range dinamici.
-  - Costi dell'anno.
-  - Semaforo per priorità.
+- [x] **T10 Revisione annuale** (P1, M): F049, F050, F060, F064 (PR #12, #18). Anticipato: non dipendeva davvero da T4 e T7.
+  - [x] TWR con 120 righe e ultima riga dinamica, Leggimi con i limiti.
+  - [x] Costi dell'anno (trasparenza, non da sottrarre di nuovo).
+  - [x] Semaforo per priorità (85/75/60%).
+  - [x] In più, da F030: soglia 5/25 per classe nel cruscotto e nella riga aggregata del tracker.
+  - [ ] Contratto di input della revisione (F031): resta a T9.
 
 ## Pre-pubblicazione — prima di rendere pubblico il repository
 
-- [ ] **Licenza:**
+- [x] **Licenza** (PR #16):
   - LICENSE e NOTICE (Apache-2.0) nel repository e nello zip, cioè in `INCLUDI` di `scripts/pacchetto.py`;
-  - SHA dell'upstream fissato: l'ultimo commit prima della rimozione è `ef165e4160`;
-  - sezione «Fork» riscritta, perché l'upstream non esiste più.
+  - SHA dell'upstream fissato: l'ultimo commit prima della rimozione è `ef165e4160`; il confronto non trova righe di testo in comune con l'upstream;
+  - sezione Licenza riscritta e link all'upstream fissato al commit. Il campo `upstream` di `plugin.json` resta a T14.
 - [ ] **Privacy dei dati utente:**
   - inventario dei campi che ogni script stampa;
   - flag `--anonimo`, perché importa-previdenza stampa nome e data di nascita;
@@ -168,7 +170,7 @@ Prese il 20/10/2026.
   - commands come alias delle skill;
   - plugin.json senza warning.
 - [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release.
-- [ ] Supply chain della CI: action fissate per SHA, Dependabot anche su pip.
+- [x] Supply chain della CI: action fissate per SHA con test di igiene, claude-code a versione fissa (PR #15). Dependabot su pip non serve: le dipendenze hanno solo versioni minime.
 - [ ] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4).
 - [ ] README coerente con un repository pubblico: marketplace e Releases.
 
