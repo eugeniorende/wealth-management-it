@@ -16,7 +16,10 @@ e produce:
   - un blocco di PARAMETRI PRONTI da incollare in proiezione-inps.py e montecarlo-pensione.py
 
 Uso:
-    python importa-previdenza.py estratto_inps.xml [storico_fondo.csv]
+    python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]
+
+Con --anonimo non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): utile
+quando l'output finisce in chat o in un documento condiviso.
 
 ONESTÀ METODOLOGICA
 - La ricostruzione del montante è un'approssimazione (±qualche %): l'estratto conto elenca i
@@ -249,11 +252,23 @@ def quota_azionaria(nome_comparto):
 
 # ================================ MAIN ================================
 
+def eta_stampata(eta, anonimo):
+    """Età da incollare in ETA_ATTUALE: con --anonimo in anni interi ARROTONDATI (proiezione-inps.py
+    usa round(ETA_PENSIONAMENTO − ETA_ATTUALE): troncare allungherebbe l'orizzonte di un anno)."""
+    return round(eta) if anonimo else round(eta, 1)
+
+
 def main():
-    if len(sys.argv) < 2:
-        sys.exit("Uso: python importa-previdenza.py estratto_inps.xml [storico_fondo.csv]")
-    path_xml = sys.argv[1]
-    path_csv = sys.argv[2] if len(sys.argv) > 2 else None
+    uso = "Uso: python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]"
+    args = [a for a in sys.argv[1:] if a != "--anonimo"]
+    anonimo = len(args) < len(sys.argv) - 1
+    # argomenti validati PRIMA di stampare qualsiasi dato: un flag sbagliato non deve rivelare i dati
+    sconosciuti = [a for a in args if a.startswith(("-", "\u2014", "\u2013"))]
+    if not args or sconosciuti or len(args) > 2:
+        sys.exit(f"{uso}\n" + (f"Argomento non riconosciuto: {sconosciuti[0]}" if sconosciuti else
+                                (f"Troppi argomenti: {' '.join(args[2:])}" if len(args) > 2 else "")))
+    path_xml = args[0]
+    path_csv = args[1] if len(args) > 1 else None
     oggi = datetime.date.today()
 
     # ------------------------------ INPS ------------------------------
@@ -261,7 +276,9 @@ def main():
     print("=" * 72)
     print("PILASTRO PUBBLICO — estratto conto contributivo INPS")
     print("=" * 72)
-    if anag.get("Cognome"):
+    if anonimo:
+        print("Intestatario: omesso (--anonimo)")
+    elif anag.get("Cognome"):
         eta = ""
         if "nascita" in anag:
             n = anag["nascita"]
@@ -357,7 +374,7 @@ def main():
     print(f"  RAL_ATTUALE      = {ral_rif:,.0f}".replace(",", "_") +
           "   # ultima annualità completa dall'estratto: verifica con la RAL da contratto")
     if "nascita" in anag:
-        print(f"  ETA_ATTUALE      = {(oggi - anag['nascita']).days / 365.25:.1f}")
+        print(f"  ETA_ATTUALE      = {eta_stampata((oggi - anag['nascita']).days / 365.25, anonimo)}")
     if fp_montante is not None:
         print("per montecarlo-pensione.py:")
         print(f"  FP_POT_ATTUALE      = {fp_montante:,.0f}".replace(",", "_"))
