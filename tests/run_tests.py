@@ -140,6 +140,18 @@ def t_pipefail():
                 f"{nome}: pipe senza pipefail ({con_pipe[0]!r}); aggiungere defaults.run.shell: bash"
 
 
+@test("igiene CI: le action dei workflow sono fissate per SHA completo")
+def t_action_sha():
+    # Supply chain: un tag (@v4) può essere spostato da chi controlla l'action, uno SHA no.
+    # Dependabot aggiorna SHA e commento di versione.
+    cartella = os.path.join(ROOT, ".github", "workflows")
+    for nome in sorted(os.listdir(cartella)):
+        for n, riga in enumerate(open(os.path.join(cartella, nome), encoding="utf-8"), 1):
+            m = re.search(r"uses:\s*([^\s#]+)", riga)
+            if m:
+                assert re.search(r"@[0-9a-f]{40}$", m.group(1)), f"{nome}:{n}: action non fissata per SHA ({m.group(1)})"
+
+
 @test("compilazione: tutti gli script Python compilano")
 def t_compila():
     import py_compile
@@ -835,7 +847,7 @@ def t_filtro():
     assert "freshness fiscale" in r.stdout
     r = subprocess.run([sys.executable, me, "--skip", "freshness", "--only", "igiene"],
                        capture_output=True, text=True, timeout=120)
-    assert "3/3 test passati" in r.stdout, r.stdout[-400:]
+    assert "4/4 test passati" in r.stdout, r.stdout[-400:]
     assert "freshness" not in r.stdout
     r = subprocess.run([sys.executable, me, "--only", "nome-inesistente"],
                        capture_output=True, text=True, timeout=120)
