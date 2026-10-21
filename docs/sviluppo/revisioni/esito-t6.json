@@ -1,0 +1,25 @@
+{
+ "branch": "feature/t6-autonomi",
+ "applicati": [
+  "Prima: incorporato feature/t4-fondo-pensione corretto (conflitti sull'xlsx degli autonomi, tenuta la versione di T6 che usa già Input!B48 in Fiscalità e riapplicata la doppia citazione della nota A67, e in tests/run_tests.py, tenute le sezioni di entrambi)",
+  "Confermato 0 (Scenari col coefficiente INPS invece di Input!B43): Riepilogo!B36:D36 e B38:D38 usano Input!B43 × ((1−decadimento colonna)/(1−B15))^(n/2); variante cassa_coeff con B43 sovrascritto",
+  "Confermato 1 (altri redditi e part-time): Input!C52, Fiscalità!D15 e A23, SKILL.md, fiscalita-forfettario.md e il comando dicono che il risparmio è esatto per redditi senza detrazioni proprie (affitti a IRPEF ordinaria) ed è un massimo con lavoro dipendente o occasionale (detrazioni art. 13 TUIR); tolto il rimando alla L. 190/2014 c. 75",
+  "Confermati 2, 3, 4 (test degli Scenari circolari, senza massimale e senza tassa in uscita): _scenari_autonomi verifica colonna per colonna lorda, netta con netto_pensionato(), rendita del fondo con la tassa su dedotti e non dedotti non comunicati, totale e gap calcolati a parte, sulle varianti default, ord150k (massimale dall'anno 0), fondo3k, cassa_coeff, ordinario e forf_non_comunica; mutanti verificati (totale = lorda + rendita, netta = lorda, senza MIN, tassa a zero, coefficiente da B42)",
+  "Conteso 0 (link alle homepage): ENPAM e CIPAG puntano alle pagine con aliquote e tetti (URL dai verificatori); il test chiede un percorso oltre il dominio; «dati indicativi» → «verificati a ottobre 2026»",
+  "Conteso 1 (colonna Ordinario con altri redditi senza test): C8, C9, C10, C11, C14, C15 verificati su tre varianti, valore chiuso 990 €; mutante senza altri redditi catturato",
+  "Non verificato 0: variante forf_altri40k (versamento 8.000, altri redditi 40.000): dedotto 5.300 e risparmio 1.749 €; mutanti «senza plafond» e «IRPEF piatta al 23%» catturati",
+  "Non verificato 1: netto della pensione anche su ord150k (ramo 28-50k) e forf8k (sotto la no tax area)",
+  "Non verificato 2: controllo «/mnt/skills» su tutte le SKILL.md; rivalutazione di default degli autonomi legata a PIL_REALE di proiezione-inps.py",
+  "Non verificato 3 (montante al 26,07%): nuova Input!B16 «Aliquota di computo (montante)» al 25% di IVS (Circ. INPS 8/2026: 26,07% = 25% IVS + 0,72% + 0,35% ISCRO) usata in Previdenza!D e negli Scenari; il 26,07% resta come aliquota versata e dedotta; sui default la pensione lorda passa da €14.193 a €13.661; testi allineati (montante ~24% più basso del dipendente, non 21%)",
+  "Non verificato 4 (avviso sui coefficienti): 40%, 54%, 62% e 86% nell'avviso su artigiani e commercianti, riga del 54% nelle tabelle; decide la gestione di iscrizione, non il coefficiente",
+  "Non verificato 5 (Inarcassa under 35): cinque anni solari ma non oltre i 35, con il limite del reddito medio degli iscritti (€46.306 per il 2025), RGP art. 4.4",
+  "Revisione delle correzioni (revisore avversariale sul commit d1d2a9a): f-string compatibili con Python 3.11; coefficiente degli scenari verificato contro la tabella e non letto da Input!B43; aliquota di computo calcolata (Gestione Separata min(versata; 25%), cassa = soggettiva) con varianti cassa_inarcassa e gs_24; decadimento degli scenari come offset dalla Base (autonomi B34/D34 e, per propagazione, crescita, PIL, inflazione e decadimento negli Scenari dei dipendenti) con varianti a coefficiente congelato; avviso 40/54/62/86% anche in «Cosa NON fa» e test su ogni avviso; 26,07% tolto come aliquota del montante in SKILL.md e nei commenti di proiezione-inps.py e importa-previdenza.py; ogni link della tabella casse con percorso; Inarcassa senza la soglia di reddito non riscontrata (€46.306)"
+ ],
+ "scartati": [
+  {
+   "titolo": "Soglia Inarcassa €46.306 per il 2025",
+   "motivo": "Non riscontrata dal secondo revisore (la ricerca dà €39.653 per un altro anno): il testo dice che il limite è il reddito medio del biennio precedente, aggiornato ogni anno, da verificare sul regolamento"
+  }
+ ],
+ "note": "Normattiva, INPS e i siti delle casse non sono raggiungibili da questa sessione: i dati normativi nuovi (Circ. INPS 8/2026 sull'aliquota di computo, Allegato 4 L. 190/2014, RGP Inarcassa art. 4.4, pagine ENPAM e CIPAG) vengono dalle letture su fonte primaria registrate dai revisori in review-t6.json."
+}
