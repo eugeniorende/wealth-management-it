@@ -25,7 +25,7 @@ Investitore in fase di accumulo, dossier presso un unico broker. Target: **60% a
 **Drift attuale**:
 - Azionario: 68% vs 60% target → **+8% sovrappeso** (€8.000 in eccesso)
 - Obbligazionario: 24% vs 30% target → **-6% sottopeso** (€6.000 mancanti)
-- Monetario: 8% vs 10% target → **-2% sottopeso** (€2.000 mancanti, ma dentro banda ±5%)
+- Monetario: 8% vs 10% target → **-2% sottopeso** (€2.000 mancanti, ma dentro la banda 5/25 di 2,5 punti)
 
 Le classi fuori banda (regola 5/25: 5 punti per azionario e obbligazionario, 2,5 per il monetario): azionario (+8%) e obbligazionario (-6%). Il monetario (-2%) è dentro banda.
 
@@ -93,7 +93,7 @@ LEVA 4: quanto vendere dell'ETF World (plus latente 19.428/68.000 = 28,6% del va
   Al bordo della banda (65%): vendere €1.050 → plus €300   → imposta 26% €78
 ```
 
-**Decisione: la regola di rientro mista.** Si va **a target se la correzione è a costo netto zero** (versamenti, minus, plus compensate dallo zainetto), e **fino a metà banda se ogni euro venduto paga imposta**. A target si spenderebbero €461 per l'ultima precisione; al bordo la classe resterebbe a un passo dal ri-sforare e costringerebbe a vendere di nuovo presto. Metà banda è il compromesso: €269. Lo strumento stampa entrambi i costi, e il parametro `OBIETTIVO_RIENTRO` permette di scegliere «target» o «banda».
+**Decisione: la regola di rientro mista.** Si va **a target se la correzione è a costo netto zero** (versamenti, minus, plus compensate dallo zainetto), e **fino a metà banda se ogni euro venduto paga imposta**. A target si spenderebbero €461 per l'ultima precisione; al bordo la classe resterebbe a un passo dal ri-sforare e costringerebbe a vendere di nuovo presto. Metà banda è il compromesso: €269. Lo strumento stampa entrambi i costi; il parametro `OBIETTIVO_RIENTRO` vale «misto» (default, questa regola), «target» o «banda», e `MARGINE_RIENTRO` fissa il punto di rientro (vedi `bande-dinamiche.md`).
 
 In questo caso, però, lo strumento non vende affatto: il drift (+6%) è oltre la banda stretta (5%) ma entro quella larga (10%), e correggerlo costa imposta. Vale l'**allargamento cost-aware** di `bande-dinamiche.md`: la vendita si rinvia, il residuo (€6.200) si dichiara, e i prossimi versamenti lo correggono gratis. Con un drift oltre il 10% si venderebbe, fino a metà banda.
 
@@ -142,8 +142,9 @@ Questo è il caso ideale: ribilanciare vendendo proprio ciò che è in perdita r
 ```
 Prelievo mensile: €2.000
   → prelevare dalle classi SOVRAPPESATE (le riduce, ribilanciando)
-  → preferire, tra le sovrappesate, quelle con plus latente minore (meno tassa)
-    o quelle compensabili con zainetto
+  → preferire, tra le sovrappesate, le posizioni in minus, poi la quota coperta
+    dallo zainetto, poi quelle con l'imposta per euro venduto più bassa
+    (plus/valore × aliquota)
 
 Esempio: azionario sovrappeso, preleva €2.000 da lì
   Se ETF World (reddito capitale, plus +40%):
@@ -152,14 +153,14 @@ Esempio: azionario sovrappeso, preleva €2.000 da lì
     (per avere €2.000 netti in tasca servirebbe vendere ~€2.160)
 ```
 
-In decumulo, la **sequenza di liquidazione tax-efficient** diventa centrale: prelevare prima dalle posizioni con minor plus latente (o in minus, o compensabili con zainetto) minimizza le tasse lungo il decumulo. Lo script la calcola con il parametro `PRELIEVO` (euro netti da prelevare): vende prima dalle classi sovrappesate e con la stessa priorità fiscale delle vendite di ribilanciamento, copre anche l'imposta e non reinveste la cassa prelevata. Vedi `sequenza-liquidazione.md`.
+In decumulo, la **sequenza di liquidazione tax-efficient** diventa centrale: prelevare prima dalle posizioni in minus, poi dalla quota compensabile con lo zainetto, poi da quelle con l'imposta per euro venduto più bassa, minimizza le tasse lungo il decumulo. Lo script la calcola con il parametro `PRELIEVO` (euro netti da prelevare): vende dalle classi più sopra il target e con la stessa priorità fiscale delle vendite di ribilanciamento, una vendita per posizione, copre anche l'imposta e non reinveste la cassa prelevata. Vedi `sequenza-liquidazione.md`.
 
 ---
 
 ## Regola pratica finale
 
 1. **In accumulo**: Leva 1 (versamenti) copre la maggior parte dei ribilanciamenti a costo zero. La vendita serve solo se il drift eccede quello che i versamenti possono correggere.
-2. **Sempre**: prima di vendere in plus (Leva 4), controllare se c'è una posizione sovrappesata in minus da vendere (Leva 3) — ribilancia gratis e crea zainetto.
+2. **Sempre**: prima di vendere in plus (Leva 4), controllare se c'è una posizione sovrappesata in minus da vendere (Leva 3), in qualsiasi classe — ribilancia gratis e crea zainetto. Va eseguita per prima: la minus compensa solo le plus realizzate dopo sullo stesso broker (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027).
 3. **Regola di rientro mista**: a target se la correzione è a costo netto zero, fino a metà della banda stretta se paga imposta (e solo se il drift supera la banda larga). Mostrare entrambi i costi.
 4. **In decumulo**: i prelievi sono la leva naturale; sequenziarli per minimizzare le plus realizzate.
 5. **Coordinare di fine anno**: se ci sono minus in scadenza (31/12 del 4° anno), il ribilanciamento è il momento per realizzare plus compensabili gratuitamente.

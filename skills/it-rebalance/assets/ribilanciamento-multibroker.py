@@ -22,7 +22,17 @@ Due idee chiave, entrambe assenti nel ribilanciamento "ingenuo":
 
 3. REGOLA DI RIENTRO MISTA (OBIETTIVO_RIENTRO = "misto"): a target se la correzione è a
    costo netto zero, fino a metà della banda stretta (MARGINE_RIENTRO) per la parte che
-   paga imposta. Lo script stampa i due costi, a target e in banda.
+   paga imposta. Lo script stampa i due costi, a target e in banda. Con "target" anche la
+   parte tassata va a target (sempre solo oltre la banda larga); con "banda" anche la parte
+   a costo zero si ferma al punto di rientro.
+
+4. ORDINE DELLE LEVE SU TUTTO IL PORTAFOGLIO. Prima le minus e le posizioni senza plus di
+   tutte le classi (Leva 3), poi le quote coperte dallo zainetto, poi il resto per imposta per
+   euro venduto, plus/valore × aliquota (Leva 4): in amministrato una minus compensa solo le
+   plus realizzate dopo sullo stesso broker (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU
+   2027), quindi i CSV elencano le vendite in minus per prime. Una classe sottopesata fuori
+   banda si riempie con la cassa e con vendite a costo zero dalle classi sopra il target,
+   anche se in banda; con imposta solo se dopo la cassa il suo drift supera la banda larga.
 
 Flussi: i versamenti e i flussi in entrata entrano nel totale prima di misurare il drift
 (una classe sovrappesata oggi può essere sottopesata dopo un versamento) e vengono allocati
@@ -52,6 +62,8 @@ import os
 # Per posizione: broker, asset_class (una delle chiavi di TARGET), tipo ("diverso" o
 # "capitale"), valore e plus in euro, e se serve "aliquota" (0.26 di default; 0.125 per
 # titoli di Stato italiani e white list, enti territoriali e organismi internazionali).
+# ETF e fondi su titoli di Stato hanno una tassazione mista (aliquota effettiva tra il 12,5% e
+# il 26%) che qui non si rappresenta: indicarli al 26% sovrastima l'imposta (prudente).
 POSITIONS = [
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "capitale", "valore": 40000, "plus": 10000},
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "diverso",  "valore": 10000, "plus":  4000},
@@ -61,7 +73,8 @@ POSITIONS = [
     {"broker": "Directa", "asset_class": "monetario",      "tipo": "capitale", "valore":  8000, "plus":     0},
 ]
 # minusvalenze compensabili disponibili per broker (lo zainetto è per-intermediario), in euro
-# di minus al 26%. Quale quota scade quest'anno lo dice it-tax-optimization (importatore).
+# di minus al 26%: le minus al 12,5% valgono il 48,08% (l'importatore di it-tax-optimization
+# dà l'importo 26%-equivalente). Quale quota scade quest'anno lo dice lo stesso importatore.
 ZAINETTO = {"Fineco": 5000, "Directa": 0}
 # allocazione target (somma = 1) — INPUT dell'utente, non scelta dallo strumento
 TARGET = {"azionario": 0.60, "obbligazionario": 0.30, "monetario": 0.10}
@@ -74,7 +87,7 @@ BANDA_ASSOLUTA   = 0.05   # 5 punti percentuali
 BANDA_RELATIVA   = 0.25   # 25% del peso target
 WIDENING         = 2.0    # fattore di allargamento della banda per correzioni con imposta netta
 OBIETTIVO_RIENTRO = "misto"  # "misto": a target se costa zero, a metà banda se tassato; "target"; "banda"
-MARGINE_RIENTRO   = 0.5      # quota della banda stretta lasciata come margine nel rientro «in banda»
+MARGINE_RIENTRO   = 0.5      # punto di rientro della parte tassata: target ± MARGINE × banda stretta (0,5 = metà)
 
 # Modulazione della banda per la VOLATILITÀ della classe (rifinitura, vedi bande-dinamiche.md).
 # Idea: una banda fissa rappresenta un "segnale vs rumore" diverso a seconda della volatilità —
@@ -188,6 +201,50 @@ def quota_costo_zero(p, zain, residuo):
     return min(residuo, zain.get(p["broker"], 0.0) / (_coeff(p) * rapporto))
 
 
+def _etichetta_rientro():
+    """Come si chiama il punto di rientro della parte tassata (target + MARGINE_RIENTRO × banda stretta)."""
+    return "a metà banda" if MARGINE_RIENTRO == 0.5 else f"al {MARGINE_RIENTRO:.0%} della banda stretta"
+
+
+def piano_quote(quote, zain, residuo, totale=None, solo_costo_zero=False):
+    """Vendite [(indice, euro)] che raccolgono fino a `quote[classe]` euro per classe (e al massimo
+    `totale` in tutto) nell'ordine fiscale, su tutte le classi insieme: prima le minus e le posizioni
+    senza plus (Leva 3, ricaricano lo zainetto), poi le quote coperte dallo zainetto del broker, poi
+    il resto per imposta per euro venduto, plus/valore × aliquota (Leva 4). Aggiorna `zain` e
+    `residuo` (passare copie per simulare) e ritorna anche l'imposta."""
+    resto = {cl: q for cl, q in quote.items() if q > 0}
+    budget = float("inf") if totale is None else totale
+    vendite, tassa = [], 0.0
+
+    def costo(i):
+        p = POSITIONS[i]
+        return (p["plus"] / p["valore"] * _aliquota(p) if p["valore"] else 0.0, i)
+
+    def passata(ammessa, quanto, minimo):
+        nonlocal budget, tassa
+        idx = [i for i, p in enumerate(POSITIONS)
+               if resto.get(p["asset_class"], 0) > 0.005 and residuo[i] > 0.005 and ammessa(p)]
+        for i in sorted(idx, key=costo):
+            p = POSITIONS[i]
+            v = min(resto[p["asset_class"]], budget, quanto(i))
+            if v < 0.005 or (v < minimo and v < min(resto[p["asset_class"]], budget) - 0.005):
+                continue        # niente ordini sotto €1 per un risparmio d'imposta di centesimi
+            _, _, t, dz = effetto_vendita(p, v, zain)
+            zain[p["broker"]] = zain.get(p["broker"], 0.0) + dz
+            residuo[i] -= v
+            resto[p["asset_class"]] -= v
+            budget -= v
+            tassa += t
+            vendite.append((i, v))
+
+    passata(lambda p: p["plus"] <= 0, lambda i: residuo[i], 1.0)
+    passata(lambda p: p["plus"] > 0 and p["tipo"] == "diverso",
+            lambda i: quota_costo_zero(POSITIONS[i], zain, residuo[i]), 1.0)
+    if not solo_costo_zero:
+        passata(lambda p: True, lambda i: residuo[i], 0.0)
+    return vendite, tassa
+
+
 def pianifica():
     """Piano di ribilanciamento: dict con drift per classe, vendite, acquisti, imposta, zainetto
     residuo, allocazione risultante e prelievo. Vedi il docstring del modulo per le regole."""
@@ -198,9 +255,10 @@ def pianifica():
     if total_post <= 0:
         raise ErroreInput("il prelievo supera il patrimonio più i versamenti")
     classi = aggrega(POSITIONS)
-    zain = {b: float(v) for b, v in ZAINETTO.items()}   # zainetto mutabile per broker
+    zain = {b: float(v) for b, v in ZAINETTO.items()}   # zainetto per broker, nell'ordine delle decisioni
     residuo = [float(p["valore"]) for p in POSITIONS]   # controvalore non ancora venduto
-    sells = []
+    eventi = []             # (indice, euro, forzata, imposta, classe servita) in ordine di decisione
+    buys = {cl: 0.0 for cl in TARGET}
 
     # 1) drift e decisione di banda, sul patrimonio dopo flussi e prelievo
     drift = {}
@@ -209,111 +267,151 @@ def pianifica():
         tight, wide = banda(tw, cl)
         drift[cl] = {"peso": w, "target": tw, "drift": w - tw, "gap_eur": (w - tw) * total_post,
                      "tight": tight, "wide": wide, "fuori_banda": abs(w - tw) > tight,
-                     "residuo_non_corretto": 0.0, "motivo": "", "costo_a_target": 0.0, "costo_in_banda": 0.0}
+                     "residuo_non_corretto": 0.0, "motivo": "", "costo_a_target": 0.0, "costo_in_banda": 0.0,
+                     "esito": "", "drift_decisione": w - tw}
+
+    def gravita(cl):          # ordine deterministico, non quello delle chiavi di TARGET
+        d = drift[cl]
+        return (-abs(d["drift"]) / d["tight"] if d["tight"] else -float("inf"), cl)
 
     def venduto(cl):
-        return sum(s["vendi"] for s in sells if s["classe"] == cl)
+        return sum(e[1] for e in eventi if POSITIONS[e[0]]["asset_class"] == cl)
 
-    def esegui(i, vendi, forzata=False):
-        p = POSITIONS[i]
-        plus_real, comp, tassa, dz = effetto_vendita(p, vendi, zain)
-        zain[p["broker"]] = zain.get(p["broker"], 0.0) + dz
-        residuo[i] -= vendi
-        sells.append({"broker": p["broker"], "classe": p["asset_class"], "tipo": p["tipo"],
-                      "aliquota": _aliquota(p), "vendi": vendi, "plus_real": plus_real,
-                      "comp": comp, "tassa": tassa, "forzata": forzata})
-        return tassa
+    def valore(cl):
+        return classi.get(cl, 0) - venduto(cl) + buys[cl]
 
-    def candidati(cl):
-        """Indici delle posizioni della classe in ordine di costo fiscale: prima le minus,
-        poi le quote a costo zero (diverso con zainetto), poi per imposta per euro venduto."""
-        idx = [i for i, p in enumerate(POSITIONS) if p["asset_class"] == cl and residuo[i] > 1e-6]
-        def costo(i):
+    def cassa_libera():       # versamenti + vendite nette − prelievo − acquisti già assegnati
+        return cassa_in + sum(e[1] - e[3] for e in eventi) - PRELIEVO - sum(buys.values())
+
+    def esegui(vendite, forzata=False, serve=None):
+        incasso = 0.0
+        for i, v in vendite:
             p = POSITIONS[i]
-            if p["plus"] <= 0:
-                return (0, p["plus"] / p["valore"] if p["valore"] else 0)
-            if quota_costo_zero(p, zain, residuo[i]) > 1e-6:
-                return (1, 0)
-            return (2, p["plus"] / p["valore"] * _aliquota(p))
-        return sorted(idx, key=costo)
+            _, _, t, dz = effetto_vendita(p, v, zain)
+            zain[p["broker"]] = zain.get(p["broker"], 0.0) + dz
+            residuo[i] -= v
+            eventi.append((i, v, forzata, t, serve or p["asset_class"]))
+            incasso += v - t
+        return incasso
 
-    def costo_simulato(cl, importo):
-        """Imposta di una vendita di `importo` dalla classe, senza eseguirla."""
-        z, r, tassa = dict(zain), list(residuo), 0.0
-        for i in candidati(cl):
-            if importo <= 1e-6:
+    def lordo(netto, quote_di):
+        """Lordo da vendere perché il netto d'imposta copra `netto` (le quote dipendono dal lordo)."""
+        g = netto
+        for _ in range(60):
+            vend, t = piano_quote(quote_di(g), dict(zain), list(residuo), totale=g)
+            if sum(v for _, v in vend) < g - 0.005 or abs(netto + t - g) < 0.0005:
                 break
-            v = min(importo, r[i])
-            _, _, t, dz = effetto_vendita(POSITIONS[i], v, z)
-            z[POSITIONS[i]["broker"]] = z.get(POSITIONS[i]["broker"], 0.0) + dz
-            tassa += t
-            importo -= v
-        return tassa
+            g = netto + t
+        return g
 
-    # 2) vendite delle sovrappesate fuori banda (Leve 3 e 4), con la regola di rientro
-    for cl, d in drift.items():
-        eccesso = classi.get(cl, 0) - d["target"] * total_post     # euro sopra il target
-        if eccesso <= 1e-6 or not d["fuori_banda"]:
+    def eccedenze(esclusa=None):  # quanto le altre classi sono sopra il target, sulla base delle decisioni
+        return {c: max(0.0, valore(c) - TARGET[c] * total_post) for c in TARGET if c != esclusa}
+
+    # 2) sovrappesate fuori banda. Prima tutto ciò che è a costo zero, su tutte le classi insieme
+    #    (le minus di ogni classe prima delle plus, perché compensano solo le plus vendute dopo sullo
+    #    stesso broker); poi, classe per classe, la parte che paga imposta, solo oltre la banda larga
+    sopra = sorted((cl for cl, d in drift.items() if d["fuori_banda"] and d["gap_eur"] > 1e-6), key=gravita)
+    eccesso = {cl: drift[cl]["gap_eur"] for cl in sopra}
+    in_banda = {cl: classi.get(cl, 0) - (drift[cl]["target"] + drift[cl]["tight"] * MARGINE_RIENTRO) * total_post
+                for cl in sopra}
+    obiettivo_zero = {cl: in_banda[cl] if OBIETTIVO_RIENTRO == "banda" else eccesso[cl] for cl in sopra}
+    esegui(piano_quote(obiettivo_zero, dict(zain), list(residuo), solo_costo_zero=True)[0])
+    for cl in sopra:
+        d = drift[cl]
+        if eccesso[cl] - venduto(cl) <= 0.005:
             continue
-        in_banda = classi.get(cl, 0) - (d["target"] + d["tight"] * MARGINE_RIENTRO) * total_post
-        # prima tutto ciò che è a costo zero: minus e plus coperte dallo zainetto del broker
-        obiettivo_zero = in_banda if OBIETTIVO_RIENTRO == "banda" else eccesso
-        da_ridurre = obiettivo_zero
-        for i in candidati(cl):
-            if da_ridurre <= 1e-6:
-                break
-            v = min(da_ridurre, quota_costo_zero(POSITIONS[i], zain, residuo[i]))
-            if v > 1e-6:
-                esegui(i, v)
-                da_ridurre -= v
-        # poi la parte che paga imposta, solo oltre la banda larga
-        mancante_target = eccesso - venduto(cl)
-        if mancante_target <= 1e-6:
-            continue
-        d["costo_a_target"] = costo_simulato(cl, mancante_target)
-        d["costo_in_banda"] = costo_simulato(cl, max(0.0, in_banda - venduto(cl)))
-        if abs(d["drift"]) <= d["wide"]:
-            d["residuo_non_corretto"] = mancante_target
-            d["motivo"] = (f"vendita rinviata: imposta €{d['costo_a_target']:,.0f} con drift "
-                           f"{d['drift']*100:+.1f}% entro la banda larga {d['wide']*100:.1f}%")
-            continue
-        da_ridurre = mancante_target if OBIETTIVO_RIENTRO == "target" else max(0.0, in_banda - venduto(cl))
-        for i in candidati(cl):
-            if da_ridurre <= 1e-6:
-                break
-            v = min(da_ridurre, residuo[i])
-            esegui(i, v)
-            da_ridurre -= v
-        d["residuo_non_corretto"] = max(0.0, eccesso - venduto(cl))
-        if d["residuo_non_corretto"] > 1e-6:
-            d["motivo"] = (f"rientro a metà banda: a target costerebbe €{d['costo_a_target']:,.0f}, "
-                           f"così €{d['costo_in_banda']:,.0f}")
+        if OBIETTIVO_RIENTRO == "banda" and in_banda[cl] - venduto(cl) <= 0.005:
+            d["esito"] = "scelta"
+        elif abs(d["drift"]) <= d["wide"]:
+            d["esito"] = "rinviata"
+        else:
+            quanto = eccesso[cl] if OBIETTIVO_RIENTRO == "target" else in_banda[cl]
+            esegui(piano_quote({cl: quanto - venduto(cl)}, dict(zain), list(residuo))[0])
+            d["esito"] = "rientro"
 
     # 3) prelievo: se la cassa non basta, vendite forzate ripartite per riportare i pesi verso il
-    #    target (water-filling sulle classi più sopra il target), finché il netto copre il prelievo
-    for _ in range(20):
-        cassa = cassa_in + sum(s["vendi"] - s["tassa"] for s in sells) - PRELIEVO
-        if cassa >= -0.005:
-            break
-        valori = {cl: sum(residuo[i] for i, p in enumerate(POSITIONS) if p["asset_class"] == cl) for cl in TARGET}
-        quote = _ripartisci(valori, -cassa)
-        for cl, importo in quote.items():
-            for i in candidati(cl):
-                if importo <= 1e-6:
-                    break
-                v = min(importo, residuo[i])
-                esegui(i, v, forzata=True)
-                importo -= v
+    #    target (water-filling sulle classi più sopra il target), con lo stesso ordine fiscale; il
+    #    lordo si calcola prima, così ogni posizione esce in una sola vendita
+    mancante = -(cassa_in + sum(e[1] - e[3] for e in eventi) - PRELIEVO)
+    if mancante > 0.005:
+        def quote_prelievo(g):
+            valori = {cl: sum(residuo[i] for i, p in enumerate(POSITIONS) if p["asset_class"] == cl) for cl in TARGET}
+            q = _ripartisci(valori, g)
+            grande = max(q, key=q.get)
+            for cl in list(q):          # niente vendite sotto €1: le briciole vanno alla classe maggiore
+                if cl != grande and 0 < q[cl] < 1 and q[grande] + q[cl] <= valori[grande]:
+                    q[grande] += q[cl]
+                    q[cl] = 0.0
+            return q
+        g = lordo(mancante, quote_prelievo)
+        esegui(piano_quote(quote_prelievo(g), dict(zain), list(residuo), totale=g)[0], forzata=True)
+        netto = cassa_in + sum(e[1] - e[3] for e in eventi) - PRELIEVO
+        if netto < -0.01:
+            raise ErroreInput(f"prelievo non finanziabile: il netto massimo dopo l'imposta è "
+                              f"€{netto + PRELIEVO:,.0f} (vendendo tutto)")
+
+    # 4) sottopesate fuori banda: prima la cassa (pro-rata al fabbisogno), poi vendite a costo zero
+    #    dalle classi sopra il target (anche in banda); con imposta solo se dopo cassa e costo zero il
+    #    drift supera ancora la banda larga, e solo fino al punto di rientro
+    sotto = sorted((cl for cl, d in drift.items() if d["fuori_banda"] and d["gap_eur"] < -1e-6), key=gravita)
+
+    def obiettivo(cl):
+        quota = TARGET[cl] - (drift[cl]["tight"] * MARGINE_RIENTRO if OBIETTIVO_RIENTRO == "banda" else 0.0)
+        return quota * total_post
+
+    bisogni = {cl: obiettivo(cl) - valore(cl) for cl in sotto if obiettivo(cl) - valore(cl) > 0.005}
+    pool, tot = max(0.0, cassa_libera()), sum(bisogni.values())
+    for cl, need in bisogni.items():
+        buys[cl] += min(need, pool * need / tot)
+    for cl in sotto:
+        d = drift[cl]
+        quota_target = TARGET[cl] * total_post
+        rientro = (TARGET[cl] - d["tight"] * MARGINE_RIENTRO) * total_post
+        manca = obiettivo(cl) - valore(cl)
+        if manca > 0.005:
+            buys[cl] += esegui(piano_quote(eccedenze(cl), dict(zain), list(residuo), totale=manca,
+                                           solo_costo_zero=True)[0], serve=cl)
+        if quota_target - valore(cl) <= 0.005:
+            continue
+        d["drift_decisione"] = (valore(cl) - quota_target) / total_post
+        if OBIETTIVO_RIENTRO == "banda" and rientro - valore(cl) <= 0.005:
+            d["esito"] = "scelta"
+        elif abs(d["drift_decisione"]) <= d["wide"]:
+            d["esito"] = "rinviata"
+        else:
+            netto = (quota_target if OBIETTIVO_RIENTRO == "target" else rientro) - valore(cl)
+            if netto > 0.005:
+                g = lordo(netto, lambda _g: eccedenze(cl))
+                buys[cl] += esegui(piano_quote(eccedenze(cl), dict(zain), list(residuo), totale=g)[0], serve=cl)
+            d["esito"] = "rientro"
+
+    # 5) liquidazione: una riga per posizione, le minus prima delle plus (compensano solo le plus
+    #    successive sullo stesso broker, art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027);
+    #    effetti fiscali ricalcolati in quest'ordine, che è quello di esecuzione
+    righe = {}
+    for i, v, forzata, _, _ in eventi:
+        r = righe.setdefault(i, {"vendi": 0.0, "prelievo": 0.0})
+        r["vendi"] += v
+        r["prelievo"] += v if forzata else 0.0
+    zain = {b: float(v) for b, v in ZAINETTO.items()}
+    sells = []
+    for i in sorted(righe, key=lambda i: POSITIONS[i]["plus"] > 0):      # stabile: poi l'ordine delle decisioni
+        p, r = POSITIONS[i], righe[i]
+        plus_real, comp, tassa, dz = effetto_vendita(p, r["vendi"], zain)
+        zain[p["broker"]] = zain.get(p["broker"], 0.0) + dz
+        sells.append({"broker": p["broker"], "classe": p["asset_class"], "tipo": p["tipo"],
+                      "aliquota": _aliquota(p), "vendi": r["vendi"], "plus_real": plus_real, "comp": comp,
+                      "tassa": tassa, "zainetto": dz, "prelievo": r["prelievo"],
+                      "forzata": r["prelievo"] >= r["vendi"] - 0.005})
     tax_tot = sum(s["tassa"] for s in sells)
 
-    # 4) cassa netta (versamenti + vendite − imposta − prelievo) verso le sottopesate:
+    # 6) cassa netta (versamenti + vendite − imposta − prelievo) verso le sottopesate:
     #    prima quelle fuori banda, poi le altre, fino al target; l'eventuale resto pro-rata al target
-    cassa = max(0.0, cassa_in + sum(s["vendi"] - s["tassa"] for s in sells) - PRELIEVO)
+    cassa = max(0.0, cassa_in + sum(s["vendi"] - s["tassa"] for s in sells) - PRELIEVO - sum(buys.values()))
     total_finale = total + cassa_in - PRELIEVO - tax_tot
-    buys = {cl: 0.0 for cl in TARGET}
 
     def manca(cl):
-        return TARGET[cl] * total_finale - (classi.get(cl, 0) - venduto(cl) + buys[cl])
+        return TARGET[cl] * total_finale - valore(cl)
     for gruppo in ([cl for cl in TARGET if drift[cl]["fuori_banda"]], list(TARGET)):
         bisogni = {cl: manca(cl) for cl in gruppo if manca(cl) > 1e-6}
         tot = sum(bisogni.values())
@@ -326,10 +424,62 @@ def pianifica():
         for cl, tw in TARGET.items():
             buys[cl] += cassa * tw
 
-    risultante = {cl: (classi.get(cl, 0) - venduto(cl) + buys[cl]) / total_finale for cl in TARGET}
+    # 7) residui dopo tutte le vendite (prelievo compreso), con il costo di completare la correzione
+    #    dallo stato finale; i costi stampati comprendono l'imposta già pagata dalla classe. Una
+    #    sovrappesata si misura sulla base delle decisioni (dopo flussi e prelievo); una sottopesata
+    #    sul patrimonio finale, perché l'imposta pagata esce dal portafoglio e non è un sottopeso
+    residuo_fin = [float(p["valore"]) for p in POSITIONS]
+    for i, r in righe.items():
+        residuo_fin[i] -= r["vendi"]
+    for cl, d in drift.items():
+        if not d["fuori_banda"]:
+            continue
+        if d["gap_eur"] > 0:
+            scarto = valore(cl) - TARGET[cl] * total_post
+            margine = d["tight"] * MARGINE_RIENTRO * total_post
+            res, res_banda = max(0.0, scarto), max(0.0, scarto - margine)
+            simula = lambda x: piano_quote({cl: x}, dict(zain), list(residuo_fin))[1]
+        else:
+            scarto = valore(cl) - TARGET[cl] * total_finale
+            margine = d["tight"] * MARGINE_RIENTRO * total_finale
+            res, res_banda = max(0.0, -scarto), max(0.0, -scarto - margine)
+            simula = lambda x: piano_quote(eccedenze(cl), dict(zain), list(residuo_fin), totale=x)[1]
+        # imposta delle vendite fatte per questa classe (le sue, o quelle che hanno riempito il suo sottopeso)
+        pagata = sum(e[3] for e in eventi if e[4] == cl and not e[2])
+        d["costo_a_target"] = pagata + (simula(res) if res > 0.5 else 0.0)
+        d["costo_in_banda"] = pagata + (simula(res_banda) if res_banda > 0.5 else 0.0)
+        if res <= 0.5:
+            continue
+        d["residuo_non_corretto"] = res
+        etichetta, deriva = _etichetta_rientro(), d["drift_decisione"] * 100
+        if d["esito"] == "scelta":
+            d["motivo"] = (f"fermato {etichetta} per scelta (OBIETTIVO_RIENTRO «banda»): a target "
+                           f"costerebbe altri €{d['costo_a_target'] - pagata:,.0f}")
+        elif d["esito"] == "rinviata":
+            costo = d["costo_in_banda"] if OBIETTIVO_RIENTRO == "banda" else d["costo_a_target"]
+            d["motivo"] = (f"vendita rinviata: imposta €{costo - pagata:,.0f} con drift {deriva:+.1f}% "
+                           f"entro la banda larga {d['wide']*100:.1f}%")
+            if OBIETTIVO_RIENTRO == "banda":
+                d["motivo"] += f"; tra il rientro {etichetta} e il target resta per scelta (OBIETTIVO_RIENTRO «banda»)"
+        elif d["esito"] == "rientro" and OBIETTIVO_RIENTRO == "target":
+            d["motivo"] = (f"rientro a target con imposta €{pagata:,.0f} (drift {deriva:+.1f}% oltre la banda "
+                           f"larga {d['wide']*100:.1f}%): lo scostamento che resta viene dall'imposta pagata, "
+                           f"che esce dal portafoglio")
+        elif d["esito"] == "rientro":
+            d["motivo"] = (f"rientro {etichetta} (drift {deriva:+.1f}% oltre la banda larga "
+                           f"{d['wide']*100:.1f}%): a target costerebbe €{d['costo_a_target']:,.0f}, "
+                           f"così €{d['costo_in_banda']:,.0f}")
+        else:
+            d["motivo"] = "scostamento rimasto dopo il prelievo e l'imposta"
+        per_prelievo = sum(s["prelievo"] for s in sells if s["classe"] == cl)
+        if per_prelievo > 0.5:
+            d["motivo"] += f"; €{per_prelievo:,.0f} già venduti per il prelievo"
+
+    liquidato = total_finale <= 0.005
+    risultante = {cl: 0.0 if liquidato else valore(cl) / total_finale for cl in TARGET}
     return {"totale": total, "totale_post": total_post, "drift": drift, "acquisti": buys,
             "vendite": sells, "imposta": tax_tot, "zainetto": zain, "risultante": risultante,
-            "prelievo": PRELIEVO, "entrate": cassa_in}
+            "prelievo": PRELIEVO, "entrate": cassa_in, "liquidato": liquidato}
 
 
 def _ripartisci(valori, importo):
@@ -353,6 +503,25 @@ NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non
             "sul portale del broker prima di operare.")
 
 
+def effetto_fiscale(s):
+    """Effetto fiscale di una vendita del piano, con il consumo reale dello zainetto (al 48,08% per
+    le plus e minus al 12,5%) e l'avviso d'ordine per le minus."""
+    al_12_5 = s["aliquota"] == 0.125
+    if s["plus_real"] < 0:
+        testo = f"minus €{-s['plus_real']:,.0f} a zainetto {s['broker']}"
+        if al_12_5:
+            testo += f" (vale €{s['zainetto']:,.0f} di zainetto: minus al 12,5% computata al 48,08%)"
+        return testo + ", da eseguire prima delle vendite in plus"
+    if s["comp"] > 0:
+        testo = f"plus €{s['plus_real']:,.0f} compensata €{s['comp']:,.0f} dallo zainetto {s['broker']}"
+        if al_12_5:
+            testo += f" (consuma €{-s['zainetto']:,.0f} di zainetto: plus al 12,5% computata al 48,08%)"
+        if s["plus_real"] - s["comp"] > 0.005:
+            testo += f", il resto €{s['plus_real'] - s['comp']:,.0f} TASSATO"
+        return testo
+    return f"plus €{s['plus_real']:,.0f} TASSATA (no zainetto compensabile qui)"
+
+
 def genera_ordini(plan):
     """Trasforma il piano in una lista di ordini ESEGUIBILI per broker, instradando la cassa.
     Le vendite sono già specifiche per broker (con l'effetto fiscale). Gli acquisti e il prelievo
@@ -362,17 +531,15 @@ def genera_ordini(plan):
     intermediari (che richiederebbero giorni)."""
     ordini = []
 
-    # VENDITE — già per broker, con annotazione fiscale
+    # VENDITE — già per broker e nell'ordine di esecuzione (le minus prima delle plus), con l'effetto fiscale
     for s in plan["vendite"]:
-        motivo = "finanzia il prelievo" if s["forzata"] else f"riduce sovrappeso {s['classe']}"
-        if s["plus_real"] > 0 and s["comp"] > 0:
-            nota = f"{motivo}; plus €{s['plus_real']:,.0f} compensata con zainetto {s['broker']}"
-        elif s["plus_real"] > 0:
-            nota = f"{motivo}; plus €{s['plus_real']:,.0f} TASSATA (no zainetto compensabile qui)"
-        elif s["plus_real"] < 0:
-            nota = f"{motivo}; minus €{-s['plus_real']:,.0f} a zainetto {s['broker']}"
+        if s["forzata"]:
+            motivo = "finanzia il prelievo"
+        elif s["prelievo"] > 0.005:
+            motivo = f"riduce sovrappeso {s['classe']}; €{s['prelievo']:,.0f} finanziano il prelievo"
         else:
-            nota = motivo
+            motivo = f"riduce sovrappeso {s['classe']}"
+        nota = f"{motivo}; {effetto_fiscale(s)}" if s["plus_real"] else motivo
         ordini.append({"broker": s["broker"], "operazione": "VENDITA", "classe": s["classe"],
                        "tipo_fiscale": s["tipo"], "importo_eur": round(s["vendi"], 2),
                        "plus_minus_eur": round(s["plus_real"], 2), "imposta_eur": round(s["tassa"], 2),
@@ -402,7 +569,12 @@ def genera_ordini(plan):
 
     # PRELIEVO prima degli acquisti: è il motivo delle vendite forzate
     if plan["prelievo"] > 0:
-        preleva(plan["prelievo"], "PRELIEVO", "", "bonifico del prelievo netto sul conto corrente")
+        rimanente = preleva(plan["prelievo"], "PRELIEVO", "", "bonifico del prelievo netto sul conto corrente")
+        if rimanente > 0.005:   # difesa: pianifica() rifiuta i prelievi non finanziabili
+            ordini.append({"broker": "(da finanziare)", "operazione": "PRELIEVO", "classe": "",
+                           "tipo_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
+                           "imposta_eur": "", "compensazione_zainetto_eur": "",
+                           "nota": "prelievo non coperto dalla cassa netta dei broker"})
     # ACQUISTI — instradati sui broker che hanno cassa
     for cl, amt in plan["acquisti"].items():
         if amt <= 1e-6:
@@ -419,6 +591,8 @@ def genera_ordini(plan):
 def scrivi_csv_per_broker(ordini, cartella=None):
     """Scrive un CSV per broker nella cartella indicata. Ritorna la lista (path, n_righe)."""
     cartella = cartella or CARTELLA_OUTPUT
+    if not ordini:
+        return []
     os.makedirs(cartella, exist_ok=True)
     scritti = []
     for b in sorted({o["broker"] for o in ordini}):
@@ -444,8 +618,9 @@ def stampa(plan):
         print(f"   pesi e gap misurati su €{plan['totale_post']:,.0f}: versamenti e flussi "
               f"+€{plan['entrate']:,.0f}, prelievo −€{plan['prelievo']:,.0f}")
 
-    regola = {"misto": "a target se costa zero, a metà banda se tassato", "target": "a target",
-              "banda": "a metà banda"}[OBIETTIVO_RIENTRO]
+    etichetta = _etichetta_rientro()
+    regola = {"misto": f"a target se costa zero, {etichetta} se tassato", "target": "a target",
+              "banda": etichetta}[OBIETTIVO_RIENTRO]
     print(f"\n1) DRIFT E BANDE DINAMICHE (regola 5/25, allargamento ×{WIDENING:g} se l'imposta morde; "
           f"rientro: {regola})")
     print(f"{'Classe':<18}{'Peso':>8}{'Target':>8}{'Drift':>8}{'B.stretta':>11}{'B.larga':>10}  Decisione")
@@ -456,23 +631,21 @@ def stampa(plan):
         print(f"{cl:<18}{d['peso']*100:>7.1f}%{d['target']*100:>7.0f}%{d['drift']*100:>+7.1f}%"
               f"{d['tight']*100:>10.1f}%{d['wide']*100:>9.1f}%  {dec}")
 
-    print(f"\n2) PIANO — vendite (ottimizzate per broker e tipo fiscale)")
+    print(f"\n2) PIANO — vendite (ottimizzate per broker e tipo fiscale; da eseguire nell'ordine "
+          f"elencato, le minus prima delle plus)")
     rinviati = {cl: d for cl, d in drift.items() if d["residuo_non_corretto"] > 1e-6}
     if not plan["vendite"]:
         if rinviati:
             print("   nessuna vendita eseguita: le correzioni residue sono rinviate (vedi sotto)")
+        elif any(d["fuori_banda"] for d in drift.values()):
+            print("   nessuna vendita necessaria: le classi fuori banda si correggono con versamenti e flussi")
         else:
-            print("   nessuna vendita necessaria (corretto con i soli flussi, o tutto in banda)")
+            print("   nessuna vendita necessaria: tutte le classi sono in banda")
     for s in plan["vendite"]:
-        nota = ""
-        if s["comp"] > 0:
-            nota = f"  → plus €{s['plus_real']:,.0f} compensata €{s['comp']:,.0f} dallo zainetto {s['broker']}"
-        elif s["plus_real"] > 0:
-            nota = f"  → plus €{s['plus_real']:,.0f} TASSATA (no zainetto compensabile qui)"
-        elif s["plus_real"] < 0:
-            nota = f"  → minus €{-s['plus_real']:,.0f} a zainetto {s['broker']}"
+        nota = f"  → {effetto_fiscale(s)}" if s["plus_real"] else ""
         aliq = "" if s["aliquota"] == 0.26 else " (12,5%)"
-        motivo = "  [prelievo]" if s["forzata"] else ""
+        motivo = "  [prelievo]" if s["forzata"] else (f"  [€{s['prelievo']:,.0f} per il prelievo]"
+                                                       if s["prelievo"] > 0.005 else "")
         print(f"   VENDI €{s['vendi']:,.0f} {s['classe']}/{s['tipo']}{aliq} @ {s['broker']}"
               f"  | imposta €{s['tassa']:,.0f}{nota}{motivo}")
     for cl, d in rinviati.items():
@@ -480,9 +653,11 @@ def stampa(plan):
     for cl, d in drift.items():
         if d["costo_a_target"] > 1e-6 or d["costo_in_banda"] > 1e-6:
             print(f"   {cl}: costo fiscale della parte tassata a target €{d['costo_a_target']:,.0f}, "
-                  f"a metà banda €{d['costo_in_banda']:,.0f}")
+                  f"{etichetta} €{d['costo_in_banda']:,.0f}")
 
     print(f"\n   acquisti (riempimento sottopesate; broker a scelta, neutro ai fini fiscali)")
+    if not any(q > 0.5 for q in plan["acquisti"].values()):
+        print("   nessun acquisto")
     for cl, q in plan["acquisti"].items():
         if q > 1e-6:
             print(f"   COMPRA €{q:,.0f} {cl}")
@@ -492,10 +667,14 @@ def stampa(plan):
           ", ".join(f"{b} €{v:,.0f}" for b, v in plan["zainetto"].items()))
     if plan["prelievo"]:
         lordo = sum(s["vendi"] for s in plan["vendite"])
+        reinvestito = sum(plan["acquisti"].values())
         print(f"   vendite lorde €{lordo:,.0f}, imposta €{plan['imposta']:,.0f}, "
-              f"netto prelevato €{plan['prelievo']:,.0f} (il resto è reinvestito)")
+              f"netto prelevato €{plan['prelievo']:,.0f}"
+              + (f" (€{reinvestito:,.0f} reinvestiti)" if reinvestito > 0.5 else ""))
 
     print(f"\n4) ALLOCAZIONE RISULTANTE vs TARGET")
+    if plan["liquidato"]:
+        print("   portafoglio interamente liquidato dal prelievo")
     for cl in TARGET:
         print(f"   {cl:<18}{plan['risultante'][cl]*100:>6.1f}%  (target {TARGET[cl]*100:.0f}%)")
     print()
@@ -518,6 +697,11 @@ def main():
 
 def esporta_ordini(plan):
     ordini = genera_ordini(plan)
+    if not ordini:
+        print("5) NESSUN ORDINE DA ESPORTARE — le correzioni sono rinviate (vedi la sezione 2) o non "
+              "necessarie; nessun CSV generato")
+        print()
+        return
     scritti = scrivi_csv_per_broker(ordini)
     print(f"5) ORDINI ESPORTATI — un CSV per broker in ./{CARTELLA_OUTPUT}/")
     for path, n in scritti:
@@ -551,4 +735,9 @@ if __name__ == "__main__":
 # è esattamente ciò che la doppia ottimizzazione (broker + tipo) evita.
 # Varianti asserite: NUOVI_VERSAMENTI=20000 → nessuna vendita, €20.000 allocati, 60/30/10;
 # zainetto Fineco 2000 → vendita €5.000 a imposta zero, residuo €3.000 rinviato;
-# PRELIEVO=10000 → vendite lorde = 10.000 + imposta + acquisti.
+# zainetto 0 → nessuna vendita, residuo €8.000 rinviato e stampato, nessun CSV;
+# OBIETTIVO_RIENTRO="banda" → vendita €5.500 a imposta zero, il resto fermo per scelta;
+# TARGET 64/21/15 (solo il monetario fuori banda, sottopeso) → €3.000 di obbligazionario in
+# minus e €4.000 di azionario «diverso» Fineco venduti a costo zero, monetario a target;
+# PRELIEVO=10000 → vendite lorde = 10.000 + imposta + acquisti, una riga per posizione;
+# PRELIEVO oltre il netto di liquidazione (€96.620) → errore nei parametri.

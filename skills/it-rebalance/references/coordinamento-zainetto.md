@@ -58,10 +58,14 @@ candidati_ottimali = posizioni che sono:
     - categoria reddito_diverso (compensabile)   [da it-tax-optimization]
 
 per candidato in candidati_ottimali:
-    plus_da_realizzare = min(
+    vendita = min(
         importo_da_vendere_per_ribilanciare,
-        zainetto_in_scadenza_disponibile / (plus_unitaria)
+        zainetto_in_scadenza_disponibile / (plus_per_euro_venduto × coeff)
     )
+    # plus_per_euro_venduto = plus latente / controvalore (sul prezzo medio di carico)
+    # coeff = 1 al 26%; 0,4808 per titoli di Stato e white list al 12,5%, la cui plus
+    # consuma lo zainetto al 48,08% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027,
+    # nel testo dell'art. 3 c. 5 DL 66/2014)
     → questa vendita ribilancia E consuma zainetto in scadenza
     → tassa netta = 0 (compensata) fino a esaurimento zainetto
 ```
@@ -73,12 +77,15 @@ Ordine consigliato delle vendite di fine anno:
 ```
 1. PRIMA: vendi le posizioni sovrappesate in plus su reddito_diverso,
    fino a consumare lo zainetto in scadenza
-   → ribilancia + compensa minus morente, tassa zero
+   → ribilancia + compensa minus morente, tassa zero: è una correzione a costo
+     zero, quindi va fino al target già oltre la banda stretta
 
 2. POI: se serve ancora ribilanciare e lo zainetto in scadenza è esaurito,
    valuta:
    a. posizioni sovrappesate in minus (Leva 3) → crea nuovo zainetto
-   b. posizioni sovrappesate in plus, accettando la tassa (Leva 4)
+   b. posizioni sovrappesate in plus che pagano imposta (Leva 4): solo se il drift
+      della classe supera la banda larga (×2 la 5/25), e solo fino a metà banda;
+      altrimenti si rinvia e il residuo si dichiara con il suo costo (bande-dinamiche.md)
 
 3. INFINE: reinvesti i ricavati nelle classi sottopesate
 ```
@@ -93,10 +100,13 @@ Ordine consigliato delle vendite di fine anno:
 **Senza coordinamento** (ribilanciare a gennaio 2027):
 ```
 Lo zainetto 2022 (€3.000) evapora il 1/1/2027 → perso
-A gennaio vendo €8.400 di azioni FTSE MIB per ribilanciare
-  plus realizzata = €8.400 × (4.000/15.000) = €2.240
-  tassa 26% = €582 (nessuna compensazione, zainetto già perso)
-COSTO: €582 di tasse + €3.000 di zainetto buttato
+A gennaio la correzione pagherebbe imposta: vendere €8.400 di azioni FTSE MIB
+  realizza €8.400 × (4.000/15.000) = €2.240 di plus → tassa 26% = €582
+  (fino a metà banda: €5.400 venduti, plus €1.440, tassa €374)
+Il drift +7% è sotto la banda larga (10%): la vendita tassata si rinvia,
+  il residuo di €8.400 si dichiara con il suo costo e il drift resta aperto
+  finché versamenti o flussi non lo correggono
+COSTO: drift non corretto + €3.000 di zainetto buttato
 ```
 
 **Con coordinamento** (ribilanciare a dicembre 2026):
@@ -112,12 +122,12 @@ Reinvesto €8.400 nell'obbligazionario sottopeso
 COSTO: €0 di tasse, zainetto sfruttato invece che perso
 ```
 
-**Risparmio dal coordinamento: €582 di tasse + recupero di €2.240 di zainetto che sarebbe evaporato.** Stesso ribilanciamento, tempistica diversa, e l'uso congiunto delle due skill.
+**Vantaggio del coordinamento: il drift si corregge subito, fino al target, a costo zero, e si usano €2.240 dei €3.000 di zainetto prima che evaporino.** La plus realizzata a dicembre non paga i €582 che costerebbe realizzarla più avanti senza zainetto; il residuo di €760 resta disponibile per altre plus entro il 31/12. Stesso ribilanciamento, tempistica diversa, e l'uso congiunto delle due skill.
 
 ## Caveat e regole
 
 - ⚠️ **La compensazione è per-broker**: lo zainetto e le plus devono stare sullo stesso intermediario. Se la posizione sovrappesata da vendere è su un broker diverso da quello dove c'è lo zainetto in scadenza, non c'è compensazione automatica (vedi `it-tax-optimization/references/multi-intermediario.md`).
-- ⚠️ **Solo reddito diverso compensa**: se la posizione sovrappesata in plus è un ETF UCITS armonizzato, la sua plus è reddito di capitale e **non** compensa lo zainetto. In quel caso il coordinamento non aiuta: meglio cercare un'altra posizione sovrappesata su reddito diverso, o accettare che il ribilanciamento di quella specifica posizione costi la tassa piena.
+- ⚠️ **Solo reddito diverso compensa**: se la posizione sovrappesata in plus è un ETF UCITS armonizzato, la sua plus è reddito di capitale e **non** compensa lo zainetto. In quel caso il coordinamento non aiuta: meglio cercare un'altra posizione sovrappesata su reddito diverso, o accettare che la vendita di quella posizione paghi la tassa piena, con le regole della Leva 4: solo oltre la banda larga e fino a metà banda.
 - ⚠️ **Non forzare il ribilanciamento solo per usare lo zainetto**: se il portafoglio è dentro banda, non vendere solo per compensare. Per il puro uso dello zainetto in scadenza senza ribilanciamento, è `it-tax-optimization` a gestirlo (può suggerire vendita + riacquisto immediato dello stesso strumento, legittimo in Italia, per realizzare plus compensabile senza cambiare l'allocazione).
 - ⚠️ **Cut-off operativo**: le vendite vanno eseguite con valuta entro il 31/12. Considerare i tempi di regolamento (T+2 sui mercati azionari) — una vendita il 30/12 potrebbe regolare nel nuovo anno. Verificare il cut-off del broker, tipicamente metà dicembre per sicurezza.
 
