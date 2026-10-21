@@ -10,3 +10,7 @@ ordini/
 
 # zip di release costruiti da scripts/pacchetto.py
 dist/
+
+# Claude Code: impostazioni locali e worktree degli agenti
+.claude/settings.local.json
+.claude/worktrees/

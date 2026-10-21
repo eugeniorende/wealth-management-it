@@ -937,29 +937,81 @@ def t_ponte():
     assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
-@test("cruscotto TWR: con meno righe compilate le celle restano vuote, non −100%")
-def t_twr_parziale():
-    # REGRESSIONE F049 (b): le righe senza valore davano rendimento −100% e azzeravano l'indice.
+@test("cruscotto TWR: ultima riga dinamica (5 o 14 rilevazioni), righe vuote senza −100%")
+def t_twr_dinamico():
+    # REGRESSIONE F049: il foglio funzionava solo con 13 righe esatte (meno → −100%,
+    # di più → TWR, XIRR e flusso terminale fermi alla riga 18).
+    import datetime
     from openpyxl import load_workbook
     mod = ricalcolatore()
     tmp = tempfile.mkdtemp()
     try:
-        copia = os.path.join(tmp, "cruscotto.xlsx")
-        wb = load_workbook(asset("it-revisione", "cruscotto-patrimoniale.xlsx"))
-        ws = wb["Rendimento TWR"]
+        orig = asset("it-revisione", "cruscotto-patrimoniale.xlsx")
+        corta, lunga = os.path.join(tmp, "corta.xlsx"), os.path.join(tmp, "lunga.xlsx")
+        wb = load_workbook(orig)
         for r in range(11, 19):  # compilati solo i primi 5 mesi
             for col in "ABC":
-                ws[f"{col}{r}"] = None
-        wb.save(copia)
-        (out,) = mod.ricalcola([copia], os.path.join(tmp, "out"))
-        ws = load_workbook(out, data_only=True)["Rendimento TWR"]
-        assert ws["E10"].value and ws["E10"].value > 0.5, f"indice dei mesi compilati alterato: {ws['E10'].value}"
+                wb["Rendimento TWR"][f"{col}{r}"] = None
+        wb.save(corta)
+        wb = load_workbook(orig)
+        ws = wb["Rendimento TWR"]
+        ws["A19"], ws["B19"], ws["C19"] = datetime.datetime(2026, 2, 1), 90500, 750
+        wb.save(lunga)
+        out_corta, out_lunga = mod.ricalcola([corta, lunga], os.path.join(tmp, "out"))
+        c = load_workbook(out_corta, data_only=True)["Rendimento TWR"]
+        assert c["I5"].value == 5, f"rilevazioni contate: {c['I5'].value!r}"
+        assert abs(c["I6"].value - (c["E10"].value - 1)) < 1e-9, "TWR non legge l'ultima riga compilata"
+        assert isinstance(c["I9"].value, float), f"XIRR su 5 righe: {c['I9'].value!r}"
         for r in range(11, 19):
-            for col in "DE":
-                assert ws[f"{col}{r}"].value in (None, ""), f"{col}{r} = {ws[f'{col}{r}'].value!r} su riga vuota"
-        assert ws["B20"].value in (None, ""), f"TWR su serie incompleta: {ws['B20'].value!r}"
+            for col in "DEF":
+                assert c[f"{col}{r}"].value in (None, ""), f"{col}{r} = {c[f'{col}{r}'].value!r} su riga vuota"
+        lw = load_workbook(out_lunga, data_only=True)["Rendimento TWR"]
+        assert lw["I5"].value == 14 and abs(lw["I6"].value - (lw["E19"].value - 1)) < 1e-9, "la 14ª riga non entra"
+        assert lw["F18"].value == -750 and lw["F19"].value == -750 + 90500, "flusso terminale non spostato"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("cruscotto: Leggimi, Sintesi con soglia per priorità, bande 5/25, costi e riga ISC")
+def t_cruscotto_revisione():
+    # REGRESSIONE F064 (soglie fisse 70/50), F030 (banda ±5 uguale per tutte le classi),
+    # F050 (nessun controllo dei costi), F049 (limiti non dichiarati).
+    from openpyxl import load_workbook
+    wb = load_workbook(xlsx_ricalcolati()[asset("it-revisione", "cruscotto-patrimoniale.xlsx")], data_only=True)
+    assert wb.sheetnames[0] == "Leggimi", f"fogli: {wb.sheetnames}"
+    assert any("120" in str(c.value) for r in wb["Leggimi"].iter_rows() for c in r), "Leggimi senza i limiti"
+    s = wb["Sintesi"]
+    assert (s["G5"].value, s["H5"].value) == ("Priorità", "Soglia"), (s["G5"].value, s["H5"].value)
+    assert s["F6"].value == "On track" and s["F7"].value == "A rischio", (s["F6"].value, s["F7"].value)
+    a = wb["Allocazione"]
+    assert a["F5"].value == 0.05 and abs(a["F7"].value - 0.0375) < 1e-12, (a["F5"].value, a["F7"].value)
+    assert str(a["E9"].value).startswith("Sottopeso"), f"alternativi 0% vs target 5%: {a['E9'].value!r}"
+    an = wb["Andamento"]
+    etichette = {str(an[f"A{r}"].value): r for r in range(1, 40) if an[f"A{r}"].value}
+    assert any(e.startswith("COSTI DELL'ANNO") for e in etichette), "blocco costi assente"
+    bollo = next(r for e, r in etichette.items() if e.startswith("Bollo"))
+    assert abs(an[f"B{bollo}"].value - 88000 * 0.002) < 1e-9, f"bollo: {an[f'B{bollo}'].value!r}"
+    assert any("ISC" in str(wb["Azioni"][f"A{r}"].value) for r in range(5, 12)), "manca la riga demo sull'ISC"
+
+
+@test("bande di ribilanciamento: regola 5/25 in cruscotto, tracker e IPS")
+def t_bande_5_25():
+    # REGRESSIONE F030: stesso portafoglio «in banda» nel cruscotto e fuori banda nello script.
+    from openpyxl import load_workbook
+    def formula(nome, foglio, cella):
+        return str(load_workbook(asset("it-revisione", nome))[foglio][cella].value)
+    assert "MIN($B$12" in formula("cruscotto-patrimoniale.xlsx", "Allocazione", "F5")
+    assert "MIN(Impostazioni!$B$14" in formula("tracker-secchielli.xlsx", "Controllo", "F15")
+    assert "MIN(0.05" in formula("investment-policy-statement.xlsx", "IPS", "C21")
+
+
+@test("revisione: costi dell'anno nel metodo e nel template, nessun percorso di sandbox")
+def t_revisione_testi():
+    cartella = os.path.join(SKILLS, "it-revisione")
+    for rel in ("references/metodo-revisione.md", "assets/template-revisione.md"):
+        assert "Costi dell'anno" in open(os.path.join(cartella, rel), encoding="utf-8").read(), rel
+    assert "/mnt/skills" not in open(os.path.join(cartella, "SKILL.md"), encoding="utf-8").read(), \
+        "SKILL.md cita ancora recalc.py del sandbox claude.ai"
 
 
 @test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")
@@ -1231,6 +1283,7 @@ def t_pacchetto():
         radice = "wealth-management-it/"
         assert all(n.startswith(radice) for n in nomi), "tutto deve stare sotto wealth-management-it/"
         for atteso in (radice + ".claude-plugin/plugin.json", radice + "README.md",
+                       radice + "LICENSE", radice + "NOTICE",  # Apache-2.0 §4: licenza e attribuzione
                        radice + "commands/pensione.md",
                        radice + "skills/it-tax-optimization/SKILL.md",
                        radice + "skills/it-pianificazione/assets/proiezione-inps.py"):
