@@ -57,7 +57,9 @@ TASSA_PLUS_DOSSIER = 0.26         # plusvalenze nel dossier (alla realizzazione)
 TASSA_PLUS_PIR = 0.00             # plusvalenze nel PIR dopo 5 anni
 
 # Scenario PENSIONE (il fondo pensione è vincolato → si valuta sull'obiettivo pensione, non sui goal a scadenza)
-CONTRIBUTO_ANNUO_FP = 5300        # versamento annuo deducibile (max deducibile 2026: €5.300)
+CONTRIBUTO_ANNUO_FP = 5300        # versamento annuo deducibile del lavoratore (plafond 2026: €5.300).
+                                  # Il plafond è condiviso con il contributo del datore e con il dovuto
+                                  # da CCNL: con un datore qui va lo spazio residuo (5.300 − datore − dovuto)
 ANNI_A_PENSIONE = 30             # anni al pensionamento
 
 # Rendimento LORDO di mercato (prima di costi e imposte), uguale per tutti i contenitori.
@@ -221,6 +223,7 @@ def main():
     print("\n" + "-" * 80)
     print(f"1) FONDO PENSIONE vs DOSSIER  —  €{CONTRIBUTO_ANNUO_FP:,}/anno per {ANNI_A_PENSIONE} anni "
           f"@ {r_pensione*100:.1f}% lordo".replace(",", "."))
+    print("   deducibile per intero solo se il datore non versa: il plafond di €5.300 è condiviso col datore")
     print("-" * 80)
 
     c = CONTRIBUTO_ANNUO_FP

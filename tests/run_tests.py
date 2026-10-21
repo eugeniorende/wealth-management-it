@@ -2480,6 +2480,20 @@ def t_ponte():
     assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
+@test("obiettivi: il fondo pensione al plafond di €5.300 presuppone nessun contributo del datore (plafond condiviso)")
+def t_obiettivi_plafond_condiviso():
+    # Nota del § 4 dell'handoff (dopo T4 e T8): «€5.300 al 33%» vale solo senza contributo del datore,
+    # che conta nel plafond insieme al dovuto del lavoratore (art. 8 c. 4 D.Lgs. 252/2005).
+    cartella = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    for rel in ("SKILL.md", "references/asset-location.md", "assets/asset-location-optimizer.py"):
+        testo = open(os.path.join(cartella, rel), encoding="utf-8").read()
+        for par in testo.split("\n\n"):
+            if re.search(r"5\.300|CONTRIBUTO_ANNUO_FP = 5300", par):
+                assert "datore" in par, f"{rel}: €5.300 senza dire che il plafond è condiviso col datore: {par.strip()[:90]}"
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"))
+    assert rc == 0 and re.search(r"plafond[^\n]*datore", out), "lo stdout deve ricordare il plafond condiviso"
+
+
 @test("cruscotto TWR: ultima riga dinamica (5 o 14 rilevazioni), righe vuote senza −100%")
 def t_twr_dinamico():
     # REGRESSIONE F049: il foglio funzionava solo con 13 righe esatte (meno → −100%,
