@@ -14,7 +14,7 @@ Per finanziare il prelievo annuo, attingere in quest'ordine:
    - prima le posizioni in **minus** (Leva 3): zero/negativo, alimentano lo zainetto;
    - poi le posizioni a **plus latente minore** in proporzione al valore (sul prezzo medio di carico);
    - usando lo **zainetto** per compensare le plus, con l'ottimizzazione **broker × tipo fiscale** (vendere reddito diverso presso il broker con zainetto, mai dare per scontata la compensazione cross-broker — vedi `ribilanciamento-multibroker.md`).
-   Lo strumento `assets/ribilanciamento-multibroker.py` calcola direttamente questa sequenza: basta impostare la "riduzione" richiesta pari all'importo da liquidare.
+   Lo strumento `assets/ribilanciamento-multibroker.py` calcola direttamente questa sequenza: basta impostare `PRELIEVO` pari all'importo netto da prelevare. Le vendite partono dalle classi sovrappesate, con la priorità fiscale qui sopra, coprono anche l'imposta, e la cassa prelevata non si reinveste; il report mostra vendite lorde, imposta e netto prelevato.
 
    **Finalità successoria.** Per azioni e obbligazioni detenute direttamente gli eredi ricevono come costo il valore di successione: la plusvalenza latente si azzera. Se una parte del dossier è destinata agli eredi, le posizioni dirette con la plusvalenza latente più alta sono le ultime da vendere. Per fondi ed ETF il testo vigente tratta l'intestazione agli eredi come una cessione: da verificare. Vedi `it-tax-optimization/references/successione-donazione.md`.
 

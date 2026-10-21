@@ -34,7 +34,7 @@ L'IPS non si riscrive a ogni revisione: si **rivede** annualmente e si **modific
 >
 > **3. Allocazione strategica.** Aggregata: [—]% azionario / [—]% obbligazionario / [—]% liquidità / [altro]. Per obiettivo: [obiettivo → profilo]. Glide path: [finestra di de-risking e atterraggio].
 >
-> **4. Ribilanciamento.** Bande: regola 5/25 (minore tra 5 punti assoluti e 25% relativi), allargata quando correggere costa imposta. Sempre a costo fiscale minimo (flussi prima delle vendite; minus prima delle plus; zainetto per compensare).
+> **4. Ribilanciamento.** Bande: regola 5/25 (minore tra 5 punti assoluti e 25% relativi), allargata quando correggere costa imposta. Sempre a costo fiscale minimo (flussi prima delle vendite; minus prima delle plus; zainetto per compensare). Rientro a target se la correzione costa zero, a metà banda per la parte che paga imposta.
 >
 > **5. Nei drawdown.** [es. "Non vendo per panico. Ribilancio secondo le bande comprando il sceso. Controllo il portafoglio al massimo una volta al mese. Non modifico questo IPS durante un crollo."]
 >

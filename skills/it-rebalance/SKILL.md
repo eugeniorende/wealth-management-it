@@ -95,6 +95,7 @@ Raccogliere:
 - `descrizione` — es. "iShares Core MSCI World UCITS ETF"
 - `asset_class` — es. azionario_globale, azionario_EU, obbligazionario_governativo, obbligazionario_corporate, monetario, oro/commodity, ecc.
 - `tipo_fiscale` — `reddito_diverso` (azioni dirette, certificates, ETC) o `reddito_capitale` (ETF e fondi, UCITS e non armonizzati). Se non noto, dedurre da descrizione (ETF o fondo → capitale)
+- `aliquota` — 26% di default; 12,5% per titoli di Stato italiani e white list, enti territoriali e organismi internazionali (la loro plus consuma lo zainetto al 48,08%, vedi `it-tax-optimization/references/aliquote-12-5-26.md`)
 - `quantita`
 - `pmc` (prezzo medio di carico), che in amministrato è la base fiscale delle vendite
 - `prezzo_corrente` o `controvalore_attuale`
@@ -103,13 +104,14 @@ Raccogliere:
 - Peso obiettivo per asset class, es. "60% azionario globale, 30% obbligazionario, 10% monetario"
 
 **Parametri di ribilanciamento:**
-- `banda` — soglia oltre cui si ribilancia. Default **dinamico** (regola 5/25 + modulazione per volatilità + allargamento cost-aware, vedi `references/bande-dinamiche.md`) invece di una banda fissa: la soglia è il minore tra 5 punti assoluti e 25% del peso target, scalata (in modo modesto e clampato) per la volatilità della classe, e allargata quando correggere richiede di pagare imposta. L'utente può forzare una banda fissa o spegnere la modulazione di volatilità se preferisce.
+- `banda` — soglia oltre cui si ribilancia. Default **dinamico** (regola 5/25 + allargamento cost-aware, vedi `references/bande-dinamiche.md`) invece di una banda fissa: la soglia è il minore tra 5 punti assoluti e 25% del peso target, allargata ×2 quando correggere richiede di pagare imposta. La modulazione per volatilità della classe è opzionale e spenta di default; l'utente può accenderla o forzare una banda fissa.
 - `nuovi_versamenti_disponibili` — liquidità in entrata da poter usare per Leva 1 (€, eventualmente ricorrente)
 - `flussi_attesi` — dividendi/cedole attesi nei prossimi mesi (per Leva 2)
 - `fase` — accumulo (versamenti netti positivi) o decumulo (prelievi netti)
+- `prelievo` — in decumulo, gli euro netti da prelevare (parametro `PRELIEVO` dello script: le vendite coprono anche l'imposta, la cassa prelevata non si reinveste)
 
 **Zainetto fiscale** (per coordinamento con it-tax-optimization):
-- Minus pregresse disponibili per broker, con anno di formazione (per la scadenza 4 anni)
+- Minus pregresse disponibili per broker, con anno di formazione (per la scadenza 4 anni). Lo script prende un totale per broker: quale quota scade quest'anno, e quindi va consumata per prima, lo dice l'importatore di `it-tax-optimization`
 
 Se mancano dati critici (allocazione target, PMC, tipo fiscale degli strumenti) → CHIEDERE, non inventare.
 
@@ -134,7 +136,9 @@ La banda **5/25** corregge il difetto della banda fissa: per le classi a peso pi
 
 L'**allargamento cost-aware** entra nello Step 3: se correggere un sovrappeso si fa a costo netto zero (flussi, vendita di minus, o plus interamente compensata dallo zainetto), si agisce sulla banda **stretta**; se richiede di realizzare plus che pagano imposta, si agisce solo oltre la banda **larga**. In breve: non si paga imposta per correggere un drift troppo piccolo per contare.
 
-⚠️ Se nessuna classe è fuori banda → **raccomandare di NON ribilanciare**. Il ribilanciamento ha senso solo oltre la soglia; ribilanciare per piccoli scostamenti genera costi (fiscali e commissioni) senza beneficio reale. Bias verso il non operare, come in it-tax-optimization. Corollario (Kitces): quando si ribilancia, riportare **a target**, non solo al bordo della banda — così si massimizza il tempo fino al prossimo intervento.
+⚠️ Se nessuna classe è fuori banda → **raccomandare di NON ribilanciare**. Il ribilanciamento ha senso solo oltre la soglia; ribilanciare per piccoli scostamenti genera costi (fiscali e commissioni) senza beneficio reale. Bias verso il non operare, come in it-tax-optimization.
+
+**Regola di rientro (una sola)**: quando si ribilancia, si va **a target se la correzione è a costo netto zero** (flussi, minus, plus compensate dallo zainetto), e **fino a metà della banda stretta per la parte che paga imposta**. Non ci si ferma al bordo (la classe ri-sforerebbe presto, Kitces), ma non si paga imposta per l'ultima precisione. Mostrare i due costi, a target e a metà banda; lo script li stampa (`OBIETTIVO_RIENTRO` permette di scegliere «target» o «banda»).
 
 ### Step 3: Costruisci il piano tax-aware (gerarchia delle leve)
 
@@ -156,11 +160,15 @@ se flussi_attesi > 0:
     aggiorna gap_da_correggere
     → costo fiscale: ZERO (la tassazione sul flusso è dovuta comunque)
 
+# Pesi e gap si misurano sul patrimonio DOPO versamenti, flussi e prelievo: una classe
+# sovrappesata oggi può non esserlo più dopo il versamento, e allora non si vende nulla.
+
 # Se gap residuo dopo Leve 1-2:
 # LEVA 3: vendita posizioni in MINUS tra le sovrappesate
 per posizione in (sovrappesate AND plus_latente < 0):
     vendere (parzialmente o totalmente) per correggere il sovrappeso
-    la minus realizzata → coordinare con it-tax-optimization
+    la minus realizzata entra subito nello zainetto di quel broker (al 48,08% se la
+    posizione è al 12,5%) e compensa le plus vendute dopo sullo stesso broker
     → costo fiscale: ZERO o NEGATIVO (genera zainetto / compensa plus)
 
 # LEVA 4 (ultima risorsa): vendita posizioni in PLUS
@@ -173,11 +181,13 @@ per posizione in (sovrappesate AND plus_latente > 0):
     priorità 2: vendere posizioni con plus latente minore in proporzione al valore (sul PMC)
     priorità 3: per ultime le posizioni reddito_capitale (ETF UCITS: plus MAI
                 compensabile) o presso broker senza zainetto (plus tassata piena)
-    # gate cost-aware (banda dinamica): una vendita che lascia imposta NETTA
-    # si esegue solo se |drift| della classe supera la banda larga; altrimenti
-    # si attende (correggere costerebbe imposta sproporzionata al beneficio)
-    calcola tassa = (plus_realizzata − compensazione_zainetto_stesso_broker) × aliquota
-    → costo fiscale: POSITIVO, da minimizzare con la scelta broker × tipo
+    # prima la QUOTA A COSTO ZERO di ogni posizione (la parte coperta dallo zainetto),
+    # anche se il resto della posizione pagherebbe imposta
+    # gate cost-aware (banda dinamica): la parte che lascia imposta NETTA si vende
+    # solo se |drift| della classe supera la banda larga, e solo fino a metà banda;
+    # altrimenti si rinvia, e il residuo non corretto si dichiara con il suo costo
+    calcola tassa = (plus_realizzata − compensazione_zainetto_stesso_broker) × aliquota_posizione
+    → costo fiscale: POSITIVO, da minimizzare con la scelta broker × tipo × aliquota
 ```
 
 Per il caso multi-broker, lo script `assets/ribilanciamento-multibroker.py` esegue questa ottimizzazione automaticamente: dato il portafoglio (con broker, tipo fiscale e plus/minus per posizione), lo zainetto per broker e il target, produce il piano di vendite ottimizzato, il costo fiscale e lo zainetto residuo. È il modo più affidabile di gestire la Leva 4 quando i conti sono più di uno.
@@ -228,7 +238,7 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 
 - Se il drift è correggibile con sole Leve 1-2 → raccomandare quella via (costo zero)
 - Se serve vendere → indicare la sequenza fiscalmente ottimale
-- Se il costo fiscale supera il beneficio del ribilanciamento → valutare ribilanciamento parziale (solo riportare in banda, non esattamente a target) o attesa
+- Se la correzione paga imposta → regola di rientro: fino a metà banda, non a target, e solo con il drift oltre la banda larga; altrimenti si rinvia, dicendo quanto resta da correggere e quanto costerebbe
 - Coordinamento di fine anno: se ci sono minus in scadenza (31/12 del 4° anno), il ribilanciamento può essere il momento per realizzare plus compensabili
 
 ### Disclaimer (obbligatorio in fondo)
@@ -246,7 +256,8 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 - ❌ Ribilanciare per scostamenti dentro la banda di tolleranza: genera costi senza beneficio.
 - ❌ Sovrastimare la Tobin tax sul ribilanciamento: per portafogli in ETF è zero (esenti).
 - ❌ Suggerire ribilanciamenti cross-broker assumendo compensazione automatica dello zainetto: lo zainetto è per-intermediario. La skill ora **ottimizza intorno a questo vincolo** scegliendo dove realizzare le plus (broker × tipo fiscale, vedi `ribilanciamento-multibroker.md`), ma non bisogna mai dare per scontata una compensazione che attraversa i broker.
-- ❌ Ribilanciare "a target esatto" quando "riportare in banda" costa meno: l'over-precision genera vendite extra non necessarie.
+- ❌ Vendere con imposta fino al target esatto: la parte tassata si ferma a metà banda (regola di rientro). A target si va solo quando costa zero.
+- ❌ Dire «nessuna vendita necessaria» quando una classe è fuori banda: se la vendita è rinviata per l'imposta, va detto, con il residuo e il suo costo.
 - ❌ Dimenticare di coordinare con minus in scadenza: il ribilanciamento di fine anno è l'occasione per usare zainetto che altrimenti evapora.
 
 ## Sinergia con le altre skill del plugin
@@ -270,7 +281,10 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 
 ## Note per l'iterazione
 
-Questa è la versione 0.5 della skill (introdotta in v0.5 del plugin, estesa in v0.8.12).
+Questa è la versione 0.6 della skill (introdotta in v0.5 del plugin, estesa in v0.8.12 e nella 0.10.0).
+
+In quest'iterazione (v0.6, plugin 0.10.0):
+- **Piano corretto e regola unica**: versamenti e flussi entrano nel totale prima del drift e sono allocati tutti; le minus realizzate ricaricano lo zainetto del broker; aliquota per posizione (12,5% per i titoli di Stato, che consumano lo zainetto al 48,08%); quota a costo zero venduta anche quando il resto è rinviato, con il residuo stampato; regola di rientro mista (`OBIETTIVO_RIENTRO`, con i due costi); prelievo in decumulo (`PRELIEVO`); modulazione per volatilità spenta di default; validazione minima dei parametri. Test con asserzioni sul caso di validazione e sugli scenari dell'audit.
 
 In quest'iterazione (v0.5):
 - **Modulazione della banda per la volatilità della classe**: la banda 5/25 ora si scala con la volatilità del comparto, perché una soglia fissa rappresenta un segnale/rumore diverso tra classi (cinque punti su un azionario capitano per rumore, su un obbligazionario sono un movimento raro). Trattata con onestà la **tensione teorica** — la visione "più volatile → banda più larga" (efficienza di trading) contro il controllo ottimo alla Leland "più volatile → banda più stretta" (la deviazione è più rischiosa): non è una legge, è un trade-off. Implementazione deliberatamente modesta (fattore `(σ/σ_rif)^β` clampato in un intervallo stretto, spegnibile per tornare alla pura 5/25). Validato: azionario si allarga, classi stabili al clamp, retro-compatibilità con modulazione spenta. Vedi `references/bande-dinamiche.md`.
@@ -279,7 +293,7 @@ In quest'iterazione (v0.4):
 - **Generatore di ordini CSV per broker**: lo script di ribilanciamento ora esporta gli ordini da eseguire, un CSV per broker, con instradamento della cassa (gli acquisti finanziati dalla liquidità presente su ciascun broker, così ogni file è eseguibile senza trasferimenti tra intermediari) e l'annotazione fiscale per riga. Chiude la voce v0.4 della roadmap. Validato su scenario mono e multi-broker (invariante: per ogni broker, acquisti ≤ cassa disponibile lì).
 
 In quest'iterazione (v0.3):
-- **Sequenza di liquidazione fiscale in decumulo** (`references/sequenza-liquidazione.md`): da dove prelevare per minimizzare l'imposta (liquidità → flussi già tassati → vendite tax-aware con la gerarchia delle leve → fondo pensione agevolato 9-15% in erogazione), riusando l'ottimizzazione multi-broker; e il prelievo annuo che diventa anche l'occasione per ribilanciare. Chiude la voce v0.4 della roadmap. La sostenibilità del prelievo (quanto, non come) è in `it-pianificazione-obiettivi/references/decumulo.md`.
+- **Sequenza di liquidazione fiscale in decumulo** (`references/sequenza-liquidazione.md`): da dove prelevare per minimizzare l'imposta (liquidità → flussi già tassati → vendite tax-aware con la gerarchia delle leve → fondo pensione agevolato 9-15% in erogazione), riusando l'ottimizzazione multi-broker; e il prelievo annuo che diventa anche l'occasione per ribilanciare. Il calcolo del prelievo nello script è arrivato solo nella v0.6 (`PRELIEVO`). La sostenibilità del prelievo (quanto, non come) è in `it-pianificazione-obiettivi/references/decumulo.md`.
 
 In quest'iterazione (v0.2):
 - **Ottimizzazione globale dello zainetto multi-broker**: la compensazione non attraversa i broker, quindi la scelta di DOVE realizzare le plus (broker × tipo fiscale) determina il costo. Reference `ribilanciamento-multibroker.md` + script `assets/ribilanciamento-multibroker.py` (primo asset della skill, validato su tre scenari).

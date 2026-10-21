@@ -1,12 +1,19 @@
 # Bande di tolleranza dinamiche
 
-Quando ribilanciare? La risposta della skill base è una **banda fissa** (±5% assoluto). Questa reference la affina con due idee consolidate nella letteratura di pianificazione (Kitces, Daryanani, Swedroe) e le adatta al contesto fiscale italiano. È implementata in `assets/ribilanciamento-multibroker.py`.
+Quando ribilanciare, e fin dove? La regola del plugin, la stessa in script, fogli e skill, è questa:
+
+- **soglia 5/25**: si agisce quando il drift di una classe supera il minore tra 5 punti assoluti e il 25% del suo peso target;
+- **allargamento cost-aware ×2**: se la correzione paga imposta, si agisce solo oltre il doppio della soglia;
+- **rientro misto**: a target se la correzione è a costo netto zero, fino a metà banda per la parte che paga imposta;
+- **modulazione per volatilità**: opzionale e spenta di default (`MODULA_VOLATILITA = False`).
+
+Questa reference spiega il perché, con le idee della letteratura di pianificazione (Kitces, Daryanani, Swedroe) adattate al contesto fiscale italiano. È implementata in `assets/ribilanciamento-multibroker.py`; l'IPS, il tracker dei secchielli e il cruscotto usano la stessa 5/25.
 
 ## Soglia, non calendario
 
 Ribilanciare "una volta l'anno" a calendario è subottimale: a volte si ribilancia quando non serve (drift piccolo), a volte si lascia correre un drift grande per mesi. L'approccio migliore è **trigger a soglia**: si controlla periodicamente, ma si agisce **solo** quando una classe supera una banda di tolleranza. La ricerca mostra che il ribilanciamento a soglia cattura gran parte del "rebalancing bonus" con **meno operazioni** — e meno operazioni, in Italia, significa meno eventi fiscali.
 
-Un corollario importante (Kitces): **il trigger è alla banda, ma quando scatta si ribilancia fino al target**, non solo fino al bordo della banda. Riportare al bordo lascerebbe la classe a un passo dal ri-sforare, costringendo a operare di nuovo presto; tornare a target massimizza il tempo fino al prossimo intervento. Lo strumento fa esattamente così.
+Un corollario importante (Kitces): **il trigger è alla banda, ma quando scatta non ci si ferma al bordo**. Riportare al bordo lascerebbe la classe a un passo dal ri-sforare, costringendo a operare di nuovo presto. In Italia però ogni euro venduto in plus può pagare imposta, e l'ultima precisione è la più cara. Da qui la **regola di rientro mista**: a target se la correzione è a costo netto zero, fino a metà della banda stretta per la parte che paga imposta. Lo strumento stampa i due costi (a target e a metà banda); il parametro `OBIETTIVO_RIENTRO` permette di scegliere «target» o «banda».
 
 ## La regola 5/25
 
@@ -36,9 +43,10 @@ Questo formalizza un'intuizione che la skill già esprimeva a parole ("se il cos
 ### Esempio del comportamento
 
 Azionario al 68% (target 60%, drift +8%). Banda stretta 5%, banda allargata 10%.
-- **Con zainetto compensabile** sulla posizione giusta: la riduzione di €8.000 è a costo netto zero → si agisce (drift +8% > banda stretta 5%). Si ribilancia.
+- **Con zainetto compensabile** sulla posizione giusta: la riduzione di €8.000 è a costo netto zero → si agisce (drift +8% > banda stretta 5%) e si va a target.
+- **Con zainetto parziale** (€2.000 su una plus del 40%): si vende la quota a costo zero, €5.000, e il resto (€3.000) si rinvia, dichiarandolo con il suo costo.
 - **Senza zainetto**, con la sola via di vendere ETF capitale (plus tassata): il drift +8% è sotto la banda allargata 10% → **non si vende, si attende**. L'imposta da pagare non è giustificata da uno scostamento ancora moderato; i flussi futuri o un'occasione di harvesting lo correggeranno più avanti a costo minore.
-- Se invece il drift fosse +12% (sopra la banda allargata 10%), si venderebbe anche pagando imposta: a quel punto lo scostamento è abbastanza grande da giustificarla.
+- Se invece il drift fosse +12% (sopra la banda allargata 10%), si venderebbe anche pagando imposta, ma solo fino a metà banda (62,5%): a quel punto lo scostamento è abbastanza grande da giustificarla.
 
 ## La modulazione per volatilità (con una tensione onesta)
 
@@ -46,7 +54,7 @@ Una banda fissa rappresenta un rapporto **segnale/rumore diverso** a seconda del
 
 Qui però va detta una cosa con onestà, perché il punto è conteso. L'intuizione "più volatile → banda più larga" non è una legge: il **controllo ottimo** (Leland e la letteratura sul no-trade region con costi di transazione) porta nella direzione **opposta**. Una deviazione su un asset volatile è più *rischiosa* — il costo atteso di stare lontano dal target cresce con la varianza — quindi un'ottimizzazione che minimizzi la perdita di rischio tollererebbe *meno* deviazione sulle classi volatili, cioè bande più *strette*. Le due visioni ottimizzano cose diverse: l'efficienza di **trading** (meno operazioni da rumore) contro l'aderenza al **target** (meno tracking error). Non c'è una risposta universale; dipende da cosa pesa di più per l'investitore.
 
-Per un risparmiatore italiano **fiscalmente sensibile** — dove ogni vendita può realizzare imposta — l'efficienza di trading ha un peso concreto, e propendere per bande un po' più larghe sulle classi volatili è difendibile. Ma resta una *scelta*, non un automatismo, e il prezzo è una maggiore distanza media dal target proprio sulle classi che si muovono di più. Per questo l'implementazione è **deliberatamente modesta**: il fattore di modulazione `(σ_classe / σ_riferimento)^β` è **clampato** in un intervallo stretto (di default 0,7–1,6), così nessuna banda si allarga o si stringe in modo estremo, e l'intera modulazione si può **spegnere** (`MODULA_VOLATILITA = False`) per tornare alla pura 5/25. Sul comparto tipico: l'azionario si allarga di poco, l'obbligazionario e il monetario si stringono fino al limite del clamp, la cripto va al tetto. Resta sopra di tutto l'allargamento cost-aware, che è la leva fiscalmente decisiva; la modulazione per volatilità è un raffinamento di secondo ordine, da usare con misura.
+Per un risparmiatore italiano **fiscalmente sensibile** — dove ogni vendita può realizzare imposta — l'efficienza di trading ha un peso concreto, e propendere per bande un po' più larghe sulle classi volatili è difendibile. Ma resta una *scelta*, non un automatismo, e il prezzo è una maggiore distanza media dal target proprio sulle classi che si muovono di più. Per questo l'implementazione è **deliberatamente modesta**: il fattore di modulazione `(σ_classe / σ_riferimento)^β` è **clampato** in un intervallo stretto (di default 0,7–1,6), così nessuna banda si allarga o si stringe in modo estremo, e l'intera modulazione è **spenta di default** (`MODULA_VOLATILITA = False`): la regola canonica è la pura 5/25, e accenderla è una scelta dell'utente. Sul comparto tipico: l'azionario si allarga di poco, l'obbligazionario e il monetario si stringono fino al limite del clamp, la cripto va al tetto. Resta sopra di tutto l'allargamento cost-aware, che è la leva fiscalmente decisiva; la modulazione per volatilità è un raffinamento di secondo ordine, da usare con misura.
 
 ## Cosa lascia fuori
 
