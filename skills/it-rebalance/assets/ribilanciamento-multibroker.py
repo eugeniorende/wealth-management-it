@@ -22,8 +22,9 @@ Due idee chiave, entrambe assenti nel ribilanciamento "ingenuo":
 
 Tutti i parametri sono editabili qui sotto. I valori di default sono un caso reale di
 validazione (vedi il commento ATTESO in fondo). plus = plusvalenza/minusvalenza latente
-in euro (negativo = minus). Approssimazione pro-rata sui realizzi parziali: il realizzo
-effettivo dipende dalla stratificazione LIFO dei lotti (cfr. SKILL.md).
+in euro (negativo = minus). Realizzi parziali pro-rata: in amministrato è il calcolo esatto,
+perché la plus si determina sul costo medio ponderato (art. 6 c. 4 D.Lgs. 461/97);
+il LIFO vale solo in dichiarativo, fuori dallo scope (cfr. SKILL.md).
 
 ⚠️ Sui CSV: i broker italiani non hanno un formato standard di IMPORT ordini, quindi i file
 generati sono una CHECKLIST DI ESECUZIONE e una traccia di audit (cosa vendere/comprare,

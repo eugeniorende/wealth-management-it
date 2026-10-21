@@ -103,7 +103,7 @@ Doing entrambe le cose nello stesso anno:
 
 **Setup**: l'utente realizza plus significative nel corso dell'anno (es. vendita di un portafoglio storico) e ha redditi da lavoro vicini al limite di scaglione.
 
-**Falso allarme**: l'utente potrebbe pensare "le plus aumentano il mio reddito IRPEF, mi spingono nello scaglione superiore". **Non è vero**: le plus su finanziari in regime amministrato sono **escluse dal reddito IRPEF complessivo** (sostitutiva, separata).
+**Falso allarme**: l'utente potrebbe pensare "le plus aumentano il mio reddito IRPEF, mi spingono nello scaglione superiore". **Non è vero**: le plus su finanziari in regime amministrato sono **escluse dal reddito IRPEF complessivo** (sostitutiva, separata). **Eccezione**: le plus di ETF e fondi non armonizzati fuori UE/SEE o senza gestore vigilato (per esempio ETF domiciliati negli USA) sono reddito di capitale che concorre al reddito complessivo, con ritenuta del 26% a titolo d'acconto e quadro RL anche in amministrato (art. 10-ter L. 77/1983): quelle sì possono spingere nello scaglione superiore.
 
 **Eccezione importante**: per chi è in **regime dichiarativo** (no sostituto d'imposta), le plus finanziarie sono sì soggette a sostitutiva 26% nel quadro RT del Modello Redditi PF, ma non concorrono comunque all'IRPEF ordinaria. Solo i **redditi di capitale** distribuiti (cedole, dividendi) in alcuni casi specifici (es. dividendi di partecipazioni qualificate pre-2018) entrano nell'IRPEF ordinaria.
 

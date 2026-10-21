@@ -490,6 +490,111 @@ def t_ips_quota():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ══════════════════════ it-tax-optimization (T1-T3) ══════════════════════
+
+TAX = os.path.join(SKILLS, "it-tax-optimization")
+
+
+def _testi_regole():
+    """{percorso relativo: testo} di skill, comandi, README (senza il changelog storico) e
+    descrizione del plugin.json, con il grassetto Markdown tolto. Il changelog del README
+    racconta le versioni passate: gli errata li aggiunge chi rilascia, non questi controlli."""
+    testi = {}
+    for base in (SKILLS, os.path.join(ROOT, "commands")):
+        for cartella, _, files in os.walk(base):
+            for f in files:
+                if f.endswith((".md", ".py")):
+                    p = os.path.join(cartella, f)
+                    testi[os.path.relpath(p, ROOT)] = open(p, encoding="utf-8").read()
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    testi["README.md"] = re.sub(r"\n### Changelog\n.*?(?=\n## )", "\n", readme, flags=re.S)
+    plugin = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
+    testi[".claude-plugin/plugin.json"] = plugin["description"]
+    return {k: v.replace("*", "") for k, v in testi.items()}
+
+
+def _frasi(testo):
+    """Spezza in frasi (punto/punto e virgola seguiti da maiuscola), righe e celle di tabella.
+    Le abbreviazioni come «art. 67» o «c. 1-bis» restano unite perché segue una cifra."""
+    return [f for f in re.split(r"(?<=[.!?;])\s+(?=[A-ZÀ-Ý«(`\[])|\n|\|", testo) if f.strip()]
+
+
+@test("T1: nessun LIFO riferito al regime amministrato (costo medio ponderato, art. 6 c. 4 D.Lgs. 461/97)")
+def t_t1_lifo_amministrato():
+    # REGRESSIONE F012: in amministrato la base è il costo medio ponderato; il LIFO
+    # (art. 67 c. 1-bis TUIR) individua i titoli ceduti solo in dichiarativo. Ogni frase
+    # che nomina il LIFO deve quindi parlare del dichiarativo (o del confronto con gli USA).
+    errori = []
+    for rel, testo in _testi_regole().items():
+        for frase in _frasi(testo):
+            if "LIFO" in frase and not re.search(r"[Dd]ichiarativ|HIFO|USA", frase):
+                errori.append(f"{rel}: «{frase.strip()[:110]}»")
+    assert not errori, "LIFO senza riferimento al dichiarativo:\n  " + "\n  ".join(errori[:12])
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    assert re.search(r"costo medio ponderato[^\n]*art\. 6 c\. 4", skill), "SKILL.md: manca la regola del costo medio (art. 6 c. 4)"
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    assert re.search(r"LIFO[^\n]*art\. 67 c\. 1-bis", dich), "regime-dichiarativo.md: manca il LIFO con l'art. 67 c. 1-bis"
+
+
+@test("T1: nessun ETF o fondo non armonizzato tra gli strumenti compensabili con lo zainetto")
+def t_t1_non_armonizzati():
+    # REGRESSIONE F003: la plus di un OICR non armonizzato è reddito di capitale (art. 44
+    # c. 1 lett. g TUIR; art. 10-ter L. 77/1983), mai compensabile; solo la minus è reddito diverso.
+    etf = open(os.path.join(TAX, "references", "etf-trap-redditi-capitale.md"), encoding="utf-8").read()
+    amici = etf.split('## Strumenti "amici"')[1].split('## Strumenti "nemici"')[0]
+    assert "armonizzat" not in amici, "etf-trap: un OICR non armonizzato nella tabella «amici»"
+    assert re.search(r'## Strumenti "nemici".*non armonizzat', etf, re.S), "etf-trap: non armonizzati assenti dai «nemici»"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    riga = next(r for r in skill.splitlines() if r.startswith("| **Reddito diverso** (art. 67"))
+    assert "armonizzat" not in riga, f"SKILL.md: riga reddito diverso: {riga[:120]}"
+    assert "reddito_capitale_irpef" in skill, "SKILL.md: manca la categoria reddito_capitale_irpef per gli OICR extra UE/SEE"
+    reb = open(os.path.join(SKILLS, "it-rebalance", "SKILL.md"), encoding="utf-8").read()
+    for r in reb.splitlines():
+        if "reddito diverso" in r and "**può**" in r:
+            assert "armonizzat" not in r, f"it-rebalance: {r[:120]}"
+    mb = open(os.path.join(SKILLS, "it-rebalance", "references", "ribilanciamento-multibroker.md"), encoding="utf-8").read()
+    m = re.search(r"compensa solo i \*\*redditi diversi\*\* \(([^)]*)\)", mb)
+    assert m and "armonizzat" not in m.group(1), "ribilanciamento-multibroker.md: elenco dei redditi diversi"
+
+
+@test("T1: alla chiusura del rapporto le minus si certificano (art. 6 c. 5 D.Lgs. 461/97), non «si perdono»")
+def t_t1_chiusura_rapporto():
+    # REGRESSIONE F011: chiudendo il rapporto (o revocando l'opzione) l'intermediario certifica
+    # le minus residue, utilizzabili su un altro rapporto con gli stessi intestatari o in
+    # dichiarazione entro la scadenza originaria. Il grassetto è tolto prima del confronto.
+    for rel, testo in _testi_regole().items():
+        assert not re.search(r"si\s+perde\s+definitivamente", testo), f"{rel}: «si perde definitivamente»"
+        assert "unico modo per consolidare" not in testo, f"{rel}: il dichiarativo presentato come unica via"
+    for rel in ("references/multi-intermediario.md", "SKILL.md"):
+        testo = open(os.path.join(TAX, rel), encoding="utf-8").read()
+        assert "certificazione" in testo and "art. 6 c. 5" in testo, f"{rel}: manca la certificazione ex art. 6 c. 5"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    assert "Pattern E" in skill, "SKILL.md: manca il Pattern E (consolidamento via certificazione)"
+    multi = open(os.path.join(TAX, "references", "multi-intermediario.md"), encoding="utf-8").read()
+    pratico = multi.split("## Caso pratico")[1]
+    for scenario in ("consumo in loco", "certificazione", "dichiarativo"):
+        assert scenario in pratico, f"caso pratico senza lo scenario «{scenario}»"
+
+
+@test("T1: scarto di emissione e coefficiente 48,08% con fonte corretta, marcatori delle reference")
+def t_t1_scarto_marcatori():
+    # REGRESSIONE F052/F035/F042: BOT e zero coupon tenuti a scadenza non consumano zainetto;
+    # il 48,08% viene dall'art. 3 c. 5 DL 66/2014, non dall'art. 68 c. 6 TUIR.
+    aliq = open(os.path.join(TAX, "references", "aliquote-12-5-26.md"), encoding="utf-8").read()
+    assert "art. 68 c. 6 TUIR, art. 7 DLgs 461/97" not in aliq, "aliquote: fonte del coefficiente superata"
+    assert "art. 3 c. 5 DL 66/2014" in aliq, "aliquote: manca la fonte del 48,08%"
+    assert re.search(r"### Esempio D[^\n]*(BOT|zero coupon)", aliq), "aliquote: manca l'esempio BOT/zero coupon"
+    assert "prezzo di emissione" in aliq and "scarto di emissione" in aliq, "aliquote: esempio senza prezzo di emissione"
+    for rel in ("it-tax-optimization/references/etf-trap-redditi-capitale.md",
+                "it-tax-optimization/references/multi-intermediario.md",
+                "it-tax-optimization/references/aliquote-12-5-26.md",
+                "it-pianificazione-obiettivi/references/asset-location.md"):
+        testo = open(os.path.join(SKILLS, rel), encoding="utf-8").read()
+        assert "Verificato: 2026-10" in testo, f"{rel}: manca il marcatore della verifica di ottobre 2026"
+    al = open(os.path.join(SKILLS, "it-pianificazione-obiettivi", "references", "asset-location.md"), encoding="utf-8").read()
+    assert "rischio demografico" in al, "asset-location: polizze esenti IRPEF solo per il rischio demografico"
+
+
 # ══════════════════════ fiscalità e tracker ══════════════════════
 
 @test("netto-pensione: IRPEF 2026, detrazioni e aliquota rendita FP (valori chiusi)")

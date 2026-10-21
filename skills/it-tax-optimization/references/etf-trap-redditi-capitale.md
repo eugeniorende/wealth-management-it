@@ -8,8 +8,8 @@ Questa asimmetria rende il classico "tax-loss harvesting" americano largamente i
 
 ## Riferimento normativo
 
-- Art. 67 comma 1 lettera c-ter TUIR: include tra i redditi diversi le plusvalenze "realizzate mediante cessione a titolo oneroso ovvero rimborso di titoli non rappresentativi di merci, di certificati di massa, di valute estere, oggetto di cessione a termine o rivenienti da depositi o conti correnti, di metalli preziosi, sempreché siano allo stato grezzo o monetato, e di quote di partecipazione ad organismi di investimento collettivo".
-- Per gli OICR (Organismi di Investimento Collettivo del Risparmio), sia **armonizzati** (conformi alla direttiva UCITS) sia **non armonizzati**, il legislatore ha però disposto che il provento sia classificato come reddito di capitale ex art. 44 TUIR comma 1 lettera g. Per i non armonizzati cambia anche il regime: vedi la tabella "nemici".
+- Art. 67 comma 1 lettera c-ter TUIR (dal 2027 art. 76 c. 1 lett. f TU D.Lgs. 117/2026): include tra i redditi diversi le plusvalenze "realizzate mediante cessione a titolo oneroso ovvero rimborso di titoli non rappresentativi di merci, di certificati di massa, di valute estere, oggetto di cessione a termine o rivenienti da depositi o conti correnti, di metalli preziosi, sempreché siano allo stato grezzo o monetato, e di quote di partecipazione ad organismi di investimento collettivo".
+- Per gli OICR (Organismi di Investimento Collettivo del Risparmio), sia **armonizzati** (conformi alla direttiva UCITS) sia **non armonizzati**, il legislatore ha però disposto che il provento sia classificato come reddito di capitale ex art. 44 TUIR comma 1 lettera g (dal 2027 art. 46 c. 1 lett. h TU D.Lgs. 117/2026). Per i non armonizzati cambia anche il regime: vedi la tabella "nemici".
 - La conseguenza pratica: i due flussi (in entrata da plus, in uscita per coprire minus) viaggiano su binari fiscali separati che non comunicano.
 
 ## Esempio numerico 1: la situazione ingenua
@@ -103,3 +103,4 @@ Questo è il caso più sottile e spesso trascurato: anche se cambi la formula da
 ---
 *Dati normativi (qualificazione fiscale di ETF/fondi come redditi di capitale) — Verificato: 2026-06.*
 *OICR non armonizzati (art. 10-ter L. 77/1983, Circ. 21/E/2014) e scarto di emissione (artt. 44-45 e 68 c. 7 TUIR) — Verificato: 2026-10.*
+*Corrispondenze nel TU 2027 (artt. 46, 47, 76 e 77 D.Lgs. 117/2026) — Verificato: 2026-10.*

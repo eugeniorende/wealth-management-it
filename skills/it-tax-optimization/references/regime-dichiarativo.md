@@ -23,6 +23,10 @@ Chi è in dichiarativo ha **due adempimenti distinti**, entrambi a suo carico:
 
 Punto chiave: l'IVAFE replica fedelmente l'imposta di bollo domestica (anch'essa 0,2%), quindi **usare un broker estero non comporta una patrimoniale più alta** — il carico è equivalente, cambia solo chi versa (tu via F24, non il broker). L'unica eccezione è il black list allo 0,4%. E l'IVAFE **non è dovuta** se un intermediario italiano fa comunque da sostituto (es. titoli esteri tenuti tramite banca italiana o fiduciaria residente): in quel caso si applica il bollo ordinario, e i due prelievi sono mutuamente esclusivi.
 
+## Quali titoli si considerano venduti in dichiarativo: LIFO
+
+Qui non c'è il costo medio ponderato dell'amministrato. In dichiarativo, per le plusvalenze delle lettere c), c-bis) e c-ter) dell'art. 67 TUIR (partecipazioni, titoli, quote di OICR, valute) «si considerano cedute per prime» le attività «acquisite in data più recente»: è il **LIFO** dell'art. 67 c. 1-bis TUIR (→ art. 76 c. 2 TU 2027), e le istruzioni del quadro RT chiedono il costo «calcolato sulla base del criterio L.I.F.O.». Servono quindi i lotti di ogni titolo, con data, quantità e prezzo. Esempio: 100 azioni comprate a €50 nel 2023 e 100 a €80 nel 2025; vendendone 100 a €90 nel 2026 si considerano cedute quelle del 2025, quindi la plus è €1.000. In amministrato, sul costo medio di €65, la stessa vendita darebbe €2.500. Per le cripto-attività vedi `criptovalute.md`: la lettera c-sexies non è tra quelle richiamate dal comma 1-bis.
+
 ## Il vero motivo per cui il dichiarativo conta nell'ottimizzazione: zainetto unificato
 
 L'aspetto che interessa questa skill non è l'adempimento, è la **compensazione**. In amministrato lo zainetto è frammentato per intermediario: una minus al broker A non compensa una plus al broker B. In **dichiarativo la compensazione è unificata a livello di contribuente**: tutte le plus e le minus di natura "reddito diverso" confluiscono nello stesso quadro RT e si compensano tra loro, **a prescindere da dove sono state realizzate**.
@@ -50,4 +54,5 @@ Il dichiarativo è il regime di chi usa broker esteri, e il suo vantaggio fiscal
 
 ---
 *Dati normativi (regole del regime dichiarativo e zainetto fiscale) — Verificato: 2026-06.*
+*LIFO in dichiarativo (art. 67 c. 1-bis TUIR, art. 76 c. 2 D.Lgs. 117/2026; istruzioni del quadro RT, Redditi PF 2026) — Verificato: 2026-10.*
 *Quadro RW: obbligo per titoli e cripto senza soglia, esonero dei soli conti fino a €15.000, IVAFE e sanzioni (art. 4-5 DL 167/1990, istruzioni Redditi PF 2026 e 730/2026) — Verificato: 2026-10.*
