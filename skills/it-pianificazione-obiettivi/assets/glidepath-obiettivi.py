@@ -21,7 +21,10 @@ Aggregato di portafoglio:
     il glide path + versamenti); un obiettivo "esce" dal portafoglio quando raggiunge
     la scadenza
   - i versamenti sono quelli del foglio (colonna I), che tengono conto del de-risking:
-    lo script li riepiloga in fondo
+    lo script li riepiloga in fondo. Il foglio fissa la finestra (Parametri!B7), la rampa
+    lineare e l'atterraggio sul profilo a quota azionaria minima: con ATTERRAGGIO_AZ,
+    CURVATURA o FINESTRA_DERISK diversi, o su un pianificatore precedente alla 0.10.0
+    (colonna I a quota fissa), i versamenti divergono dalla colonna I e lo script lo dice
 
 Dipendenze: openpyxl  (pip install openpyxl)
 Uso:        python glidepath-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]
@@ -35,8 +38,8 @@ import sys
 import os
 from openpyxl import load_workbook
 
-from motore_bootstrap import (applica_override, frazioni_glide, leggi_finestra_derisk, pmt_glide, quota_glide,
-                              verifica_intestazioni_obiettivi)
+from motore_bootstrap import (applica_override, finestra_nel_foglio, frazioni_glide, leggi_finestra_derisk,
+                              pmt_glide, quota_glide, scarti_dal_foglio, verifica_intestazioni_obiettivi)
 
 # ---- Parametri del glide path (editabili) ----
 FINESTRA_DERISK = None   # anni prima della scadenza in cui inizia il de-risking;
@@ -62,6 +65,7 @@ def leggi_excel(path):
     obj = wb["Obiettivi"]
     inflazione = par.cell(row=INFL_ROW, column=2).value or 0
     finestra = leggi_finestra_derisk(par)
+    nel_foglio = finestra_nel_foglio(par)
     profili = {}
     for i in range(PROF_N):
         r = PROF_START + i
@@ -89,7 +93,7 @@ def leggi_excel(path):
                 # default: terminante (caso comune); permanente solo se indicato
                 "permanente": (str(tipo).strip().lower() == "permanente"),
             })
-    return inflazione, finestra, profili, obiettivi
+    return inflazione, finestra, nel_foglio, profili, obiettivi
 
 
 def rendimento_a_quota(quota, profili):
@@ -123,12 +127,15 @@ def main():
         print(f"File non trovato: {path}")
         sys.exit(1)
 
-    inflazione, finestra_foglio, profili, obiettivi = leggi_excel(path)
+    inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     if not obiettivi:
         print("Nessun obiettivo trovato nel foglio.")
         sys.exit(0)
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     rend_atterraggio = rendimento_a_quota(ATTERRAGGIO_AZ, profili)
+    # i versamenti coincidono con la colonna I solo coi parametri del glide path del foglio
+    scarti = scarti_dal_foglio(finestra, finestra_foglio if nel_foglio else None, ATTERRAGGIO_AZ,
+                               min(eq for _, eq in profili.values()), CURVATURA)
 
     orizzonte_max = max(g["orizzonte"] for g in obiettivi)
 
@@ -206,7 +213,10 @@ def main():
 
     # i versamenti su cui poggia la proiezione: gli stessi del foglio e del Monte Carlo
     print("\n" + "-" * 78)
-    print("VERSAMENTI usati nella proiezione (come la colonna I del foglio, de-risking compreso):")
+    if scarti:
+        print(f"VERSAMENTI usati nella proiezione, DIVERSI dalla colonna I del foglio ({'; '.join(scarti)}):")
+    else:
+        print("VERSAMENTI usati nella proiezione (come la colonna I del foglio, de-risking compreso):")
     for g in obiettivi:
         quanto = "— (nessun target)" if g["target_oggi"] is None else f"€{g['pmt']:,.0f}/mese".replace(",", ".")
         print(f"  {g['nome']}: {quanto}")

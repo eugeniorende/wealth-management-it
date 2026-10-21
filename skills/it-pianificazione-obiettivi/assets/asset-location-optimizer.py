@@ -18,6 +18,10 @@ Rendimento LORDO: i profili del pianificatore sono rendimenti NETTI di costi e i
 per contenitore, quindi lo script parte dal rendimento lordo di mercato. Se
 RENDIMENTO_LORDO è None lo ricava dal netto del profilo con la conversione inversa
 (lordo_da_netto); si può fissare esplicitamente con --set RENDIMENTO_LORDO=0.07.
+La conversione tratta l'imposta come pagata ogni anno: dà il lordo più alto compatibile col
+netto, e un lordo più alto aumenta il valore delle esenzioni, quindi favorisce i contenitori
+esenti. Per questo, per ogni obiettivo, lo script mostra anche la variante con l'imposta pagata
+alla vendita (ETF ad accumulazione, lordo_da_netto_differito) e il pareggio del PIR che ne esce.
 
 Dipendenze: openpyxl  (pip install openpyxl)
 Uso:        python asset-location-optimizer.py [percorso/pianificatore-obiettivi.xlsx]
@@ -106,8 +110,19 @@ def leggi_excel(path):
 def lordo_da_netto(netto):
     """Inverso della convenzione dei profili, netto ≈ (lordo − costi) × (1 − 26%): il
     rendimento lordo di mercato da cui l'ottimizzatore toglie costi e imposte di ogni
-    contenitore. Prudente: tratta il netto come tassato ogni anno."""
+    contenitore. Tratta il netto come tassato ogni anno: per il versamento è la scelta
+    prudente, qui no, perché dà il lordo più alto compatibile col netto e quindi favorisce i
+    contenitori esenti (vedi lordo_da_netto_differito)."""
     return netto / (1 - TASSA_PLUS_DOSSIER) + TER_DOSSIER + BOLLO
+
+
+def lordo_da_netto_differito(netto, anni):
+    """Lordo equivalente al netto con l'imposta pagata alla vendita (ETF ad accumulazione nel
+    dossier): il lordo per cui, dopo costi e plusvalenza tassata alla fine, il capitale cresce
+    come al netto composto per `anni`. È più basso di lordo_da_netto: lo scenario prudente per
+    il confronto con i contenitori esenti."""
+    finale = ((1 + netto) ** anni - TASSA_PLUS_DOSSIER) / (1 - TASSA_PLUS_DOSSIER)
+    return finale ** (1 / anni) - 1 + TER_DOSSIER + BOLLO
 
 
 def rendimento_lordo(netto_profilo):
@@ -270,6 +285,13 @@ def main():
         print(f"      → {segno}: {euro(netto)}")
         print(f"      TER di pareggio del PIR: {ter_par*100:.2f}%  "
               f"(sotto questo costo il PIR conviene, sopra no — TER tipici PIR: 1,2-1,35%)")
+        if RENDIMENTO_LORDO is None:
+            r_diff = lordo_da_netto_differito(profili.get(g["profilo"], 0.055), H)
+            ter_par_diff = ter_pareggio_pir(gia, H, r_diff)
+            print(f"      Con l'imposta alla vendita (ETF ad accumulazione) il lordo equivalente a {H} anni "
+                  f"è {r_diff*100:.2f}%:")
+            print(f"      il pareggio scende a {ter_par_diff*100:.2f}% (la conversione annua favorisce "
+                  f"il PIR; scenario prudente: --set RENDIMENTO_LORDO={r_diff:.4f})")
 
     print("\n" + "-" * 80)
     print("LETTURA:")
@@ -282,7 +304,9 @@ def main():
     print("  concentrazione del PIR (PMI italiane). È un rischio in più che il fisco deve ripagare.")
     print("- Il verdetto PIR dipende dal rendimento LORDO: più è alto, più vale l'esenzione delle")
     print("  plus. Trattare come lordo il rendimento netto dei profili lo ribalterebbe; per un'altra")
-    print("  ipotesi: --set RENDIMENTO_LORDO=0.07.")
+    print("  ipotesi: --set RENDIMENTO_LORDO=0.07. Il lordo ricavato dal netto tratta l'imposta come")
+    print("  annua ed è il più alto compatibile col profilo: favorisce i contenitori esenti (PIR e")
+    print("  fondo pensione); la variante con l'imposta alla vendita è lo scenario prudente.")
     print("\nNON è consulenza. Calcoli illustrativi, parametri editabili in cima allo script.")
     print("Vedi asset-location.md. Verificare con consulente abilitato e commercialista.")
 

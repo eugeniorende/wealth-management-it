@@ -21,7 +21,10 @@ Convenzioni, le stesse del foglio:
   - gli obiettivi TERMINANTI seguono il glide path (GLIDE = True): quota del profilo
     finché mancano più di FINESTRA_DERISK anni, poi discesa fino all'atterraggio, anno
     per anno come in glidepath-obiettivi.py. Il versamento deterministico è quello del
-    foglio (colonna I), che tiene conto del de-risking. I permanenti non de-riskano.
+    foglio (colonna I), che tiene conto del de-risking, finché finestra, atterraggio e
+    curvatura sono quelli del foglio (Parametri!B7, profilo a quota azionaria minima, rampa
+    lineare): cambiandoli, o su un pianificatore precedente alla 0.10.0, diverge e lo script
+    lo dice. I permanenti non de-riskano.
 
 Dipendenze: numpy, openpyxl  (pip install numpy openpyxl)
 Uso:        python montecarlo-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]
@@ -42,9 +45,9 @@ import os
 import numpy as np
 from openpyxl import load_workbook
 
-from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_storico, frazioni_glide,
-                              indici_bootstrap, leggi_finestra_derisk, pmt_glide,
-                              verifica_intestazioni_obiettivi)
+from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_storico, finestra_nel_foglio,
+                              frazioni_glide, indici_bootstrap, leggi_finestra_derisk, pmt_glide,
+                              scarti_dal_foglio, verifica_intestazioni_obiettivi)
 
 # ---- Parametri della simulazione ----
 N_SIM = 20000              # numero di percorsi simulati
@@ -83,7 +86,7 @@ _OB_HIST = None
 # Posizioni note nel foglio (coerenti con build_obiettivi.py)
 CAP_ROW = 5                # Parametri!B5 = capacità di risparmio mensile
 INFL_ROW = 6               # Parametri!B6 = inflazione
-PROF_START = 10            # Parametri!A10:C14 = profili (nome, rendimento, volatilità)
+PROF_START = 10            # Parametri!A10:D15 = profili (nome, rendimento, volatilità, % azionario)
 PROF_N = 6
 GOAL_START = 5             # Obiettivi: prima riga dati
 GOAL_N = 10
@@ -98,6 +101,7 @@ def leggi_excel(path):
     capacita = par.cell(row=CAP_ROW, column=2).value or 0
     inflazione = par.cell(row=INFL_ROW, column=2).value or 0
     finestra = leggi_finestra_derisk(par)
+    nel_foglio = finestra_nel_foglio(par)
 
     profili = {}
     for i in range(PROF_N):
@@ -130,7 +134,7 @@ def leggi_excel(path):
                 # default terminante (il caso comune), come glidepath-obiettivi.py
                 "permanente": str(tipo or "").strip().lower() == "permanente",
             })
-    return capacita, inflazione, finestra, profili, obiettivi
+    return capacita, inflazione, finestra, nel_foglio, profili, obiettivi
 
 
 def pmt_deterministico(target_nom, gia, rend_ann, anni):
@@ -315,9 +319,11 @@ def main():
         print("Uso: python montecarlo-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]")
         sys.exit(1)
 
-    capacita, inflazione, finestra_foglio, profili, obiettivi = leggi_excel(path)
+    capacita, inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     rend_l, vol_l = interp_profilo(ATTERRAGGIO_AZ, profili)    # il portafoglio di atterraggio
+    scarti = scarti_dal_foglio(finestra, finestra_foglio if nel_foglio else None, ATTERRAGGIO_AZ,
+                               min(p[2] for p in profili.values()), CURVATURA)
 
     # carica la serie storica se il modello è bootstrap
     global _AZ_HIST, _OB_HIST
@@ -345,6 +351,9 @@ def main():
     if GLIDE:
         print(f"Glide path: i terminanti de-riskano da {finestra} anni prima della scadenza fino a "
               f"{ATTERRAGGIO_AZ*100:.0f}% azionario (versamento e simulazione)")
+        if scarti:
+            print(f"⚠️  Glide path diverso da quello del foglio ({'; '.join(scarti)}): il versamento "
+                  f"deterministico dei terminanti non è quello della colonna I.")
     else:
         print("Glide path: spento (GLIDE=False), quota fissa del profilo fino alla scadenza")
     print("-" * 78)

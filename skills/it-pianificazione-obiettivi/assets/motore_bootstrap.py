@@ -20,15 +20,16 @@ Contenuto:
   - applica_override(spazio): override '--set NOME=VALORE' delle costanti da riga di comando
   - percorso_json / scrivi_json: flag '--json <file>' per l'output machine-readable (pipeline)
   - verifica_intestazioni_obiettivi(ws): guardia sul layout del pianificatore Excel
-  - quota_glide / frazioni_glide / pmt_glide / crescita_glide / leggi_finestra_derisk: il glide
-    path del pianificatore obiettivi, unica definizione per foglio, Monte Carlo, glide path e
-    allocatore
+  - quota_glide / frazioni_glide / pmt_glide / crescita_glide / leggi_finestra_derisk /
+    finestra_nel_foglio / scarti_dal_foglio: il glide path del pianificatore obiettivi, unica
+    definizione per foglio, Monte Carlo, glide path e allocatore
 
 Natura della serie (rendimenti-storici.csv): rendimenti NOMINALI in dollari USA di un
 investitore USA (S&P 500 con dividendi, T-Bond decennale), senza componente di cambio. Chi
 ricentra la media su un rendimento atteso (Monte Carlo obiettivi e pensione) ne usa solo la
-forma; chi usa la serie grezza in termini reali la deflaziona anno per anno con la colonna
-inflazione (deflaziona), non con un'inflazione costante che cancellerebbe gli anni '70.
+forma; chi usa la serie grezza contro spese o target in euro di oggi deve deflazionarla anno
+per anno con la colonna inflazione (carica_inflazione + deflaziona), non con un'inflazione
+costante che cancellerebbe gli anni '70 (lo fa decumulo-obiettivi.py).
 
 Il campionamento usa np.random (generatore legacy): il seed fissato dagli script
 con np.random.seed(...) governa anche il motore. La sequenza di chiamate random è
@@ -257,8 +258,15 @@ def pmt_glide(target_nom, gia, rend, rend_atterraggio, anni, finestra, curvatura
     (Obiettivi!I). Due fasi: gli anni a quota piena al rendimento del profilo, poi gli anni di
     rampa al loro rendimento medio (con rampa lineare, la media tra profilo e atterraggio:
     Obiettivi!P). Con rend_atterraggio = rend (permanenti, profili senza azionario) è la formula
-    classica del valore futuro di una rendita. Rispetto al calcolo anno per anno sbaglia per
-    difetto di meno dell'1,5%."""
+    classica del valore futuro di una rendita.
+
+    Rispetto al calcolo anno per anno sbaglia per difetto, di più quanto più azionario ha il
+    profilo e quanto più lunga è la finestra; il caso peggiore è un orizzonte pari alla finestra.
+    Con la finestra di 7 anni l'errore resta sotto l'1% con Moderato e arriva all'1,4% con
+    Crescita e all'1,8% con Azionario totale; con una finestra di 10 anni arriva al 2,8% con
+    Crescita massima e al 3,0% con Azionario totale. È misurato sul versamento senza capitale già
+    accantonato: se il già accantonato copre quasi tutto il target l'errore relativo sale, ma su un
+    versamento piccolo."""
     f = frazioni_glide(anni, finestra, curvatura)
     m = int(np.sum(f < 1.0))               # anni di rampa
     k = anni - m                           # anni a quota piena
@@ -274,11 +282,39 @@ def crescita_glide(rend, rend_atterraggio, anni, finestra, curvatura=1.0):
     return float(np.prod(1 + rend_atterraggio + (rend - rend_atterraggio) * f))
 
 
-def leggi_finestra_derisk(ws_parametri, default=FINESTRA_DERISK_DEFAULT):
-    """Finestra di de-risking dal foglio Parametri del pianificatore (A7:B7); il default se il
-    foglio non la porta (pianificatori compilati prima che esistesse)."""
+def finestra_nel_foglio(ws_parametri):
+    """True se il foglio Parametri porta la finestra di de-risking (A7:B7): i pianificatori dalla
+    0.10.0, la cui colonna I sconta il glide path."""
     etichetta = str(ws_parametri["A7"].value or "").lower()
     valore = ws_parametri["B7"].value
-    if "finestra" in etichetta and isinstance(valore, (int, float)) and valore >= 0:
-        return int(valore)
+    return "finestra" in etichetta and isinstance(valore, (int, float)) and valore >= 0
+
+
+def leggi_finestra_derisk(ws_parametri, default=FINESTRA_DERISK_DEFAULT):
+    """Finestra di de-risking dal foglio Parametri del pianificatore (A7:B7). Un pianificatore
+    compilato prima della 0.10.0 non la porta: si usa il default e lo si dice, perché la colonna I
+    di quel foglio è a quota fissa, più bassa del versamento col glide path degli script."""
+    if finestra_nel_foglio(ws_parametri):
+        return int(ws_parametri["B7"].value)
+    print(f"⚠️  Pianificatore senza la finestra di de-risking (Parametri!A7:B7), compilato prima della "
+          f"0.10.0: uso {default} anni. La sua colonna I è a quota fissa e non sconta il glide path, "
+          f"quindi è più bassa dei versamenti calcolati qui. Ricopia gli obiettivi nel "
+          f"pianificatore-obiettivi.xlsx aggiornato.")
     return default
+
+
+def scarti_dal_foglio(finestra, finestra_foglio, atterraggio, quota_minima, curvatura):
+    """Dove il glide path di uno script si discosta da quello del foglio (Obiettivi, colonne I, O, P:
+    finestra di Parametri!B7, rampa lineare, atterraggio sul profilo a quota azionaria minima).
+    finestra_foglio = None se il foglio non la porta. Lista vuota = il versamento dello script è
+    quello della colonna I."""
+    scarti = []
+    if finestra_foglio is None:
+        scarti.append("pianificatore precedente alla 0.10.0, colonna I a quota fissa")
+    elif finestra != finestra_foglio:
+        scarti.append(f"finestra {finestra} anni invece dei {finestra_foglio} di Parametri!B7")
+    if abs(atterraggio - quota_minima) > 1e-9:
+        scarti.append(f"atterraggio al {atterraggio * 100:.0f}% invece del {quota_minima * 100:.0f}% azionario")
+    if curvatura != 1:
+        scarti.append(f"curvatura {curvatura} invece della rampa lineare")
+    return scarti

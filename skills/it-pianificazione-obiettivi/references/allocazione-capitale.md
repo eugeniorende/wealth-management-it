@@ -20,7 +20,7 @@ Un terminante però **de-riska** negli ultimi anni (glide path, finestra in Para
 PV = target_oggi × (1 + inflazione)^anni / Π (1 + rendimento_anno)
 ```
 
-dove `rendimento_anno` è quello del profilo finché mancano più anni della finestra, poi scende linearmente con la quota azionaria. Sull'obiettivo d'esempio a 20 anni (Crescita) il capitale richiesto oggi passa da €50.928 a €57.140 (+12%) rispetto al rendimento pieno.
+dove `rendimento_anno` è quello del profilo finché mancano più anni della finestra, poi scende linearmente con la quota azionaria. È il calendario annuale esatto (`motore_bootstrap.crescita_glide`), non l'approssimazione in due fasi del versamento. Sull'obiettivo d'esempio a 20 anni (Crescita) il capitale richiesto oggi passa da €50.928 a €57.140 (+12%) rispetto al rendimento pieno.
 
 Una riserva **permanente** (fondo di emergenza) è un caso diverso: non è in crescita verso una scadenza, la vuoi **disponibile adesso** al suo valore pieno. Il capitale richiesto è quindi l'**importo pieno di oggi**, tenuto in liquidità, non un valore scontato su un orizzonte. Trattarla a present value come gli altri obiettivi sarebbe un errore concettuale: una riserva di emergenza scontata di qualche anno non sarebbe più una riserva. (Il comportamento è disattivabile, ma è il default corretto.)
 
