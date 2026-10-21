@@ -17,7 +17,10 @@ Logica (goals-based, per valore attuale):
     accantonato).
   - Gli obiettivi TERMINANTI (università, casa…) ricevono il loro PRESENT VALUE:
     il capitale che, al rendimento atteso del profilo, cresce fino al target
-    nominale entro la scadenza.  PV = target_oggi * ((1+infl)/(1+r))^anni.
+    nominale entro la scadenza.  PV = target_nominale / Π(1 + r_anno), dove r_anno
+    segue il glide path (quota del profilo, poi discesa negli ultimi anni verso
+    l'atterraggio, come il versamento del foglio); senza de-risking è
+    target_oggi * ((1+infl)/(1+r))^anni.
   - Si alloca la somma in ordine di PRIORITÀ (essenziale > importante >
     desiderabile), poi per orizzonte crescente, fino a esaurimento.
   - Se la somma AVANZA, l'eccedenza è "capitale libero": va trattata come un
@@ -45,7 +48,8 @@ Uso:  python allocatore-capitale.py [percorso/pianificatore-obiettivi.xlsx] [cap
 import os
 import sys
 
-from motore_bootstrap import applica_override, percorso_json, scrivi_json, verifica_intestazioni_obiettivi
+from motore_bootstrap import (applica_override, crescita_glide, leggi_finestra_derisk, percorso_json,
+                              scrivi_json, verifica_intestazioni_obiettivi)
 
 try:
     from openpyxl import load_workbook
@@ -64,6 +68,8 @@ CAPITALE_LIBERO_SPLIT = [
     ("Eredità",             0.70, "Azionario totale"),
 ]
 TRATTA_PERMANENTI_A_VALORE_PIENO = True  # riserve permanenti = valore pieno in liquidità oggi
+FINESTRA_DERISK = None   # glide path dei terminanti: None = dal foglio (Parametri!B7); l'atterraggio è
+                         # il profilo con la quota azionaria più bassa (Preservazione, 0%)
 # ────────────────────────────────────────────────────────────────────────────
 
 # layout del foglio (coerente con pianificatore-obiettivi.xlsx)
@@ -81,6 +87,7 @@ def leggi_excel(path):
     obj = wb["Obiettivi"]
 
     inflazione = par.cell(row=INFL_ROW, column=2).value or 0.0
+    finestra = leggi_finestra_derisk(par)
 
     profili = {}
     for i in range(PROF_N):
@@ -112,22 +119,29 @@ def leggi_excel(path):
                 "priorita": (prio or "").strip().lower(),
                 "tipo": (tipo or "terminante").strip().lower(),
             })
-    return inflazione, profili, obiettivi
+    return inflazione, finestra, profili, obiettivi
 
 
-def present_value(target_oggi, inflazione, rend, anni):
-    """Capitale da mettere OGGI perché, al rendimento r, raggiunga il target nominale a scadenza."""
-    return target_oggi * ((1 + inflazione) / (1 + rend)) ** anni
+def present_value(target_oggi, inflazione, rend, anni, rend_atterraggio=None, finestra=0):
+    """Capitale da mettere OGGI perché raggiunga il target nominale a scadenza. Con
+    rend_atterraggio la crescita segue il glide path (obiettivi terminanti); senza, il
+    rendimento r del profilo per tutti gli anni."""
+    if rend_atterraggio is None:
+        return target_oggi * ((1 + inflazione) / (1 + rend)) ** anni
+    return target_oggi * (1 + inflazione) ** anni / crescita_glide(rend, rend_atterraggio, anni, finestra)
 
 
-def capitale_richiesto(g, inflazione, profili):
+def capitale_richiesto(g, inflazione, profili, finestra):
     """Capitale richiesto OGGI per finanziare l'obiettivo, al netto del già accantonato."""
-    rend, _, _ = profili[g["profilo"]]
+    rend, _, peso = profili[g["profilo"]]
     permanente = g["tipo"].startswith("perman")
     if permanente and TRATTA_PERMANENTI_A_VALORE_PIENO:
         lordo = g["target_oggi"]            # valore pieno, tenuto liquido oggi
     else:
-        lordo = present_value(g["target_oggi"], inflazione, rend, g["orizzonte"])
+        rend_l, _, peso_l = min(profili.values(), key=lambda p: p[2])   # atterraggio del glide path
+        glide = not permanente and peso > peso_l
+        lordo = present_value(g["target_oggi"], inflazione, rend, g["orizzonte"],
+                              rend_l if glide else None, finestra)
     return max(0.0, lordo - g["gia"]), permanente
 
 
@@ -136,12 +150,12 @@ def ordina(obiettivi):
     return sorted(obiettivi, key=lambda g: (RANK_PRIORITA.get(g["priorita"], 3), g["orizzonte"]))
 
 
-def alloca(obiettivi, capitale, inflazione, profili):
+def alloca(obiettivi, capitale, inflazione, profili, finestra):
     """Allocazione greedy del capitale per priorità/orizzonte. Ritorna le righe e l'eccedenza."""
     righe = []
     residuo = capitale
     for g in ordina(obiettivi):
-        rich, permanente = capitale_richiesto(g, inflazione, profili)
+        rich, permanente = capitale_richiesto(g, inflazione, profili, finestra)
         dato = min(rich, residuo)
         residuo -= dato
         righe.append({
@@ -200,14 +214,15 @@ def main():
         print(f"File non trovato: {path}")
         sys.exit(1)
 
-    inflazione, profili, obiettivi = leggi_excel(path)
+    inflazione, finestra_foglio, profili, obiettivi = leggi_excel(path)
+    finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     if PROFILO_CAPITALE_LIBERO not in profili:
         print(f"⚠️  Profilo capitale libero '{PROFILO_CAPITALE_LIBERO}' non in tabella.")
     if not obiettivi:
         print("Nessun obiettivo nel foglio. Compila il pianificatore prima.")
         sys.exit(1)
 
-    righe, residuo = alloca(obiettivi, capitale, inflazione, profili)
+    righe, residuo = alloca(obiettivi, capitale, inflazione, profili, finestra)
     tot_richiesto = sum(r["richiesto"] for r in righe)
     surplus = max(0.0, residuo)
     deficit = max(0.0, tot_richiesto - capitale)
@@ -276,6 +291,8 @@ def main():
     print("- Vista 'lump sum': il present value assume di finanziare l'obiettivo col solo")
     print("  capitale. Se versi anche mensilmente, il capitale richiesto SCENDE e l'eccedenza")
     print("  cresce — i versamenti sono la leva separata che gestisce montecarlo-obiettivi.py.")
+    print(f"- Terminanti col glide path: il present value sconta il de-risking degli ultimi {finestra}")
+    print("  anni (rendimento più basso vicino alla scadenza), come il versamento del foglio.")
     print("- Riserve permanenti al valore pieno: una riserva (fondo emergenza) la vuoi")
     print("  disponibile OGGI, non in crescita verso una scadenza. Spegni con")
     print("  TRATTA_PERMANENTI_A_VALORE_PIENO=False per trattarla a present value come le altre.")
