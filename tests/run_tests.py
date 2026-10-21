@@ -1525,6 +1525,20 @@ def t_t2_pubblici_etc():
     assert a["plus_realizzabili_a_costo_zero"] == 1_050, a
     assert abs(a["imposta_risparmiabile"] - (550 * 0.125 + 500 * 0.26)) < 0.02, a
     assert set(a["per_broker"]) == {"Fineco"}, a
+    # Revisione di T2: nomi che somigliano a emittenti pubblici, ETC o indici senza esserlo
+    rc, d, out = _importa(_fx("estratto-falsi-positivi.csv"), "--anno", "2026")
+    assert rc == 0 and d, out[-400:]
+    pos = {p["descrizione"]: p for p in d["posizioni"]}
+    for nome in ("UBS Bloomberg US Treasury Bond 1-10", "JPM BetaBuilders US Treasury Bond 0-1 yr",
+                 "OATLY GROUP AB ADR", "ETFS Brent Crude", "Bundesrepublik Deutschland"):
+        assert pos[nome]["categoria_fiscale"] == "da_classificare", pos[nome]
+    for nome in ("BUNDESIMMOBILIENGESELLSCHAFT 3,375% 2030", "OESTERREICHISCHE BUNDESBAHNEN 3% 2033",
+                 "OATLY GROUP 9,25% 2028"):
+        assert pos[nome]["categoria_fiscale"] == "reddito_diverso" and pos[nome]["aliquota"] == 26, pos[nome]
+    for nome in ("ETFS Physical Gold", "MSCI Inc", "S&P Global Inc", "World Kinect Corp"):
+        assert pos[nome]["categoria_fiscale"] == "reddito_diverso", pos[nome]
+    assert pos["Xtrackers FTSE Developed Europe Real Estate UCITS ETF"]["categoria_fiscale"] == "reddito_capitale"
+    assert not any(p["aliquota"] == 12.5 or p["categoria_fiscale"] == "reddito_capitale_irpef" for p in d["posizioni"])
 
 
 @test("T2 importatore: zainetto per anno di scadenza, residuo accanto al lordo, righe anomale")
@@ -1541,12 +1555,20 @@ def t_t2_zainetto_colonne():
     assert any("scadenza" in av for av in d["avvisi"]), d["avvisi"]
     rc, testo = run_script(IMPORTATORE, estratto, _fx("zainetto-scadenza.csv"), "--anno", "2026")
     assert rc == 0 and "Priorità" in testo, testo[-400:]
-    for nome in ("zainetto-lordo-residuo.csv", "zainetto-plurale.csv", "zainetto-utilizzato.csv"):
+    # lordo 5.000, utilizzato 1.000 e residuo 500: vale il residuo, non lordo − utilizzato
+    for nome in ("zainetto-lordo-residuo.csv", "zainetto-plurale.csv", "zainetto-utilizzato.csv",
+                 "zainetto-compensabili.csv"):
         rc, d, out = _importa(estratto, _fx(nome), "--anno", "2026")
         assert rc == 0 and d, f"{nome}: {out[-300:]}"
         assert d["analisi"]["zainetto_totale"] == 500, f"{nome}: {d['analisi']}"
         if nome != "zainetto-plurale.csv":
             assert any("residu" in av.lower() for av in d["avvisi"]), f"{nome}: {d['avvisi']}"
+    rc, d, out = _importa(estratto, _fx("zainetto-esercizio-scadenza.csv"), "--anno", "2026")
+    assert rc == 0 and d["zainetto"][0]["anno"] == 2022 and d["zainetto"][0]["stato"] == "in_scadenza", out[-300:]
+    # CSV con la virgola come delimitatore e importi interi all'italiana: «1.500» sono millecinquecento
+    rc, d, out = _importa(estratto, _fx("zainetto-virgola-interi.csv"), "--anno", "2026")
+    assert rc == 0 and d["analisi"]["zainetto_totale"] == 3_500, out[-300:]
+    assert any(av.startswith("zainetto: formato numeri") for av in d["avvisi"]), d["avvisi"]
     rc, d, out = _importa(estratto, _fx("zainetto-anomalie.csv"), "--anno", "2026")
     assert rc == 0 and d, out[-400:]
     assert d["analisi"]["zainetto_totale"] == 1_000, d["analisi"]          # la riga senza anno resta fuori
@@ -1586,6 +1608,17 @@ def t_t2_numeri_colonne():
         rc, d, out = _importa(natura)
         assert rc == 0 and d["posizioni"][0]["categoria_fiscale"] == "reddito_diverso", out[-300:]
         assert d["posizioni"][0]["fonte_categoria"] == "descrizione", d["posizioni"][0]
+        assert not any("tipo fiscale" in av for av in d["avvisi"]), d["avvisi"]
+        ambiguo = os.path.join(tmp, "ambiguo.csv")
+        with open(ambiguo, "w", encoding="utf-8") as f:
+            f.write("Anno realizzo;Importo;Ammontare;Aliquota\n2024;5.000,00;500,00;26%\n")
+        rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), ambiguo)
+        assert rc == 2 and "Traceback" not in out and "ambigu" in out, out[-300:]
+        vuota = os.path.join(tmp, "vuota.csv")
+        with open(vuota, "w", encoding="utf-8") as f:
+            f.write("Anno realizzo;Minusvalenza residua;Aliquota\n2024;1.000,00;\n")
+        rc, d, out = _importa(_fx("estratto-migliaia-it.csv"), vuota)
+        assert rc == 0 and any("riga 2" in av and "aliquota" in av for av in d["avvisi"]), out[-300:]
         zain = os.path.join(tmp, "zainetto.csv")
         with open(zain, "w", encoding="utf-8") as f:
             f.write("Anno realizzo;Minusvalenza residua;Aliquota\n2024;1.000,00;30%\n")
