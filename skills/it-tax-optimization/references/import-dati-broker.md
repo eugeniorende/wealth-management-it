@@ -36,10 +36,17 @@ broker, e:
 1. calcola le **plus/minus latenti** per ogni posizione (valore di mercato − costo di carico, cioè il
    PMC del broker, che in amministrato è la base fiscale);
 2. assegna a ogni posizione la **categoria fiscale**: dalla colonna «tipo fiscale» se c'è, altrimenti
-   dalla descrizione (vedi sotto). Le plus di ETF e fondi sono reddito di capitale e non entrano tra
-   le compensabili; quelle degli OICR fuori UE/SEE sono segnalate come IRPEF (quadro RL);
-3. deduce l'**aliquota**: 12,5% per i titoli di Stato italiani (ISIN IT e BTP/BOT/CCT/CTZ in
-   descrizione), 26% per il resto, salvo una colonna «aliquota» nel file;
+   dalla descrizione (vedi sotto). Le plus di ETF e fondi mobiliari sono reddito di capitale e non
+   entrano tra le compensabili; quelle degli OICR fuori UE/SEE sono segnalate come IRPEF (quadro RL);
+3. deduce l'**aliquota**, salvo una colonna «aliquota» nel file. Il 12,5% spetta ai titoli di Stato
+   italiani e agli equiparati (enti territoriali, organismi internazionali come BEI e BIRS) e alle
+   obbligazioni degli Stati della white list e dei loro enti territoriali (art. 6 c. 1 D.Lgs. 461/97
+   → art. 306 c. 1 TU 2027; vedi `aliquote-12-5-26.md`). Lo script lo riconosce dalla descrizione per
+   BTP, BOT, CCT, CTZ ed enti territoriali italiani (con ISIN IT o senza ISIN), per Bund, OAT, Bonos,
+   Treasury, Gilt e JGB e per BEI, BERS, BIRS e le altre banche multilaterali. Le altre obbligazioni
+   con ISIN estero restano al 26% **con un avviso**: se sono di uno Stato white list, di un suo ente
+   territoriale (per esempio un Land tedesco) o di un organismo internazionale, l'aliquota va
+   indicata nella colonna;
 4. se gli passi anche un CSV con lo **zainetto** (un secondo file, perché vive nella certificazione),
    calcola la **scadenza** di ogni minus (31/12 del quarto anno successivo), esclude quelle scadute
    rispetto a `--anno`, converte il 12,5% in «26%-equivalente» nei due versi e ti dice **quanta plus
@@ -60,21 +67,32 @@ riconosciute, aliquote ignote) escono con un messaggio leggibile e codice 2. Sol
 ### Come classifica senza la colonna «tipo fiscale»
 
 La categoria si deduce dalla **descrizione**, non dal prefisso dell'ISIN: DE, FR, IE e LU coprono anche
-azioni singole come SAP o LVMH, ed ETC ed ETN con ISIN IE o JE non sono fondi.
+azioni singole come SAP o LVMH, ed ETC ed ETN con ISIN IE o JE non sono fondi. Le regole, nell'ordine:
 - ETC, ETN, ETP e certificate → reddito diverso.
-- «ETF», «UCITS», «fondo», «SICAV» o il nome di un emittente di ETF (iShares, Vanguard, Xtrackers,
-  Amundi, Lyxor, SPDR, Invesco, VanEck, WisdomTree) → OICR: reddito di capitale se l'ISIN è di un
-  Paese UE/SEE, `reddito_capitale_irpef` se è di un altro Paese (per esempio un ETF domiciliato negli
-  USA), da classificare se la descrizione dice «non armonizzato» (dipende dal gestore).
-- Azioni riconoscibili dalla forma societaria (SpA, SE, AG, SA, NV, PLC, Inc) → reddito diverso.
+- «ETF», «UCITS», «fondo», «fund(s)» o «SICAV» → OICR: reddito di capitale se l'ISIN è di un Paese
+  UE/SEE, `reddito_capitale_irpef` se è di un altro Paese (per esempio un ETF domiciliato negli USA),
+  da classificare se la descrizione dice «non armonizzato» (dipende dal gestore) o se è un fondo
+  immobiliare (plus e minus seguono regole proprie, art. 7 DL 351/2001).
+- «Physical» o «fisico» senza la parola ETF (per esempio «WisdomTree Physical Gold», «iShares Physical
+  Gold») → ETC fisico, reddito diverso.
+- Il solo nome di un emittente (iShares, Vanguard, Xtrackers, Amundi, Lyxor, SPDR, Invesco, VanEck,
+  WisdomTree) non basta, perché gli stessi emittenti fanno anche ETC, e alcuni hanno azioni quotate:
+  con un indice nella descrizione (MSCI, FTSE, S&P, STOXX…) e ISIN UE/SEE è un ETF, reddito di capitale;
+  altrimenti resta **da classificare**. Dal solo nome non si deduce mai la tassazione IRPEF.
+- Azioni riconoscibili dalla forma societaria (SpA, SE, AG, SA, NV, PLC, Inc) → reddito diverso, ma non
+  se la descrizione contiene un indice: «… High Dividend Yield Inc» è la classe a distribuzione di un
+  ETF, e resta da classificare.
 - Obbligazioni e titoli di Stato → reddito diverso, al netto di ratei e scarto di emissione maturati.
-  BOT, CTZ e zero coupon restano **da classificare**: la loro plus latente è in gran parte scarto di
-  emissione, cioè reddito di capitale.
+  BOT, CTZ, BTF, T-Bill e zero coupon restano **da classificare**: la loro plus latente è in gran parte
+  scarto di emissione, cioè reddito di capitale.
 - Nessun indizio → **da classificare**: la plus non viene contata tra le compensabili e il report
   chiede di indicarne la categoria. Non si assume mai «reddito diverso».
 
 Valori accettati nella colonna «tipo fiscale»: `reddito_diverso`, `reddito_capitale`,
-`reddito_capitale_irpef`, `da_classificare` (o le forme brevi «diverso», «capitale»).
+`reddito_capitale_irpef`, `da_classificare` (o le forme brevi «diverso», «capitale»; «Redditi diversi
+(capital gain)» è reddito diverso). Un valore non riconosciuto è segnalato negli avvisi e vale la
+categoria dedotta dalla descrizione. La colonna si chiama «tipo fiscale», «categoria fiscale» o
+«natura fiscale»: una «Natura strumento» (azione, ETF) non è letta come categoria fiscale.
 
 ## Il parser è tollerante ai formati (deve esserlo)
 
@@ -83,14 +101,23 @@ standard**. Per questo il parser non assume colonne fisse: riconosce i nomi-colo
 dossier italiani con un dizionario di sinonimi e un matching tollerante (ignora maiuscole, accenti,
 spazi, e gestisce sia i numeri all'italiana `1.234,56` sia all'inglese `1,234.56`). Il formato si
 decide **per file**: se in una colonna numerica compare una virgola decimale (`12,40`), il file è
-all'italiana e `1.000` o `1.234.567` sono migliaia; se il file non dà indizi, `1.000` è letto come
-mille e il report lo segnala. Le righe senza costo o valore leggibili sono scartate con un avviso,
-mai in silenzio. Riconosce per esempio `ISIN`/`Codice ISIN`, `Descrizione`/`Strumento`/`Titolo`, `Quantità`/`Pezzi`,
+all'italiana e `1.000` o `1.234.567` sono migliaia. Se il file non dà indizi (nessun decimale) o dà
+indizi in conflitto, decide il delimitatore: con `;` il file è all'italiana, con `,` all'inglese
+(`"1,000"` vale mille); in ogni caso il report elenca le celle il cui valore dipende dal formato.
+Le righe senza costo o valore leggibili sono scartate con un avviso, mai in silenzio. Riconosce per esempio `ISIN`/`Codice ISIN`, `Descrizione`/`Strumento`/`Titolo`, `Quantità`/`Pezzi`,
 `Prezzo medio di carico`/`PMC`/`Prezzo di carico`, `Controvalore`/`Valore di mercato`. Se il tuo
 export usa nomi che non riconosce, li aggiungi ai dizionari `SINONIMI` in testa allo script — è una
 riga. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il formato atteso: sugli
 esempi le uniche plus sono di un ETF, quindi l'importatore risponde «€ 0 a imposta zero».
-Lo zainetto accetta le colonne anno, importo, aliquota e, se serve, broker.
+Lo zainetto accetta le colonne anno di **realizzo** (non di scadenza), importo residuo, aliquota e,
+se serve, broker. Le varianti della certificazione sono gestite con un avviso:
+- solo l'anno di scadenza («Anno di scadenza», «Utilizzabile fino al»): l'anno di realizzo è la
+  scadenza meno 4;
+- la minus lorda accanto al residuo («Minusvalenza» e «Residuo»): vale il residuo;
+- la minus lorda e l'utilizzato, senza residuo: residuo = lorda − utilizzato.
+
+Le righe senza anno sono escluse (scadenza ignota); un'aliquota vuota, «-» o «n.d.» vale 26% con un
+avviso, mentre un numero diverso da 26 e 12,5 ferma l'import con il nome del file e la riga.
 
 ## Come esportare da ciascun broker
 
@@ -115,8 +142,8 @@ pilota.
   parser dedicato per ciascun broker ed è rimandato.
 - **Lo zainetto è un input separato.** Sta in un documento diverso (la certificazione) rispetto
   all'estratto delle posizioni, quindi è un secondo CSV opzionale, non ricavabile dalle posizioni.
-- **La classificazione dalla descrizione è un'euristica.** La plus da vendita di ETF e fondi è reddito
-  di **capitale** e non compensa lo zainetto (art. 44 c. 1 lett. g TUIR; circ. AdE 21/E/2014); solo
+- **La classificazione dalla descrizione è un'euristica.** La plus da vendita di ETF e fondi mobiliari
+  è reddito di **capitale** e non compensa lo zainetto (art. 44 c. 1 lett. g TUIR; circ. AdE 21/E/2014); solo
   la minus è reddito diverso (vedi `etf-trap-redditi-capitale.md`). Lo script lo applica, ma
   riconosce gli strumenti dalla descrizione: quando sbaglia o non sa, la colonna «tipo fiscale»
   nel CSV ha la precedenza, e le posizioni senza indizi restano da classificare.

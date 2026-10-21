@@ -118,12 +118,13 @@ Se `categoria_fiscale` non fornita, dedurla:
 - ETF o fondo non armonizzato (non UCITS) → `reddito_capitale` se istituito in UE/SEE white list con gestore vigilato, altrimenti (per esempio ETF domiciliati negli USA) `reddito_capitale_irpef`: la plus concorre al reddito complessivo e va nel quadro RL anche in amministrato. Vendita in perdita: la *minus* è reddito diverso.
 - Nessun indizio dalla descrizione (né ETF o fondo, né azione, né obbligazione) → `da_classificare`: chiedere, non assumere `reddito_diverso`
 - Obbligazioni e titoli di Stato: cedole, ratei e scarto di emissione (differenza tra prezzo di emissione e rimborso, maturata pro rata) = `reddito_capitale`; `reddito_diverso` solo la differenza tra corrispettivo o rimborso e costo d'acquisto, al netto dei redditi di capitale maturati. Un BOT, un CTZ o uno zero coupon sottoscritto all'emissione e tenuto a scadenza non genera reddito diverso e non consuma zainetto.
-- ETC fisico (materie prime) → caso a caso, in dubbio chiedere
+- ETC fisico (materie prime) → `reddito_diverso` come gli altri ETC; se dalla descrizione non si capisce se è un ETC o un ETF (solo il nome dell'emittente, per esempio «WisdomTree Gold») → `da_classificare`, chiedere
 
 Se `aliquota` non fornita, dedurla:
 - ISIN che inizia con `IT000` + titolo di Stato/ente pubblico → 12,5%
 - BTP/BOT/CCT/CTZ identificati per descrizione → 12,5%
 - Titoli di Stato esteri (Treasury USA, Bund, OAT, Gilt, JGB) → 12,5% (whitelist)
+- Organismi internazionali (BEI, BERS, BIRS…) ed enti territoriali di Stati white list → 12,5%. L'importatore riconosce per nome solo i casi più comuni: per le altre obbligazioni estere assume il 26% e lo segnala, e l'aliquota va indicata nella colonna
 - Tutto il resto → 26%
 - ETF UCITS su titoli di Stato: NON 12,5% pulito → 26% di default con caveat (vedi `references/aliquote-12-5-26.md`)
 

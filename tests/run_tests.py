@@ -832,6 +832,112 @@ def t_t2_broker_json_errori():
     assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
 
 
+def _fx(nome):
+    return os.path.join(FIXTURES, nome)
+
+
+@test("T2 importatore: 12,5% a Stati white list, enti territoriali e sovranazionali; ETC e nomi di emittenti senza default rischiosi")
+def t_t2_pubblici_etc():
+    # REGRESSIONE revisione T2: Bund, Treasury e BEI uscivano al 26% senza avviso (art. 6 c. 1
+    # D.Lgs. 461/97 → art. 306 c. 1 TU 2027); «WisdomTree Physical Gold» (JE) finiva a IRPEF
+    # con quadro RL; «Vanguard … Inc» e «ISHARES III PLC» erano azioni con la plus compensabile.
+    rc, d, out = _importa(_fx("estratto-pubblici-etc.csv"), _fx("zainetto-un-broker.csv"), "--anno", "2026")
+    assert rc == 0 and d, out[-400:]
+    pos = {p["descrizione"]: p for p in d["posizioni"]}
+    for nome in ("Bund 0% 15/02/2032", "BEI 1,5% 15/11/2030", "US Treasury 4,5% 15/11/2033",
+                 "Comune di Roma 5,345% 2048", "Land Berlin 1% 2030", "BTP 2,5% 01/12/2032"):
+        assert pos[nome]["categoria_fiscale"] == "reddito_diverso" and pos[nome]["aliquota"] == 12.5, pos[nome]
+    enel = pos["Enel Finance 3% 2030"]
+    assert enel["categoria_fiscale"] == "reddito_diverso" and enel["aliquota"] == 26, enel
+    avvisi_aliquota = [av for av in d["avvisi"] if "12,5%" in av]
+    assert any("Enel Finance" in av for av in avvisi_aliquota), d["avvisi"]
+    assert not any(re.search(r"Bund|BEI|Treasury|Comune|Land Berlin|BTP", av) for av in avvisi_aliquota), avvisi_aliquota
+    for nome in ("WisdomTree Physical Gold", "iShares Physical Gold"):
+        assert pos[nome]["categoria_fiscale"] == "reddito_diverso", pos[nome]
+    assert pos["Vanguard FTSE All-World High Dividend Yield Inc"]["categoria_fiscale"] == "reddito_capitale"
+    for nome in ("ISHARES III PLC", "WisdomTree Brent Crude Oil", "Fondo Esempio non armonizzato",
+                 "Fondo Immobiliare Esempio", "HSBC MSCI World Inc", "SPDR S&P 500 Trust"):
+        assert pos[nome]["categoria_fiscale"] == "da_classificare", pos[nome]
+    assert not any(p["categoria_fiscale"] == "reddito_capitale_irpef" for p in d["posizioni"])
+    a = d["analisi"]
+    assert a["plus_latenti_compensabili"] == 1_050 and a["plus_non_compensabili"] == 100, a
+    assert a["plus_da_classificare"] == 270 and a["plus_irpef"] == 0, a
+    # 1.000 di minus al 26% coprono prima i 550 al 12,5% (264,42 in 26%-equivalente), poi i 500 al 26%
+    assert a["plus_realizzabili_a_costo_zero"] == 1_050, a
+    assert abs(a["imposta_risparmiabile"] - (550 * 0.125 + 500 * 0.26)) < 0.02, a
+    assert set(a["per_broker"]) == {"Fineco"}, a
+
+
+@test("T2 importatore: zainetto per anno di scadenza, residuo accanto al lordo, righe anomale")
+def t_t2_zainetto_colonne():
+    # REGRESSIONE revisione T2: «Anno di scadenza» era letto come anno di realizzo (+4 anni);
+    # con «Minusvalenza» e «Residuo» vinceva il lordo; «-» nell'aliquota fermava tutto l'import.
+    estratto = _fx("estratto-migliaia-it.csv")
+    rc, d, out = _importa(estratto, _fx("zainetto-scadenza.csv"), "--anno", "2026")
+    assert rc == 0 and d, out[-400:]
+    z = sorted(d["zainetto"], key=lambda r: r["anno"])
+    assert [r["anno"] for r in z] == [2022, 2023], z
+    assert z[0]["scade_il"] == "31/12/2026" and z[0]["stato"] == "in_scadenza", z
+    assert d["analisi"]["zainetto_in_scadenza"] == 1_000 and d["analisi"]["zainetto_totale"] == 1_800, d["analisi"]
+    assert any("scadenza" in av for av in d["avvisi"]), d["avvisi"]
+    rc, testo = run_script(IMPORTATORE, estratto, _fx("zainetto-scadenza.csv"), "--anno", "2026")
+    assert rc == 0 and "Priorità" in testo, testo[-400:]
+    for nome in ("zainetto-lordo-residuo.csv", "zainetto-plurale.csv", "zainetto-utilizzato.csv"):
+        rc, d, out = _importa(estratto, _fx(nome), "--anno", "2026")
+        assert rc == 0 and d, f"{nome}: {out[-300:]}"
+        assert d["analisi"]["zainetto_totale"] == 500, f"{nome}: {d['analisi']}"
+        if nome != "zainetto-plurale.csv":
+            assert any("residu" in av.lower() for av in d["avvisi"]), f"{nome}: {d['avvisi']}"
+    rc, d, out = _importa(estratto, _fx("zainetto-anomalie.csv"), "--anno", "2026")
+    assert rc == 0 and d, out[-400:]
+    assert d["analisi"]["zainetto_totale"] == 1_000, d["analisi"]          # la riga senza anno resta fuori
+    assert [r["stato"] for r in d["zainetto"]].count("anno_mancante") == 1, d["zainetto"]
+    assert any("riga 3" in av and "aliquota" in av for av in d["avvisi"]), d["avvisi"]
+
+
+@test("T2 importatore: numeri senza indizi di formato, colonna tipo fiscale, broker unico, errori di input")
+def t_t2_numeri_colonne():
+    # REGRESSIONE revisione T2: «1,000» in un CSV con la virgola come delimitatore diventava 1;
+    # «Redditi diversi (capital gain)» diventava reddito di capitale; «Natura strumento» era
+    # scambiata per il tipo fiscale; errori su aliquota e cartelle senza file né riga.
+    for nome in ("estratto-migliaia-it.csv", "estratto-migliaia-en.csv"):
+        rc, d, out = _importa(_fx(nome))
+        assert rc == 0 and d, f"{nome}: {out[-300:]}"
+        sap = d["posizioni"][0]
+        assert sap["costo"] == 120_000 and sap["valore"] == 150_000, f"{nome}: {sap}"
+        assert any("formato numeri" in av for av in d["avvisi"]), f"{nome}: {d['avvisi']}"
+    rc, d, out = _importa(_fx("estratto-tipo-fiscale.csv"))
+    assert rc == 0 and d, out[-400:]
+    pos = {p["isin"]: p for p in d["posizioni"]}
+    assert pos["IE00B4L5Y983"]["categoria_fiscale"] == "reddito_capitale_irpef", pos["IE00B4L5Y983"]
+    assert pos["IE00B4L5Y983"]["costo"] == 10_000 and pos["IE00B4L5Y983"]["valore"] == 12_000, pos["IE00B4L5Y983"]
+    assert pos["US0378331005"]["categoria_fiscale"] == "reddito_diverso", pos["US0378331005"]
+    assert pos["IE00B5BMR087"]["categoria_fiscale"] == "reddito_capitale", pos["IE00B5BMR087"]
+    assert any("boh" in av for av in d["avvisi"]), d["avvisi"]
+    rc, d, out = _importa(_fx("estratto-migliaia-it.csv"), _fx("zainetto-un-broker.csv"), "--anno", "2026")
+    assert rc == 0 and d["analisi"]["plus_realizzabili_a_costo_zero"] == 1_000, out[-400:]
+    rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), _fx("zainetto-multibroker.csv"))
+    assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
+    tmp = tempfile.mkdtemp()
+    try:
+        natura = os.path.join(tmp, "natura.csv")
+        with open(natura, "w", encoding="utf-8") as f:
+            f.write("ISIN;Descrizione;Natura strumento;Quantità;Prezzo medio di carico;Controvalore\n"
+                    "DE0007164600;SAP SE;Azione;10;100,00;1.500,00\n")
+        rc, d, out = _importa(natura)
+        assert rc == 0 and d["posizioni"][0]["categoria_fiscale"] == "reddito_diverso", out[-300:]
+        assert d["posizioni"][0]["fonte_categoria"] == "descrizione", d["posizioni"][0]
+        zain = os.path.join(tmp, "zainetto.csv")
+        with open(zain, "w", encoding="utf-8") as f:
+            f.write("Anno realizzo;Minusvalenza residua;Aliquota\n2024;1.000,00;30%\n")
+        rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), zain)
+        assert rc == 2 and "Traceback" not in out and "zainetto.csv" in out and "riga 2" in out, out[-300:]
+        rc, out = run_script(IMPORTATORE, tmp)
+        assert rc == 2 and "Traceback" not in out, out[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════════ fiscalità e tracker ══════════════════════
 
 @test("netto-pensione: IRPEF 2026, detrazioni e aliquota rendita FP (valori chiusi)")
