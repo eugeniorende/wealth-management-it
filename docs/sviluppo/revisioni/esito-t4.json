@@ -1,0 +1,36 @@
+{
+ "branch": "feature/t4-fondo-pensione",
+ "applicati": [
+  "Prima: incorporato feature/t5-pensione-pubblica corretto (conflitto solo sull'xlsx dei dipendenti: tenuta la versione di T4 e riapplicata la nuova Pubblica!E5 di T5, poi ricalcolo) e develop",
+  "Confermato 0 (netto-pensione tassa tutta la rendita, la reference dice il contrario): parametro QUOTA_IMPONIBILE_FP (default 1,0, prudente), funzione rendita_netta_fp, JSON con la quota, docstring; rimando corretto in proiezione-tenore-vita.md; «leggermente» tolto da ponte-pensione.py — t_netto_quota_imponibile",
+  "Confermato 1 (esempio J1): tassa in uscita sui soli €66.000 dedotti all'11,4%, netto ≈ €91.000, totale ≈ €112.800; riga 34 sulla base — integrazione-fiscale-joint.md",
+  "Confermato 2 + conteso 0 (stime vecchie del vantaggio del TFR nel fondo): riga 74 ed euristica 6 di previdenza-complementare.md con il vantaggio fiscale certo (~23-27% contro 9-15% sulle quote, ~€7.700) separato da quello di rendimento, come scenario e non raccomandazione",
+  "Confermati 3 e 5 (sequenza-liquidazione.md): base imponibile su TFR e contributi dedotti, capitale al 50%, nuove forme con il limite dei prelievi, irrevocabilità e transitorio COVIP; «agevolato ma rigido» attenuato; SKILL.md:356 col caso del 100%",
+  "Confermato 6 + non verificato 11 (nuove forme senza vincoli): limite dei prelievi (c. 3-quater), elenco dei vincoli (alternative non combinabili, irrevocabilità, niente RITA in corso né versamenti, residuo ai beneficiari c. 3-quinquies, transitorio al 31/12/2026), lascito nella vitalizia, «Regola pratica» riscritta come confronto di scenari senza il default 50/50",
+  "Confermato 4 + conteso 2 (plafond cablato nel foglio autonomi): Fiscalità!B8:C8 usano Input!B48; test che nessuna formula dei due xlsx contenga 5300 o 5164 e variante con plafond 5.164,57",
+  "Conteso 1 (confronto TFR col saldo già maturato nel fondo): il TFR maturato resta in azienda (art. 8 c. 7), quindi con B21=0 il blocco confronta le sole quote future (M5, N5, B81, B82, intestazione e nota); test: il delta non dipende dal saldo",
+  "Conteso 2 di T5 (rendimento del comparto non dichiarato reale): Input!A28/C28 «netto reale» al 2,5% come montecarlo-pensione.py, Scenari!A9, nota del Complementare; esempio TFR rifatto al 2,5% reale (delta €40.121,51, fondo +54%) in SKILL.md, previdenza-complementare.md e proiezione-tenore-vita.md; SKILL.md Step 3 distingue nominale e reale — t_rendimento_reale_fondo",
+  "Non verificati 0, 1, 2, 3 (test che non arrivavano al plafond, alle righe dopo la prima, alle colonne B/D degli Scenari, allo scaglione al 43% e al montante già accumulato degli autonomi): varianti ral60k, ral150k, ordinario_montante, forf_montante e replica anno per anno; mutanti verificati (K senza plafond, I = tutto il volontario, J = 0, Scenari con i parametri della colonna C, 43% → 33%, saldo nel fondo, B60 senza B31, Fiscalità a 5300)",
+  "Non verificato 4 (asserzioni testuali deboli): ancorate alle frasi nuove (non dedotti entro il 31/12 con la perdita del 9-15%, base sulle sole quote)",
+  "Non verificato 5 (gap con il TFR in azienda): riga 34 degli Scenari con la rendita equivalente al 5,5%, fuori dal gap, e nota in SKILL.md",
+  "Non verificato 8 (doppie citazioni): art. 11 c. 6 D.Lgs. 252/2005 con «dal 2027 art. 258 c. 4 D.Lgs. 117/2026» in reference, SKILL.md, fiscalita-forfettario.md, sequenza-liquidazione.md e note degli Excel (mappa verificata in docs/sviluppo/t11); test di paragrafo",
+  "Non verificato 9 (esempio RAL 60k): risparmio ≈ €2.194/anno (ultimi ~€850 al 33%), ≈ €65.800 in 30 anni; il test lo ricalcola con netto-pensione.py",
+  "Non verificato 10 (rendita in erogazione): la parte della rata dai rendimenti maturati in erogazione paga il 26% (12,5% titoli di Stato), in previdenza-complementare.md, proiezione-tenore-vita.md e docstring di netto-pensione.py",
+  "Non verificato 12 (forbice +30-80% che non contiene l'esempio): +30-90%, e il test controlla che l'esempio calcolato stia nella forbice"
+ ],
+ "scartati": [
+  {
+   "titolo": "Non verificato 6 (plafond di €5.300 non deflazionato)",
+   "motivo": "Convenzione del plugin: regole fiscali di oggi su importi in euro di oggi (netto-pensione.py), quindi le soglie restano costanti in termini reali come gli scaglioni del foglio Pubblica. Dichiarata in Scenari!A28, SKILL.md e previdenza-complementare.md, con l'effetto se la legge non aggiorna le soglie"
+  },
+  {
+   "titolo": "Non verificato 7 (scaglioni 2026 su reddito di riferimento in euro di oggi)",
+   "motivo": "Stessa convenzione: confrontare un importo nominale con scaglioni nominali fermi per 30 anni equivale a ipotizzare il drenaggio fiscale pieno; il foglio usa soglie di oggi in euro di oggi e ora lo dichiara («a scaglioni di oggi»), segnalando che senza aggiornamenti il vantaggio del fondo cresce"
+  },
+  {
+   "titolo": "Citazioni dal 2027 di artt. 17 e 19 TUIR e art. 11 c. 3 D.Lgs. 47/2000",
+   "motivo": "Successori non confermati nella mappa verificata (docs/sviluppo/t11/mappa-nuovo-tuir.md, «Da verificare»): restano alla seconda parte di T11"
+  }
+ ],
+ "note": "Normattiva e INPS non sono raggiungibili da questa sessione: i dati normativi nuovi (c. 3-quater e 3-quinquies, delibera COVIP 25/6/2026, art. 44 lett. g-quinquies) vengono dalle letture su fonte primaria registrate dai verificatori in review-t4.json."
+}

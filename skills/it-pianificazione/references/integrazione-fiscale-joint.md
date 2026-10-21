@@ -32,7 +32,7 @@ Deducibili:
 - **A — Fondo pensione complementare** (entro €5.300 deducibili):
   - Deduzione IRPEF immediata = €X × aliquota_marginale
   - Capitalizzazione interna tassata 20% (12,5% titoli Stato)
-  - Tassazione finale 9-15% (in base ad anni partecipazione)
+  - Tassazione finale 9-15% (in base ad anni partecipazione) sui soli contributi dedotti e TFR conferito; rendimenti già tassati e non dedotti comunicati esclusi
 - **B — Investimento finanziario su dossier titoli normale** (ETF/azioni):
   - No deduzione IRPEF
   - Tassazione 26% sui gains realizzati (12,5% se titoli Stato whitelist)
@@ -54,9 +54,12 @@ Scenario A — €3.000/anno al fondo pensione (bilanciato, rendimento netto 3,5
   Risparmio IRPEF annuo: €3.000 × 33% = €990
   Risparmio IRPEF cumulato: €990 × 22 = €21.780
   Montante a pensione (capitalizzato 22 anni): €98.500
-  Aliquota finale fondo: ~12% (27 anni partecipazione)
-  Netto finale: €86.700
-  TOTALE valore: €86.700 + €21.780 = €108.480 (in nominale)
+  Aliquota finale fondo: 11,4% (27 anni di partecipazione: 15% − 0,30 × 12)
+  Tassa in uscita: €66.000 di contributi dedotti (€3.000 × 22) × 11,4% ≈ €7.500;
+    i rendimenti, già tassati al 20% nel fondo, sono esclusi (art. 11 c. 6
+    D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026)
+  Netto finale: ≈ €91.000
+  TOTALE valore: ≈ €91.000 + €21.780 ≈ €112.800 (in nominale)
 
 Scenario B — €3.000/anno su ETF MSCI World UCITS (rendimento lordo 6%)
   Nessuna deduzione IRPEF
