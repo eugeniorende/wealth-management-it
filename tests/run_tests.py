@@ -1854,6 +1854,19 @@ def t_revisione_testi():
         "SKILL.md cita ancora recalc.py del sandbox claude.ai"
 
 
+@test("revisione: spazio deducibile residuo del fondo (plafond − datore − dovuto) e perdita sui non dedotti non comunicati")
+def t_revisione_spazio_deducibile():
+    # Nota del § 4 dell'handoff (T10 dopo T4): la revisione di fine anno deve dire quanto resta
+    # deducibile e quanto costa non comunicare i non dedotti.
+    for rel in ("skills/it-revisione/SKILL.md", "skills/it-revisione/references/metodo-revisione.md",
+                "skills/it-revisione/assets/template-revisione.md", "commands/revisione.md"):
+        testo = " ".join(open(os.path.join(ROOT, rel), encoding="utf-8").read().split())
+        assert "spazio deducibile residuo" in testo, f"{rel}: manca lo spazio deducibile residuo"
+        assert re.search(r"5\.300 − (?:contributo del )?datore − (?:contributo )?dovuto", testo), \
+            f"{rel}: lo spazio residuo va calcolato come plafond − datore − dovuto"
+        assert re.search(r"non dedott[^.]*9-15%", testo), f"{rel}: manca la perdita del 9-15% sui non dedotti non comunicati"
+
+
 @test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")
 def t_non_dedotti():
     # REGRESSIONE F020: senza comunicazione al fondo entro il 31/12 dell'anno successivo,

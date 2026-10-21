@@ -15,7 +15,7 @@ Workflow (cinque passi):
 
 2. **Cosa è cambiato**: versamenti effettuati vs pianificati, drift dell'allocazione, eventi della vita (reddito, figli, casa, passaggio dipendente↔P.IVA), novità normative (Legge di Bilancio).
 
-3. **Avanzamento per dominio** (richiamando le altre skill): pensione → gap previdenziale e tasso di sostituzione; obiettivi → on track / probabilità Monte Carlo / glide path; fiscalità → minusvalenze in scadenza al 31/12 e harvesting; allocazione → drift vs target.
+3. **Avanzamento per dominio** (richiamando le altre skill): pensione → gap previdenziale e tasso di sostituzione, spazio deducibile residuo del fondo (€5.300 − datore − dovuto, tetto fiscale e non importo consigliato) e contributi non dedotti da comunicare (senza comunicazione si perde il 9-15% di quella parte); obiettivi → on track / probabilità Monte Carlo / glide path; fiscalità → minusvalenze in scadenza al 31/12 e harvesting; allocazione → drift vs target.
 
 4. **Azioni prioritizzate**, in ordine: (a) SCADENZA prima di tutto (minus in scadenza, versamento fondo pensione entro il 31/12 per la deduzione, comunicazione al fondo dei contributi non dedotti dell'anno precedente); (b) IMPATTO strutturale (gap previdenziale, obiettivo a rischio — agire presto vale più che agire tanto); (c) MANUTENZIONE (ribilanciamento entro le bande, de-risking). Cercare sempre le AZIONI CROSS-DOMINIO che risolvono più cose insieme (ribilanciare usando le minus in scadenza; indirizzare il versamento annuale dove rende di più; coordinare de-risking e harvesting).
 

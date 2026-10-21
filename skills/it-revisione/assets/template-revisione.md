@@ -43,6 +43,8 @@
 ### Pensione *(da `it-pianificazione` / `it-pianificazione-autonomi`)*
 Tasso di sostituzione proiettato: **[—]%** (obiettivo [—]%). Gap: **[—]**. [in linea / da colmare]
 
+Fondo pensione: spazio deducibile residuo quest'anno **€ [—]** (€5.300 − datore − dovuto; tetto fiscale, non importo consigliato). Contributi non dedotti dell'anno scorso da comunicare entro il 31/12: **€ [—]** (senza comunicazione, in uscita si perde il 9-15% di quella parte).
+
 ### Obiettivi *(da `it-pianificazione-obiettivi`)*
 
 | Obiettivo | Capitale attuale | Target | % compl. | Prob. (MC) | Stato |
