@@ -17,9 +17,9 @@ Conseguenza pratica e onesta: la dispersione del tasso di sostituzione viene qua
 pilastro complementare; il pubblico la àncora. Lo script lo mostra esplicitamente.
 
 Il motore è lo stesso block bootstrap di montecarlo-obiettivi.py: ricampiona blocchi di anni
-consecutivi dalla serie storica reale (così code grasse, correlazioni e mean reversion sono quelle
-vere), ricentrando la media sul rendimento atteso del comparto (si calibra il LIVELLO sull'ipotesi,
-si mantiene la FORMA reale). Stessa serie Damodaran di obiettivi.
+consecutivi dalla serie storica USA (S&P 500 e T-Bond 1928-2025, Damodaran), che è NOMINALE in
+dollari. Ne usa solo la FORMA (code grasse, correlazioni e mean reversion storiche): la media viene
+ricentrata sul rendimento atteso reale del comparto, che fissa il LIVELLO. Stessa serie di obiettivi.
 
 Termini: esprimi TUTTI i valori in modo coerente — consigliato in EURO DI OGGI (potere d'acquisto):
 rendimento reale del comparto, pensione INPS e RAL in moneta di oggi. Il bootstrap trapianta la

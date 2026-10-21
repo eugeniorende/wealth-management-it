@@ -26,7 +26,10 @@ Uso:
     python ponte-pensione.py --set ETA_USCITA=60 --set SPESA_ANNUA_PONTE=22000
 
 ONESTÀ METODOLOGICA
-- Tutto in termini REALI (€ di oggi). La RITA è modellata a rate costanti
+- Tutto in termini REALI (€ di oggi). La serie storica (S&P 500 e T-Bond USA 1928-2025,
+  Damodaran) è NOMINALE in dollari: si deflaziona anno per anno con l'inflazione USA dello
+  stesso anno (CPI, colonna del CSV), come in decumulo-obiettivi.py, così gli anni '70 restano
+  quello che erano per chi spende in termini reali. La RITA è modellata a rate costanti
   (capitale destinato al comparto garantito, ~0% reale: prassi prudente) e con
   l'aliquota agevolata sull'INTERO importo (conservativo: la parte di
   rendimenti già tassati, che può valere il 30-45% del montante, sarebbe esente).
@@ -53,7 +56,8 @@ Questo strumento è educativo e non costituisce consulenza finanziaria o previde
 
 import numpy as np
 
-from motore_bootstrap import applica_override, carica_storico, blocchi_bootstrap, pctl, percorso_json, scrivi_json
+from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_inflazione, carica_storico, deflaziona,
+                              pctl, percorso_json, scrivi_json)
 
 # ============================== PARAMETRI ==============================
 
@@ -85,6 +89,10 @@ RENDIMENTO_FP_REALE = 0.030   # rendimento reale del fondo (per i versamenti per
 N_SIM = 20_000
 SEED = 42
 BLOCCO = 5                    # block bootstrap (anni consecutivi)
+FILE_STORICO = "rendimenti-storici.csv"
+INFLAZIONE = None             # None = inflazione USA storica anno per anno (colonna del CSV);
+                              # un numero (es. 0.02) = costante, che appiattisce gli anni '70
+INFLAZIONE_RIPIEGO = 0.02     # usata se la serie (propria) non ha la colonna inflazione
 
 # =======================================================================
 
@@ -92,6 +100,27 @@ BLOCCO = 5                    # block bootstrap (anni consecutivi)
 def aliquota_rita(anni_iscrizione):
     """15% − 0,30%/anno oltre il 15°, riduzione max 6 punti → floor 9%."""
     return max(0.09, 0.15 - 0.003 * max(0, anni_iscrizione - 15))
+
+
+def inflazione_usata():
+    """Inflazione per deflazionare la serie: l'array storico, o una costante (INFLAZIONE o il
+    ripiego se la serie non ha la colonna). Ritorna (inflazione, descrizione)."""
+    if INFLAZIONE is not None:
+        return INFLAZIONE, f"inflazione costante {INFLAZIONE*100:.1f}%"
+    storica = carica_inflazione(FILE_STORICO)
+    if storica is None:
+        return INFLAZIONE_RIPIEGO, (f"inflazione costante {INFLAZIONE_RIPIEGO*100:.1f}% "
+                                    "(la serie non ha la colonna inflazione)")
+    return storica, "inflazione USA storica anno per anno (CPI dicembre su dicembre)"
+
+
+def rendimenti_reali_ponte():
+    """Rendimenti REALI annui del portafoglio del ponte: la serie nominale in dollari deflazionata
+    anno per anno, poi pesata tra azionario e obbligazionario."""
+    az, ob = carica_storico(FILE_STORICO)
+    inflazione, _ = inflazione_usata()
+    return (PESO_AZIONARIO_PONTE * deflaziona(az, inflazione)
+            + (1 - PESO_AZIONARIO_PONTE) * deflaziona(ob, inflazione))
 
 
 def simula_ponte(capitale, rendimenti, prelievi):
@@ -148,8 +177,7 @@ def main():
     ])
 
     # ── Monte Carlo ──
-    az, ob = carica_storico("rendimenti-storici.csv")
-    port = PESO_AZIONARIO_PONTE * az + (1 - PESO_AZIONARIO_PONTE) * ob
+    port = rendimenti_reali_ponte()
     rendimenti = blocchi_bootstrap(port, N_SIM, anni_ponte, BLOCCO)
     vivi, saldi = simula_ponte(CAPITALE_PONTE, rendimenti, prelievi)
     prob = vivi.mean()
@@ -175,6 +203,7 @@ def main():
 
     print(f"\nMONTE CARLO ({N_SIM:,} percorsi, {PESO_AZIONARIO_PONTE:.0%} azioni, "
           f"drag fiscale {DRAG_FISCALE_ANNUO:.1%}):")
+    print(f"  serie storica USA nominale in dollari, deflazionata con {inflazione_usata()[1]}")
     print(f"  capitale-ponte disponibile: € {CAPITALE_PONTE:,.0f}")
     print(f"  → PROBABILITÀ di coprire il ponte: {prob:.1%}")
     if prob > 0:
@@ -215,6 +244,7 @@ def main():
         scrivi_json(json_out, {
             "anni_ponte": anni_ponte,
             "probabilita_successo": round(float(prob), 4),
+            "inflazione": inflazione_usata()[1],
             "capitale_ponte": CAPITALE_PONTE,
             "capitale_necessario": {f"{c:.0%}": round(v, 0) for c, v in necessari.items()},
             "rita": {"attiva": bool(RITA_ATTIVA), "eta_inizio": eta_inizio_rita,
