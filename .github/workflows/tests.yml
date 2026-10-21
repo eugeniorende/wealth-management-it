@@ -22,11 +22,17 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Il minimo dichiarato nel README e la versione più recente: t_compila compila
+    # tutti gli script con l'interprete del job, quindi una sintassi solo-3.12 emerge qui.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt

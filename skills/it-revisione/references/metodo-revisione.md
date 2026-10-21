@@ -35,6 +35,16 @@ Il confronto tra i due è esso stesso informativo: la **differenza TWR − MWR �
 
 Infine, **sempre in termini reali**: l'inflazione erode. Un +5% nominale con inflazione al 3% è circa +2% reale, ed è il potere d'acquisto guadagnato che conta davvero. Formula: `(1 + rendimento nominale) / (1 + inflazione) − 1`.
 
+## Costi dell'anno: trasparenza, non correzione
+
+I costi sono l'unica parte del rendimento interamente sotto il controllo dell'investitore, e la revisione annuale è il momento per guardarli. Si annotano:
+- **bollo del dossier**: 0,2% del controvalore a fine periodo rendicontato, senza tetto per le persone fisiche; il fondo pensione ne è esente;
+- **commissioni e Tobin tax** pagate nell'anno, dall'estratto del broker;
+- **TER medio ponderato** del dossier, il costo implicito dei fondi e degli ETF;
+- **ISC del fondo pensione**, da confrontare con l'ISC medio della stessa tipologia di forma pubblicato da COVIP: se è molto più alto, il trasferimento a un fondo meno caro (possibile dopo 2 anni di partecipazione) è spesso la decisione a più alto valore, vedi `it-pianificazione/references/previdenza-complementare.md`.
+
+Il rendimento calcolato sui valori di mercato (foglio Andamento) è già al netto di TER, ISC, commissioni e bollo addebitati nel dossier: questi numeri servono a confrontare i costi anno su anno e con le alternative, **non** a sottrarli una seconda volta.
+
 ## Prioritizzare le azioni che emergono
 
 La revisione tocca quattro domini (pensione, obiettivi, fiscalità, allocazione) e ne esce una lista di possibili azioni. Ordinarle bene è il vero valore della sintesi. Tre criteri, in ordine:
