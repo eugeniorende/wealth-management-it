@@ -331,7 +331,9 @@ def _montante_stimato(ral, g, r, anzianita, massimale, aliquota):
 PP = ("it-pianificazione", "proiezione-pensione.xlsx")
 VARIANTI_PP = {"ral150k": {("Input", "B10"): 150_000, ("Input", "B12"): 0.0},
                "ral150k_g": {("Input", "B10"): 150_000, ("Input", "B12"): 0.015},
-               "ral8k": {("Input", "B10"): 8_000}}
+               "ral8k": {("Input", "B10"): 8_000},
+               # coefficiente congelato: le colonne degli Scenari restano ordinate (offset dalla Base)
+               "decadimento_zero": {("Input", "B18"): 0.0}}
 
 
 @test("proiezione-pensione.xlsx: Pubblica in euro di oggi = proiezione-inps.py (PIL reale, massimale, contributo dell'anno)")
@@ -404,7 +406,8 @@ def t_scenari_reali():
     from openpyxl import load_workbook
     base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
     netto = _modulo_previdenza("netto-pensione.py")
-    for nome, wb in (("default", base), ("ral150k", _varianti(*PP, VARIANTI_PP)["ral150k"])):
+    var = _varianti(*PP, VARIANTI_PP)
+    for nome, wb in (("default", base), ("ral150k", var["ral150k"]), ("decadimento_zero", var["decadimento_zero"])):
         s, i, p = wb["Scenari"], wb["Input"], wb["Pubblica"]
         for col in "BCD":
             assert abs(s[f"{col}18"].value - i["B39"].value) < 0.01, \
@@ -598,6 +601,8 @@ def t_coerenza_parametri_2026():
     assert np_.MASSIMALE_CONTRIBUTIVO == massimale and np_.PRIMA_FASCIA_PENSIONABILE == prima_fascia
     wb = load_workbook(asset(*PP))
     assert _per_etichetta(wb["Input"], "Massimale contributivo") == massimale, "massimale dell'Excel dipendenti"
+    assert _per_etichetta(load_workbook(asset(*PA))["Input"], "Massimale contributivo") == massimale, \
+        "massimale dell'Excel autonomi"
     plafond = next(iter(trovati["plafond"]))
     for skill, nome in (PP, ("it-pianificazione-autonomi", "proiezione-pensione-autonomi.xlsx")):
         assert _per_etichetta(load_workbook(asset(skill, nome))["Input"], "Plafond deducibilità") == plafond, \
@@ -915,6 +920,189 @@ def t_testi_fondo():
         assert "tassazione agevolata della prestazione finale (15→9%)" not in testo, f"{rel}: uscita del forfettario"
 
 
+VARIANTI_PA_T6 = {
+    "ord150k": {("Input", "B19"): 2, ("Input", "B21"): 150_000, ("Input", "B22"): 0},
+    # affitti tassati a IRPEF ordinaria: nessuna detrazione propria, il risparmio è l'IRPEF lorda
+    "forf_altri12k": {("Input", "B19"): 1, ("Input", "B28"): 3_000, ("Input", "B52"): 12_000},
+    "forf_altri2k": {("Input", "B19"): 1, ("Input", "B28"): 3_000, ("Input", "B52"): 2_000},
+    "forf_altri40k": {("Input", "B19"): 1, ("Input", "B28"): 8_000, ("Input", "B52"): 40_000},
+    "fondo3k": {("Input", "B28"): 3_000, ("Input", "B31"): 10_000, ("Input", "B32"): 30},
+    # cassa con coefficiente proprio, scritto sopra Input!B43 come dice il foglio Coefficienti
+    "cassa_coeff": {("Input", "B11"): 2, ("Input", "B43"): 0.045, ("Input", "B28"): 3_000, ("Input", "B31"): 10_000},
+    # cassa che imposta solo la soggettiva: l'aliquota di computo la segue (revisione delle correzioni T6)
+    "cassa_inarcassa": {("Input", "B11"): 2, ("Input", "B12"): 0.145},
+    "gs_24": {("Input", "B12"): 0.24},
+    "decadimento_zero": {("Input", "B15"): 0.0},
+    "forf8k": {("Input", "B21"): 8_000},
+}
+
+
+def _pensione_autonomi(i, g, r, n, massimale, coeff):
+    """Previdenza autonomi: stessa meccanica L. 335/1995 dei dipendenti, sul reddito professionale.
+    A montante va l'aliquota di computo (Gestione Separata: 25% IVS), non quella versata (26,07%)."""
+    return _pensione_contributiva(i["B13"].value, i["B23"].value, g, r, n, massimale,
+                                  _per_etichetta(i, "Aliquota di computo"), coeff)
+
+
+@test("proiezione-pensione-autonomi.xlsx: massimale (150k in ordinario → versati €31.882,31, a montante €30.573,75) e rivalutazione L. 335/1995")
+def t_autonomi_massimale():
+    # REGRESSIONE F015: nessuna cella applicava il massimale (contributo 39.105 invece di 31.882,
+    # pensione +38,8%); Previdenza!F rivalutava anche il contributo dell'anno.
+    from openpyxl import load_workbook
+    base = load_workbook(xlsx_ricalcolati()[asset(*PA)], data_only=True)
+    v = _varianti(*PA, VARIANTI_PA_T6)
+    p, f = v["ord150k"]["Previdenza"], v["ord150k"]["Fiscalità"]
+    # a montante il 25% IVS (Circ. INPS 8/2026: 26,07% = 25% IVS + 0,72% + 0,35% ISCRO); si deduce tutto il versato
+    assert abs(p["D5"].value - 122_295 * 0.25) < 0.01, f"Previdenza!D5 = {p['D5'].value:,.2f}"
+    assert abs(f["C7"].value - 122_295 * 0.2607) < 0.01, f"Fiscalità!C7 = {f['C7'].value:,.2f} senza massimale"
+    assert _per_etichetta(base["Input"], "Aliquota di computo") == 0.25
+    assert base["Input"]["B14"].value == _modulo_previdenza("proiezione-inps.py").PIL_REALE, \
+        "rivalutazione di default degli autonomi ≠ PIL_REALE di proiezione-inps.py"
+    formule = load_workbook_formule(asset(*PA))
+    assert "Input!$B$51" in formule["Previdenza"]["D5"].value and "MIN(" in formule["Previdenza"]["D5"].value
+    netto = _modulo_previdenza("netto-pensione.py")
+    for nome in ("ord150k", "forf8k"):  # rami della detrazione oltre 28.000 e sotto la no tax area
+        p = v[nome]["Previdenza"]
+        assert abs(_per_etichetta(p, "NETTA annua") - netto.netto_pensionato(p["B60"].value, 0.02, 0.0)[0]) < 0.01, \
+            f"{nome}: netto della pensione (lorda {p['B60'].value:,.0f})"
+    assert v["forf8k"]["Previdenza"]["B60"].value <= 8_500 < 28_000 < v["ord150k"]["Previdenza"]["B60"].value
+    for nome, wb in (("default", base), ("ord150k", v["ord150k"])):
+        i, p = wb["Input"], wb["Previdenza"]
+        n = int(i["B7"].value)
+        atteso = _pensione_autonomi(i, i["B24"].value, i["B14"].value, n, _per_etichetta(i, "Massimale contributivo"), 1.0)
+        assert abs(p["B58"].value - atteso) <= 1e-6 * atteso, f"{nome}: montante {p['B58'].value:,.0f} ≠ {atteso:,.0f}"
+
+
+@test("proiezione-pensione-autonomi.xlsx: il forfettario deduce il fondo solo fino agli altri redditi IRPEF")
+def t_autonomi_altri_redditi():
+    # REGRESSIONE F039: Fiscalità!B8 = MIN(versamento; 5.300) × 0, cablato: l'eccezione del forfettario
+    # con affitti o lavoro dipendente part-time non era calcolabile.
+    from openpyxl import load_workbook
+    base = load_workbook(xlsx_ricalcolati()[asset(*PA)], data_only=True)
+    v = _varianti(*PA, VARIANTI_PA_T6)
+    for nome, wb, dedotto in (("altri 12k", v["forf_altri12k"], 3_000), ("altri 2k", v["forf_altri2k"], 2_000),
+                              ("altri 40k", v["forf_altri40k"], 5_300), ("default", base, 0)):
+        i, f = wb["Input"], wb["Fiscalità"]
+        altri = _per_etichetta(i, "Altri redditi IRPEF")
+        assert _per_etichetta(i, "Versamento dedotto") == min(dedotto, i["B28"].value), f"{nome}: versamento dedotto"
+        risparmio = _irpef(altri) - _irpef(altri - min(i["B28"].value, 5_300, altri))
+        assert abs(f["B15"].value - risparmio) < 0.01, f"{nome}: risparmio forfettario {f['B15'].value:,.2f} ≠ {risparmio:,.2f}"
+        # colonna Ordinario: gli altri redditi si sommano al reddito professionale (revisione T6)
+        x = f["C6"].value - f["C7"].value + altri
+        ded = min(i["B28"].value, _per_etichetta(i, "Plafond deducibilità"))
+        assert abs(f["C8"].value - ded) < 0.01 and abs(f["C9"].value - max(0, x - ded)) < 0.01, f"{nome}: Ordinario C8/C9"
+        assert abs(f["C14"].value - _irpef(max(0, x))) < 0.01 and abs(f["C10"].value - _irpef(f["C9"].value)) < 0.01
+        assert abs(f["C11"].value - (x - f["C10"].value)) < 0.01, f"{nome}: Ordinario C11"
+        assert abs(f["C15"].value - (_irpef(x) - _irpef(max(0, x - ded)))) < 0.01, f"{nome}: risparmio ordinario"
+    assert abs(v["forf_altri12k"]["Fiscalità"]["B15"].value - 690) < 0.01
+    assert abs(v["forf_altri12k"]["Fiscalità"]["C15"].value - 990) < 0.01, "ordinario con 12k di altri redditi: 3.000 al 33%"
+    assert abs(v["forf_altri40k"]["Fiscalità"]["B15"].value - 1_749) < 0.01, "plafond e secondo scaglione"
+    # il modello vale per redditi senza detrazioni proprie: col lavoro dipendente il risparmio è minore
+    c52 = load_workbook_formule(asset(*PA))["Input"]["C52"].value
+    assert "detrazion" in c52 and "part-time: danno capienza" not in c52, f"Input!C52: {c52}"
+
+
+def _tassa_uscita_autonomi(i):
+    """Tassa in uscita del fondo degli autonomi, in euro di oggi: montante già accumulato, versamenti
+    dedotti e non dedotti NON comunicati, al nominale riportato a oggi (art. 11 c. 6 D.Lgs. 252/2005)."""
+    n, infl = int(i["B7"].value), i["B39"].value
+    ded = _per_etichetta(i, "Versamento dedotto")
+    tassato = ded + (0 if i["B47"].value == 1 else i["B28"].value - ded)
+    return (i["B31"].value * (1 + infl) ** -n + sum(tassato * (1 + infl) ** (t - n) for t in range(n))) * i["B38"].value
+
+
+def _scenari_autonomi(wb, nome):
+    """Tabella Scenari del Riepilogo autonomi contro repliche indipendenti, colonna per colonna:
+    pensione lorda (massimale, aliquota di computo, coefficiente effettivo di Input!B43), netta con
+    netto_pensionato(), rendita del fondo al netto della tassa in uscita, totale e gap mai letti dal foglio."""
+    i, p, c, r = wb["Input"], wb["Previdenza"], wb["Complementare"], wb["Riepilogo"]
+    netto = _modulo_previdenza("netto-pensione.py")
+    righe = {str(r[f"A{k}"].value): k for k in range(1, r.max_row + 1) if r[f"A{k}"].value}
+    def riga(testo):
+        return next(k for e, k in righe.items() if e.startswith(testo))
+    intest = riga("Voce")
+    assert [r[f"{x}{intest}"].value for x in "BCD"] == ["Conservativo", "Base", "Ottimistico"], nome
+    # Base = fogli di calcolo, anche con il coefficiente della cassa scritto in Input!B43
+    assert abs(r[f"C{riga('Pensione obbligatoria lorda')}"].value - p["B60"].value) < 0.01, f"{nome}: Base lorda"
+    assert abs(r[f"C{riga('Pensione obbligatoria netta')}"].value - _per_etichetta(p, "NETTA annua")) < 0.01, nome
+    assert abs(r[f"C{riga('Rendita fondo')}"].value - c["B62"].value) < 0.01, f"{nome}: Base ≠ Complementare!B62"
+    spesa = _per_etichetta(i, "Spesa mensile attuale") * 12 * _per_etichetta(i, "Fattore riduzione spesa")
+    n, massimale = int(i["B7"].value), _per_etichetta(i, "Massimale contributivo")
+    dec_base = i["B15"].value
+    # coefficiente replicato dalla tabella (o quello della cassa scritto nella variante), mai letto da Input!B43
+    coeff = VARIANTI_PA_T6["cassa_coeff"][("Input", "B43")] if nome == "cassa_coeff" else \
+        _coeff_excel(wb, i["B6"].value) * (1 - dec_base) ** (n / 2)
+    assert abs(p["B59"].value - coeff) < 1e-12, f"{nome}: coefficiente proiettato {p['B59'].value} ≠ {coeff}"
+    tassa = _tassa_uscita_autonomi(i)
+    lorde = []
+    for col in "BCD":
+        g, rv, d, rend = (r[f"{col}{riga(t)}"].value for t in ("Crescita reddito", "Rivalutazione montante",
+                                                                "Decadimento", "Rendimento netto fondo"))
+        coeff_col = coeff * ((1 - d) / (1 - dec_base)) ** (n / 2)
+        attesa = _pensione_autonomi(i, g, rv, n, massimale, coeff_col)
+        lorda = r[f"{col}{riga('Pensione obbligatoria lorda')}"].value
+        assert abs(lorda - attesa) <= 1e-6 * attesa, f"{nome} {col}: pensione {lorda:,.2f} ≠ {attesa:,.2f}"
+        netta = netto.netto_pensionato(attesa, 0.02, 0.0)[0]
+        assert abs(r[f"{col}{riga('Pensione obbligatoria netta')}"].value - netta) < 0.01, f"{nome} {col}: netta"
+        montante = i["B31"].value * (1 + rend) ** n + sum(i["B28"].value * (1 + rend) ** (n - t) for t in range(n))
+        rendita = (montante - tassa) * coeff_col
+        nel_foglio = r[f"{col}{riga('Rendita fondo')}"].value
+        assert abs(nel_foglio - rendita) <= 1e-6 * max(rendita, 1), \
+            f"{nome} {col}: rendita del fondo {nel_foglio:,.2f} ≠ {rendita:,.2f}"
+        tot = netta + rendita
+        assert abs(r[f"{col}{riga('Pensione totale netta')}"].value - tot) < 0.01, f"{nome} {col}: totale netto"
+        assert abs(r[f"{col}{riga('Spesa target')}"].value - spesa) < 0.01, f"{nome} {col}: spesa target in euro di oggi"
+        assert abs(r[f"{col}{riga('GAP')}"].value - (spesa - tot)) < 0.01, f"{nome} {col}: gap = spesa − pensione netta"
+        lorde.append(attesa)
+    assert lorde[0] < lorde[1] < lorde[2], f"{nome}: scenari non ordinati {lorde}"
+
+
+@test("proiezione-pensione-autonomi.xlsx: pensione netta e tre scenari sul gap rispetto alla spesa target")
+def t_autonomi_scenari():
+    # REGRESSIONE F039: nessun netto, gap solo rispetto al reddito, «Scenari» = due righe.
+    # Revisione T6: totale e gap verificati senza leggere il foglio; sopra il massimale; coefficiente
+    # della cassa in Input!B43; tassa in uscita su dedotti e non dedotti non comunicati.
+    from openpyxl import load_workbook
+    wb = load_workbook(xlsx_ricalcolati()[asset(*PA)], data_only=True)
+    netto = _modulo_previdenza("netto-pensione.py")
+    assert abs(_per_etichetta(wb["Previdenza"], "NETTA annua")
+               - netto.netto_pensionato(wb["Previdenza"]["B60"].value, 0.02, 0.0)[0]) < 0.01, "pensione netta"
+    v6, v4 = _varianti(*PA, VARIANTI_PA_T6), _varianti(*PA, VARIANTI_PA_T4)
+    i = v6["ord150k"]["Input"]
+    assert i["B23"].value > _per_etichetta(i, "Massimale contributivo"), "ord150k: il massimale deve scattare dall'anno 0"
+    for nome, w in (("default", wb), ("ord150k", v6["ord150k"]), ("fondo3k", v6["fondo3k"]),
+                    ("cassa_coeff", v6["cassa_coeff"]), ("ordinario", v4["ordinario"]),
+                    ("forf_non_comunica", v4["forf_non_comunica"]), ("decadimento_zero", v6["decadimento_zero"])):
+        _scenari_autonomi(w, nome)
+    # aliquota di computo: segue la soggettiva della cassa; in Gestione Separata è l'IVS (25%, o 24%)
+    for nome, attesa in (("cassa_inarcassa", 0.145), ("gs_24", 0.24)):
+        i, p = v6[nome]["Input"], v6[nome]["Previdenza"]
+        assert abs(_per_etichetta(i, "Aliquota di computo") - attesa) < 1e-12, f"{nome}: aliquota di computo"
+        assert abs(p["D5"].value - p["C5"].value * attesa) < 0.01, f"{nome}: contributo a montante"
+    assert v6["fondo3k"]["Complementare"]["B62"].value > 0 and v4["forf_non_comunica"]["Complementare"]["B60"].value > 0
+
+
+@test("casse professionali: ogni riga della tabella ha una fonte ufficiale e il marcatore, dati 2026 corretti")
+def t_casse_fonti():
+    # F038/T6: tabella «indicativa, da verificare» senza fonti; Inarcassa con un 3% oltre il massimale
+    # abolito dal 2013, Forense con il volontario all'1-10% (è 1-20%).
+    testo = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "references", "casse-professionali.md"),
+                 encoding="utf-8").read()
+    righe = [r for r in testo.splitlines() if r.startswith("| **")]
+    assert len(righe) >= 6, f"tabella casse: {len(righe)} righe"
+    for riga in righe:
+        nome = riga.split("**")[1]
+        link = re.findall(r"\]\((https://[^)]+)\)", riga)
+        assert link and all(re.match(r"https://[^/]+/\S+", u) for u in link), \
+            f"{nome}: ogni link deve puntare a una pagina ufficiale, non alla homepage: {link}"
+        assert "Verificato: 2026-10" in riga, f"{nome}: manca il marcatore"
+    per_nome = {r.split("**")[1]: r for r in righe}
+    assert "2.785" in per_nome["Inarcassa"] and "3%" not in per_nome["Inarcassa"], per_nome["Inarcassa"][:160]
+    assert "reddito medio" in per_nome["Inarcassa"] and "non oltre i 35" in per_nome["Inarcassa"], "Inarcassa: limiti dell'agevolazione under 35"
+    assert "20%" in per_nome["Cassa Forense"] and "131.800" in per_nome["Cassa Forense"], per_nome["Cassa Forense"][:160]
+    assert "209.300" in per_nome["CNPADC"] and "856" in per_nome["ENPAP"], "CNPADC/ENPAP"
+
+
 @test("previdenza: requisiti 2027-2028 completi nelle due reference, tassi storici veri, nessun dominio inesistente")
 def t_requisiti_e_link_inps():
     # Revisione T5. Requisiti: Circ. INPS 28/2026, All. 2 (anticipata ordinaria 43a1m/42a1m dal 2028,
@@ -972,9 +1160,10 @@ def _excel_test(obiettivi):
         r = 5 + i
         for col, v in zip("ABCDFGN", (nome, target, oriz, prof, gia, prio, tipo)):
             o[f"{col}{r}"] = v
-    r = 5 + len(obiettivi)
-    for col in "ABCDFGN":
-        o[f"{col}{r}"] = None
+    # F022: azzera TUTTE le righe residue (5..14): prima restava la riga demo 7 con un solo obiettivo
+    for r in range(5 + len(obiettivi), 15):
+        for col in "ABCDFGN":
+            o[f"{col}{r}"] = None
     wb.save(dst)
     return dst
 
@@ -1010,14 +1199,27 @@ def t_allocatore():
     assert abs(tot - 50000) < 50, f"somma aggregata {tot} != 50000"
 
 
-@test("montecarlo-obiettivi: obiettivo ampiamente finanziato → probabilità alta")
+def _prob_obiettivi(out):
+    """{nome: probabilità di successo col versamento deterministico} dall'output di montecarlo-obiettivi."""
+    return {nome: int(re.search(r"Probabilità di successo con questo versamento: (\d+)%", testo).group(1))
+            for nome, (_, _, testo) in _sezioni_obiettivi(out).items()}
+
+
+@test("montecarlo-obiettivi: obiettivo ampiamente finanziato → probabilità alta, controllo a bassa volatilità ≈ 50%")
 def t_mc_obiettivi():
-    xlsx = _excel_test([("Quasi fatto", 10000, 10, "Moderato", 9500, "importante", "terminante")])
+    # F022: la fixture lasciava la riga demo 7 e il regex prendeva la quota azionaria dell'OPZIONE
+    # (~100%) invece della probabilità: il mutante «già accantonato ignorato» passava.
+    xlsx = _excel_test([("Sovra-finanziato", 10000, 10, "Moderato", 14000, "importante", "terminante"),
+                        ("Controllo", 20000, 10, "Preservazione", 6000, "importante", "terminante")])
     rc, out = run_script(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), xlsx)
     shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
     assert rc == 0, out[-400:]
-    probs = [float(p) for p in re.findall(r"(\d+(?:[.,]\d+)?)\s*%", out.replace(",", "."))]
-    assert probs and max(probs) > 85, f"nessuna probabilità alta trovata (max {max(probs) if probs else '—'})"
+    prob = _prob_obiettivi(out)
+    assert set(prob) == {"Sovra-finanziato", "Controllo"}, f"obiettivi letti: {sorted(prob)} (riga demo residua?)"
+    assert prob["Sovra-finanziato"] >= 95, f"14.000 accantonati su 12.190 nominali: probabilità {prob['Sovra-finanziato']}%"
+    # versamento deterministico a volatilità 1,5%: ~50%. Se il già accantonato è ignorato nella
+    # simulazione la probabilità crolla; se è ignorato nel versamento sale verso il 100%.
+    assert 40 <= prob["Controllo"] <= 55, f"controllo Preservazione: probabilità {prob['Controllo']}%, attesa 40-55%"
 
 
 def _sezioni_obiettivi(out):
@@ -1109,6 +1311,538 @@ def t_disclaimer_csv():
             assert all(r["operazione"] in ("VENDITA", "ACQUISTO") for r in righe[:-1]), "righe d'ordine alterate"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+# ══════════════════════ obiettivi (T8) ══════════════════════
+
+def _modulo_obiettivi(nome):
+    """Importa uno script di it-pianificazione-obiettivi (con il suo motore_bootstrap)."""
+    cartella = os.path.join(SKILLS, "it-pianificazione-obiettivi", "assets")
+    sys.path.insert(0, cartella)
+    try:
+        return carica_modulo(os.path.join(cartella, nome))
+    finally:
+        sys.path.remove(cartella)
+
+
+def _testo_obiettivi(rel):
+    return open(os.path.join(SKILLS, "it-pianificazione-obiettivi", rel), encoding="utf-8").read()
+
+
+def _euro_it(x):
+    return f"€{x:,.0f}".replace(",", ".")
+
+
+def _pct_it(x, decimali=1):
+    return f"{x:.{decimali}f}".replace(".", ",")
+
+
+def _pmt_anno_per_anno(target, gia, rend, rend_atterraggio, anni, finestra):
+    """Replica indipendente del versamento col calendario annuale del glide path: la quota
+    dell'anno y è quella del calendario a inizio anno (anni residui = anni − y), il rendimento
+    è lineare nella quota tra il profilo e l'atterraggio; 12 versamenti di fine mese."""
+    w = min(finestra, anni)
+    tassi = [rend_atterraggio + (rend - rend_atterraggio) * (1.0 if anni - y >= w else (anni - y) / w)
+             for y in range(anni)]
+    crescita, coeff = 1.0, 0.0
+    for r in reversed(tassi):  # FV = gia·Π(1+r) + PMT·Σ a(r_y)·Π_{z>y}(1+r_z)
+        coeff += (12.0 if r == 0 else r / ((1 + r) ** (1 / 12) - 1)) * crescita
+        crescita *= 1 + r
+    return (target - gia * crescita) / coeff, crescita
+
+
+def _obiettivi_foglio():
+    """Obiettivi e parametri del pianificatore d'esempio, dalle cache ricalcolate."""
+    from openpyxl import load_workbook
+    wb = load_workbook(xlsx_ricalcolati()[asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx")],
+                       data_only=True)
+    par, obj = wb["Parametri"], wb["Obiettivi"]
+    profili = {par[f"A{r}"].value: (par[f"B{r}"].value, par[f"C{r}"].value, par[f"D{r}"].value)
+               for r in range(10, 16) if par[f"A{r}"].value}
+    obiettivi = []
+    for r in range(5, 15):
+        if obj[f"A{r}"].value:
+            obiettivi.append({c: obj[f"{col}{r}"].value for c, col in (
+                ("nome", "A"), ("target", "B"), ("anni", "C"), ("profilo", "D"), ("gia", "F"),
+                ("priorita", "G"), ("versamento", "I"), ("tipo", "N"))})
+    return par, profili, obiettivi
+
+
+@test("obiettivi: versamento col glide path ≥ quota fissa, stesso numero in foglio, motore, Monte Carlo e glide path")
+def t_versamento_glide():
+    # F040: gli obiettivi terminanti de-riskano negli ultimi anni, ma il versamento usava il
+    # rendimento pieno del profilo (shortfall ~10% a 20 anni). Il foglio approssima la rampa col
+    # suo rendimento medio: sugli obiettivi d'esempio entro l'1,5% dal calcolo anno per anno, mai
+    # sotto la quota fissa (l'errore per profilo e finestra è in t_errore_due_fasi).
+    par, profili, obiettivi = _obiettivi_foglio()
+    infl = par["B6"].value
+    rend_l = min(profili.values(), key=lambda p: p[2])[0]   # rendimento all'atterraggio (0% azionario)
+    finestra = 7
+    attesi = {}
+    for g in obiettivi:
+        rend, _, quota = profili[g["profilo"]]
+        target_nom = g["target"] * (1 + infl) ** g["anni"]
+        fisso, _ = _pmt_anno_per_anno(target_nom, g["gia"] or 0, rend, rend, g["anni"], finestra)
+        foglio = g["versamento"]
+        if g["tipo"] == "permanente" or quota == 0:
+            assert abs(foglio - fisso) < 0.01, f"{g['nome']}: permanente €{foglio:.2f} ≠ quota fissa €{fisso:.2f}"
+        else:
+            esatto, _ = _pmt_anno_per_anno(target_nom, g["gia"] or 0, rend, rend_l, g["anni"], finestra)
+            assert foglio >= 0.985 * esatto, (f"{g['nome']}: il foglio chiede €{foglio:.0f}/mese, col glide path "
+                                              f"ne servono €{esatto:.0f}: de-risking ignorato nel versamento")
+            assert fisso < foglio <= esatto + 0.01, f"{g['nome']}: €{foglio:.2f} fuori da [{fisso:.2f}, {esatto:.2f}]"
+        attesi[g["nome"]] = (foglio, target_nom, g, rend)
+    assert "finestra" in str(par["A7"].value).lower() and par["B7"].value == finestra, \
+        "Parametri!A7:B7 deve portare la finestra di de-risking (7 anni, come glidepath-obiettivi.py)"
+    motore = _modulo_obiettivi("motore_bootstrap.py")
+    for nome, (foglio, target_nom, g, rend) in attesi.items():
+        glide = g["tipo"] != "permanente" and profili[g["profilo"]][2] > 0
+        calcolo = motore.pmt_glide(target_nom, g["gia"] or 0, rend, rend_l if glide else rend, g["anni"], finestra)
+        assert abs(calcolo - foglio) < 0.01, f"{nome}: motore €{calcolo:.2f} ≠ foglio €{foglio:.2f}"
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"))
+    assert rc == 0, out[-400:]
+    for nome, (_, _, testo) in _sezioni_obiettivi(out).items():
+        m = re.search(r"Versamento deterministico:\s*(€[\d.]+)/mese", testo)
+        assert m and m.group(1) == _euro_it(attesi[nome][0]), f"Monte Carlo, {nome}: {m and m.group(1)} ≠ foglio"
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py"))
+    assert rc == 0, out[-400:]
+    assert "VERSAMENTI" in out, "glidepath: manca il riepilogo dei versamenti usati nella proiezione"
+    for nome, (foglio, *_) in attesi.items():
+        m = re.search(re.escape(nome) + r"[^\n]*?(€[\d.]+)/mese", out.split("VERSAMENTI")[-1])
+        assert m and m.group(1) == _euro_it(foglio), f"glide path, {nome}: {m and m.group(1)} ≠ foglio"
+    # allocatore: il capitale richiesto oggi da un terminante segue la stessa crescita col glide
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(asset("it-pianificazione-obiettivi", "allocatore-capitale.py"),
+                             "--json", os.path.join(tmp, "a.json"))
+        assert rc == 0, out[-400:]
+        righe = {r["nome"]: r for r in json.load(open(os.path.join(tmp, "a.json")))["obiettivi"]}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    g = attesi["Lungo termine / libertà"][2]
+    rend = profili[g["profilo"]][0]
+    target_nom = g["target"] * (1 + infl) ** g["anni"]
+    _, crescita = _pmt_anno_per_anno(target_nom, 0, rend, rend_l, g["anni"], finestra)
+    atteso = target_nom / crescita - (g["gia"] or 0)
+    assert abs(righe[g["nome"]]["richiesto"] - atteso) < 1, \
+        f"allocatore: richiesto €{righe[g['nome']]['richiesto']:.0f}, col glide path €{atteso:.0f}"
+
+
+@test("obiettivi: l'errore della formula in due fasi è quello documentato, per profilo e finestra")
+def t_errore_due_fasi():
+    # Revisione T8: «sbaglia per difetto di meno dell'1,5%» era falso già con la finestra di
+    # default (Crescita massima 1,7%, Azionario totale 1,8%) e con la finestra di 10 anni, che
+    # glide-path.md propone, arriva al 3%. Il caso peggiore è un orizzonte pari alla finestra.
+    motore = _modulo_obiettivi("motore_bootstrap.py")
+    _, profili, _ = _obiettivi_foglio()
+    rend_l = min(profili.values(), key=lambda p: p[2])[0]
+
+    def errore_max(rend, finestra):
+        peggiore = 0.0
+        for n in range(1, 41):
+            target = 100_000 * 1.02 ** n
+            esatto, _ = _pmt_anno_per_anno(target, 0, rend, rend_l, n, finestra)
+            peggiore = max(peggiore, 1 - motore.pmt_glide(target, 0, rend, rend_l, n, finestra) / esatto)
+        return peggiore * 100
+
+    err = {(nome, f): errore_max(p[0], f) for nome, p in profili.items() if p[2] > 0 for f in (7, 10)}
+    for (nome, f), e in err.items():
+        assert e >= 0, f"{nome}, finestra {f}: la formula in due fasi non sbaglia per difetto"
+        if f == 7:
+            assert e < 2, f"{nome}: errore {e:.2f}% con la finestra di default, oltre il 2%"
+    assert err[("Moderato", 7)] < 1, f"Moderato: errore {err[('Moderato', 7)]:.2f}%, documentato sotto l'1%"
+    frasi = ("sotto l'1% con Moderato",
+             f"{_pct_it(err[('Crescita', 7)])}% con Crescita",
+             f"{_pct_it(err[('Azionario totale', 7)])}% con Azionario totale",
+             f"{_pct_it(err[('Crescita massima', 10)])}% con Crescita massima",
+             f"{_pct_it(err[('Azionario totale', 10)])}% con Azionario totale")
+    motore_txt = open(asset("it-pianificazione-obiettivi", "motore_bootstrap.py"), encoding="utf-8").read()
+    for rel, testo in (("references/glide-path.md", _testo_obiettivi("references/glide-path.md")),
+                       ("references/matematica-accumulo.md", _testo_obiettivi("references/matematica-accumulo.md")),
+                       ("motore_bootstrap.py", " ".join(motore_txt.split()))):
+        testo = " ".join(testo.split())
+        assert "meno dell'1,5%" not in testo, f"{rel}: «meno dell'1,5%» vale solo fino al profilo Crescita"
+        for frase in frasi:
+            assert frase in testo, f"{rel}: manca «{frase}» (errore misurato)"
+
+
+@test("glidepath e Monte Carlo: «come la colonna I» solo coi parametri del foglio, avviso sui pianificatori vecchi")
+def t_glide_come_foglio():
+    # Revisione T8: su un pianificatore compilato prima della 0.10.0 (senza Parametri!B7, colonna I
+    # a quota fissa) o con ATTERRAGGIO_AZ/CURVATURA/FINESTRA_DERISK cambiati, gli script davano un
+    # versamento diverso dal foglio dichiarandolo «come la colonna I».
+    from openpyxl import load_workbook
+    gp = asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py")
+    mc = asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py")
+    rc, out = run_script(gp)
+    assert rc == 0 and "come la colonna I del foglio" in out, "default: i versamenti sono quelli della colonna I"
+    assert "0.10.0" not in out, "default: avviso sul pianificatore vecchio fuori luogo"
+    for args in (("--set", "CURVATURA=0.5"), ("--set", "ATTERRAGGIO_AZ=0.2"), ("--set", "FINESTRA_DERISK=5")):
+        rc, out = run_script(gp, *args)
+        assert rc == 0, out[-400:]
+        assert "come la colonna I" not in out and "DIVERSI dalla colonna I" in out, f"{args}: versamenti spacciati per la colonna I"
+        rc, out = run_script(mc, *args)
+        assert rc == 0 and "non è quello della colonna I" in out, f"Monte Carlo {args}: manca l'avviso"
+    xlsx = _excel_test([("Casa", 40000, 6, "Moderato", 5000, "importante", "terminante")])
+    try:
+        wb = load_workbook(xlsx)
+        wb["Parametri"]["A7"] = None
+        wb["Parametri"]["B7"] = None
+        wb.save(xlsx)
+        for script in (gp, mc, asset("it-pianificazione-obiettivi", "allocatore-capitale.py")):
+            rc, out = run_script(script, xlsx)
+            assert rc == 0, out[-400:]
+            assert "prima della 0.10.0" in out, f"{os.path.basename(script)}: nessun avviso sul pianificatore vecchio"
+            assert "come la colonna I" not in out, f"{os.path.basename(script)}: «come la colonna I» su un foglio a quota fissa"
+    finally:
+        shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    assert "prima della 0.10.0" in _testo_obiettivi("SKILL.md"), "SKILL.md: manca la nota sui pianificatori vecchi"
+    assert "ATTERRAGGIO_AZ" in _testo_obiettivi("references/glide-path.md").split("## Il glide path nel versamento")[0] \
+        and "colonna I" in _testo_obiettivi("references/glide-path.md").split("## Il glide path nel versamento")[0], \
+        "glide-path.md: dire che atterraggio e curvatura diversi dal foglio fanno divergere dalla colonna I"
+
+
+@test("montecarlo-obiettivi: il rendimento del profilo è la media aritmetica annua (volatilità → 0 ⇒ 50%)")
+def t_convenzione_media():
+    # F041: il modello normale centra la MEDIA del capitale sul versamento deterministico; con
+    # volatilità quasi nulla la probabilità tende al 50%. Il mutante «media mensile = rend/12»
+    # (media aritmetica annua > rend) la porta al 100%.
+    import numpy as np
+    mod = _modulo_obiettivi("montecarlo-obiettivi.py")
+    mod.MODELLO = "normale"
+    np.random.seed(3)
+    target, rend, anni = 100_000.0, 0.05, 10
+    pmt = mod.pmt_deterministico(target, 0.0, rend, anni)
+    p, _ = mod.prob_successo(target, 0.0, pmt, rend, 0.001, anni)
+    assert 0.45 <= p <= 0.55, f"volatilità 0,1%: probabilità {p:.1%}, attesa ~50%"
+    # le etichette dicevano «geometrica»; serve la nota σ²/2 per tarare su rendimenti annualizzati
+    assert "(geometrica)" not in open(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
+                                      encoding="utf-8").read(), "etichetta «(geometrica)» nello script"
+    mc = _testo_obiettivi("references/monte-carlo.md")
+    assert "composizione geometrica" not in mc, "monte-carlo.md: «composizione geometrica»"
+    for rel in ("references/monte-carlo.md", "references/mercati-e-correlazione.md"):
+        assert "σ²/2" in _testo_obiettivi(rel), f"{rel}: manca la conversione σ²/2 tra media aritmetica e annualizzata"
+
+
+@test("obiettivi: la ricetta DMS → profilo è svolta sui Parametri, confronti tra grandezze omogenee")
+def t_ricetta_dms():
+    # Revisione T8: la ricetta aggiungeva σ²/2 al lordo e poi tassava, mentre il Monte Carlo applica la
+    # volatilità del profilo al rendimento NETTO (e il suo esempio 4,65% ↔ 5,5% era già netto); mancava
+    # un esempio svolto fino a un default del foglio, che sta sopra la ricetta mondiale; monte-carlo.md
+    # chiamava «prudenti» i profili confrontando il loro netto con la media storica lorda.
+    import numpy as np
+    foglio, profili, _ = _obiettivi_foglio()
+    infl = foglio["B6"].value
+    al = _modulo_obiettivi("asset-location-optimizer.py")
+    costi, tassa = al.TER_DOSSIER + al.BOLLO, al.TASSA_PLUS_DOSSIER
+    rend, vol, _ = profili["Azionario totale"]
+    dms = 0.052  # azionario mondiale reale annualizzato 1900-2024 (DMS), citato nella reference
+    profilo_dms = ((1 + dms) * (1 + infl) - 1 - costi) * (1 - tassa) + vol ** 2 / 2  # nominale → netto → +σ²/2
+    reale_foglio = (1 + (rend - vol ** 2 / 2) / (1 - tassa) + costi) / (1 + infl) - 1  # il default, a ritroso
+    mer = " ".join(_testo_obiettivi("references/mercati-e-correlazione.md").split())
+    ricetta = mer.split("**Come tradurre un dato DMS")[1].split("**(b)")[0]
+    assert ricetta.index("(1 − 26%)") < ricetta.index("aggiungere σ²/2"), \
+        "ricetta DMS: σ²/2 si aggiunge al netto, dopo costi e imposte (il Monte Carlo applica σ al netto)"
+    for cifra in (f"{_pct_it(profilo_dms * 100)}%", f"{_pct_it(rend * 100)}%", f"{_pct_it(reale_foglio * 100)}% reale"):
+        assert cifra in ricetta, f"mercati-e-correlazione.md: manca {cifra} nell'esempio svolto DMS → Azionario totale"
+    crescita, vol_c, peso_c = profili["Crescita"]
+    m = re.search(r"(\d+,\d+)% netto annualizzato ↔ " + re.escape(_pct_it(crescita * 100)) + "% del foglio", ricetta)
+    assert m and abs(float(m.group(1).replace(",", ".")) - (crescita - vol_c ** 2 / 2) * 100) <= 0.006, \
+        "ricetta DMS: l'esempio σ²/2 della Crescita va sul netto annualizzato (rendimento − σ²/2)"
+    motore = _modulo_obiettivi("motore_bootstrap.py")
+    az, ob = motore.carica_storico("rendimenti-storici.csv")
+    storico = float(np.mean(peso_c * az + (1 - peso_c) * ob)) * 100
+    mc = " ".join(_testo_obiettivi("references/monte-carlo.md").split())
+    for cifra in (f"~{_pct_it(storico)}% nominale lordo", f"{_pct_it(al.lordo_da_netto(crescita) * 100)}% lordo"):
+        assert cifra in mc, f"monte-carlo.md (ricentratura): manca {cifra}, il confronto va fatto lordo con lordo"
+
+
+@test("montecarlo-obiettivi (bootstrap): la coda congiunta di due essenziali supera il prodotto delle marginali")
+def t_rischio_sistemico():
+    # F022: simula_congiunta non era mai esercitata dai test. Con un mercato condiviso la
+    # probabilità che falliscano insieme è più alta che sotto indipendenza.
+    xlsx = _excel_test([("Casa", 60000, 8, "Moderato", 0, "essenziale", "terminante"),
+                        ("Università", 80000, 12, "Crescita", 0, "essenziale", "terminante")])
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), xlsx,
+                         "--set", "MODELLO=bootstrap")
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    assert rc == 0, out[-400:]
+    sez = out.split("RISCHIO SISTEMICO")[-1]
+    assert "essenziali): Casa, Università" in sez, sez[:300]
+    coda = re.search(r"falliscono.*?prodotto\):\s*([\d.]+)%.*?congiunta\):\s*([\d.]+)%", sez, re.S)
+    insieme = re.search(r"riescono insieme.*?prodotto\):\s*([\d.]+)%.*?congiunta\):\s*([\d.]+)%", sez, re.S)
+    ind, cong = float(coda.group(1)), float(coda.group(2))
+    assert cong >= ind + 2, f"P(falliscono insieme): congiunta {cong}% vs prodotto {ind}%: shock non condivisi?"
+    assert float(insieme.group(2)) >= float(insieme.group(1)), "P(riescono insieme) congiunta < prodotto"
+
+
+@test("montecarlo-obiettivi: accanto all'OPZIONE la probabilità sul percorso glide, più bassa che a quota fissa")
+def t_opzione_glide():
+    # F017 (resto): la OPZIONE a quota fissa (58%) ignorava il de-risking che it-rebalance eseguirà
+    # (sul glide path la stessa leva dà molto meno). Si mostrano entrambi i numeri, in entrambi i modelli.
+    xlsx = _excel_test([("Barca", 400000, 20, "Moderato", 0, "desiderabile", "terminante")])
+    try:
+        for args in ((), ("--set", "GLIDE=False")):
+            rc, out = run_script(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), xlsx, *args)
+            assert rc == 0, out[-400:]
+            testo = _sezioni_obiettivi(out)["Barca"][2]
+            assert "OPZIONE:" in testo, f"{args}: OPZIONE attesa per un desiderabile a 20 anni"
+            glide = re.search(r"percorso glide[^\n]*dal (\d+)% al (\d+)%", testo)
+            fissa = re.search(r"quota fissa[^\n]*dal (\d+)% al (\d+)%", testo)
+            assert glide and fissa, f"{args}: mancano le probabilità glide e quota fissa accanto all'OPZIONE"
+            assert int(glide.group(2)) < int(fissa.group(2)), "col de-risking la leva non può rendere di più"
+            assert int(glide.group(2)) > int(glide.group(1)), "OPZIONE senza guadagno sul percorso glide"
+    finally:
+        shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+
+
+@test("asset-location: l'ottimizzatore riceve un rendimento lordo esplicito, «netto» definito ovunque")
+def t_rendimento_lordo():
+    # F018: i rendimenti dei profili sono netti di costi e imposte; l'ottimizzatore toglie TER,
+    # bollo e imposte da sé, quindi deve partire dal LORDO (prima: 5,5% netto trattato come lordo,
+    # verdetto PIR ribaltato). Conversione dichiarata: lordo = netto / (1 − 26%) + TER + bollo.
+    mod = _modulo_obiettivi("asset-location-optimizer.py")
+    lordo = 0.055 / (1 - 0.26) + 0.002 + 0.002
+    def dossier(r, gia, anni):  # replica: ETF ad accumulazione, plus 26% alla fine
+        m = gia * (1 + r - 0.002 - 0.002) ** anni
+        return m - max(0.0, m - gia) * 0.26
+    def pareggio(r):
+        lo, hi = 0.0, 0.10
+        for _ in range(60):  # TER del PIR a cui PIR (plus esente, bollo) = dossier
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if 10_000 * (1 + r - mid - 0.002) ** 15 > dossier(r, 10_000, 15) else (lo, mid)
+        return lo
+    lo = pareggio(lordo)
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"))
+    assert rc == 0, out[-400:]
+    m = re.search(r"TER di pareggio del PIR: ([\d.]+)%", out)
+    assert m and abs(float(m.group(1)) - lo * 100) <= 0.006, \
+        f"TER di pareggio {m and m.group(1)}%, atteso {lo*100:.2f}% col lordo {lordo:.2%}"
+    assert abs(mod.lordo_da_netto(0.055) - lordo) < 1e-12
+    assert re.search(r"lordo[^\n]*7[.,]8%", out), "l'output deve dichiarare il rendimento lordo usato"
+    # Revisione T8: la conversione tratta l'imposta come annua, quindi dà il lordo più alto compatibile
+    # col netto e favorisce i contenitori esenti. Con l'imposta alla vendita (ETF ad accumulazione) il
+    # lordo equivalente è più basso e il pareggio del PIR scende: verso e variante vanno detti.
+    differito = ((1.055 ** 15 - 0.26) / 0.74) ** (1 / 15) - 1 + 0.004
+    m = re.search(r"lordo equivalente a 15 anni è ([\d.]+)%.*?pareggio scende a ([\d.]+)%", out, re.S)
+    assert m, "l'output deve dare la variante con l'imposta alla vendita (lordo equivalente e pareggio)"
+    assert abs(float(m.group(1)) - differito * 100) <= 0.006, f"lordo con imposta differita {m.group(1)}%, atteso {differito:.2%}"
+    assert abs(float(m.group(2)) - pareggio(differito) * 100) <= 0.006, \
+        f"pareggio con imposta differita {m.group(2)}%, atteso {pareggio(differito):.2%}"
+    assert "Prudente:" not in (mod.lordo_da_netto.__doc__ or ""), "lordo_da_netto: nell'ottimizzatore non è prudente"
+    skill = _testo_obiettivi("SKILL.md")
+    for cifra in (f"{_pct_it(pareggio(differito) * 100, 2)}%", "favorisce i contenitori esenti"):
+        assert cifra in skill, f"SKILL.md (asset location): manca «{cifra}»"
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
+                         "--set", "RENDIMENTO_LORDO=0.07")
+    assert rc == 0 and "@ 7.0%" in out, "RENDIMENTO_LORDO esplicito non usato nello scenario pensione"
+    par, _, _ = _obiettivi_foglio()
+    note = " ".join(str(par[f"A{r}"].value or "") for r in range(1, 30))
+    formula = "(lordo − costi) × (1 − 26%)"
+    assert "netti di costi e imposte" in str(par["A8"].value), f"Parametri!A8: {par['A8'].value!r}"
+    for dove, testo in (("Parametri", note), ("SKILL.md", _testo_obiettivi("SKILL.md")),
+                        ("matematica-accumulo.md", _testo_obiettivi("references/matematica-accumulo.md"))):
+        assert formula in testo, f"{dove}: manca la definizione di «netto» ({formula})"
+
+
+@test("obiettivi: le cifre citate in SKILL.md e nelle reference sono l'output sui default")
+def t_cifre_documentate():
+    # F043: gli esempi usavano 3,5%/5% (€487/€366/€1.353) contro il 4,0%/5,5% dell'Excel, e le
+    # cifre dell'asset location venivano da un «test sui dati reali» non riproducibile.
+    from openpyxl import load_workbook
+    skill = _testo_obiettivi("SKILL.md")
+    mat = _testo_obiettivi("references/matematica-accumulo.md")
+    mc = _testo_obiettivi("references/monte-carlo.md")
+    dec = _testo_obiettivi("references/decumulo.md")
+    mer = _testo_obiettivi("references/mercati-e-correlazione.md")
+    # piano di accumulo: i versamenti del foglio d'esempio
+    foglio, profili, obiettivi = _obiettivi_foglio()
+    totale = sum(g["versamento"] for g in obiettivi)
+    for v in [g["versamento"] for g in obiettivi] + [totale]:
+        assert _euro_it(v) in mat, f"matematica-accumulo.md non cita {_euro_it(v)} del foglio d'esempio"
+    for vecchio in ("€487", "€366", "€1.353"):
+        assert vecchio not in mat, f"matematica-accumulo.md: {vecchio} non è l'output dei Parametri"
+    glide = {g["nome"]: _euro_it(g["versamento"]) for g in obiettivi}
+    for rel, testo, nomi in (("references/glide-path.md", _testo_obiettivi("references/glide-path.md"),
+                              ("Anticipo casa", "Lungo termine / libertà")),
+                             ("SKILL.md", skill, ("Lungo termine / libertà",))):
+        for nome in nomi:
+            assert glide[nome] in testo, f"{rel} non cita il versamento col glide path di {nome} ({glide[nome]})"
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(asset("it-pianificazione-obiettivi", "allocatore-capitale.py"),
+                             "--json", os.path.join(tmp, "a.json"))
+        assert rc == 0, out[-400:]
+        righe = {r["nome"]: r for r in json.load(open(os.path.join(tmp, "a.json")))["obiettivi"]}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    richiesto = _euro_it(righe["Lungo termine / libertà"]["richiesto"])
+    assert richiesto in _testo_obiettivi("references/allocazione-capitale.md"), \
+        f"allocazione-capitale.md non cita il capitale richiesto col glide path ({richiesto})"
+    # Revisione T8: anche le cifre a quota fissa e quelle che dipendono dai default o dalla serie
+    # (aggiornata ogni gennaio) devono essere l'output, non numeri scritti a mano.
+    infl = foglio["B6"].value
+    per_nome = {g["nome"]: g for g in obiettivi}
+    gp = _testo_obiettivi("references/glide-path.md")
+    alloc = _testo_obiettivi("references/allocazione-capitale.md")
+    fissi = {}
+    for nome in ("Anticipo casa", "Lungo termine / libertà"):
+        g = per_nome[nome]
+        rend = profili[g["profilo"]][0]
+        target_nom = g["target"] * (1 + infl) ** g["anni"]
+        fissi[nome], _ = _pmt_anno_per_anno(target_nom, g["gia"] or 0, rend, rend, g["anni"], 7)
+        for rel, testo in (("references/glide-path.md", gp), ("references/matematica-accumulo.md", mat)):
+            assert _euro_it(fissi[nome]) in testo, \
+                f"{rel}: manca il versamento a quota fissa di {nome} ({_euro_it(fissi[nome])})"
+    g = per_nome["Lungo termine / libertà"]
+    rend, fisso = profili[g["profilo"]][0], fissi["Lungo termine / libertà"]
+    target_nom = g["target"] * (1 + infl) ** g["anni"]
+    assert _euro_it(fisso) in skill, f"SKILL.md: manca il versamento a quota fissa a 20 anni ({_euro_it(fisso)})"
+    aumento = f"(+{round((g['versamento'] / fisso - 1) * 100)}%)"
+    assert aumento in gp, f"glide-path.md: il glide path alza il versamento a 20 anni di {aumento}"
+    rend_l = min(profili.values(), key=lambda p: p[2])[0]
+    cap = 0.0  # capitale finale col versamento a quota fissa, seguendo il glide path
+    for r in rend_l + (rend - rend_l) * _modulo_obiettivi("motore_bootstrap.py").frazioni_glide(g["anni"], 7):
+        cap = cap * (1 + r) + fisso * r / ((1 + r) ** (1 / 12) - 1)
+    quota = f"circa il {round(cap / target_nom * 100)}% del target"
+    assert quota in gp, f"glide-path.md: a quota fissa il capitale si ferma a «{quota}»"
+    pv_fisso = g["target"] * ((1 + infl) / (1 + rend)) ** g["anni"]
+    for rel, testo in (("references/allocazione-capitale.md", alloc), ("SKILL.md", skill)):
+        for cifra in (_euro_it(pv_fisso), richiesto):
+            assert cifra in testo, f"{rel}: manca {cifra} (present value a rendimento pieno e col glide path)"
+    aumento = f"(+{round((righe[g['nome']]['richiesto'] / pv_fisso - 1) * 100)}%)"
+    assert aumento in alloc, f"allocazione-capitale.md: il glide path alza il capitale richiesto di {aumento}"
+    # tabella dei profili di monte-carlo.md = Parametri (sei profili)
+    righe = re.findall(r"^\| ([A-Z][a-z ]+) \| ([\d,]+)% \| ([\d,]+)% \|", mc, re.M)
+    doc = {n: (float(r.replace(",", ".")) / 100, float(v.replace(",", ".")) / 100) for n, r, v in righe}
+    assert set(doc) == set(profili), f"monte-carlo.md elenca {sorted(doc)}, il foglio {sorted(profili)}"
+    for n, (r, v, _) in profili.items():
+        assert abs(doc[n][0] - r) < 1e-9 and abs(doc[n][1] - v) < 1e-9, f"monte-carlo.md, {n}: {doc[n]} ≠ {(r, v)}"
+    # Monte Carlo sui default
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"))
+    assert rc == 0, out[-400:]
+    sez = _sezioni_obiettivi(out)
+    casa = sez["Anticipo casa"][2]
+    pmt = re.search(r"Versamento deterministico:\s*(€[\d.]+)/mese", casa).group(1)
+    p = re.search(r"questo versamento: (\d+)%", casa).group(1)
+    pmt85 = re.search(r"confidenza:\s*(€[\d.]+)/mese", casa).group(1)
+    frase = f"con {pmt}/mese hai il {p}% di arrivarci; per l'85% te ne servono {pmt85}"
+    assert frase in mc, f"monte-carlo.md deve citare l'output sui default: «{frase}»"
+    prob = _prob_obiettivi(out)
+    assert f"solo il ~{prob['Lungo termine / libertà']}% di probabilità" in mc, "monte-carlo.md: probabilità a 20 anni"
+    assert f"vicino al {prob['Fondo di emergenza']}%" in mc, "monte-carlo.md: probabilità del fondo di emergenza"
+    # asset location sui default
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"))
+    assert rc == 0, out[-400:]
+    vant = re.search(r"VANTAGGIO FONDO PENSIONE: (€[\d.]+)\s+\(\+(\d+)% vs dossier\)", out)
+    pir = re.search(r"(VANTAGGIO|SVANTAGGIO) PIR: (-?€[\d.]+)", out)
+    par = re.search(r"TER di pareggio del PIR: ([\d.]+)%", out)
+    for cifra in (vant.group(1), f"+{vant.group(2)}% vs dossier", pir.group(2).replace("-", "−"),
+                  par.group(1).replace(".", ",") + "%"):
+        assert cifra in skill, f"SKILL.md non cita {cifra} dell'ottimizzatore sui default"
+    al = _modulo_obiettivi("asset-location-optimizer.py")
+    deduzione = _euro_it(al.CONTRIBUTO_ANNUO_FP * al.ALIQUOTA_IRPEF_MARGINALE * al.ANNI_A_PENSIONE)
+    reinvestita = re.search(r"Driver: la deduzione IRPEF \((€[\d.]+)\)", out).group(1)
+    for cifra in (deduzione, reinvestita):
+        assert cifra in skill, f"SKILL.md non cita {cifra} (risparmio IRPEF e suo reinvestimento)"
+    # decumulo sui default
+    rc, out = run_script(asset("it-pianificazione-obiettivi", "decumulo-obiettivi.py"))
+    assert rc == 0, out[-400:]
+    sens = dict(re.findall(r"^\s+€\s*[\d,]+\s+([\d.]+)%\s+([\d.]+)%$", out, re.M))
+    for tasso in ("3.0", "4.0", "5.0", "6.0"):
+        assert f"{_pct_it(float(sens[tasso]))}% al {tasso[0]}%" in dec, \
+            f"decumulo.md: manca «{_pct_it(float(sens[tasso]))}% al {tasso[0]}%» (output sui default)"
+    anno = re.search(r"peggiori rendimenti PRIMA:\s+ESAURITO all'anno (\d+)", out).group(1)
+    assert f"all'anno {anno}" in dec, f"decumulo.md: la sequenza peggiore esaurisce all'anno {anno}"
+    iniziale = float(re.search(r"capitale €([\d,]+)", out).group(1).replace(",", ""))
+    finale = float(re.search(r"migliori rendimenti PRIMA:\s+capitale finale €([\d,]+)", out).group(1).replace(",", ""))
+    assert 1.75 <= finale / iniziale <= 2.25 and "circa il doppio" in dec, \
+        f"decumulo.md: «circa il doppio» con i migliori prima, l'output dà {finale / iniziale:.2f} volte"
+    # rendimento reale storico dell'azionario USA (dalla serie, deflazionata con la CPI)
+    motore = _modulo_obiettivi("motore_bootstrap.py")
+    az, _ = motore.carica_storico("rendimenti-storici.csv")
+    cpi = motore.carica_inflazione("rendimenti-storici.csv")
+    import numpy as np
+    reale = (np.prod((1 + az) / (1 + cpi)) ** (1 / len(az)) - 1) * 100
+    for rel, testo in (("mercati-e-correlazione.md", mer), ("monte-carlo.md", mc)):
+        assert f"~{_pct_it(reale)}%" in testo, f"{rel}: l'azionario USA ha reso ~{_pct_it(reale)}% reale annuo"
+    costante = (np.prod((1 + az) / 1.02) ** (1 / len(az)) - 1) * 100
+    frase = f"inflazione costante del 2% l'azionario USA renderebbe ~{_pct_it(costante)}% reale invece di ~{_pct_it(reale)}%"
+    assert frase in mer, f"mercati-e-correlazione.md: «{frase}»"
+    i = 1974 - 1928
+    meno = lambda x: x.replace("-", "−")
+    frase = (f"1974: {meno(_pct_it(az[i] * 100))}% nominale con inflazione al {_pct_it(cpi[i] * 100)}%, "
+             f"{meno(str(round(((1 + az[i]) / (1 + cpi[i]) - 1) * 100)))}% reale")
+    assert frase in mer, f"mercati-e-correlazione.md: «{frase}» (dalla serie)"
+    # numero di formule del pianificatore
+    wb = load_workbook(asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx"))
+    n = sum(1 for ws in wb.worksheets for riga in ws.iter_rows() for c in riga
+            if isinstance(c.value, str) and c.value.startswith("="))
+    citati = re.findall(r"(\d+) formule", skill)
+    assert citati and all(int(c) == n for c in citati), f"SKILL.md cita {citati} formule, il foglio ne ha {n}"
+
+
+@test("obiettivi: nessun rimando superato nelle reference (decumulo, correlazione, glide path, --json)")
+def t_rimandi_superati():
+    # F043: rimandi a «roadmap» per cose già fatte e limiti non più veri.
+    # Revisione T8: l'allocatore non usa pmt_glide ma crescita_glide; il flag Tipo cambia anche la
+    # vista per obiettivo; la finestra si legge da Parametri!B7; i profili non vanno confrontati
+    # (netti) con la media storica (lorda) come «ipotesi prudenti»; SKILL.md descriveva l'allocatore
+    # a rendimento pieno.
+    vietati = {
+        "references/monte-carlo.md": ("roadmap di `it-rebalance`", "roadmap di it-rebalance",
+                                      "Nessuna correlazione tra obiettivi", "o glide path**",
+                                      "7 anni come in `glidepath-obiettivi.py`", "ipotesi prudenti dei profili"),
+        "references/glide-path.md": ("roadmap di it-rebalance", "sovrastima leggermente",
+                                     "e l'allocatore (per il capitale richiesto oggi)",
+                                     "La vista **per obiettivo** non dipende dal flag"),
+        "references/matematica-accumulo.md": ("glide path e allocatore usano la stessa",),
+        "SKILL.md": ("correlazione sistemica tra obiettivi nel Monte Carlo", "alimenta il tracker e il glide path",
+                     "il capitale che al rendimento del profilo cresce fino al target",
+                     "finestra di de-risking di 7 anni"),
+        "assets/montecarlo-obiettivi.py": ("Parametri!A10:C14",),
+    }
+    for rel, frasi in vietati.items():
+        testo = _testo_obiettivi(rel)
+        for frase in frasi:
+            assert frase not in testo, f"{rel}: «{frase}»"
+    gp = _testo_obiettivi("references/glide-path.md")
+    assert re.search(r"circa (il )?10%", gp), "glide-path.md: l'ordine di grandezza del de-risking ignorato (~10%)"
+    # Step 4 di SKILL.md: lo pseudocodice era solo a quota fissa (chi lo segue in chat sottostima il
+    # versamento dei terminanti); il report deve dichiarare le convenzioni.
+    skill = _testo_obiettivi("SKILL.md")
+    passo4 = skill.split("### Step 4")[1].split("### Step 5")[0]
+    for formula in (r"m\s*=\s*min\(finestra, n\) − 1", r"r2\s*=\s*\(r \+ r_atterraggio\) / 2",
+                    r"Quota fissa[^\n]*permanenti"):
+        assert re.search(formula, passo4), f"SKILL.md, Step 4: manca «{formula}» (versamento in due fasi)"
+    sezione3 = skill.split("### 3. Piano di accumulo")[1].split("### 4.")[0]
+    assert "glide path" in sezione3 and "netto" in sezione3, "SKILL.md, report: dichiarare le convenzioni"
+
+
+@test("serie storica: nominale in USD dichiarata, il decumulo deflaziona anno per anno con la CPI USA")
+def t_serie_storica():
+    # Critica dell'audit: la serie è nominale in dollari ma il motore la chiamava «reale», e il
+    # decumulo la deflazionava con un 2% costante (cancellando la stagflazione degli anni '70).
+    csv_path = asset("it-pianificazione-obiettivi", "rendimenti-storici.csv")
+    righe = open(csv_path, encoding="utf-8").read().splitlines()
+    commenti = " ".join(r for r in righe if r.startswith("#")).lower()
+    assert "nominali" in commenti and "dollari" in commenti, "intestazione: dichiarare rendimenti nominali in dollari"
+    assert "anno,azionario,obbligazionario,inflazione" in righe, "manca la colonna inflazione"
+    dati = {int(r.split(",")[0]): [float(x) for x in r.split(",")[1:]] for r in righe
+            if r and r[0].isdigit()}
+    assert sorted(dati) == list(range(1928, 2026)) and all(len(v) == 3 for v in dati.values())
+    # CPI-U dicembre su dicembre pubblicata dal BLS (tabella storica; release CPI dicembre 2025)
+    for anno, bls in ((1946, 18.1), (1974, 12.3), (1979, 13.3), (1980, 12.5), (2008, 0.1), (2022, 6.5), (2025, 2.7)):
+        assert abs(dati[anno][2] - bls) <= 0.05 + 1e-9, f"inflazione {anno}: {dati[anno][2]} vs BLS {bls}"
+    motore = open(asset("it-pianificazione-obiettivi", "motore_bootstrap.py"), encoding="utf-8").read()
+    assert "serie annuali reali" not in motore, "motore_bootstrap: la serie non è reale"
+    mod = _modulo_obiettivi("decumulo-obiettivi.py")
+    mod.PESO_AZIONARIO, mod.INFLAZIONE = 1.0, None
+    reali = mod.carica_rendimenti_reali(0.0)
+    atteso = (1 + dati[1974][0] / 100) / (1 + dati[1974][2] / 100) - 1
+    assert abs(reali[1974 - 1928] - atteso) < 1e-12, f"1974 reale {reali[1974 - 1928]:.4f}, atteso {atteso:.4f}"
+    mod.INFLAZIONE = 0.02  # override esplicito: inflazione costante come prima
+    assert abs(mod.carica_rendimenti_reali(0.0)[1974 - 1928] - ((1 + dati[1974][0] / 100) / 1.02 - 1)) < 1e-12
+
 
 # ══════════════════════ motore bootstrap condiviso ══════════════════════
 
@@ -1213,6 +1947,11 @@ def _testi_regole():
     plugin = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
     testi[".claude-plugin/plugin.json"] = plugin["description"]
     return {k: v.replace("*", "") for k, v in testi.items()}
+
+
+def _blocchi(testo):
+    """Paragrafi, voci di elenco e righe di tabella."""
+    return [b for b in re.split(r"\n\s*\n|\n(?=\s*[-*|] )|\n(?=\|)", testo) if b.strip()]
 
 
 def _frasi(testo):
@@ -1532,6 +2271,158 @@ def t_t2_broker_json_errori():
     rc, out = run_script(IMPORTATORE, os.path.join(FIXTURES, "estratto-multibroker.csv"),
                          os.path.join(TAX, "assets", "esempio-zainetto.csv"))
     assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
+
+
+@test("T3: quadro RW senza soglia per i titoli, stato dei broker esteri con data di verifica")
+def t_t3_rw_broker():
+    # REGRESSIONE F006/F053/F036: la soglia di €15.000 vale solo per conti e depositi; Trade
+    # Republic e Scalable non sono più broker «senza sostituto d'imposta» per tutti.
+    # Revisione T3: il controllo lavora sul paragrafo (o sulla riga di tabella), non sulla frase,
+    # e riconosce anche la frase originale di F053 («non ha un sostituto d'imposta italiano»).
+    senza_sostituto = re.compile(r"(senza|nessun|non ha(nno)?( un| alcun)?|privi? di)\s+(un |alcun )?sostitut", re.I)
+    for rel, testo in _testi_regole().items():
+        for blocco in _blocchi(testo):
+            frasi = [blocco] if blocco.lstrip().startswith("|") else _frasi(blocco)
+            if re.search(r"\bRW\b|monitoraggio", blocco):
+                for frase in frasi:
+                    if "15.000" in frase:
+                        assert re.search(r"\bconti\b|conti? corrent|deposit", frase), f"{rel}: «{frase.strip()[:120]}»"
+            for frase in frasi:
+                if senza_sostituto.search(frase):
+                    assert not re.search(r"Trade Republic|Scalable", frase), f"{rel}: «{frase.strip()[:120]}»"
+                for clausola in re.split(r"[();]", frase):     # la description è una frase sola
+                    if re.search(r"broker ester|dichiarativ", clausola) and re.search(r"Trade Republic|Scalable", clausola):
+                        assert re.search(r"amministrat|succursale|verific", clausola), f"{rel}: «{clausola.strip()[:120]}»"
+                if re.search(r"cripto", frase) and re.search(r"Trade Republic", frase):
+                    assert re.search(r"verific", frase), f"{rel}: cripto su Trade Republic date per certe: «{frase.strip()[:120]}»"
+                assert not re.search(r"broker ester\w*[^.\n]{0,40}\bobbligatori|regime di chi usa (un |i )?broker ester|"
+                                     r"dichiarativ\w*\**\s*\(broker ester", frase), \
+                    f"{rel}: broker estero = dichiarativo: «{frase.strip()[:120]}»"
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    rw = next(b for b in _blocchi(dich) if b.startswith("**Quadro RW"))
+    assert re.search(r"[Pp]er titoli, ETF, fondi e cripto[^.]*qualunque sia l'importo", rw), "quadro RW: obbligo senza soglia per i titoli"
+    stato = dich.split("## Quali broker")[1].split("\n## ")[0] if "## Quali broker" in dich else ""
+    regimi = {}
+    for riga in stato.splitlines():
+        celle = [c.strip() for c in riga.strip().strip("|").split("|")]
+        if len(celle) >= 3:
+            regimi[celle[0]] = celle[1]
+    for broker, regime in (("Interactive Brokers", "Dichiarativo"), ("Degiro", "Dichiarativo"),
+                           ("Trade Republic", "Amministrato"), ("Scalable Capital", "Amministrato")):
+        assert regimi.get(broker, "").startswith(regime), f"regime-dichiarativo.md: {broker} → «{regimi.get(broker)}»"
+    assert "ottobre 2026" in stato, "tabella dei broker senza data di verifica"
+    assert "non entrano nello zainetto del nuovo rapporto in amministrato" in dich, "minus RT e passaggio all'amministrato"
+    assert not re.search(r"revoca[^.\n]{0,40}\(Pattern E\)", dich), "la revoca dell'amministrato è il Pattern D, la chiusura il Pattern E"
+    # un conto Interactive Brokers o Degiro nell'importatore: avviso che i numeri per broker non valgono
+    tmp = tempfile.mkdtemp()
+    try:
+        estratto = os.path.join(tmp, "ibkr.csv")
+        with open(estratto, "w", encoding="utf-8") as f:
+            f.write("Broker;ISIN;Descrizione;Quantità;Prezzo medio di carico;Controvalore\n"
+                    "Interactive Brokers;US0378331005;Apple Inc;10;100,00;1.700,00\n")
+        rc, d, out = _importa(estratto)
+        assert rc == 0 and any("dichiarativo" in av and "Interactive Brokers" in av for av in d["avvisi"]), out[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    riga_tr = next((r for r in stato.splitlines() if r.startswith("| Trade Republic")), "")
+    frasi_cripto = [f for f in re.split(r"(?<=\.)\s+", riga_tr) if "cripto" in f]
+    assert frasi_cripto and all("verific" in f for f in frasi_cripto), \
+        f"cripto su Trade Republic: va verificato se rientrano nell'amministrato: {frasi_cripto}"
+    imp = open(os.path.join(TAX, "references", "import-dati-broker.md"), encoding="utf-8").read()
+    assert "Scalable" in imp and "Interactive Brokers" in imp and "Verificato: 2026-10" in imp, \
+        "import-dati-broker.md: stato dei broker esteri o marcatore mancanti"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    assert "soglie RW" not in skill, "SKILL.md: «soglie RW» verificate (non esistono soglie per i titoli)"
+
+
+@test("T3: dichiarativo con cambio del giorno, conti in valuta, minus in RT e plus di ETF nel quadro RM")
+def t_t3_dichiarativo():
+    # REGRESSIONE F053: plus in euro al cambio del giorno (art. 9 c. 2 TUIR), soglia di
+    # €51.645,69 per 7 giorni lavorativi sui conti in valuta, minus da indicare in RT nell'anno.
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    for atteso in ("art. 9 c. 2", "51.645,69", "sette giorni lavorativi", "60/E", "quadro RM",
+                   "anno di realizzo", "4043"):
+        assert atteso in dich, f"regime-dichiarativo.md senza «{atteso}»"
+    # l'esempio in dollari deve tornare con i numeri scritti nel testo (cambi, importi e segno)
+    num = lambda x: float(x.replace(".", "").replace(",", "."))
+    m = re.search(r"(\d+) azioni comprate a \$(\d+) con il cambio EUR/USD a (\d,\d+) \(costo €([\d.]+,\d\d)\) "
+                  r"e vendute a \$(\d+) con il cambio a (\d,\d+) \(corrispettivo €([\d.]+,\d\d)\)"
+                  r".*?in euro è una (minus|plus) di €([\d.]+,\d\d)", dich, re.S)
+    assert m, "esempio USD non trovato"
+    q, p0, c0, costo, p1, c1, ricavo, segno, diff = m.groups()
+    q, costo_ok, ricavo_ok = int(q), int(q) * int(p0) / num(c0), int(q) * int(p1) / num(c1)
+    assert abs(num(costo) - costo_ok) < 0.01 and abs(num(ricavo) - ricavo_ok) < 0.01, m.group(0)
+    assert segno == ("minus" if ricavo_ok < costo_ok else "plus") and abs(num(diff) - abs(ricavo_ok - costo_ok)) < 0.01, m.group(0)
+    # le minus di ETF e fondi sono redditi diversi: quadro RT, anche se le plus vanno nel quadro RM
+    assert re.search(r"minus[^.\n]*(ETF|fondi)[^.\n]*quadro RT|quadro RT[^.\n]*minus[^.\n]*(ETF|fondi)", dich), "minus di ETF nel quadro RT"
+    assert "Nel quadro RT vanno anche le minus da vendita di ETF e fondi, che sono redditi diversi" in dich.replace("**", "")
+    assert not re.search(r"non vanno[^.\n]*minus|minus[^.\n]*(ETF|fondi)[^.\n]*redditi di capitale", dich), "minus di ETF negate nel quadro RT"
+    for rel in ("skills/it-tax-optimization/references/regime-dichiarativo.md", "skills/it-tax-optimization/SKILL.md"):
+        assert "sette giorni lavorativi continui" in open(os.path.join(ROOT, rel), encoding="utf-8").read(), rel
+    checklist = dich.split("## Checklist")[1].split("\n## ")[0]
+    for atteso in ("730", "30/9", "4047", "4048", "30/11"):
+        assert atteso in checklist, f"checklist del dichiarativo senza «{atteso}»"
+    assert re.search(r"(RT|quadro T)[^.\n]*(senza|non ha|nessun) acconti?", checklist), "l'imposta del quadro RT si versa a saldo, senza acconti"
+    multi = open(os.path.join(TAX, "references", "multi-intermediario.md"), encoding="utf-8").read()
+    assert "senza acconti" in multi and "e in acconto" not in multi and "(non 730)" not in multi and "730" in multi, \
+        "multi-intermediario: 730 ammesso, imposta del quadro RT senza acconti"
+    for rel, testo in _testi_regole().items():
+        for m in re.finditer(r"quadro RT del Modello Redditi PF", testo):
+            assert "730" in testo[m.end():m.end() + 60], f"{rel}: «{testo[m.start():m.end() + 60]}» senza il 730"
+        for vecchio, nuovo in ((r"68 c\. 9-bis", "77 c. 11"), (r"68 c\. 5", "77 c. 6"),
+                               (r"6 c\. 2 D\.Lgs\. 461/97", "306 c. 3"), (r"6 c\. 5 D\.Lgs\. 461/97", "306 c. 6")):
+            for m in re.finditer(vecchio + r"[^\n]{0,40}?(?:→|dal 2027) art\. (\d+ c\. \d+)", testo):
+                assert m.group(1) == nuovo, f"{rel}: «{m.group(0)}» (atteso art. {nuovo})"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    pattern_d = skill.split("**Pattern D")[1].split("**Pattern E")[0]
+    assert "cambio" in pattern_d and "entrambi i regimi" in pattern_d, "Pattern D: il cambio del giorno vale in entrambi i regimi"
+    assert "continui" in pattern_d and "51.645,69" in pattern_d, "Pattern D: €51.645,69 per sette giorni lavorativi continui"
+    calendario = skill.split("### Step 4")[1].split("## Formato output")[0]
+    assert "dichiarativo" in calendario and "Redditi PF" in calendario, "calendario senza le scadenze del dichiarativo"
+    assert "730" in calendario and "30/11" in calendario, "calendario: 730 e secondo acconto IVAFE"
+    assert "quadro RT, senza acconti" in calendario, "calendario: l'imposta del quadro RT non ha acconti"
+    # Revisione T3: il workflow non può trattare un conto in dichiarativo come un dossier in amministrato
+    analisi = skill.split("### Step 2")[1].split("### Step 3")[0]
+    ramo = analisi.split("**Broker in dichiarativo**")[1].split("\n\n")[0] if "**Broker in dichiarativo**" in analisi else ""
+    for atteso in ("lotti", "cambio del giorno", "non calcolare", "Pattern A è cross-broker",
+                   "Il Pattern D si valuta solo per i rapporti in amministrato",
+                   "Pattern D (revoca dell'amministrato", "Pattern E (chiusura", "sezione 5"):
+        assert atteso in ramo, f"Step 2, ramo dei broker in dichiarativo senza «{atteso}»"
+    assert "indicative" not in ramo, "plus e minus dei conti in dichiarativo non sono «indicative» sul PMC in valuta"
+    assert "### 5. (Solo con conti in dichiarativo) Adempimenti del dichiarativo" in skill
+    assert re.search(r"### 4\. \(Solo se multi-broker[^)\n]*amministrato\)", skill), "sezione 4 solo con un rapporto in amministrato"
+    ingest = skill.split("### Step 1")[1].split("### Step 2")[0]
+    assert re.search(r"quadro RT[^.\n]*(per anno|non per broker)", ingest), "Step 1: minus riportabili dal quadro RT"
+    disclaimer = skill.split("### Disclaimer")[1].split("\n## ")[0]
+    assert "dichiarativo" in disclaimer, "disclaimer limitato all'amministrato"
+    comando = open(os.path.join(ROOT, "commands", "minusvalenze.md"), encoding="utf-8").read()
+    assert re.search(r"regime[^.\n]*(ciascun|ogni) broker|(ciascun|ogni) broker[^.\n]*regime", comando), \
+        "/minusvalenze non chiede il regime di ogni broker"
+    assert re.search(r"minus riportabili dal quadro RT", comando) and "sezioni 4 e 5" in comando, \
+        "/minusvalenze: minus del quadro RT e sezioni 4 e 5 della skill"
+    assert re.search(r"[Nn]on (lanciare|usare) l'importatore[^.\n]*dichiarativo", comando), "/minusvalenze: importatore solo per l'amministrato"
+
+
+@test("T3: cripto con leva ETN/ETC al 26% (con cautela) e reference marcate")
+def t_t3_cripto():
+    # REGRESSIONE F036: manca il confronto tra 33% della detenzione diretta e 26% degli
+    # strumenti finanziari con sottostante cripto; pene e ravvedimento restano quelli verificati.
+    cripto = open(os.path.join(TAX, "references", "criptovalute.md"), encoding="utf-8").read()
+    leve = cripto.split("## Leve di pianificazione")[1].split("\n## ")[0]
+    voce = next((r for r in leve.splitlines() if re.search(r"ETN|ETC|ETP", r)), "")
+    assert re.search(r"al 26% invece del 33%", voce), f"leva ETN/ETC: {voce[:120]}"
+    assert "zainetto ordinario" in voce and "non con le minus cripto" in voce, f"leva ETN/ETC: {voce[:120]}"
+    assert "verificare" in voce.lower() and "rischio emittente" in voce, "leva ETN/ETC senza cautele"
+    assert re.search(r"[Nn]é ETN[^.]*né ETP|ETC, ETN ed ETP[^.]*non sono citati", voce), \
+        "la Circ. 30/E/2023 non cita ETN, ETC ed ETP"
+    assert not re.search(r"circolare[^.]*(lo )?conferm", voce), "la circolare non conferma il trattamento di ETN ed ETC"
+    assert re.search(r"\bW\b[^.\n]{0,30}dal 730/2024", cripto.replace("*", "")), "criptovalute: il quadro W c'è dal 730/2024"
+    assert "l'AdE applica il LIFO" not in cripto
+    avanzate = open(os.path.join(TAX, "references", "criptovalute-avanzate.md"), encoding="utf-8").read()
+    assert "da 2 a 5 anni" in avanzate and "1-3 anni" not in avanzate, "pena dell'omessa dichiarazione"
+    for f in ("criptovalute.md", "criptovalute-avanzate.md", "criptovalute-casi-speciali.md",
+              "regime-dichiarativo.md", "import-dati-broker.md"):
+        assert "Verificato: 2026-10" in open(os.path.join(TAX, "references", f), encoding="utf-8").read(), f
 
 
 def _fx(nome):
@@ -1866,8 +2757,10 @@ def t_revisione_testi():
     cartella = os.path.join(SKILLS, "it-revisione")
     for rel in ("references/metodo-revisione.md", "assets/template-revisione.md"):
         assert "Costi dell'anno" in open(os.path.join(cartella, rel), encoding="utf-8").read(), rel
-    assert "/mnt/skills" not in open(os.path.join(cartella, "SKILL.md"), encoding="utf-8").read(), \
-        "SKILL.md cita ancora recalc.py del sandbox claude.ai"
+    for nome in sorted(os.listdir(SKILLS)):
+        f = os.path.join(SKILLS, nome, "SKILL.md")
+        if os.path.exists(f):
+            assert "/mnt/skills" not in open(f, encoding="utf-8").read(), f"{nome}/SKILL.md cita recalc.py del sandbox claude.ai"
 
 
 @test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")
@@ -1902,7 +2795,19 @@ def t_autonomi_perimetro():
     enpam = next(r for r in casse.splitlines() if r.startswith("| **ENPAM**"))
     assert "5%" in cipag and "Verificato: 2026-10" in cipag, f"riga CIPAG: {cipag[:120]}"
     assert "19,5" in enpam and "Verificato: 2026-10" in enpam, f"riga ENPAM: {enpam[:120]}"
+    ff = open(os.path.join(cartella, "references", "fiscalita-forfettario.md"), encoding="utf-8").read()
+    for testo, rel in ((skill, "SKILL.md"), (ff, "fiscalita-forfettario.md")):
+        avvisi = [r for p in testo.split("\n\n") for r in p.splitlines() if "artigian" in r and re.search(r"coefficient\w* (?:di redditività )?del \d+%", r)]
+        assert avvisi, f"{rel}: manca l'avviso su artigiani e commercianti accanto ai coefficienti"
+        for avviso in avvisi:
+            for coeff in ("40%", "54%", "62%", "86%"):
+                assert coeff in avviso, f"{rel}: l'avviso «{avviso.strip()[:60]}…» non cita il coefficiente {coeff}"
     gs = open(os.path.join(cartella, "references", "previdenza-gestione-separata.md"), encoding="utf-8").read()
+    assert "Σ (reddito_anno × 0,25)" in gs and "0,2607) rivalutato" not in gs, "Gestione Separata: a montante va il 25% IVS"
+    assert "× 0,25 fino al pensionamento" in skill, "SKILL.md: montante al 26,07% invece del 25% di IVS"
+    for rel, testo in _file_testo(cartella, os.path.join(SKILLS, "it-pianificazione"), os.path.join(ROOT, "commands")):
+        for riga in testo.splitlines():
+            assert not re.search(r"aliquota 26,07% vs 33%|separata ~0,2607", riga), f"{rel}: 26,07% come aliquota del montante: {riga.strip()[:100]}"
     for superato in ("1,5× assegno sociale", "considerabile anche la rendita della complementare"):
         assert superato not in gs, f"previdenza-gestione-separata.md: «{superato}»"
 

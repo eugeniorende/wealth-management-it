@@ -43,7 +43,7 @@ Regole fiscali applicate (vedi SKILL.md e le reference):
 Limiti dichiarati: legge CSV, non i PDF della certificazione; lo zainetto è un secondo CSV;
 per le obbligazioni con nominale e prezzo in percentuale serve la colonna del valore di carico
 (altrimenti costo = quantità × prezzo); i numeri valgono solo per l'amministrato:
-in dichiarativo (broker esteri) si applicano il LIFO e il cambio del giorno, non calcolati qui.
+in dichiarativo (Interactive Brokers, Degiro) si applicano il LIFO e il cambio del giorno, non calcolati qui.
 
 Uso:
     python importa-estratto-broker.py estratto.csv [zainetto.csv] [--anno AAAA]
@@ -524,6 +524,16 @@ def allinea_broker(posizioni, zainetto, avvisi):
                       "quelle minus non compensano plus di altri broker")
 
 
+def avvisa_dichiarativo(posizioni, zainetto, avvisi):
+    """Interactive Brokers e Degiro non sono sostituti d'imposta: in dichiarativo valgono il LIFO
+    sui lotti, i cambi del giorno e le minus del quadro RT, comuni a tutti quei conti."""
+    for b in sorted({p["broker"] for p in posizioni} | {z["broker"] for z in zainetto}, key=str):
+        if b and re.search(r"interactive|ibkr|degiro", str(b), re.I):
+            avvisi.append(f"{b}: conto in regime dichiarativo, i numeri di questo broker non valgono "
+                          "(servono i lotti, i cambi del giorno e le minus del quadro RT, comuni ai conti "
+                          "in dichiarativo): vedi regime-dichiarativo.md")
+
+
 # ───────────────────────────── analisi ─────────────────────────────
 def _compensazione(posizioni, zainetto):
     """Compensazione dentro UN broker, in 26%-equivalente: si coprono prima le plus al 12,5%
@@ -686,6 +696,7 @@ def main(argv=None):
         posizioni = parse_estratto(args.estratto, args.broker, avvisi)
         zainetto = parse_zainetto(args.zainetto, args.anno, args.broker, avvisi) if args.zainetto else []
         allinea_broker(posizioni, zainetto, avvisi)
+        avvisa_dichiarativo(posizioni, zainetto, avvisi)
         if not posizioni:
             raise ErroreInput(f"{args.estratto}: nessuna posizione valutabile (vedi gli avvisi: {avvisi[:2]})")
     except ErroreInput as e:

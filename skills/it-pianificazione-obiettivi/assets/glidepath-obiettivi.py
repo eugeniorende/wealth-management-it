@@ -17,14 +17,20 @@ Logica del glide path (per ogni obiettivo):
 
 Aggregato di portafoglio:
   - per ogni anno, pesa la quota azionaria di ogni obiettivo ATTIVO per il suo
-    capitale proiettato a quell'anno (crescita al rendimento del profilo +
-    versamenti); un obiettivo "esce" dal portafoglio quando raggiunge la scadenza
+    capitale proiettato a quell'anno (crescita al rendimento atteso dell'anno lungo
+    il glide path + versamenti); un obiettivo "esce" dal portafoglio quando raggiunge
+    la scadenza
+  - i versamenti sono quelli del foglio (colonna I), che tengono conto del de-risking:
+    lo script li riepiloga in fondo. Il foglio fissa la finestra (Parametri!B7), la rampa
+    lineare e l'atterraggio sul profilo a quota azionaria minima: con ATTERRAGGIO_AZ,
+    CURVATURA o FINESTRA_DERISK diversi, o su un pianificatore precedente alla 0.10.0
+    (colonna I a quota fissa), i versamenti divergono dalla colonna I e lo script lo dice
 
 Dipendenze: openpyxl  (pip install openpyxl)
 Uso:        python glidepath-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]
 
 NON è consulenza di investimento. Il glide path è una regola metodologica, le %
-sono esempi; la proiezione del capitale usa il rendimento medio del profilo (non
+sono esempi; la proiezione del capitale usa il rendimento atteso anno per anno (non
 modella la volatilità). Vedi glide-path.md per i limiti e l'interpretazione.
 """
 
@@ -32,10 +38,12 @@ import sys
 import os
 from openpyxl import load_workbook
 
-from motore_bootstrap import applica_override, verifica_intestazioni_obiettivi
+from motore_bootstrap import (applica_override, finestra_nel_foglio, frazioni_glide, leggi_finestra_derisk,
+                              pmt_glide, quota_glide, scarti_dal_foglio, verifica_intestazioni_obiettivi)
 
 # ---- Parametri del glide path (editabili) ----
-FINESTRA_DERISK = 7      # anni prima della scadenza in cui inizia il de-risking
+FINESTRA_DERISK = None   # anni prima della scadenza in cui inizia il de-risking;
+                         #   None = dal foglio (Parametri!B7, 7 anni nell'esempio)
 ATTERRAGGIO_AZ = 0.00    # quota azionaria target alla scadenza (0% = tutto liquido/sicuro)
 CURVATURA = 1.0          # forma della rampa: 1.0 = lineare; <1 tiene la quota azionaria
                          #   più alta all'inizio della finestra e scende ripida vicino alla scadenza
@@ -56,6 +64,8 @@ def leggi_excel(path):
     par = wb["Parametri"]
     obj = wb["Obiettivi"]
     inflazione = par.cell(row=INFL_ROW, column=2).value or 0
+    finestra = leggi_finestra_derisk(par)
+    nel_foglio = finestra_nel_foglio(par)
     profili = {}
     for i in range(PROF_N):
         r = PROF_START + i
@@ -83,27 +93,23 @@ def leggi_excel(path):
                 # default: terminante (caso comune); permanente solo se indicato
                 "permanente": (str(tipo).strip().lower() == "permanente"),
             })
-    return inflazione, profili, obiettivi
+    return inflazione, finestra, nel_foglio, profili, obiettivi
 
 
-def pmt_mensile(target_nom, gia, rend, anni):
-    if rend == 0:
-        return max(0.0, (target_nom - gia) / (anni * 12))
-    fattore = (((1 + rend) ** anni) - 1) / ((1 + rend) ** (1 / 12) - 1)
-    return max(0.0, (target_nom - gia * (1 + rend) ** anni) / fattore)
+def rendimento_a_quota(quota, profili):
+    """Rendimento atteso per una quota azionaria, lineare tra i profili (quello di atterraggio)."""
+    pts = sorted(profili.values(), key=lambda p: p[1])     # (rend, quota) per quota crescente
+    if quota <= pts[0][1]:
+        return pts[0][0]
+    for (r0, q0), (r1, q1) in zip(pts, pts[1:]):
+        if quota <= q1 and q1 > q0:
+            return r0 + (r1 - r0) * (quota - q0) / (q1 - q0)
+    return pts[-1][0]
 
 
 def equity_glide(anni_residui, eq_start, finestra, atterraggio):
-    """Quota azionaria target dato il tempo residuo all'obiettivo."""
-    if eq_start <= atterraggio:
-        return eq_start                      # già conservativo: niente da de-riskare
-    if anni_residui <= 0:
-        return atterraggio
-    if anni_residui >= finestra:
-        return eq_start                      # ancora lontano: tiene la quota piena
-    # rampa dentro la finestra: frazione di azionario (sopra l'atterraggio) ancora trattenuta
-    frazione = (anni_residui / finestra) ** CURVATURA
-    return atterraggio + (eq_start - atterraggio) * frazione
+    """Quota azionaria target dato il tempo residuo all'obiettivo (definizione nel motore)."""
+    return quota_glide(anni_residui, eq_start, finestra, atterraggio, CURVATURA)
 
 
 def pct(x):
@@ -121,10 +127,15 @@ def main():
         print(f"File non trovato: {path}")
         sys.exit(1)
 
-    inflazione, profili, obiettivi = leggi_excel(path)
+    inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     if not obiettivi:
         print("Nessun obiettivo trovato nel foglio.")
         sys.exit(0)
+    finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
+    rend_atterraggio = rendimento_a_quota(ATTERRAGGIO_AZ, profili)
+    # i versamenti coincidono con la colonna I solo coi parametri del glide path del foglio
+    scarti = scarti_dal_foglio(finestra, finestra_foglio if nel_foglio else None, ATTERRAGGIO_AZ,
+                               min(eq for _, eq in profili.values()), CURVATURA)
 
     orizzonte_max = max(g["orizzonte"] for g in obiettivi)
 
@@ -132,21 +143,30 @@ def main():
     for g in obiettivi:
         rend, eq = profili.get(g["profilo"], (0.0, 0.0))
         g["rend"], g["eq_start"] = rend, eq
-        g["finestra"] = min(FINESTRA_DERISK, g["orizzonte"])
+        g["finestra"] = min(finestra, g["orizzonte"])
+        # i terminanti de-riskano: rendimento dell'anno lineare nella quota tra profilo e atterraggio
+        de_risk = not g["permanente"] and eq > ATTERRAGGIO_AZ
+        rend_l = rend_atterraggio if de_risk else rend
+        frazioni = frazioni_glide(g["orizzonte"], finestra, CURVATURA)
+        tassi = rend_l + (rend - rend_l) * frazioni
         if g["target_oggi"] is None:
             # "il più possibile": nessun versamento "necessario" da calcolare — si proietta
             # il solo capitale assegnato (eventuali versamenti liberi sono una scelta, non un obbligo)
             g["pmt"] = 0.0
         else:
+            # lo stesso versamento del foglio (colonna I), col de-risking dei terminanti
             target_nom = g["target_oggi"] * (1 + inflazione) ** g["orizzonte"]
-            g["pmt"] = pmt_mensile(target_nom, g["gia"], rend, g["orizzonte"])
+            g["pmt"] = max(0.0, pmt_glide(target_nom, g["gia"], rend, rend_l, g["orizzonte"], finestra, CURVATURA))
         # proiezione capitale fino a orizzonte_max:
-        #  - fino alla scadenza: cresce al rendimento del profilo + versamenti
+        #  - fino alla scadenza: cresce al rendimento atteso dell'anno (glide path) + 12 versamenti
+        #    mensili capitalizzati nell'anno
         #  - oltre la scadenza: TERMINANTE = irrilevante (esce); PERMANENTE = tenuto costante (riserva piena)
         cap = [g["gia"]]
         for t in range(1, orizzonte_max + 1):
             if t <= g["orizzonte"]:
-                cap.append(cap[-1] * (1 + rend) + 12 * g["pmt"])
+                r = tassi[t - 1]
+                versati = 12.0 if r == 0 else r / ((1 + r) ** (1 / 12) - 1)
+                cap.append(cap[-1] * (1 + r) + g["pmt"] * versati)
             else:
                 cap.append(cap[-1] if g["permanente"] else 0.0)
         g["cap"] = cap
@@ -154,7 +174,7 @@ def main():
     print("=" * 78)
     print("GLIDE PATH — CALENDARIO DI DE-RISKING")
     print("=" * 78)
-    print(f"Finestra de-risking: {FINESTRA_DERISK} anni  |  Atterraggio: {pct(ATTERRAGGIO_AZ)} azionario alla scadenza")
+    print(f"Finestra de-risking: {finestra} anni  |  Atterraggio: {pct(ATTERRAGGIO_AZ)} azionario alla scadenza")
     print(f"Inflazione: {inflazione*100:.1f}%")
     print("-" * 78)
 
@@ -191,6 +211,16 @@ def main():
         riga = f"{t:>4}  " + "  ".join(celle) + f"   |  {pct(agg):>10}"
         print(riga)
 
+    # i versamenti su cui poggia la proiezione: gli stessi del foglio e del Monte Carlo
+    print("\n" + "-" * 78)
+    if scarti:
+        print(f"VERSAMENTI usati nella proiezione, DIVERSI dalla colonna I del foglio ({'; '.join(scarti)}):")
+    else:
+        print("VERSAMENTI usati nella proiezione (come la colonna I del foglio, de-risking compreso):")
+    for g in obiettivi:
+        quanto = "— (nessun target)" if g["target_oggi"] is None else f"€{g['pmt']:,.0f}/mese".replace(",", ".")
+        print(f"  {g['nome']}: {quanto}")
+
     # transizioni chiave dell'aggregato
     print("\n" + "-" * 78)
     print("LETTURA:")
@@ -204,9 +234,9 @@ def main():
     print("- (max) = obiettivo SENZA target («il più possibile»): si proietta il solo capitale")
     print("  assegnato; nessun versamento 'necessario' viene calcolato. Se terminante, de-riska")
     print("  e a scadenza si spende come gli altri; se permanente, resta e non de-riska mai.")
-    print("\nNON è consulenza di investimento. Proiezione al rendimento medio del profilo")
-    print("(non modella la volatilità). Le % azionario per profilo e i parametri del glide")
-    print("path sono editabili. Vedi glide-path.md.")
+    print("\nNON è consulenza di investimento. Proiezione al rendimento atteso di ogni anno lungo")
+    print("il glide path (non modella la volatilità). Le % azionario per profilo e i parametri")
+    print("del glide path sono editabili (la finestra anche nel foglio, Parametri!B7). Vedi glide-path.md.")
 
 
 if __name__ == "__main__":

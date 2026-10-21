@@ -1,6 +1,6 @@
 ---
 name: it-tax-optimization
-description: Ottimizzazione fiscale di minusvalenze e plusvalenze sotto la normativa italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di minusvalenze, plusvalenze, ottimizzazione fiscale italiana, compensazione minus/plus, zainetto fiscale, scadenza minus a 4 anni, harvesting fiscale su broker italiani (Directa, Fineco, Banca Sella, IWBank, BG Saxo, ecc.), tassazione ETF UCITS armonizzati, regime amministrato come sostituto d'imposta, articolo 67 vs articolo 44 TUIR, Tobin tax / imposta sulle transazioni finanziarie (ITF) su azioni italiane, imposta di bollo sul dossier titoli. Usa questa skill anche per la tassazione delle criptovalute / cripto-attività (Bitcoin, Ethereum, altcoin, NFT, stablecoin): aliquota 33% dal 2026 e 26% per gli e-money token in euro MiCA, compartimento separato delle minusvalenze cripto, eventi tassabili e permuta cripto-cripto, metodo del costo di carico, monitoraggio fiscale quadro RW/W, imposta sul valore delle cripto-attività 0,2%, regime amministrato cripto, rivalutazione del costo di carico. Copre anche i temi cripto avanzati: DeFi (staking, lending, yield, liquidity pool, LP token, impermanent loss), airdrop e fork, mining occasionale vs professionale, NFT secondo il ruolo (investitore vs artista/creatore), e il ravvedimento operoso per regolarizzare cripto non dichiarate negli anni passati (quadro RW omesso, sanzioni, DAC8). Copre inoltre i casi di confine: trasferimenti tra wallet, bridge cross-chain e wrapping (WBTC, stETH), cripto detenute in attività d'impresa o partita IVA (IRES, IVA, forfettario che investe in cripto), cripto ricevuta come stipendio o compenso, neo-residenti e flat tax €100.000 sui redditi esteri, e successione/donazione di criptovalute (eredità, costo di carico per gli eredi, territorialità). Trigger anche su domande di fine anno fiscale (novembre-dicembre) relative a portafogli italiani. NON usare per fiscalità USA (wash sale, HIFO, Roth IRA) — quella è coperta dalla skill upstream `tax-loss-harvesting`. NON sostituisce consulenza di un commercialista abilitato.
+description: Ottimizzazione fiscale di minusvalenze e plusvalenze sotto la normativa italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di minusvalenze, plusvalenze, ottimizzazione fiscale italiana, compensazione minus/plus, zainetto fiscale, scadenza minus a 4 anni, harvesting fiscale su broker italiani (Directa, Fineco, Banca Sella, ecc.) ed esteri (Interactive Brokers e Degiro in regime dichiarativo, nei principi, con quadri RT/RW e IVAFE; Trade Republic e Scalable possono essere in amministrato), tassazione ETF UCITS armonizzati, regime amministrato come sostituto d'imposta, articolo 67 vs articolo 44 TUIR, Tobin tax / imposta sulle transazioni finanziarie (ITF) su azioni italiane, imposta di bollo sul dossier titoli. Usa questa skill anche per la tassazione delle criptovalute / cripto-attività (Bitcoin, Ethereum, altcoin, NFT, stablecoin): aliquota 33% dal 2026 e 26% per gli e-money token in euro MiCA, compartimento separato delle minusvalenze cripto, eventi tassabili e permuta cripto-cripto, metodo del costo di carico, monitoraggio fiscale quadro RW/W, imposta sul valore delle cripto-attività 0,2%, regime amministrato cripto, rivalutazione del costo di carico. Copre anche i temi cripto avanzati: DeFi (staking, lending, yield, liquidity pool, LP token, impermanent loss), airdrop e fork, mining occasionale vs professionale, NFT secondo il ruolo (investitore vs artista/creatore), e il ravvedimento operoso per regolarizzare cripto non dichiarate negli anni passati (quadro RW omesso, sanzioni, DAC8). Copre inoltre i casi di confine: trasferimenti tra wallet, bridge cross-chain e wrapping (WBTC, stETH), cripto detenute in attività d'impresa o partita IVA (IRES, IVA, forfettario che investe in cripto), cripto ricevuta come stipendio o compenso, neo-residenti e flat tax €100.000 sui redditi esteri, e successione/donazione di criptovalute (eredità, costo di carico per gli eredi, territorialità). Trigger anche su domande di fine anno fiscale (novembre-dicembre) relative a portafogli italiani. NON usare per fiscalità USA (wash sale, HIFO, Roth IRA) — quella è coperta dalla skill upstream `tax-loss-harvesting`. NON sostituisce consulenza di un commercialista abilitato.
 ---
 
 # it-tax-optimization
@@ -17,7 +17,7 @@ Skill per l'ottimizzazione di minusvalenze e plusvalenze sotto il regime fiscale
 **Cosa NON fa:**
 - ❌ Non dà consigli di investimento. Le strategie sono *fiscali*, non orientate a rendimento/rischio.
 - ❌ Non sostituisce un commercialista. Casi limite (successioni, residenza estera, partecipazioni qualificate, conferimento fondi pensione, trasferimento dossier inter-intermediario) richiedono parere professionale.
-- ⚠️ Il calcolo automatico assume il regime amministrato. Il regime **dichiarativo** (broker esteri, intermediario non sostituto d'imposta) è ora coperto a livello di principi, adempimenti e implicazioni sulla compensazione (`references/regime-dichiarativo.md`: quadro RT, quadro RW, IVAFE, zainetto unificato), ma la compilazione effettiva del Modello Redditi PF e il calcolo operazione-per-operazione richiedono un commercialista.
+- ⚠️ Il calcolo automatico assume il regime amministrato. Il regime **dichiarativo** (broker senza sostituto d'imposta italiano, come Interactive Brokers e Degiro) è ora coperto a livello di principi, adempimenti e implicazioni sulla compensazione (`references/regime-dichiarativo.md`: stato dei broker esteri, quadri RT, RM e RW, IVAFE, LIFO, cambio del giorno, liquidità in valuta, zainetto unificato), ma la compilazione effettiva del Modello Redditi PF e il calcolo operazione-per-operazione richiedono un commercialista.
 - ❌ Non gestisce: derivati OTC, immobili, partecipazioni qualificate, fondi pensione (regime sostitutivo distinto). Le **criptovalute** sono ora coperte a livello di principi e adempimenti (`references/criptovalute.md`), ma il calcolo su portafogli con molte operazioni o storici multi-exchange richiede comunque un commercialista o un software dedicato.
 
 ## Regole fiscali fondamentali (vigenti 2026)
@@ -130,13 +130,14 @@ Se `aliquota` non fornita, dedurla:
 
 **Stato zainetto fiscale** (può essere scaricato da quasi tutti i broker italiani come "rendiconto fiscale annuale" o "estratto plus/minus"). Schema:
 - `broker` — **obbligatorio** (zainetto è per-intermediario in amministrato)
+- per i conti in dichiarativo, invece, le **minus riportabili dal quadro RT** delle dichiarazioni precedenti, per anno e aliquota, non per broker: sono del contribuente e valgono per tutti quei conti
 - `anno_realizzo`
 - `importo_residuo` (€)
 - `aliquota` (26% o 12,5%)
 
 **Contesto operativo**:
 - Numero di intermediari coinvolti (se >1: applicare workflow multi-broker, vedi `references/multi-intermediario.md`)
-- Regime per ciascun broker: amministrato (default) o dichiarativo
+- Regime per ciascun broker: amministrato (default) o dichiarativo. Trade Republic e Scalable Capital possono essere in amministrato con la succursale italiana, Interactive Brokers e Degiro sono in dichiarativo: vedi la tabella in `references/regime-dichiarativo.md`
 - Cut-off operativi specifici del broker (Directa e Sella di solito chiudono prima del 31/12)
 
 Se mancano dati essenziali → CHIEDERE, NON INVENTARE. Esempio: se l'utente fornisce solo controvalore totale senza ISIN, non si può fare analisi. Se non specifica i broker quando ne ha più di uno, l'analisi è inattendibile.
@@ -158,6 +159,12 @@ Per ciascun intermediario separatamente:
 2. **Plus latenti compensabili** (categoria `reddito_diverso`) — totale e per posizione, suddiviso per aliquota
 3. **Plus latenti NON compensabili** (`reddito_capitale` e `reddito_capitale_irpef`) — flaggate con avviso; per `reddito_capitale_irpef` ricordare l'IRPEF marginale e il quadro RL
 4. **Minus latenti** — potenziali nuovi contributi a zainetto se realizzate
+
+**Broker in dichiarativo** (Interactive Brokers, Degiro, o un conto per cui l'utente ha scelto il dichiarativo): il calcolo sul PMC e lo zainetto per broker non valgono.
+- Plus e minus si calcolano sui **lotti** (data, quantità, prezzo e cambio del giorno di ogni acquisto), in euro (art. 9 c. 2 TUIR) e con il LIFO del dichiarativo. Il prezzo medio in valuta mostrato dal broker non basta: il cambio può invertire il segno della plus. Senza i lotti non calcolare plus e minus di quei conti: dirlo all'utente e rinviare al commercialista.
+- Le minus del quadro RT degli anni precedenti sono del contribuente e valgono per tutti i conti in dichiarativo: tra due conti in dichiarativo il Pattern A è cross-broker.
+- Il Pattern D si valuta solo per i rapporti in amministrato. Tra un conto in amministrato con minus e uno in dichiarativo con plus si confrontano il Pattern D (revoca dell'amministrato sul conto con le minus: resta aperto, le minus certificate vanno nel quadro RT e da lì compensano le plus del conto in dichiarativo) e il Pattern E (chiusura del rapporto, con la stessa certificazione).
+- L'output aggiunge la sezione «Adempimenti del dichiarativo» (sezione 5).
 
 **Aggregazione CROSS-BROKER** (per il confronto tra amministrato, chiusura con certificazione e dichiarativo):
 
@@ -218,10 +225,11 @@ se numero_broker > 1:
     se delta_risparmio_dichiarativo > costo_dichiarativo + soglia_sicurezza (~€500):
         proporre il dichiarativo nel confronto a tre con il Pattern E (sezione 4 dell'output), non come automatismo
         ricordare scadenza opzione (di solito 31/12 anno precedente)
+        verificare che l'intermediario accetti il regime dichiarativo
         ricordare irrevocabilità per anno
 ```
 
-L'opzione per il dichiarativo, come la revoca dell'amministrato, ha effetto dal periodo d'imposta successivo (art. 6 c. 2 D.Lgs. 461/97 → art. 306 c. 3 TU 2027): le minus che scadono il 31/12 dell'anno in corso non si salvano così. Per quelle, e quando un broker non ha più ragione di restare aperto, confrontare il Pattern E.
+L'opzione per il dichiarativo, come la revoca dell'amministrato, ha effetto dal periodo d'imposta successivo (art. 6 c. 2 D.Lgs. 461/97 → art. 306 c. 3 TU 2027): le minus che scadono il 31/12 dell'anno in corso non si salvano così. Per quelle, e quando un broker non ha più ragione di restare aperto, confrontare il Pattern E. Nel costo del dichiarativo va messo anche il calcolo operazione per operazione, con il LIFO e i cambi del giorno. Il cambio in sé non è un costo del dichiarativo: la plus fiscale si calcola in euro al cambio del giorno di acquisto e di vendita (art. 9 c. 2 TUIR) in entrambi i regimi, e in dichiarativo cambia solo chi la calcola. Con liquidità in valuta oltre €51.645,69 per almeno sette giorni lavorativi continui diventano tassabili anche gli utili su cambi (art. 67 c. 1-ter TUIR, dal 2027 nell'art. 76 D.Lgs. 117/2026; vedi `references/regime-dichiarativo.md`).
 
 **Pattern E — Consolidamento via certificazione (chiusura del rapporto)**: se un broker ha minus che lì non troveranno plus compensabili (tipico: un dossier fermo, senza posizioni in plus), chiudere il rapporto le sposta invece di lasciarle evaporare. Alla chiusura del rapporto, o alla revoca dell'opzione per l'amministrato, l'intermediario rilascia una **certificazione** delle minus residue (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027). Le minus certificate si usano:
 - su **un altro rapporto in amministrato intestato agli stessi soggetti** (con le cointestazioni gli intestatari devono coincidere), consegnando la certificazione al nuovo intermediario;
@@ -244,7 +252,7 @@ per broker_destinazione (stessi intestatari) con plus latenti reddito_diverso:
 
 Se più origini puntano alla stessa destinazione, le sue plus si dividono tra loro e non si contano due volte. Togliere dalla capienza lo zainetto che la destinazione ha già dà il recupero certo dell'anno: il resto dipende dalle plus future della destinazione.
 
-Rispetto al Pattern D la certificazione resta in amministrato (niente quadro RT, niente commercialista) ma richiede di chiudere un rapporto; il dichiarativo consolida senza chiudere nulla, ma vale dall'anno successivo e costa adempimenti. Il Pattern D resta la via quando non si vuole chiudere alcun rapporto. Prima di proporre la chiusura verificare con entrambi gli intermediari tempi e modalità di rilascio e di accettazione della certificazione. Confronto a tre su un caso pratico in `references/multi-intermediario.md`.
+Rispetto al Pattern D la certificazione, se la destinazione è un altro rapporto in amministrato, resta in amministrato (niente quadro RT, niente commercialista) ma richiede di chiudere un rapporto; il dichiarativo consolida senza chiudere nulla, ma vale dall'anno successivo e costa adempimenti. Il Pattern D resta la via quando non si vuole chiudere alcun rapporto. Prima di proporre la chiusura verificare con entrambi gli intermediari tempi e modalità di rilascio e di accettazione della certificazione. Confronto a tre su un caso pratico in `references/multi-intermediario.md`.
 
 *Certificazione delle minus alla chiusura del rapporto (art. 6 c. 2 e c. 5 D.Lgs. 461/97 → art. 306 c. 3 e c. 6 D.Lgs. 117/2026; righi RT4, RT14, RT44 delle istruzioni Redditi PF 2026) — Verificato: 2026-10.*
 
@@ -258,6 +266,7 @@ Tabella scadenze ordinata cronologicamente:
 |---|---|---|---|---|
 | 31/12/{anno corrente} | Deadline operativa | Tutti i trade dell'anno fiscale | Alta se zainetto in scadenza | T+2: ultima esecuzione utile ~27/12 (verificare con broker) |
 | 31/12/{anno+0..4} | Scadenza zainetto | Importo specifico | Alta se anno corrente, decrescente | Da 1/1 successivo evapora |
+| 30/6, 30/9 o 31/10 e 30/11 dell'anno dopo | Solo con un conto in dichiarativo | 30/6 (30/7 con +0,40%): saldo dell'imposta del quadro RT, senza acconti, e saldo e primo acconto IVAFE; invio del 730 (quadri T, M e W) entro il 30/9 o del Redditi PF (RT, RM e RW) entro il 31/10; 30/11: secondo acconto IVAFE | Alta | IVAFE con F24: 4043 il saldo, 4047 e 4048 gli acconti; il 31/10 slitta al primo giorno lavorativo |
 
 Note operative da includere sempre:
 - Settlement T+2 per la maggior parte degli strumenti: operare con almeno 2 giorni lavorativi di anticipo sul 31/12
@@ -266,7 +275,7 @@ Note operative da includere sempre:
 
 ## Formato output
 
-Report in markdown, tre sezioni + (se applicabile) sezione dichiarativo + disclaimer.
+Report in markdown, tre sezioni + (se applicabili) le sezioni 4 e 5 sul dichiarativo + disclaimer.
 
 ### 1. Stato attuale
 
@@ -305,7 +314,7 @@ Suddivise per Pattern (A, B, C, D, E). Per ogni opportunità:
 
 Tabella scadenze come sopra. Aggiungere riepilogo testuale del prossimo intervento critico ("La prossima scadenza è X il giorno Y, riguarda Z").
 
-### 4. (Solo se multi-broker) Decisione regime per anno prossimo
+### 4. (Solo se multi-broker, con almeno un rapporto in amministrato) Decisione regime per anno prossimo
 
 Sezione dedicata al confronto tra amministrato, chiusura con certificazione e dichiarativo:
 
@@ -318,9 +327,13 @@ Sezione dedicata al confronto tra amministrato, chiusura con certificazione e di
 
 Raccomandazione + scadenza per l'opzione (di solito 31/12 anno corrente per applicazione anno successivo).
 
+### 5. (Solo con conti in dichiarativo) Adempimenti del dichiarativo
+
+La checklist di `references/regime-dichiarativo.md` applicata ai conti dell'utente: quadri RT, RM e RW (o T, M e W nel 730), minus da indicare nell'anno di realizzo, IVAFE, scadenze. Plus e minus dei conti in dichiarativo sono indicative (LIFO e cambi del giorno da ricostruire).
+
 ### Disclaimer (obbligatorio in fondo)
 
-> **Disclaimer**: questo report ha finalità informative e di pianificazione fiscale personale. Non costituisce consulenza fiscale, finanziaria o di investimento professionale. I calcoli sono basati sui dati forniti dall'utente e su regole fiscali generali del regime amministrato italiano vigenti alla data di redazione. Per situazioni specifiche (successioni, donazioni, residenza estera, partecipazioni qualificate, conferimento fondi pensione, trasferimento dossier inter-intermediario, regime impatriati, etc.) consultare un commercialista o consulente fiscale abilitato. Verificare sempre saldi, zainetto fiscale e cut-off operativi sul portale del proprio intermediario prima di operare. L'autore di questa skill e Anthropic non si assumono responsabilità per decisioni operative basate sull'output di questa skill.
+> **Disclaimer**: questo report ha finalità informative e di pianificazione fiscale personale. Non costituisce consulenza fiscale, finanziaria o di investimento professionale. I calcoli sono basati sui dati forniti dall'utente e su regole fiscali generali del regime amministrato italiano vigenti alla data di redazione; per i conti in regime dichiarativo i numeri sono indicativi e la dichiarazione va verificata con un commercialista. Per situazioni specifiche (successioni, donazioni, residenza estera, partecipazioni qualificate, conferimento fondi pensione, trasferimento dossier inter-intermediario, regime impatriati, etc.) consultare un commercialista o consulente fiscale abilitato. Verificare sempre saldi, zainetto fiscale e cut-off operativi sul portale del proprio intermediario prima di operare. L'autore di questa skill e Anthropic non si assumono responsabilità per decisioni operative basate sull'output di questa skill.
 
 ## Anti-pattern (NON FARE MAI)
 
@@ -343,7 +356,7 @@ Raccomandazione + scadenza per l'opzione (di solito 31/12 anno corrente per appl
 - `references/etf-trap-redditi-capitale.md` — approfondimento con esempi numerici sulla trappola ETF UCITS armonizzati (asimmetria redditi diversi vs redditi di capitale)
 - `references/aliquote-12-5-26.md` — gestione cross-rate, coefficiente di abbattimento 12,5/26, edge case ETF su titoli di Stato
 - `references/multi-intermediario.md` — zainetto per intermediario, certificazione delle minus alla chiusura del rapporto, regime dichiarativo, confronto a tre su un caso pratico
-- `references/regime-dichiarativo.md` — il regime **dichiarativo** per chi usa broker esteri: i tre regimi a confronto (amministrato / dichiarativo / gestito), il quadro **RT** (plusvalenze) e il quadro **RW** (monitoraggio + **IVAFE** 0,2%, 0,4% black list), e soprattutto la **compensazione unificata** a livello di contribuente — che fa sparire la frammentazione dello zainetto per broker — più i criteri per scegliere il regime e gli adempimenti cripto (RW + IVCA)
+- `references/regime-dichiarativo.md` — il regime **dichiarativo** per chi usa broker senza sostituto d'imposta italiano: lo stato dei broker esteri a ottobre 2026, i tre regimi a confronto (amministrato / dichiarativo / gestito), i quadri **RT** (plusvalenze, con il LIFO), **RM** (proventi di ETF esteri) e **RW** (monitoraggio + **IVAFE** 0,2%, 0,4% black list), il cambio del giorno e la soglia di €51.645,69 sulla liquidità in valuta, una checklist degli adempimenti, e soprattutto la **compensazione unificata** a livello di contribuente — che fa sparire la frammentazione dello zainetto per broker — più i criteri per scegliere il regime e gli adempimenti cripto (RW + IVCA)
 - `references/import-dati-broker.md` — come portare i **dati reali** nella skill: perché un MCP "live" sui broker (Directa/Fineco/Trade Republic) è stato valutato e **scartato** (le API non danno lo zainetto, e darebbero credenziali a un tool), e come usare invece l'importatore dei report esportati. Istruzioni di export per ciascun broker, mappatura tollerante dei formati, limiti onesti del pilota
 - `assets/importa-estratto-broker.py` — l'**importatore**: ingerisce un estratto del portafoglio in CSV (che scarichi tu, senza credenziali in giro), calcola le plus/minus **latenti** per posizione, assegna categoria fiscale e aliquota (dalla colonna «tipo fiscale» o dalla descrizione; in dubbio «da classificare», mai reddito diverso per default) e, con un secondo CSV per lo zainetto, esclude le minus scadute, converte 12,5/26 nei due versi e calcola broker per broker quanta plus compensabile si può realizzare a **imposta zero**. `--anno`, `--broker`, `--json` per il JSON completo su file; numeri IT/EN decisi per file; solo libreria standard. Con `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` come template di formato
 - `references/criptovalute.md` — fiscalità delle cripto-attività (2026): aliquota 33% (26% per EMT-euro MiCA), il compartimento separato delle minusvalenze (solo cripto con cripto), eventi tassabili e neutri, costo medio ponderato in amministrato e LIFO in dichiarativo (per le cripto lo indica la Circ. 30/E/2023, non la legge), monitoraggio RW e imposta sul valore 0,2%, il regime amministrato cripto (possibile dal 2023), le leve (rivalutazione, harvesting) e i punti controversi
@@ -364,7 +377,7 @@ Questa è la versione 0.10 del PoC.
 - **MCP "live" sui broker: valutato ed escluso, con motivazione** (`references/import-dati-broker.md`). Verifica broker per broker: solo Directa ha un'API ufficiale (socket, richiede Darwin aperto in locale) e comunque non espone lo zainetto; Fineco e Trade Republic non hanno API retail. Il dato fiscale vive nei report esportabili, non nelle API — da cui la scelta dell'importatore di report invece del collegamento live (anche per non dare credenziali a un tool).
 
 **v0.8**:
-- Aggiunto il **regime dichiarativo** (`references/regime-dichiarativo.md`), il caso di chi usa broker esteri (Interactive Brokers, Degiro): i tre regimi a confronto (amministrato / dichiarativo / gestito), il quadro RT (plusvalenze) e RW (monitoraggio + IVAFE 0,2%, 0,4% black list), e il punto che più conta per l'ottimizzazione — in dichiarativo la **compensazione è unificata** a livello di contribuente, quindi la frammentazione dello zainetto per broker sparisce. Cifre 2026 verificate via web (IVAFE, bollo, soglie RW). Il limite "non opera in dichiarativo" è stato di conseguenza ammorbidito.
+- Aggiunto il **regime dichiarativo** (`references/regime-dichiarativo.md`), il caso di chi usa broker esteri (Interactive Brokers, Degiro): i tre regimi a confronto (amministrato / dichiarativo / gestito), il quadro RT (plusvalenze) e RW (monitoraggio + IVAFE 0,2%, 0,4% black list), e il punto che più conta per l'ottimizzazione — in dichiarativo la **compensazione è unificata** a livello di contribuente, quindi la frammentazione dello zainetto per broker sparisce. Cifre 2026 verificate via web (IVAFE, bollo); la regola del quadro RW è stata poi corretta nella v0.10: nessuna soglia per titoli e cripto presso intermediari esteri, €15.000 solo per i conti. Il limite "non opera in dichiarativo" è stato di conseguenza ammorbidito.
 - **Corretto un errore**: l'imposta di bollo sul dossier non ha tetto per le persone fisiche (il tetto di €14.000 vale solo per società ed enti). Allineato all'IVAFE estera (anch'essa 0,2%).
 
 **v0.7**:

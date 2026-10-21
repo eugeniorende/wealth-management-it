@@ -109,7 +109,7 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 | dicembre 2026 | Legge di bilancio 2027: IRPEF, plafond del fondo pensione, cripto, bollo, Tobin tax | SKILL.md e reference di it-tax-optimization, it-pianificazione, it-rebalance; `netto-pensione.py` |
 | entro fine 2026 | Decreto sui coefficienti di trasformazione 2027-2028 (il precedente è del 20/11/2024) | `previdenza-obbligatoria.md`, foglio Coefficienti di `proiezione-pensione.xlsx`, `proiezione-inps.py` |
 | 1° gennaio 2027 | Nuovi testi unici (TUIR D.Lgs. 117/2026 e collegati): cambiano gli articoli citati | doppie citazioni nelle reference |
-| gennaio 2027 | Aggiornamento annuale della serie Damodaran | `rendimenti-storici.csv` (due copie identiche) |
+| gennaio 2027 | Aggiornamento annuale della serie Damodaran e della CPI USA di dicembre 2026 (BLS, colonna inflazione) | `rendimenti-storici.csv` (due copie identiche) |
 | gennaio-febbraio 2027 | Circolari INPS su massimale, minimale e prima fascia 2027; aliquote della Gestione Separata | it-pianificazione, it-pianificazione-autonomi |
 | 2027-2028 | Requisiti di pensione già noti (Circ. INPS 28/2026), da applicare alla data | `previdenza-obbligatoria.md`, `previdenza-gestione-separata.md` |
 | giugno-luglio 2027 | Scadono i marcatori di giugno-luglio 2026: suite completa e workflow di release falliscono finché non si riverifica | tabella sopra |
