@@ -13,7 +13,7 @@ L'upstream è cablato sulla fiscalità USA: wash sale rule a 30 giorni, scelta d
 | Aspetto | Upstream (USA) | Fork (IT) |
 |---|---|---|
 | Wash sale | 30 giorni di vincolo dopo realizzo perdita | Inesistente, riacquisto immediato legittimo |
-| Cost basis | Scelta investitore (HIFO/LIFO/SpecID) | LIFO obbligatorio in regime amministrato |
+| Cost basis | Scelta investitore (HIFO/LIFO/SpecID) | Costo medio ponderato in amministrato, LIFO in dichiarativo: il lotto non si sceglie |
 | Compensazione cross-category | Cap gain compensa qualsiasi cap gain | Solo "redditi diversi" tra loro; non con "redditi di capitale" |
 | Dividendi | Possono essere "qualified" o "ordinary", compensabili in alcuni casi | Sempre reddito di capitale, mai compensabili con minus |
 | ETF | Tutti uguali fiscalmente | Trappola ETF: plus reddito di capitale (UCITS e non armonizzati), minus reddito diverso |
@@ -47,7 +47,7 @@ Le skill non sono isolate: formano un sistema dove le vendite generano eventi fi
                                │ è la leva di coordinamento
                     ┌──────────┴──────────┐
                     │     it-rebalance     │  ← mantiene l'allocazione-target,
-                    │  (drift, leve, LIFO) │     esegue il glide path nel tempo
+                    │  (drift, leve, PMC)  │     esegue il glide path nel tempo
                     └──────────┬──────────┘
                                │ le scelte di vendita
                                │ cambiano il reddito
@@ -474,7 +474,7 @@ Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazion
 
 L'utente deve fornire:
 
-1. **Snapshot portafoglio** in CSV o testo. Schema:
+1. **Snapshot portafoglio** in CSV o testo (l'estratto CSV del broker si legge con `skills/it-tax-optimization/assets/importa-estratto-broker.py`, che classifica le posizioni, esclude le minus scadute e incrocia lo zainetto broker per broker). Schema:
    ```
    isin,descrizione,quantita,pmc,prezzo_corrente,categoria_fiscale
    IE00B4L5Y983,iShares Core MSCI World,100,75.20,89.50,reddito_capitale
@@ -510,7 +510,7 @@ Più disclaimer obbligatorio.
 
 ## Differenza chiave: zainetto fiscale
 
-Il concetto di "zainetto fiscale" è centrale e non ha equivalente diretto USA. È il registro di minusvalenze pregresse custodito dall'intermediario in regime amministrato, con scadenza a 4 anni e regole asimmetriche di compensazione (vedi `skills/it-tax-optimization/references/etf-trap-redditi-capitale.md`).
+Il concetto di "zainetto fiscale" è centrale e non ha equivalente diretto USA. È il registro di minusvalenze pregresse custodito dall'intermediario in regime amministrato, con scadenza a 4 anni e regole asimmetriche di compensazione (vedi `skills/it-tax-optimization/references/etf-trap-redditi-capitale.md`). Chiudendo il rapporto non si perde: l'intermediario certifica le minus residue, che si usano su un altro rapporto con gli stessi intestatari o in dichiarazione fino alla scadenza originaria (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027, vedi `multi-intermediario.md`).
 
 ## Contribuire
 

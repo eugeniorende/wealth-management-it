@@ -12,7 +12,7 @@ Per finanziare il prelievo annuo, attingere in quest'ordine:
 
 **3. Vendite dal dossier titoli — imposta sui realizzi (26%), da minimizzare.** Quando le prime due fonti non bastano, si vende. Qui si applica la **stessa gerarchia delle leve** del ribilanciamento, perché il problema è identico (scegliere cosa e dove vendere per minimizzare la plus tassata):
    - prima le posizioni in **minus** (Leva 3): zero/negativo, alimentano lo zainetto;
-   - poi le posizioni a **plus latente minore** (spesso i lotti LIFO recenti);
+   - poi le posizioni a **plus latente minore** in proporzione al valore (sul prezzo medio di carico);
    - usando lo **zainetto** per compensare le plus, con l'ottimizzazione **broker × tipo fiscale** (vendere reddito diverso presso il broker con zainetto, mai dare per scontata la compensazione cross-broker — vedi `ribilanciamento-multibroker.md`).
    Lo strumento `assets/ribilanciamento-multibroker.py` calcola direttamente questa sequenza: basta impostare la "riduzione" richiesta pari all'importo da liquidare.
 
@@ -31,4 +31,4 @@ Il fondo pensione (agevolato ma rigido) e il dossier (flessibile ma tassato al 2
 
 ## Caveat
 
-I realizzi parziali sono approssimati pro-rata; l'importo effettivo dipende dalla stratificazione **LIFO** dei lotti. Lo zainetto va verificato per broker, con l'anno di formazione, sul portale dell'intermediario. E le aliquote del fondo pensione e i vincoli capitale/rendita vanno verificati al momento del pensionamento (cambiano con le riforme). La sostenibilità complessiva del prelievo — quanto, non come — è in `it-pianificazione-obiettivi/references/decumulo.md`.
+I realizzi parziali sono calcolati pro-rata sul prezzo medio di carico, che in amministrato è la base fiscale effettiva (art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027). Lo zainetto va verificato per broker, con l'anno di formazione, sul portale dell'intermediario. E le aliquote del fondo pensione e i vincoli capitale/rendita vanno verificati al momento del pensionamento (cambiano con le riforme). La sostenibilità complessiva del prelievo — quanto, non come — è in `it-pianificazione-obiettivi/references/decumulo.md`.
