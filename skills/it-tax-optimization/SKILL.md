@@ -1,6 +1,6 @@
 ---
 name: it-tax-optimization
-description: Ottimizzazione fiscale di minusvalenze e plusvalenze sotto la normativa italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di minusvalenze, plusvalenze, ottimizzazione fiscale italiana, compensazione minus/plus, zainetto fiscale, scadenza minus a 4 anni, harvesting fiscale su broker italiani (Directa, Fineco, Banca Sella, IWBank, BG Saxo, ecc.), tassazione ETF UCITS armonizzati, regime amministrato come sostituto d'imposta, articolo 67 vs articolo 44 TUIR, Tobin tax / imposta sulle transazioni finanziarie (ITF) su azioni italiane, imposta di bollo sul dossier titoli. Usa questa skill anche per la tassazione delle criptovalute / cripto-attività (Bitcoin, Ethereum, altcoin, NFT, stablecoin): aliquota 33% dal 2026 e 26% per gli e-money token in euro MiCA, compartimento separato delle minusvalenze cripto, eventi tassabili e permuta cripto-cripto, costo medio (amministrato) e LIFO (dichiarativo), monitoraggio fiscale quadro RW/W, imposta sul valore delle cripto-attività 0,2%, regime amministrato cripto, rivalutazione del costo di carico. Copre anche i temi cripto avanzati: DeFi (staking, lending, yield, liquidity pool, LP token, impermanent loss), airdrop e fork, mining occasionale vs professionale, NFT secondo il ruolo (investitore vs artista/creatore), e il ravvedimento operoso per regolarizzare cripto non dichiarate negli anni passati (quadro RW omesso, sanzioni, DAC8). Copre inoltre i casi di confine: trasferimenti tra wallet, bridge cross-chain e wrapping (WBTC, stETH), cripto detenute in attività d'impresa o partita IVA (IRES, IVA, forfettario che investe in cripto), cripto ricevuta come stipendio o compenso, neo-residenti e flat tax €100.000 sui redditi esteri, e successione/donazione di criptovalute (eredità, costo di carico per gli eredi, territorialità). Trigger anche su domande di fine anno fiscale (novembre-dicembre) relative a portafogli italiani. NON usare per fiscalità USA (wash sale, HIFO, Roth IRA) — quella è coperta dalla skill upstream `tax-loss-harvesting`. NON sostituisce consulenza di un commercialista abilitato.
+description: Ottimizzazione fiscale di minusvalenze e plusvalenze sotto la normativa italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di minusvalenze, plusvalenze, ottimizzazione fiscale italiana, compensazione minus/plus, zainetto fiscale, scadenza minus a 4 anni, harvesting fiscale su broker italiani (Directa, Fineco, Banca Sella, IWBank, BG Saxo, ecc.), tassazione ETF UCITS armonizzati, regime amministrato come sostituto d'imposta, articolo 67 vs articolo 44 TUIR, Tobin tax / imposta sulle transazioni finanziarie (ITF) su azioni italiane, imposta di bollo sul dossier titoli. Usa questa skill anche per la tassazione delle criptovalute / cripto-attività (Bitcoin, Ethereum, altcoin, NFT, stablecoin): aliquota 33% dal 2026 e 26% per gli e-money token in euro MiCA, compartimento separato delle minusvalenze cripto, eventi tassabili e permuta cripto-cripto, metodo del costo di carico, monitoraggio fiscale quadro RW/W, imposta sul valore delle cripto-attività 0,2%, regime amministrato cripto, rivalutazione del costo di carico. Copre anche i temi cripto avanzati: DeFi (staking, lending, yield, liquidity pool, LP token, impermanent loss), airdrop e fork, mining occasionale vs professionale, NFT secondo il ruolo (investitore vs artista/creatore), e il ravvedimento operoso per regolarizzare cripto non dichiarate negli anni passati (quadro RW omesso, sanzioni, DAC8). Copre inoltre i casi di confine: trasferimenti tra wallet, bridge cross-chain e wrapping (WBTC, stETH), cripto detenute in attività d'impresa o partita IVA (IRES, IVA, forfettario che investe in cripto), cripto ricevuta come stipendio o compenso, neo-residenti e flat tax €100.000 sui redditi esteri, e successione/donazione di criptovalute (eredità, costo di carico per gli eredi, territorialità). Trigger anche su domande di fine anno fiscale (novembre-dicembre) relative a portafogli italiani. NON usare per fiscalità USA (wash sale, HIFO, Roth IRA) — quella è coperta dalla skill upstream `tax-loss-harvesting`. NON sostituisce consulenza di un commercialista abilitato.
 ---
 
 # it-tax-optimization
@@ -34,7 +34,7 @@ Questo è il vincolo strutturale del sistema italiano e la fonte degli errori pi
 
 ⚠️ **Trappola ETF UCITS armonizzati**: la *perdita* sulla vendita di un ETF UCITS è reddito diverso (genera minus utilizzabile). La *plusvalenza* sulla vendita futura dello stesso tipo di ETF è reddito di capitale (non compensabile). Vedi `references/etf-trap-redditi-capitale.md` per esempi numerici.
 
-⚠️ **ETF e fondi non armonizzati** (non UCITS, per esempio ETF domiciliati negli USA): la plusvalenza è reddito di capitale e non compensa mai lo zainetto; la minus è reddito diverso. Cambia il regime: 26% a titolo d'imposta solo se l'OICR è istituito in UE/SEE white list e ha un gestore vigilato AIFMD; altrimenti la plus concorre al reddito complessivo IRPEF, con ritenuta del 26% a titolo d'acconto, e va dichiarata nel quadro RL anche in regime amministrato (art. 10-ter L. 77/1983, vigente fino al 31/12/2026; dal 2027 art. 59 dell'All. 1 al D.Lgs. 33/2025).
+⚠️ **ETF e fondi non armonizzati** (non UCITS, per esempio ETF domiciliati negli USA): la plusvalenza è reddito di capitale e non compensa mai lo zainetto; la minus è reddito diverso. Cambia il regime: 26% a titolo d'imposta solo se l'OICR è istituito in UE/SEE white list e ha un gestore vigilato AIFMD; altrimenti la plus concorre al reddito complessivo IRPEF, con ritenuta del 26% a titolo d'acconto, e va dichiarata nel quadro RL anche in regime amministrato (art. 10-ter cc. 6-7 L. 77/1983, vigente fino al 31/12/2026; dal 2027 art. 59 cc. 9-10 dell'All. 1 al D.Lgs. 33/2025; aliquota del 26% dall'art. 3 c. 1 DL 66/2014).
 
 ⚠️ **Le cripto sono un terzo compartimento**: sono redditi diversi (art. 67 c-sexies), ma le minusvalenze cripto compensano **solo** plusvalenze cripto — non azioni, ETF o derivati, né viceversa. Aliquota **33%** dal 2026 (26% solo per gli e-money token in euro MiCA). Vedi `references/criptovalute.md`.
 
@@ -160,11 +160,11 @@ Per ciascun intermediario separatamente:
 
 **Aggregazione CROSS-BROKER** (per il confronto tra amministrato, chiusura con certificazione e dichiarativo):
 
-Calcolare anche lo scenario "consolidato" come se tutti i broker fossero in dichiarativo unificato:
-- Zainetto totale consolidato (somma cross-broker, distinto per aliquota)
+Calcolare anche lo scenario "consolidato" come se tutti i broker fossero in dichiarativo unificato. L'opzione vale dal 1/1 dell'anno successivo, quindi lo scenario conta solo le minus che a quella data sono ancora vive:
+- Zainetto consolidato utile al dichiarativo: somma cross-broker delle minus con scadenza successiva al 31/12 dell'anno corrente, distinta per aliquota. Quelle che scadono quest'anno restano fuori: vanno consumate in loco (Pattern A) o certificate chiudendo il rapporto (Pattern E)
 - Plus latenti compensabili totali (somma cross-broker)
-- Compensazione massima teorica in dichiarativo
-- **Delta vs amministrato**: quanto risparmio fiscale extra è disponibile passando a dichiarativo
+- Compensazione massima teorica in dichiarativo, su quello zainetto
+- **Delta vs amministrato**: quanto risparmio fiscale extra dà il dichiarativo rispetto a quello che ogni broker compensa da sé con le stesse minus
 
 Conservare entrambi gli aggregati per la simulazione e l'output.
 
@@ -208,15 +208,19 @@ per ciascun broker:
 
 ```
 se numero_broker > 1:
+    # l'opzione vale dal 1/1 dell'anno successivo: le minus che scadono quest'anno non contano
+    zainetto_utile = minus con anno_scadenza > anno_corrente (somma cross-broker, per aliquota)
+    compensazione_amministrato = parte di zainetto_utile che ogni broker compensa da sé (Pattern A)
+    compensazione_consolidata = min(zainetto_utile, plus_compensabili_cross_broker)   # 0,48077 se aliquote diverse
     delta_risparmio_dichiarativo = (compensazione_consolidata - compensazione_amministrato) × aliquota
     costo_dichiarativo = costo_commercialista_stimato (~€200-500) + onere_personale
     se delta_risparmio_dichiarativo > costo_dichiarativo + soglia_sicurezza (~€500):
-        raccomandare opzione dichiarativo
+        proporre il dichiarativo nel confronto a tre con il Pattern E (sezione 4 dell'output), non come automatismo
         ricordare scadenza opzione (di solito 31/12 anno precedente)
         ricordare irrevocabilità per anno
 ```
 
-L'opzione per il dichiarativo, come la revoca dell'amministrato, ha effetto dal periodo d'imposta successivo (art. 6 c. 2 D.Lgs. 461/97): le minus che scadono il 31/12 dell'anno in corso non si salvano così. Per quelle, e quando un broker non ha più ragione di restare aperto, confrontare il Pattern E.
+L'opzione per il dichiarativo, come la revoca dell'amministrato, ha effetto dal periodo d'imposta successivo (art. 6 c. 2 D.Lgs. 461/97 → art. 306 c. 3 TU 2027): le minus che scadono il 31/12 dell'anno in corso non si salvano così. Per quelle, e quando un broker non ha più ragione di restare aperto, confrontare il Pattern E.
 
 **Pattern E — Consolidamento via certificazione (chiusura del rapporto)**: se un broker ha minus che lì non troveranno plus compensabili (tipico: un dossier fermo, senza posizioni in plus), chiudere il rapporto le sposta invece di lasciarle evaporare. Alla chiusura del rapporto, o alla revoca dell'opzione per l'amministrato, l'intermediario rilascia una **certificazione** delle minus residue (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027). Le minus certificate si usano:
 - su **un altro rapporto in amministrato intestato agli stessi soggetti** (con le cointestazioni gli intestatari devono coincidere), consegnando la certificazione al nuovo intermediario;
@@ -225,17 +229,23 @@ L'opzione per il dichiarativo, come la revoca dell'amministrato, ha effetto dal 
 La scadenza resta quella originaria, il quarto anno successivo a quello di realizzo: la certificazione non azzera il contatore.
 
 ```
-per broker_origine con minus che non troveranno plus compensabili entro la scadenza:
-    se esiste broker_destinazione (stessi intestatari) con plus latenti reddito_diverso:
-        recuperabile = min(minus_origine, plus_compensabili_destinazione)   # 0,48077 se aliquote diverse
+per broker_destinazione (stessi intestatari) con plus latenti reddito_diverso:
+    capienza = max(0, plus_compensabili_destinazione − zainetto_destinazione)   # plus non già coperte dal suo zainetto
+    per broker_origine in ordine di scadenza delle minus (prima quelle che scadono prima):
+        residuo_origine = minus che lì non troveranno plus entro la scadenza (dopo il consumo in loco, Pattern A)
+        recuperabile = min(residuo_origine, capienza)   # 0,48077 se aliquote diverse
         risparmio = recuperabile × aliquota
         costo = chiusura e trasferimento titoli + stop dell'operatività + tempi di rilascio e caricamento
-        proporre se risparmio > costo e se i tempi stanno nella scadenza (a fine anno spesso no)
+        se risparmio > costo e i tempi stanno nella scadenza (a fine anno spesso no):
+            proporre la chiusura
+            capienza −= recuperabile
 ```
+
+Se più origini puntano alla stessa destinazione, le sue plus si dividono tra loro e non si contano due volte. Togliere dalla capienza lo zainetto che la destinazione ha già dà il recupero certo dell'anno: il resto dipende dalle plus future della destinazione.
 
 Rispetto al Pattern D la certificazione resta in amministrato (niente quadro RT, niente commercialista) ma richiede di chiudere un rapporto; il dichiarativo consolida senza chiudere nulla, ma vale dall'anno successivo e costa adempimenti. Il Pattern D resta la via quando non si vuole chiudere alcun rapporto. Prima di proporre la chiusura verificare con entrambi gli intermediari tempi e modalità di rilascio e di accettazione della certificazione. Confronto a tre su un caso pratico in `references/multi-intermediario.md`.
 
-*Certificazione delle minus alla chiusura del rapporto (art. 6 c. 2 e c. 5 D.Lgs. 461/97; righi RT4, RT14, RT44 delle istruzioni Redditi PF 2026) — Verificato: 2026-10.*
+*Certificazione delle minus alla chiusura del rapporto (art. 6 c. 2 e c. 5 D.Lgs. 461/97 → art. 306 c. 3 e c. 6 D.Lgs. 117/2026; righi RT4, RT14, RT44 delle istruzioni Redditi PF 2026) — Verificato: 2026-10.*
 
 Vedi `references/multi-intermediario.md` per dettagli, esempio numerico completo e checklist decisionale.
 
@@ -322,7 +332,7 @@ Raccomandazione + scadenza per l'opzione (di solito 31/12 anno corrente per appl
 - ❌ Inventare numeri quando i dati non sono completi: chiedere all'utente.
 - ❌ Trattare i broker come fungibili in amministrato: lo zainetto è **per-intermediario**. Mai proporre compensazioni cross-broker assumendo che avvengano automaticamente.
 - ❌ Suggerire trasferimenti titoli pensando di "spostare anche lo zainetto" — il PMC si sposta, lo zainetto **resta sul broker originario** finché quel rapporto non viene chiuso (Pattern E).
-- ❌ Dire che chiudendo il rapporto lo zainetto va perso: si chiede la **certificazione** (art. 6 c. 5 D.Lgs. 461/97) e le minus restano utilizzabili su un altro rapporto con gli stessi intestatari, o in dichiarazione, fino alla scadenza originaria. Ma non proporre la chiusura senza aver verificato tempi, costi e accettazione della certificazione da parte del broker ricevente.
+- ❌ Dire che chiudendo il rapporto lo zainetto va perso: si chiede la **certificazione** (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027) e le minus restano utilizzabili su un altro rapporto con gli stessi intestatari, o in dichiarazione, fino alla scadenza originaria. Ma non proporre la chiusura senza aver verificato tempi, costi e accettazione della certificazione da parte del broker ricevente.
 - ❌ Trattare gli ETF UCITS su titoli di Stato come "tassati al 12,5%": l'aliquota effettiva è **mista** (dipende dalla quota di NAV whitelist).
 - ❌ Applicare il coefficiente di abbattimento 12,5/26 senza esplicitare il calcolo: l'utente deve poter verificare.
 - ❌ Raccomandare il passaggio a dichiarativo senza quantificare il delta vs costi (commercialista, onere amministrativo).
@@ -335,7 +345,7 @@ Raccomandazione + scadenza per l'opzione (di solito 31/12 anno corrente per appl
 - `references/regime-dichiarativo.md` — il regime **dichiarativo** per chi usa broker esteri: i tre regimi a confronto (amministrato / dichiarativo / gestito), il quadro **RT** (plusvalenze) e il quadro **RW** (monitoraggio + **IVAFE** 0,2%, 0,4% black list), e soprattutto la **compensazione unificata** a livello di contribuente — che fa sparire la frammentazione dello zainetto per broker — più i criteri per scegliere il regime e gli adempimenti cripto (RW + IVCA)
 - `references/import-dati-broker.md` — come portare i **dati reali** nella skill: perché un MCP "live" sui broker (Directa/Fineco/Trade Republic) è stato valutato e **scartato** (le API non danno lo zainetto, e darebbero credenziali a un tool), e come usare invece l'importatore dei report esportati. Istruzioni di export per ciascun broker, mappatura tollerante dei formati, limiti onesti del pilota
 - `assets/importa-estratto-broker.py` — l'**importatore**: ingerisce un estratto del portafoglio in CSV (che scarichi tu, senza credenziali in giro), calcola le plus/minus **latenti** per posizione, assegna categoria fiscale e aliquota (dalla colonna «tipo fiscale» o dalla descrizione; in dubbio «da classificare», mai reddito diverso per default) e, con un secondo CSV per lo zainetto, esclude le minus scadute, converte 12,5/26 nei due versi e calcola broker per broker quanta plus compensabile si può realizzare a **imposta zero**. `--anno`, `--broker`, `--json` per il JSON completo su file; numeri IT/EN decisi per file; solo libreria standard. Con `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` come template di formato
-- `references/criptovalute.md` — fiscalità delle cripto-attività (2026): aliquota 33% (26% per EMT-euro MiCA), il compartimento separato delle minusvalenze (solo cripto con cripto), eventi tassabili e neutri, costo medio ponderato in amministrato e LIFO in dichiarativo, monitoraggio RW e imposta sul valore 0,2%, il regime amministrato cripto (possibile dal 2023), le leve (rivalutazione, harvesting) e i punti controversi
+- `references/criptovalute.md` — fiscalità delle cripto-attività (2026): aliquota 33% (26% per EMT-euro MiCA), il compartimento separato delle minusvalenze (solo cripto con cripto), eventi tassabili e neutri, costo medio ponderato in amministrato e LIFO in dichiarativo (per le cripto lo indica la Circ. 30/E/2023, non la legge), monitoraggio RW e imposta sul valore 0,2%, il regime amministrato cripto (possibile dal 2023), le leve (rivalutazione, harvesting) e i punti controversi
 - `references/criptovalute-avanzate.md` — i temi cripto avanzati e meno consolidati: DeFi (staking/lending/yield: momento impositivo alla percezione, lordo, deposito lending non imponibile), liquidity pool e LP token (ingresso/uscita come permuta potenzialmente imponibile), airdrop e fork (la questione dell'onerosità), mining occasionale vs professionale, NFT secondo il ruolo (investitore 33% vs creatore IRPEF; scambio NFT/NFT), e il **ravvedimento operoso** per regolarizzare il pregresso (due violazioni distinte RW e RT, frazioni di sanzione, anno per anno; la finestra DAC8; la soglia penale €50.000)
 - `references/criptovalute-casi-speciali.md` — i casi di confine: trasferimenti, **bridge e wrapping** (trasferimento neutro vs permuta, interpello 135/2025); cripto in **impresa/P.IVA** (art. 110 TUIR per IRES, esenzione IVA Hedqvist, il forfettario che investe in cripto senza cumulo), **mining** e cripto come **compenso**; i **neo-residenti** e la flat tax €100.000 sui redditi esteri (con la questione aperta della fonte delle cripto); **successione e donazione** (territorialità, costo di carico per eredi/donatari, la documentazione che evita il costo zero, l'accesso alle chiavi)
 - **Vedi anche** `it-pianificazione/references/integrazione-fiscale-joint.md` — pattern fiscali joint con la pianificazione pensionistica: quando deduzione fondo + realizzo plus si combinano (es. soglia scaglione IRPEF, sterilizzazione redditi alti €200k). Particolarmente rilevante per redditi tra €40k-€100k e per chi è prossimo a una soglia di scaglione 28k/50k/200k.

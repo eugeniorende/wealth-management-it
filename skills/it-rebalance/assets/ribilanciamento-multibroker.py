@@ -23,8 +23,9 @@ Due idee chiave, entrambe assenti nel ribilanciamento "ingenuo":
 Tutti i parametri sono editabili qui sotto. I valori di default sono un caso reale di
 validazione (vedi il commento ATTESO in fondo). plus = plusvalenza/minusvalenza latente
 in euro (negativo = minus). Realizzi parziali pro-rata: in amministrato è il calcolo esatto,
-perché la plus si determina sul costo medio ponderato (art. 6 c. 4 D.Lgs. 461/97);
-il LIFO vale solo in dichiarativo, fuori dallo scope (cfr. SKILL.md).
+perché la plus si determina sul costo medio ponderato
+(art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027); il LIFO vale solo in dichiarativo,
+fuori dallo scope (cfr. SKILL.md).
 
 ⚠️ Sui CSV: i broker italiani non hanno un formato standard di IMPORT ordini, quindi i file
 generati sono una CHECKLIST DI ESECUZIONE e una traccia di audit (cosa vendere/comprare,
@@ -212,8 +213,8 @@ CAMPI_CSV = ["broker", "operazione", "classe", "tipo_fiscale", "strumento_ISIN",
              "importo_eur", "plus_minus_eur", "imposta_eur", "compensazione_zainetto_eur", "nota"]
 # Ultima riga di ogni CSV: chi apre il file vede il disclaimer, e l'intestazione resta la prima riga.
 NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non costituisce consulenza "
-            "di investimento né un ordine. Verificare saldi, lotti e zainetto sul portale del broker "
-            "prima di operare.")
+            "di investimento né un ordine. Verificare saldi, prezzo medio di carico e zainetto "
+            "sul portale del broker prima di operare.")
 
 
 def genera_ordini(plan):
@@ -342,7 +343,8 @@ def main():
     if GENERA_CSV:
         esporta_ordini(plan)
     print("   Questo strumento è educativo e non costituisce consulenza di investimento o fiscale:")
-    print("   l'allocazione target è tua; saldi, lotti e zainetto vanno verificati sul portale del broker.")
+    print("   l'allocazione target è tua; saldi, prezzo medio di carico e zainetto vanno verificati")
+    print("   sul portale del broker.")
     print()
 
 

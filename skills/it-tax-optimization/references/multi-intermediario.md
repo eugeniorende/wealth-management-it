@@ -33,7 +33,7 @@ Se chiudi il rapporto con un broker dove hai zainetto attivo, le minus **non van
 
 Cosa costa davvero, anche se non c'è un'imposta da pagare:
 - la certificazione si ottiene **solo chiudendo il rapporto** (o revocando l'opzione, che però manda quel rapporto in dichiarativo dall'anno successivo): un conto di trading attivo va spostato altrove;
-- i titoli vanno venduti o trasferiti (il trasferimento a un rapporto con gli stessi intestatari conserva il costo di carico, art. 6 c. 7);
+- i titoli vanno venduti o trasferiti (il trasferimento a un rapporto con gli stessi intestatari conserva il costo di carico, art. 6 c. 7 D.Lgs. 461/97 → art. 306 c. 8 TU 2027);
 - i tempi di rilascio della certificazione e di caricamento presso il nuovo intermediario sono quelli dei due broker, e la modalità di consegna (originale, PEC) va chiesta prima: verificarli con entrambi, perché a fine anno possono non bastare.
 
 Quindi: **chiudere un rapporto con zainetto attivo non lo fa sparire**, ma va pianificato. È il Pattern E della skill.
@@ -66,7 +66,7 @@ Optando per dichiarativo:
 - Possibilità di rinviare il pagamento (versi a giugno-luglio dell'anno successivo, non subito)
 - Tracciabilità: il registro delle minus è tuo, nel quadro RT
 
-Il coefficiente del 48,08% per i titoli di Stato vale anche in dichiarativo (art. 5 c. 2 D.Lgs. 461/97): il dichiarativo non dà più flessibilità sul cross-rate.
+Il coefficiente del 48,08% per i titoli di Stato vale anche in dichiarativo (art. 5 c. 2 D.Lgs. 461/97 → art. 304 c. 1 TU 2027): il dichiarativo non dà più flessibilità sul cross-rate.
 
 ### Contro
 
@@ -81,7 +81,6 @@ Il coefficiente del 48,08% per i titoli di Stato vale anche in dichiarativo (art
 Casi tipici dove vale la pena valutare il dichiarativo:
 - **Multi-intermediario con squilibri** — hai minus su un broker e plus su un altro, gli importi sono significativi (almeno €5-10k di tasse in gioco) e **non vuoi chiudere** il rapporto con le minus (altrimenti confronta prima la certificazione, Caso 2)
 - **Trading concentrato su strumenti esotici** — certificates complessi, derivati, dove la certificazione del broker è sub-ottimale
-- **Pianificazione successoria** — vuoi tracciabilità storica del PMC
 
 Casi dove NON conviene:
 - Singolo broker, portafoglio buy-and-hold con poche operazioni
@@ -178,4 +177,4 @@ I tre rapporti hanno lo stesso intestatario. Directa è il conto di trading atti
 In questo caso la skill deve proporre per prima la certificazione di Banca Sella, con il calendario stretto di fine anno da verificare con i due broker. Per le minus di Directa la scelta è tra chiudere quel rapporto (b) e il dichiarativo (c): il Pattern D resta la via quando non si vuole chiudere alcun rapporto. Il confronto va presentato con i numeri, non come automatismo.
 
 ---
-*Zainetto per rapporto, certificazione alla chiusura e revoca dell'opzione (art. 6 c. 2, 5 e 7 D.Lgs. 461/97, testo vigente fino al 31/12/2026; dal 2027 art. 306 TU D.Lgs. 117/2026), riporto in dichiarazione (art. 68 c. 5 TUIR; righi RT4, RT14 e RT44 delle istruzioni Redditi PF 2026) — Verificato: 2026-10.*
+*Zainetto per rapporto, certificazione alla chiusura e revoca dell'opzione (art. 6 c. 2, 5 e 7 e art. 5 c. 2 D.Lgs. 461/97, testo vigente fino al 31/12/2026; dal 2027 art. 306 c. 3, 6 e 8 e art. 304 c. 1 TU D.Lgs. 117/2026), riporto in dichiarazione (art. 68 c. 5 TUIR; righi RT4, RT14 e RT44 delle istruzioni Redditi PF 2026) — Verificato: 2026-10.*
