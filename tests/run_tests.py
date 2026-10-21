@@ -1745,6 +1745,11 @@ def _testi_regole():
     return {k: v.replace("*", "") for k, v in testi.items()}
 
 
+def _blocchi(testo):
+    """Paragrafi, voci di elenco e righe di tabella."""
+    return [b for b in re.split(r"\n\s*\n|\n(?=\s*[-*|] )|\n(?=\|)", testo) if b.strip()]
+
+
 def _frasi(testo):
     """Spezza in frasi (punto/punto e virgola seguiti da maiuscola), righe e celle di tabella.
     Le abbreviazioni come «art. 67» o «c. 1-bis» restano unite perché segue una cifra."""
@@ -2062,6 +2067,158 @@ def t_t2_broker_json_errori():
     rc, out = run_script(IMPORTATORE, os.path.join(FIXTURES, "estratto-multibroker.csv"),
                          os.path.join(TAX, "assets", "esempio-zainetto.csv"))
     assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
+
+
+@test("T3: quadro RW senza soglia per i titoli, stato dei broker esteri con data di verifica")
+def t_t3_rw_broker():
+    # REGRESSIONE F006/F053/F036: la soglia di €15.000 vale solo per conti e depositi; Trade
+    # Republic e Scalable non sono più broker «senza sostituto d'imposta» per tutti.
+    # Revisione T3: il controllo lavora sul paragrafo (o sulla riga di tabella), non sulla frase,
+    # e riconosce anche la frase originale di F053 («non ha un sostituto d'imposta italiano»).
+    senza_sostituto = re.compile(r"(senza|nessun|non ha(nno)?( un| alcun)?|privi? di)\s+(un |alcun )?sostitut", re.I)
+    for rel, testo in _testi_regole().items():
+        for blocco in _blocchi(testo):
+            frasi = [blocco] if blocco.lstrip().startswith("|") else _frasi(blocco)
+            if re.search(r"\bRW\b|monitoraggio", blocco):
+                for frase in frasi:
+                    if "15.000" in frase:
+                        assert re.search(r"\bconti\b|conti? corrent|deposit", frase), f"{rel}: «{frase.strip()[:120]}»"
+            for frase in frasi:
+                if senza_sostituto.search(frase):
+                    assert not re.search(r"Trade Republic|Scalable", frase), f"{rel}: «{frase.strip()[:120]}»"
+                for clausola in re.split(r"[();]", frase):     # la description è una frase sola
+                    if re.search(r"broker ester|dichiarativ", clausola) and re.search(r"Trade Republic|Scalable", clausola):
+                        assert re.search(r"amministrat|succursale|verific", clausola), f"{rel}: «{clausola.strip()[:120]}»"
+                if re.search(r"cripto", frase) and re.search(r"Trade Republic", frase):
+                    assert re.search(r"verific", frase), f"{rel}: cripto su Trade Republic date per certe: «{frase.strip()[:120]}»"
+                assert not re.search(r"broker ester\w*[^.\n]{0,40}\bobbligatori|regime di chi usa (un |i )?broker ester|"
+                                     r"dichiarativ\w*\**\s*\(broker ester", frase), \
+                    f"{rel}: broker estero = dichiarativo: «{frase.strip()[:120]}»"
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    rw = next(b for b in _blocchi(dich) if b.startswith("**Quadro RW"))
+    assert re.search(r"[Pp]er titoli, ETF, fondi e cripto[^.]*qualunque sia l'importo", rw), "quadro RW: obbligo senza soglia per i titoli"
+    stato = dich.split("## Quali broker")[1].split("\n## ")[0] if "## Quali broker" in dich else ""
+    regimi = {}
+    for riga in stato.splitlines():
+        celle = [c.strip() for c in riga.strip().strip("|").split("|")]
+        if len(celle) >= 3:
+            regimi[celle[0]] = celle[1]
+    for broker, regime in (("Interactive Brokers", "Dichiarativo"), ("Degiro", "Dichiarativo"),
+                           ("Trade Republic", "Amministrato"), ("Scalable Capital", "Amministrato")):
+        assert regimi.get(broker, "").startswith(regime), f"regime-dichiarativo.md: {broker} → «{regimi.get(broker)}»"
+    assert "ottobre 2026" in stato, "tabella dei broker senza data di verifica"
+    assert "non entrano nello zainetto del nuovo rapporto in amministrato" in dich, "minus RT e passaggio all'amministrato"
+    assert not re.search(r"revoca[^.\n]{0,40}\(Pattern E\)", dich), "la revoca dell'amministrato è il Pattern D, la chiusura il Pattern E"
+    # un conto Interactive Brokers o Degiro nell'importatore: avviso che i numeri per broker non valgono
+    tmp = tempfile.mkdtemp()
+    try:
+        estratto = os.path.join(tmp, "ibkr.csv")
+        with open(estratto, "w", encoding="utf-8") as f:
+            f.write("Broker;ISIN;Descrizione;Quantità;Prezzo medio di carico;Controvalore\n"
+                    "Interactive Brokers;US0378331005;Apple Inc;10;100,00;1.700,00\n")
+        rc, d, out = _importa(estratto)
+        assert rc == 0 and any("dichiarativo" in av and "Interactive Brokers" in av for av in d["avvisi"]), out[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    riga_tr = next((r for r in stato.splitlines() if r.startswith("| Trade Republic")), "")
+    frasi_cripto = [f for f in re.split(r"(?<=\.)\s+", riga_tr) if "cripto" in f]
+    assert frasi_cripto and all("verific" in f for f in frasi_cripto), \
+        f"cripto su Trade Republic: va verificato se rientrano nell'amministrato: {frasi_cripto}"
+    imp = open(os.path.join(TAX, "references", "import-dati-broker.md"), encoding="utf-8").read()
+    assert "Scalable" in imp and "Interactive Brokers" in imp and "Verificato: 2026-10" in imp, \
+        "import-dati-broker.md: stato dei broker esteri o marcatore mancanti"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    assert "soglie RW" not in skill, "SKILL.md: «soglie RW» verificate (non esistono soglie per i titoli)"
+
+
+@test("T3: dichiarativo con cambio del giorno, conti in valuta, minus in RT e plus di ETF nel quadro RM")
+def t_t3_dichiarativo():
+    # REGRESSIONE F053: plus in euro al cambio del giorno (art. 9 c. 2 TUIR), soglia di
+    # €51.645,69 per 7 giorni lavorativi sui conti in valuta, minus da indicare in RT nell'anno.
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    for atteso in ("art. 9 c. 2", "51.645,69", "sette giorni lavorativi", "60/E", "quadro RM",
+                   "anno di realizzo", "4043"):
+        assert atteso in dich, f"regime-dichiarativo.md senza «{atteso}»"
+    # l'esempio in dollari deve tornare con i numeri scritti nel testo (cambi, importi e segno)
+    num = lambda x: float(x.replace(".", "").replace(",", "."))
+    m = re.search(r"(\d+) azioni comprate a \$(\d+) con il cambio EUR/USD a (\d,\d+) \(costo €([\d.]+,\d\d)\) "
+                  r"e vendute a \$(\d+) con il cambio a (\d,\d+) \(corrispettivo €([\d.]+,\d\d)\)"
+                  r".*?in euro è una (minus|plus) di €([\d.]+,\d\d)", dich, re.S)
+    assert m, "esempio USD non trovato"
+    q, p0, c0, costo, p1, c1, ricavo, segno, diff = m.groups()
+    q, costo_ok, ricavo_ok = int(q), int(q) * int(p0) / num(c0), int(q) * int(p1) / num(c1)
+    assert abs(num(costo) - costo_ok) < 0.01 and abs(num(ricavo) - ricavo_ok) < 0.01, m.group(0)
+    assert segno == ("minus" if ricavo_ok < costo_ok else "plus") and abs(num(diff) - abs(ricavo_ok - costo_ok)) < 0.01, m.group(0)
+    # le minus di ETF e fondi sono redditi diversi: quadro RT, anche se le plus vanno nel quadro RM
+    assert re.search(r"minus[^.\n]*(ETF|fondi)[^.\n]*quadro RT|quadro RT[^.\n]*minus[^.\n]*(ETF|fondi)", dich), "minus di ETF nel quadro RT"
+    assert "Nel quadro RT vanno anche le minus da vendita di ETF e fondi, che sono redditi diversi" in dich.replace("**", "")
+    assert not re.search(r"non vanno[^.\n]*minus|minus[^.\n]*(ETF|fondi)[^.\n]*redditi di capitale", dich), "minus di ETF negate nel quadro RT"
+    for rel in ("skills/it-tax-optimization/references/regime-dichiarativo.md", "skills/it-tax-optimization/SKILL.md"):
+        assert "sette giorni lavorativi continui" in open(os.path.join(ROOT, rel), encoding="utf-8").read(), rel
+    checklist = dich.split("## Checklist")[1].split("\n## ")[0]
+    for atteso in ("730", "30/9", "4047", "4048", "30/11"):
+        assert atteso in checklist, f"checklist del dichiarativo senza «{atteso}»"
+    assert re.search(r"(RT|quadro T)[^.\n]*(senza|non ha|nessun) acconti?", checklist), "l'imposta del quadro RT si versa a saldo, senza acconti"
+    multi = open(os.path.join(TAX, "references", "multi-intermediario.md"), encoding="utf-8").read()
+    assert "senza acconti" in multi and "e in acconto" not in multi and "(non 730)" not in multi and "730" in multi, \
+        "multi-intermediario: 730 ammesso, imposta del quadro RT senza acconti"
+    for rel, testo in _testi_regole().items():
+        for m in re.finditer(r"quadro RT del Modello Redditi PF", testo):
+            assert "730" in testo[m.end():m.end() + 60], f"{rel}: «{testo[m.start():m.end() + 60]}» senza il 730"
+        for vecchio, nuovo in ((r"68 c\. 9-bis", "77 c. 11"), (r"68 c\. 5", "77 c. 6"),
+                               (r"6 c\. 2 D\.Lgs\. 461/97", "306 c. 3"), (r"6 c\. 5 D\.Lgs\. 461/97", "306 c. 6")):
+            for m in re.finditer(vecchio + r"[^\n]{0,40}?(?:→|dal 2027) art\. (\d+ c\. \d+)", testo):
+                assert m.group(1) == nuovo, f"{rel}: «{m.group(0)}» (atteso art. {nuovo})"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    pattern_d = skill.split("**Pattern D")[1].split("**Pattern E")[0]
+    assert "cambio" in pattern_d and "entrambi i regimi" in pattern_d, "Pattern D: il cambio del giorno vale in entrambi i regimi"
+    assert "continui" in pattern_d and "51.645,69" in pattern_d, "Pattern D: €51.645,69 per sette giorni lavorativi continui"
+    calendario = skill.split("### Step 4")[1].split("## Formato output")[0]
+    assert "dichiarativo" in calendario and "Redditi PF" in calendario, "calendario senza le scadenze del dichiarativo"
+    assert "730" in calendario and "30/11" in calendario, "calendario: 730 e secondo acconto IVAFE"
+    assert "quadro RT, senza acconti" in calendario, "calendario: l'imposta del quadro RT non ha acconti"
+    # Revisione T3: il workflow non può trattare un conto in dichiarativo come un dossier in amministrato
+    analisi = skill.split("### Step 2")[1].split("### Step 3")[0]
+    ramo = analisi.split("**Broker in dichiarativo**")[1].split("\n\n")[0] if "**Broker in dichiarativo**" in analisi else ""
+    for atteso in ("lotti", "cambio del giorno", "non calcolare", "Pattern A è cross-broker",
+                   "Il Pattern D si valuta solo per i rapporti in amministrato",
+                   "Pattern D (revoca dell'amministrato", "Pattern E (chiusura", "sezione 5"):
+        assert atteso in ramo, f"Step 2, ramo dei broker in dichiarativo senza «{atteso}»"
+    assert "indicative" not in ramo, "plus e minus dei conti in dichiarativo non sono «indicative» sul PMC in valuta"
+    assert "### 5. (Solo con conti in dichiarativo) Adempimenti del dichiarativo" in skill
+    assert re.search(r"### 4\. \(Solo se multi-broker[^)\n]*amministrato\)", skill), "sezione 4 solo con un rapporto in amministrato"
+    ingest = skill.split("### Step 1")[1].split("### Step 2")[0]
+    assert re.search(r"quadro RT[^.\n]*(per anno|non per broker)", ingest), "Step 1: minus riportabili dal quadro RT"
+    disclaimer = skill.split("### Disclaimer")[1].split("\n## ")[0]
+    assert "dichiarativo" in disclaimer, "disclaimer limitato all'amministrato"
+    comando = open(os.path.join(ROOT, "commands", "minusvalenze.md"), encoding="utf-8").read()
+    assert re.search(r"regime[^.\n]*(ciascun|ogni) broker|(ciascun|ogni) broker[^.\n]*regime", comando), \
+        "/minusvalenze non chiede il regime di ogni broker"
+    assert re.search(r"minus riportabili dal quadro RT", comando) and "sezioni 4 e 5" in comando, \
+        "/minusvalenze: minus del quadro RT e sezioni 4 e 5 della skill"
+    assert re.search(r"[Nn]on (lanciare|usare) l'importatore[^.\n]*dichiarativo", comando), "/minusvalenze: importatore solo per l'amministrato"
+
+
+@test("T3: cripto con leva ETN/ETC al 26% (con cautela) e reference marcate")
+def t_t3_cripto():
+    # REGRESSIONE F036: manca il confronto tra 33% della detenzione diretta e 26% degli
+    # strumenti finanziari con sottostante cripto; pene e ravvedimento restano quelli verificati.
+    cripto = open(os.path.join(TAX, "references", "criptovalute.md"), encoding="utf-8").read()
+    leve = cripto.split("## Leve di pianificazione")[1].split("\n## ")[0]
+    voce = next((r for r in leve.splitlines() if re.search(r"ETN|ETC|ETP", r)), "")
+    assert re.search(r"al 26% invece del 33%", voce), f"leva ETN/ETC: {voce[:120]}"
+    assert "zainetto ordinario" in voce and "non con le minus cripto" in voce, f"leva ETN/ETC: {voce[:120]}"
+    assert "verificare" in voce.lower() and "rischio emittente" in voce, "leva ETN/ETC senza cautele"
+    assert re.search(r"[Nn]é ETN[^.]*né ETP|ETC, ETN ed ETP[^.]*non sono citati", voce), \
+        "la Circ. 30/E/2023 non cita ETN, ETC ed ETP"
+    assert not re.search(r"circolare[^.]*(lo )?conferm", voce), "la circolare non conferma il trattamento di ETN ed ETC"
+    assert re.search(r"\bW\b[^.\n]{0,30}dal 730/2024", cripto.replace("*", "")), "criptovalute: il quadro W c'è dal 730/2024"
+    assert "l'AdE applica il LIFO" not in cripto
+    avanzate = open(os.path.join(TAX, "references", "criptovalute-avanzate.md"), encoding="utf-8").read()
+    assert "da 2 a 5 anni" in avanzate and "1-3 anni" not in avanzate, "pena dell'omessa dichiarazione"
+    for f in ("criptovalute.md", "criptovalute-avanzate.md", "criptovalute-casi-speciali.md",
+              "regime-dichiarativo.md", "import-dati-broker.md"):
+        assert "Verificato: 2026-10" in open(os.path.join(TAX, "references", f), encoding="utf-8").read(), f
 
 
 def _fx(nome):
