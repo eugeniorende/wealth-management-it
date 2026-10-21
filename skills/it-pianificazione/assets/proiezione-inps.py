@@ -32,7 +32,7 @@ from motore_bootstrap import applica_override, percorso_json, scrivi_json
 MONTANTE_ATTUALE = 85_000.0   # montante contributivo a oggi (€) — da importa-previdenza.py
                               # o, meglio, da "La mia pensione futura" sul portale INPS
 RAL_ATTUALE      = 36_000.0   # retribuzione annua lorda attuale (€)
-ALIQUOTA_COMPUTO = 0.33       # IVS dipendenti (autonomi ~0,24; gestione separata ~0,2607)
+ALIQUOTA_COMPUTO = 0.33       # computo IVS dipendenti (artigiani e commercianti 0,24; gestione separata 0,25, sul 26,07% versato)
 
 ETA_ATTUALE        = 37.0     # età attuale (anche frazionaria)
 ETA_PENSIONAMENTO  = 69.0     # età di uscita ipotizzata (la vecchiaia è indicizzata alla

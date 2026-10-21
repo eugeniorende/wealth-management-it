@@ -56,7 +56,7 @@ Anche tenuti nel dossier, i titoli di Stato hanno aliquota **12,5%** ed **esenzi
 | **Medio termine (parte sicura)** | BTP nel dossier (12,5%) | — |
 | **Lungo termine (crescita)** | Dossier amministrato, ETF accumulazione | Una *quota* in PIR se si accetta concentrazione IT + lock 5 anni per lo 0% |
 | **Obiettivo con data fissa vicina** | Dossier (flessibilità) → conto deposito avvicinandosi | No fondo pensione (vincolato), cautela su PIR (concentrazione su goal rigido) |
-| **Trasferimento generazionale** | Polizza vita / BTP / PIR (esenti dall'imposta di successione; i BTP non da quella di donazione) | Solo se la finalità successoria è prioritaria e i costi sono accettabili. Costo fiscale degli eredi e confronto tra vendere e lasciare in eredità: `it-tax-optimization/references/successione-donazione.md` |
+| **Trasferimento generazionale** | Polizza vita / BTP / PIR (esenti dall'imposta di successione, non da quella di donazione) | Solo se la finalità successoria è prioritaria e i costi sono accettabili. Costo fiscale degli eredi e confronto tra vendere e lasciare in eredità: `it-tax-optimization/references/successione-donazione.md` |
 
 Principio guida: **il dossier amministrato è il default flessibile**; si devia verso un contenitore vincolato (fondo pensione, PIR, polizza) **solo quando il vincolo di quel contenitore coincide con la natura dell'obiettivo** e il vantaggio fiscale supera costi e perdita di flessibilità/diversificazione.
 

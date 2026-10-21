@@ -94,7 +94,7 @@ Le cripto vanno nel **quadro RW** qualunque sia l'importo, perché l'art. 4 DL 1
 
 ## In sintesi
 
-Il dichiarativo è il regime di chi usa broker senza sostituto d'imposta italiano, e il suo vantaggio fiscale vero è la **compensazione unificata** (lo zainetto non è più prigioniero del singolo broker), al prezzo di doversi gestire RT, RM, RW e IVAFE da sé, con i cambi del giorno. La patrimoniale (IVAFE 0,2%) è equivalente al bollo italiano, salvo il black list allo 0,4%. Per il resto le regole sostanziali — aliquote, compensazione a 4 anni, reddito diverso vs capitale — sono quelle del regime amministrato trattate nel resto della skill, salvo il metodo del costo, che in dichiarativo è il LIFO e non il costo medio ponderato.
+Il dichiarativo è il regime di chi usa broker senza sostituto d'imposta italiano, e il suo vantaggio fiscale vero è la **compensazione unificata** (lo zainetto non è più prigioniero del singolo broker), al prezzo di doversi gestire RT, RM, RW e IVAFE da sé, con i cambi del giorno. La patrimoniale (IVAFE 0,2%) è equivalente al bollo italiano, salvo il black list allo 0,4%. Per il resto le regole sostanziali — aliquote, compensazione a 4 anni, reddito diverso vs capitale — sono quelle del regime amministrato trattate nel resto della skill, salvo il metodo del costo, che in dichiarativo è il LIFO e non il costo medio ponderato, e la base del 26% sui dividendi esteri, che secondo l'Agenzia è il lordo e non il netto frontiera (vedi `dividendi-esteri.md`).
 
 ---
 *Dati normativi (regole del regime dichiarativo e zainetto fiscale) — Verificato: 2026-06.*
