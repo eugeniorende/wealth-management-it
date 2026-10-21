@@ -519,27 +519,105 @@ def _frasi(testo):
     return [f for f in re.split(r"(?<=[.!?;])\s+(?=[A-ZÀ-Ý«(`\[])|\n|\|", testo) if f.strip()]
 
 
+_LIFO = re.compile(r"\bL\.?I\.?F\.?O\b\.?", re.I)
+_REGIME = re.compile(r"amministrat|dichiarativ", re.I)
+_CONFINE = re.compile(r"[,;:]|\bmentre\b|\binvece\b", re.I)
+# LIFO legato subito al dichiarativo: «LIFO in dichiarativo», «LIFO (dichiarativo)», «LIFO solo in
+# dichiarativo», «il LIFO vale solo in dichiarativo»; oppure «in dichiarativo è il LIFO».
+_LIFO_DICH_DOPO = re.compile(r"\s*\)?\s*\(?\s*(?:vale\s+)?(?:solo\s+)?(?:in|nel|per\s+il)?\s*(?:regime\s+)?dichiarativ", re.I)
+_LIFO_DICH_PRIMA = re.compile(r"dichiarativ\w*[^.;:,()]{0,25}$", re.I)
+_ELENCO_USA = re.compile(r"HIFO\s*/\s*L\.?I\.?F\.?O|L\.?I\.?F\.?O\.?\s*/\s*Spec", re.I)
+
+
+def _lifo_errato(frase):
+    """True se la frase riferisce il LIFO all'amministrato, o lo nomina senza alcun regime fuori
+    dall'elenco dei metodi USA (HIFO/LIFO/SpecID). Ogni occorrenza (anche «Lifo», «L.I.F.O.») si
+    lega al regime della propria clausola (confini: , ; : «mentre» «invece»); se la clausola non
+    ne nomina, al regime nominato più vicino prima di lei nella frase, o al primo dopo."""
+    for m in _LIFO.finditer(frase):
+        if _LIFO_DICH_DOPO.match(frase, m.end()) or _LIFO_DICH_PRIMA.search(frase, 0, m.start()):
+            continue
+        inizio = max([0] + [c.end() for c in _CONFINE.finditer(frase, 0, m.start())])
+        dopo = _CONFINE.search(frase, m.end())
+        clausola = frase[inizio:dopo.start() if dopo else len(frase)]
+        if re.search(r"amministrat", clausola, re.I):
+            return True
+        if re.search(r"dichiarativ", clausola, re.I):
+            continue
+        prima = list(_REGIME.finditer(frase, 0, m.start()))
+        regime = prima[-1] if prima else _REGIME.search(frase, m.end())
+        if regime is None:
+            if not _ELENCO_USA.search(frase[max(0, m.start() - 8):m.end() + 8]):
+                return True
+        elif regime.group(0).lower().startswith("amministrat"):
+            return True
+    return False
+
+
 @test("T1: nessun LIFO riferito al regime amministrato (costo medio ponderato, art. 6 c. 4 D.Lgs. 461/97)")
 def t_t1_lifo_amministrato():
     # REGRESSIONE F012: in amministrato la base è il costo medio ponderato; il LIFO
-    # (art. 67 c. 1-bis TUIR) individua i titoli ceduti solo in dichiarativo. Ogni frase
-    # che nomina il LIFO deve quindi parlare del dichiarativo (o del confronto con gli USA).
+    # (art. 67 c. 1-bis TUIR) individua i titoli ceduti solo in dichiarativo. Ogni LIFO deve
+    # quindi essere legato al dichiarativo (o all'elenco dei metodi USA), non all'amministrato.
+    for frase in ("- ❌ Assumere HIFO o Specific ID per la scelta del lotto: in amministrato è sempre LIFO.",
+                  "In regime amministrato la plus si calcola con il LIFO, mentre in dichiarativo si usa il costo medio ponderato.",
+                  "- ❌ Ignorare il LIFO: la scelta del lotto NON è libera come negli USA, e influenza la plus realizzata.",
+                  "LIFO obbligatorio in regime amministrato",
+                  "In regime amministrato il metodo di valorizzazione è Lifo per default.",
+                  "In amministrato i lotti si scaricano con il L.I.F.O."):
+        assert _lifo_errato(frase), f"il controllo non riconosce: «{frase}»"
+    for frase in ("Costo medio ponderato in amministrato, LIFO in dichiarativo: il lotto non si sceglie",
+                  "costo medio ponderato (LIFO solo in dichiarativo)",
+                  "la base è il costo medio ponderato (il LIFO vale solo in dichiarativo).",
+                  "Cambiano il metodo del costo, che in dichiarativo è il LIFO e non il costo medio ponderato dell'amministrato",
+                  "Scelta investitore (HIFO/LIFO/SpecID)"):
+        assert not _lifo_errato(frase), f"falso positivo: «{frase}»"
     errori = []
     for rel, testo in _testi_regole().items():
         for frase in _frasi(testo):
-            if "LIFO" in frase and not re.search(r"[Dd]ichiarativ|HIFO|USA", frase):
+            if _lifo_errato(frase):
                 errori.append(f"{rel}: «{frase.strip()[:110]}»")
-    assert not errori, "LIFO senza riferimento al dichiarativo:\n  " + "\n  ".join(errori[:12])
+    assert not errori, "LIFO riferito all'amministrato o senza regime:\n  " + "\n  ".join(errori[:12])
     skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
     assert re.search(r"costo medio ponderato[^\n]*art\. 6 c\. 4", skill), "SKILL.md: manca la regola del costo medio (art. 6 c. 4)"
     dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
     assert re.search(r"LIFO[^\n]*art\. 67 c\. 1-bis", dich), "regime-dichiarativo.md: manca il LIFO con l'art. 67 c. 1-bis"
+    assert "identiche all'amministrato" not in dich, "regime-dichiarativo.md: regole «identiche» all'amministrato, ma il metodo del costo cambia"
+    # Cripto in dichiarativo: la legge non richiama la lettera c-sexies, ma la Circ. 30/E/2023
+    # (par. 3.2.1) prescrive il LIFO: non è una prassi «per analogia» da concordare.
+    metodo = open(os.path.join(TAX, "references", "criptovalute.md"), encoding="utf-8").read().split("Metodo di valorizzazione")[1].split("\n")[0]
+    assert re.search(r"LIFO[^\n]*Circ\. 30/E/2023, par\. 3\.2\.1", metodo), "criptovalute.md: manca il LIFO della Circ. 30/E/2023 par. 3.2.1"
+    assert "analogia" not in metodo and "da concordare" not in metodo, "criptovalute.md: il LIFO cripto presentato come scelta da concordare"
+
+
+_NA = r"(?:non[ -]armonizzat|non[ -]UCITS|US-listed)"
+_NA_COMPENSABILE = (
+    re.compile(_NA + r"[^→\n|]*→\s*`?reddito[ _]divers", re.I),          # «ETF non armonizzato → `reddito_diverso`»
+    re.compile(r"reddit[oi][ _]divers[oi]`?\s*\([^)\n]*" + _NA, re.I),  # «`reddito_diverso` (azioni, ETF non armonizzati)»
+    re.compile(_NA + r"[^\n]{0,40}?(?<!non )(?<!mai )compensabil", re.I),  # «ETF non armonizzati (compensabili)»
+    re.compile(_NA + r"[^\n→]*→\s*SÌ"),                                   # «plus su ... ETF non armonizzati → SÌ, consumato»
+)
 
 
 @test("T1: nessun ETF o fondo non armonizzato tra gli strumenti compensabili con lo zainetto")
 def t_t1_non_armonizzati():
     # REGRESSIONE F003: la plus di un OICR non armonizzato è reddito di capitale (art. 44
     # c. 1 lett. g TUIR; art. 10-ter L. 77/1983), mai compensabile; solo la minus è reddito diverso.
+    # Su tutti i testi, riga per riga (gli anti-pattern «❌» descrivono l'errore e si saltano).
+    errori = []
+    for rel, testo in _testi_regole().items():
+        for riga in testo.splitlines():
+            if "❌" not in riga and any(p.search(riga) for p in _NA_COMPENSABILE):
+                errori.append(f"{rel}: «{riga.strip()[:110]}»")
+    assert not errori, "non armonizzati tra i compensabili:\n  " + "\n  ".join(errori[:12])
+    joint = open(os.path.join(SKILLS, "it-pianificazione", "references", "integrazione-fiscale-joint.md"),
+                 encoding="utf-8").read()
+    mappa = joint.split("```")[1].splitlines()
+    col = next(r for r in mappa if "Imposta sostitutiva" in r).index("Imposta sostitutiva")
+    for r in mappa:
+        assert not re.search(_NA, r[col:], re.I), f"integrazione-fiscale-joint: non armonizzati nella colonna della sostitutiva: {r.strip()}"
+    assert re.search(r"regime dichiarativo[^\n]*non armonizzat[^\n]*quadro RL|regime dichiarativo[^\n]*quadro RL[^\n]*non armonizzat", joint.replace("*", "")), \
+        "integrazione-fiscale-joint: in dichiarativo manca l'eccezione IRPEF dei non armonizzati"
     etf = open(os.path.join(TAX, "references", "etf-trap-redditi-capitale.md"), encoding="utf-8").read()
     amici = etf.split('## Strumenti "amici"')[1].split('## Strumenti "nemici"')[0]
     assert "armonizzat" not in amici, "etf-trap: un OICR non armonizzato nella tabella «amici»"
@@ -548,10 +626,17 @@ def t_t1_non_armonizzati():
     riga = next(r for r in skill.splitlines() if r.startswith("| **Reddito diverso** (art. 67"))
     assert "armonizzat" not in riga, f"SKILL.md: riga reddito diverso: {riga[:120]}"
     assert "reddito_capitale_irpef" in skill, "SKILL.md: manca la categoria reddito_capitale_irpef per gli OICR extra UE/SEE"
+    assert re.search(r"non armonizzat[^\n]*→\s*`reddito_capitale`[^\n]*`reddito_capitale_irpef`", skill), \
+        "SKILL.md: la deduzione della categoria non manda i non armonizzati a reddito_capitale/_irpef"
     reb = open(os.path.join(SKILLS, "it-rebalance", "SKILL.md"), encoding="utf-8").read()
+    assert re.search(r"`tipo_fiscale`[^\n]*`reddito_capitale`\s*\([^)\n]*non armonizzat", reb), \
+        "it-rebalance: la riga tipo_fiscale non mette i non armonizzati sotto reddito_capitale"
+    trovate = 0
     for r in reb.splitlines():
         if "reddito diverso" in r and "**può**" in r:
+            trovate += 1
             assert "armonizzat" not in r, f"it-rebalance: {r[:120]}"
+    assert trovate >= 1, "it-rebalance: manca la riga su cosa il reddito diverso può compensare"
     mb = open(os.path.join(SKILLS, "it-rebalance", "references", "ribilanciamento-multibroker.md"), encoding="utf-8").read()
     m = re.search(r"compensa solo i \*\*redditi diversi\*\* \(([^)]*)\)", mb)
     assert m and "armonizzat" not in m.group(1), "ribilanciamento-multibroker.md: elenco dei redditi diversi"
@@ -571,9 +656,38 @@ def t_t1_chiusura_rapporto():
     skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
     assert "Pattern E" in skill, "SKILL.md: manca il Pattern E (consolidamento via certificazione)"
     multi = open(os.path.join(TAX, "references", "multi-intermediario.md"), encoding="utf-8").read()
-    pratico = multi.split("## Caso pratico")[1]
-    for scenario in ("consumo in loco", "certificazione", "dichiarativo"):
-        assert scenario in pratico, f"caso pratico senza lo scenario «{scenario}»"
+    pratico = multi.split("## Caso pratico")[1].split("\n---\n")[0]   # senza il marcatore in fondo
+    assert "Verificato" not in pratico, "caso pratico: il taglio include il marcatore"
+    for lettera, chiave in (("a", "consumo in loco"), ("b", "certificazione"), ("c", "dichiarativo")):
+        assert re.search(rf"^\*\*Scenario \({lettera}\)[^\n]*{chiave}", pratico, re.M), \
+            f"caso pratico: manca l'intestazione dello scenario ({lettera}) «{chiave}»"
+        assert re.search(rf"^\| \({lettera}\) ", pratico, re.M), f"caso pratico: manca la riga ({lettera}) della tabella riassuntiva"
+    # I totali seguono le regole dei Pattern A, D ed E applicate alla tabella dei rapporti: il
+    # dichiarativo vale dall'anno dopo e non salva le minus che scadono il 31/12/N.
+    rapporti = re.findall(r"^\| (\w[\w ]*?) \| ([\d.]+) \| (31/12/N(?:\+\d)?|—) \| ([\d.]+) \|$", pratico, re.M)
+    assert len(rapporti) == 3, f"caso pratico: tabella dei rapporti illeggibile ({rapporti})"
+    num = lambda s: int(s.replace(".", ""))
+    in_loco = sum(min(num(z), num(p)) for _, z, _, p in rapporti)
+    residuo = {b: num(z) - min(num(z), num(p)) for b, z, _, p in rapporti}
+    capienza = sum(num(p) - min(num(z), num(p)) for _, z, _, p in rapporti)
+    scade_ora = [b for b, _, s, _ in rapporti if s == "31/12/N" and residuo[b] > 0]
+    assert scade_ora, "caso pratico: nessun rapporto con minus in scadenza il 31/12/N"
+    eur = lambda x: "€" + f"{round(x * 0.26):,}".replace(",", ".")
+    certificate = min(sum(residuo[b] for b in scade_ora), capienza)
+    tutte = min(sum(residuo.values()), capienza)
+    dichiarativo = min(sum(r for b, r in residuo.items() if b not in scade_ora), capienza)
+    for lettera, attesi in (("a", [in_loco]), ("b", [in_loco + certificate, in_loco + tutte]),
+                            ("c", [in_loco + dichiarativo])):
+        riga = re.search(rf"^\| \({lettera}\) [^\n]*", pratico, re.M).group(0)
+        for x in attesi:
+            assert eur(x) in riga, f"caso pratico, riga ({lettera}): atteso {eur(x)} — {riga}"
+    # Pattern D senza le minus in scadenza nell'anno; Pattern E con la capienza della destinazione
+    # divisa tra le origini (le stesse plus non si contano due volte).
+    pattern_d = skill.split("**Pattern D")[1].split("**Pattern E")[0]
+    assert re.search(r"anno_scadenza\s*>\s*anno_corrente", pattern_d), "Pattern D: lo zainetto consolidato conta anche le minus che scadono nell'anno"
+    assert "Pattern E" in pattern_d.split("```")[1], "Pattern D: la proposta non passa dal confronto con il Pattern E"
+    pattern_e = skill.split("**Pattern E")[1].split("### Step 4")[0]
+    assert re.search(r"capienza\s*[−-]=\s*recuperabile", pattern_e), "Pattern E: la capienza della destinazione non si riduce tra un'origine e l'altra"
 
 
 @test("T1: scarto di emissione e coefficiente 48,08% con fonte corretta, marcatori delle reference")
@@ -593,6 +707,31 @@ def t_t1_scarto_marcatori():
         assert "Verificato: 2026-10" in testo, f"{rel}: manca il marcatore della verifica di ottobre 2026"
     al = open(os.path.join(SKILLS, "it-pianificazione-obiettivi", "references", "asset-location.md"), encoding="utf-8").read()
     assert "rischio demografico" in al, "asset-location: polizze esenti IRPEF solo per il rischio demografico"
+
+
+@test("T1: le citazioni del D.Lgs. 461/97 e dell'art. 10-ter L. 77/1983 portano il riferimento dal 2027")
+def t_t1_doppie_citazioni():
+    # Regola della roadmap «Citazioni dal 2027»: l'art. 6 D.Lgs. 461/97 confluisce nell'art. 306
+    # del TU D.Lgs. 117/2026 (c. 2 → c. 3, c. 4 → c. 5, c. 5 → c. 6, c. 7 → c. 8), l'art. 5 nel 304,
+    # l'art. 10-ter L. 77/1983 nell'art. 59 dell'All. 1 al D.Lgs. 33/2025. Nei file del tema T1
+    # ogni riga che cita la norma vecchia nomina anche quella nuova.
+    file_t1 = ["README.md",
+               "skills/it-pianificazione/references/integrazione-fiscale-joint.md",
+               "skills/it-rebalance/SKILL.md",
+               "skills/it-rebalance/assets/ribilanciamento-multibroker.py",
+               "skills/it-rebalance/references/ribilanciamento-multibroker.md",
+               "skills/it-rebalance/references/sequenza-liquidazione.md",
+               "skills/it-tax-optimization/SKILL.md"] + [
+               f"skills/it-tax-optimization/references/{f}" for f in
+               ("aliquote-12-5-26.md", "criptovalute.md", "etf-trap-redditi-capitale.md",
+                "multi-intermediario.md", "regime-dichiarativo.md")]
+    testi = _testi_regole()
+    errori = []
+    for rel in file_t1:
+        for riga in testi[rel].splitlines():
+            if re.search(r"D\.\s?Lgs\.\s?461|10-ter", riga) and not re.search(r"30[4-7]|TU 2027|117/2026|33/2025", riga):
+                errori.append(f"{rel}: «{riga.strip()[:110]}»")
+    assert not errori, "citazioni senza il riferimento dal 2027:\n  " + "\n  ".join(errori)
 
 
 IMPORTATORE = os.path.join(TAX, "assets", "importa-estratto-broker.py")
@@ -750,6 +889,112 @@ def t_t3_cripto():
         assert "Verificato: 2026-10" in open(os.path.join(TAX, "references", f), encoding="utf-8").read(), f
 
 
+def _fx(nome):
+    return os.path.join(FIXTURES, nome)
+
+
+@test("T2 importatore: 12,5% a Stati white list, enti territoriali e sovranazionali; ETC e nomi di emittenti senza default rischiosi")
+def t_t2_pubblici_etc():
+    # REGRESSIONE revisione T2: Bund, Treasury e BEI uscivano al 26% senza avviso (art. 6 c. 1
+    # D.Lgs. 461/97 → art. 306 c. 1 TU 2027); «WisdomTree Physical Gold» (JE) finiva a IRPEF
+    # con quadro RL; «Vanguard … Inc» e «ISHARES III PLC» erano azioni con la plus compensabile.
+    rc, d, out = _importa(_fx("estratto-pubblici-etc.csv"), _fx("zainetto-un-broker.csv"), "--anno", "2026")
+    assert rc == 0 and d, out[-400:]
+    pos = {p["descrizione"]: p for p in d["posizioni"]}
+    for nome in ("Bund 0% 15/02/2032", "BEI 1,5% 15/11/2030", "US Treasury 4,5% 15/11/2033",
+                 "Comune di Roma 5,345% 2048", "Land Berlin 1% 2030", "BTP 2,5% 01/12/2032"):
+        assert pos[nome]["categoria_fiscale"] == "reddito_diverso" and pos[nome]["aliquota"] == 12.5, pos[nome]
+    enel = pos["Enel Finance 3% 2030"]
+    assert enel["categoria_fiscale"] == "reddito_diverso" and enel["aliquota"] == 26, enel
+    avvisi_aliquota = [av for av in d["avvisi"] if "12,5%" in av]
+    assert any("Enel Finance" in av for av in avvisi_aliquota), d["avvisi"]
+    assert not any(re.search(r"Bund|BEI|Treasury|Comune|Land Berlin|BTP", av) for av in avvisi_aliquota), avvisi_aliquota
+    for nome in ("WisdomTree Physical Gold", "iShares Physical Gold"):
+        assert pos[nome]["categoria_fiscale"] == "reddito_diverso", pos[nome]
+    assert pos["Vanguard FTSE All-World High Dividend Yield Inc"]["categoria_fiscale"] == "reddito_capitale"
+    for nome in ("ISHARES III PLC", "WisdomTree Brent Crude Oil", "Fondo Esempio non armonizzato",
+                 "Fondo Immobiliare Esempio", "HSBC MSCI World Inc", "SPDR S&P 500 Trust"):
+        assert pos[nome]["categoria_fiscale"] == "da_classificare", pos[nome]
+    assert not any(p["categoria_fiscale"] == "reddito_capitale_irpef" for p in d["posizioni"])
+    a = d["analisi"]
+    assert a["plus_latenti_compensabili"] == 1_050 and a["plus_non_compensabili"] == 100, a
+    assert a["plus_da_classificare"] == 270 and a["plus_irpef"] == 0, a
+    # 1.000 di minus al 26% coprono prima i 550 al 12,5% (264,42 in 26%-equivalente), poi i 500 al 26%
+    assert a["plus_realizzabili_a_costo_zero"] == 1_050, a
+    assert abs(a["imposta_risparmiabile"] - (550 * 0.125 + 500 * 0.26)) < 0.02, a
+    assert set(a["per_broker"]) == {"Fineco"}, a
+
+
+@test("T2 importatore: zainetto per anno di scadenza, residuo accanto al lordo, righe anomale")
+def t_t2_zainetto_colonne():
+    # REGRESSIONE revisione T2: «Anno di scadenza» era letto come anno di realizzo (+4 anni);
+    # con «Minusvalenza» e «Residuo» vinceva il lordo; «-» nell'aliquota fermava tutto l'import.
+    estratto = _fx("estratto-migliaia-it.csv")
+    rc, d, out = _importa(estratto, _fx("zainetto-scadenza.csv"), "--anno", "2026")
+    assert rc == 0 and d, out[-400:]
+    z = sorted(d["zainetto"], key=lambda r: r["anno"])
+    assert [r["anno"] for r in z] == [2022, 2023], z
+    assert z[0]["scade_il"] == "31/12/2026" and z[0]["stato"] == "in_scadenza", z
+    assert d["analisi"]["zainetto_in_scadenza"] == 1_000 and d["analisi"]["zainetto_totale"] == 1_800, d["analisi"]
+    assert any("scadenza" in av for av in d["avvisi"]), d["avvisi"]
+    rc, testo = run_script(IMPORTATORE, estratto, _fx("zainetto-scadenza.csv"), "--anno", "2026")
+    assert rc == 0 and "Priorità" in testo, testo[-400:]
+    for nome in ("zainetto-lordo-residuo.csv", "zainetto-plurale.csv", "zainetto-utilizzato.csv"):
+        rc, d, out = _importa(estratto, _fx(nome), "--anno", "2026")
+        assert rc == 0 and d, f"{nome}: {out[-300:]}"
+        assert d["analisi"]["zainetto_totale"] == 500, f"{nome}: {d['analisi']}"
+        if nome != "zainetto-plurale.csv":
+            assert any("residu" in av.lower() for av in d["avvisi"]), f"{nome}: {d['avvisi']}"
+    rc, d, out = _importa(estratto, _fx("zainetto-anomalie.csv"), "--anno", "2026")
+    assert rc == 0 and d, out[-400:]
+    assert d["analisi"]["zainetto_totale"] == 1_000, d["analisi"]          # la riga senza anno resta fuori
+    assert [r["stato"] for r in d["zainetto"]].count("anno_mancante") == 1, d["zainetto"]
+    assert any("riga 3" in av and "aliquota" in av for av in d["avvisi"]), d["avvisi"]
+
+
+@test("T2 importatore: numeri senza indizi di formato, colonna tipo fiscale, broker unico, errori di input")
+def t_t2_numeri_colonne():
+    # REGRESSIONE revisione T2: «1,000» in un CSV con la virgola come delimitatore diventava 1;
+    # «Redditi diversi (capital gain)» diventava reddito di capitale; «Natura strumento» era
+    # scambiata per il tipo fiscale; errori su aliquota e cartelle senza file né riga.
+    for nome in ("estratto-migliaia-it.csv", "estratto-migliaia-en.csv"):
+        rc, d, out = _importa(_fx(nome))
+        assert rc == 0 and d, f"{nome}: {out[-300:]}"
+        sap = d["posizioni"][0]
+        assert sap["costo"] == 120_000 and sap["valore"] == 150_000, f"{nome}: {sap}"
+        assert any("formato numeri" in av for av in d["avvisi"]), f"{nome}: {d['avvisi']}"
+    rc, d, out = _importa(_fx("estratto-tipo-fiscale.csv"))
+    assert rc == 0 and d, out[-400:]
+    pos = {p["isin"]: p for p in d["posizioni"]}
+    assert pos["IE00B4L5Y983"]["categoria_fiscale"] == "reddito_capitale_irpef", pos["IE00B4L5Y983"]
+    assert pos["IE00B4L5Y983"]["costo"] == 10_000 and pos["IE00B4L5Y983"]["valore"] == 12_000, pos["IE00B4L5Y983"]
+    assert pos["US0378331005"]["categoria_fiscale"] == "reddito_diverso", pos["US0378331005"]
+    assert pos["IE00B5BMR087"]["categoria_fiscale"] == "reddito_capitale", pos["IE00B5BMR087"]
+    assert any("boh" in av for av in d["avvisi"]), d["avvisi"]
+    rc, d, out = _importa(_fx("estratto-migliaia-it.csv"), _fx("zainetto-un-broker.csv"), "--anno", "2026")
+    assert rc == 0 and d["analisi"]["plus_realizzabili_a_costo_zero"] == 1_000, out[-400:]
+    rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), _fx("zainetto-multibroker.csv"))
+    assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
+    tmp = tempfile.mkdtemp()
+    try:
+        natura = os.path.join(tmp, "natura.csv")
+        with open(natura, "w", encoding="utf-8") as f:
+            f.write("ISIN;Descrizione;Natura strumento;Quantità;Prezzo medio di carico;Controvalore\n"
+                    "DE0007164600;SAP SE;Azione;10;100,00;1.500,00\n")
+        rc, d, out = _importa(natura)
+        assert rc == 0 and d["posizioni"][0]["categoria_fiscale"] == "reddito_diverso", out[-300:]
+        assert d["posizioni"][0]["fonte_categoria"] == "descrizione", d["posizioni"][0]
+        zain = os.path.join(tmp, "zainetto.csv")
+        with open(zain, "w", encoding="utf-8") as f:
+            f.write("Anno realizzo;Minusvalenza residua;Aliquota\n2024;1.000,00;30%\n")
+        rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), zain)
+        assert rc == 2 and "Traceback" not in out and "zainetto.csv" in out and "riga 2" in out, out[-300:]
+        rc, out = run_script(IMPORTATORE, tmp)
+        assert rc == 2 and "Traceback" not in out, out[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════════ fiscalità e tracker ══════════════════════
 
 @test("netto-pensione: IRPEF 2026, detrazioni e aliquota rendita FP (valori chiusi)")
@@ -845,29 +1090,81 @@ def t_ponte():
     assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
-@test("cruscotto TWR: con meno righe compilate le celle restano vuote, non −100%")
-def t_twr_parziale():
-    # REGRESSIONE F049 (b): le righe senza valore davano rendimento −100% e azzeravano l'indice.
+@test("cruscotto TWR: ultima riga dinamica (5 o 14 rilevazioni), righe vuote senza −100%")
+def t_twr_dinamico():
+    # REGRESSIONE F049: il foglio funzionava solo con 13 righe esatte (meno → −100%,
+    # di più → TWR, XIRR e flusso terminale fermi alla riga 18).
+    import datetime
     from openpyxl import load_workbook
     mod = ricalcolatore()
     tmp = tempfile.mkdtemp()
     try:
-        copia = os.path.join(tmp, "cruscotto.xlsx")
-        wb = load_workbook(asset("it-revisione", "cruscotto-patrimoniale.xlsx"))
-        ws = wb["Rendimento TWR"]
+        orig = asset("it-revisione", "cruscotto-patrimoniale.xlsx")
+        corta, lunga = os.path.join(tmp, "corta.xlsx"), os.path.join(tmp, "lunga.xlsx")
+        wb = load_workbook(orig)
         for r in range(11, 19):  # compilati solo i primi 5 mesi
             for col in "ABC":
-                ws[f"{col}{r}"] = None
-        wb.save(copia)
-        (out,) = mod.ricalcola([copia], os.path.join(tmp, "out"))
-        ws = load_workbook(out, data_only=True)["Rendimento TWR"]
-        assert ws["E10"].value and ws["E10"].value > 0.5, f"indice dei mesi compilati alterato: {ws['E10'].value}"
+                wb["Rendimento TWR"][f"{col}{r}"] = None
+        wb.save(corta)
+        wb = load_workbook(orig)
+        ws = wb["Rendimento TWR"]
+        ws["A19"], ws["B19"], ws["C19"] = datetime.datetime(2026, 2, 1), 90500, 750
+        wb.save(lunga)
+        out_corta, out_lunga = mod.ricalcola([corta, lunga], os.path.join(tmp, "out"))
+        c = load_workbook(out_corta, data_only=True)["Rendimento TWR"]
+        assert c["I5"].value == 5, f"rilevazioni contate: {c['I5'].value!r}"
+        assert abs(c["I6"].value - (c["E10"].value - 1)) < 1e-9, "TWR non legge l'ultima riga compilata"
+        assert isinstance(c["I9"].value, float), f"XIRR su 5 righe: {c['I9'].value!r}"
         for r in range(11, 19):
-            for col in "DE":
-                assert ws[f"{col}{r}"].value in (None, ""), f"{col}{r} = {ws[f'{col}{r}'].value!r} su riga vuota"
-        assert ws["B20"].value in (None, ""), f"TWR su serie incompleta: {ws['B20'].value!r}"
+            for col in "DEF":
+                assert c[f"{col}{r}"].value in (None, ""), f"{col}{r} = {c[f'{col}{r}'].value!r} su riga vuota"
+        lw = load_workbook(out_lunga, data_only=True)["Rendimento TWR"]
+        assert lw["I5"].value == 14 and abs(lw["I6"].value - (lw["E19"].value - 1)) < 1e-9, "la 14ª riga non entra"
+        assert lw["F18"].value == -750 and lw["F19"].value == -750 + 90500, "flusso terminale non spostato"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("cruscotto: Leggimi, Sintesi con soglia per priorità, bande 5/25, costi e riga ISC")
+def t_cruscotto_revisione():
+    # REGRESSIONE F064 (soglie fisse 70/50), F030 (banda ±5 uguale per tutte le classi),
+    # F050 (nessun controllo dei costi), F049 (limiti non dichiarati).
+    from openpyxl import load_workbook
+    wb = load_workbook(xlsx_ricalcolati()[asset("it-revisione", "cruscotto-patrimoniale.xlsx")], data_only=True)
+    assert wb.sheetnames[0] == "Leggimi", f"fogli: {wb.sheetnames}"
+    assert any("120" in str(c.value) for r in wb["Leggimi"].iter_rows() for c in r), "Leggimi senza i limiti"
+    s = wb["Sintesi"]
+    assert (s["G5"].value, s["H5"].value) == ("Priorità", "Soglia"), (s["G5"].value, s["H5"].value)
+    assert s["F6"].value == "On track" and s["F7"].value == "A rischio", (s["F6"].value, s["F7"].value)
+    a = wb["Allocazione"]
+    assert a["F5"].value == 0.05 and abs(a["F7"].value - 0.0375) < 1e-12, (a["F5"].value, a["F7"].value)
+    assert str(a["E9"].value).startswith("Sottopeso"), f"alternativi 0% vs target 5%: {a['E9'].value!r}"
+    an = wb["Andamento"]
+    etichette = {str(an[f"A{r}"].value): r for r in range(1, 40) if an[f"A{r}"].value}
+    assert any(e.startswith("COSTI DELL'ANNO") for e in etichette), "blocco costi assente"
+    bollo = next(r for e, r in etichette.items() if e.startswith("Bollo"))
+    assert abs(an[f"B{bollo}"].value - 88000 * 0.002) < 1e-9, f"bollo: {an[f'B{bollo}'].value!r}"
+    assert any("ISC" in str(wb["Azioni"][f"A{r}"].value) for r in range(5, 12)), "manca la riga demo sull'ISC"
+
+
+@test("bande di ribilanciamento: regola 5/25 in cruscotto, tracker e IPS")
+def t_bande_5_25():
+    # REGRESSIONE F030: stesso portafoglio «in banda» nel cruscotto e fuori banda nello script.
+    from openpyxl import load_workbook
+    def formula(nome, foglio, cella):
+        return str(load_workbook(asset("it-revisione", nome))[foglio][cella].value)
+    assert "MIN($B$12" in formula("cruscotto-patrimoniale.xlsx", "Allocazione", "F5")
+    assert "MIN(Impostazioni!$B$14" in formula("tracker-secchielli.xlsx", "Controllo", "F15")
+    assert "MIN(0.05" in formula("investment-policy-statement.xlsx", "IPS", "C21")
+
+
+@test("revisione: costi dell'anno nel metodo e nel template, nessun percorso di sandbox")
+def t_revisione_testi():
+    cartella = os.path.join(SKILLS, "it-revisione")
+    for rel in ("references/metodo-revisione.md", "assets/template-revisione.md"):
+        assert "Costi dell'anno" in open(os.path.join(cartella, rel), encoding="utf-8").read(), rel
+    assert "/mnt/skills" not in open(os.path.join(cartella, "SKILL.md"), encoding="utf-8").read(), \
+        "SKILL.md cita ancora recalc.py del sandbox claude.ai"
 
 
 @test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")
@@ -1139,6 +1436,7 @@ def t_pacchetto():
         radice = "wealth-management-it/"
         assert all(n.startswith(radice) for n in nomi), "tutto deve stare sotto wealth-management-it/"
         for atteso in (radice + ".claude-plugin/plugin.json", radice + "README.md",
+                       radice + "LICENSE", radice + "NOTICE",  # Apache-2.0 §4: licenza e attribuzione
                        radice + "commands/pensione.md",
                        radice + "skills/it-tax-optimization/SKILL.md",
                        radice + "skills/it-pianificazione/assets/proiezione-inps.py"):

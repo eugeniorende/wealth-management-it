@@ -31,4 +31,4 @@ Il fondo pensione (agevolato ma rigido) e il dossier (flessibile ma tassato al 2
 
 ## Caveat
 
-I realizzi parziali sono calcolati pro-rata sul prezzo medio di carico, che in amministrato è la base fiscale effettiva (art. 6 c. 4 D.Lgs. 461/97). Lo zainetto va verificato per broker, con l'anno di formazione, sul portale dell'intermediario. E le aliquote del fondo pensione e i vincoli capitale/rendita vanno verificati al momento del pensionamento (cambiano con le riforme). La sostenibilità complessiva del prelievo — quanto, non come — è in `it-pianificazione-obiettivi/references/decumulo.md`.
+I realizzi parziali sono calcolati pro-rata sul prezzo medio di carico, che in amministrato è la base fiscale effettiva (art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027). Lo zainetto va verificato per broker, con l'anno di formazione, sul portale dell'intermediario. E le aliquote del fondo pensione e i vincoli capitale/rendita vanno verificati al momento del pensionamento (cambiano con le riforme). La sostenibilità complessiva del prelievo — quanto, non come — è in `it-pianificazione-obiettivi/references/decumulo.md`.

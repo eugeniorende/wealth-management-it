@@ -25,6 +25,8 @@
 
 > *Promemoria: il rendimento è la parte di mercato, non l'intera variazione del saldo. Non confondere i versamenti col rendimento.*
 
+**Costi dell'anno** (per confronto, già inclusi nel rendimento): bollo del dossier € [—] (0,2% del controvalore a fine periodo), commissioni e Tobin tax € [—], TER medio ponderato [—]%, ISC del fondo pensione [—]% contro l'ISC medio COVIP della stessa tipologia [—]%.
+
 ---
 
 ## 2. Cosa è cambiato — dall'ultima revisione
