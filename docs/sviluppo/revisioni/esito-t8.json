@@ -1,0 +1,39 @@
+{
+ "branch": "feature/t8-obiettivi",
+ "commit": "9064ada9f5f2d2ca2bfb1614ec018eab71bf348a",
+ "applicati": [
+  "Errore della formula in due fasi «meno dell'1,5%» falso (CONF 1): errore misurato per profilo e finestra (7 anni: <1% Moderato, 1,4% Crescita, 1,8% Azionario totale; 10 anni: 2,8% Crescita massima, 3,0% Azionario totale) in references/glide-path.md, references/matematica-accumulo.md, docstring di pmt_glide in entrambe le copie di assets/motore_bootstrap.py; nuovo t_errore_due_fasi in tests/run_tests.py (vincola anche pmt_glide ≥ 98% del calcolo anno per anno con finestra 7)",
+  "SKILL.md mostra solo le formule a quota fissa (CONF 3 + NV 7): Step 4 con le due fasi (m, k, r2) e quota fissa limitata a permanenti e profili senza azionario; allocatore descritto col present value lungo il glide path (€57.140 invece di €50.928); il report dichiara le convenzioni — skills/it-pianificazione-obiettivi/SKILL.md; vincoli in t_rimandi_superati e t_cifre_documentate",
+  "Allocatore descritto come utente di pmt_glide (NV 3): usa crescita_glide, testo corretto in references/matematica-accumulo.md, references/glide-path.md, references/allocazione-capitale.md; frasi vecchie vietate in t_rimandi_superati",
+  "Pianificatori precedenti alla 0.10.0 e parametri diversi dal foglio spacciati per «come la colonna I» (NV 0 + NV 8): finestra_nel_foglio, avviso in leggi_finestra_derisk e scarti_dal_foglio in entrambe le copie di motore_bootstrap.py; glidepath-obiettivi.py e montecarlo-obiettivi.py dicono quando divergono; nota in SKILL.md e glide-path.md; nuovo t_glide_come_foglio (mutante «scarti sempre vuoti» catturato)",
+  "Ricetta DMS → profilo che mescola lordo e netto, default non dichiarati sopra la ricetta mondiale, confronto non omogeneo in monte-carlo.md (NV 1): σ²/2 aggiunto al netto, esempio svolto 5,2% DMS → 6,7% contro il 6,9% del foglio (circa 5,4% reale), monte-carlo.md confronta lordo con lordo (65/35 storico ~9,4% contro 7,8%) — references/mercati-e-correlazione.md, references/monte-carlo.md, references/matematica-accumulo.md; nuovo t_ricetta_dms",
+  "Conversione netto → lordo «prudente» che nell'ottimizzatore favorisce i contenitori esenti (NV 5): lordo_da_netto_differito e variante stampata (7,15% lordo, pareggio PIR 1,45%), docstring e LETTURA corretti in assets/asset-location-optimizer.py, verso dichiarato in SKILL.md; t_rendimento_lordo rafforzato (mutante «variante = conversione annua» catturato)",
+  "Cifre documentate non coperte dai test (NV 4): t_cifre_documentate copre quota fissa €346/€478, +11%, circa il 90%, €50.928 e +12%, €52.470 e €145.836, ~7,9% reale a inflazione costante, il 1974 deflazionato, «circa il doppio» del decumulo; quattro mutanti di cifra passano col test vecchio e falliscono col nuovo",
+  "Flag Tipo che «non cambia la vista per obiettivo» (NV 10): riscritto in references/glide-path.md; frase vecchia vietata nel test",
+  "Finestra «7 anni» fissa e commento dei profili superato (NV 11): Parametri!B7 in SKILL.md (due punti) e references/monte-carlo.md; commento A10:D15 in assets/montecarlo-obiettivi.py; vincoli in t_rimandi_superati",
+  "Contratto della serie nominale (parte in perimetro di CONF 0/CONF 2/NV 6): la docstring di entrambe le copie di motore_bootstrap.py ora dice che chi usa la serie grezza contro spese in euro di oggi DEVE deflazionarla (prima la descriveva come già fatta, falso per ponte-pensione)"
+ ],
+ "scartati": [
+  {
+   "titolo": "ponte-pensione usa la serie nominale in USD come se fosse reale (CONF 0, CONF 2, NV 6) — parte su ponte-pensione.py, montecarlo-pensione.py e it-pianificazione",
+   "motivo": "Riprodotto (44,0% → 21,1% deflazionando; capitale all'85% €49.335 → €53.167, al 95% €52.750 → €58.619), ma ponte-pensione.py, montecarlo-pensione.py e i testi di it-pianificazione sono fuori perimetro (li modifica un altro tema). In questo branch ho solo trasformato la docstring del motore in un contratto; il resto è nelle note per l'integratore."
+  },
+  {
+   "titolo": "Nella skill gemella it-pianificazione la serie resta «storica reale» (NV 9)",
+   "motivo": "Rilievo reale ma fuori perimetro: it-pianificazione/SKILL.md:361-362, montecarlo-pensione.py:19-22 e references/montecarlo-pensione.md:47-52 appartengono al tema che sta modificando quegli script. README.md:206 e :301 sono voci del changelog, che non va toccato. Rimandato all'integratore."
+  },
+  {
+   "titolo": "Il versamento +11% non è nel changelog e README dice ancora «40 test» (NV 2)",
+   "motivo": "Il changelog del README è escluso dal perimetro e nel repository si aggiorna su develop dopo i merge (commit 160c0bc e 3516b88). Il conteggio «40 test» era già sbagliato su develop (44) prima di T8. Rimandato all'integratore."
+  }
+ ],
+ "suite": "55/55 test passati",
+ "note_integratore": [
+  "skills/it-pianificazione/assets/ponte-pensione.py:138: deflazionare la serie come fa il decumulo. Importare carica_inflazione e deflaziona dal motore e aggiungere i parametri INFLAZIONE=None (None = CPI storica anno per anno) e INFLAZIONE_RIPIEGO=0.02 per una serie senza colonna; poi az, ob = deflaziona(az, infl), deflaziona(ob, infl) prima di comporre port. Sui default (seed attuale) l'esito verificato su una copia è: PROBABILITÀ 44,0% → 21,1%; capitale per l'85% €49.335 → €53.167; per il 95% €52.750 → €58.619. Aggiungere a t_ponte un test che vincoli la probabilità sui default (~21,1%) e l'anno 1974 reale = (1+nominale)/(1+CPI)−1. Nello stdout stampare l'inflazione usata e rinominare «totale nominale» (somma in € di oggi) in «totale (€ di oggi, non attualizzato)». Docstring ONESTÀ METODOLOGICA: serie USA nominale in dollari, deflazionata con la CPI-U, senza componente di cambio; valutare un DERATING opzionale.",
+  "skills/it-pianificazione/assets/montecarlo-pensione.py:20-22: sostituire «dalla serie storica reale» e «FORMA reale» con «serie storica USA nominale in dollari (Damodaran), ne usa solo la forma: media ricentrata sul rendimento reale del comparto». L'effetto numerico è trascurabile (mediana €169.205 → €166.930 se si deflazionasse), quindi va corretto solo il testo.",
+  "skills/it-pianificazione/SKILL.md:361-362 e references/montecarlo-pensione.md:47-52: stessa correzione di dicitura. Descrivere il CSV come in it-pianificazione-obiettivi/SKILL.md:331, cioè nominale in dollari con la colonna inflazione CPI-U dicembre su dicembre (BLS). Disambiguare «reale» dove significa «effettivo».",
+  "Dopo il fix di ponte-pensione: in it-pianificazione-obiettivi/references/mercati-e-correlazione.md:21 (uso «grezzo» della serie) si può citare anche ponte-pensione accanto al decumulo. La docstring del motore ora lo esige come contratto («chi usa la serie grezza contro spese in euro di oggi deve deflazionarla»).",
+  "Commit/changelog su develop: il commit 02bb662 dice «ponte-pensione danno output identico»; quando ponte-pensione verrà deflazionato i suoi output con seed cambieranno, e va detto. Nel changelog v0.10.0 va aggiunta la voce T8 (versamento dei terminanti col glide path: €346 → €384, €478 → €500; finestra in Parametri!B7; rendimenti netti; serie nominale USD con CPI e decumulo deflazionato; avviso sui pianificatori precedenti alla 0.10.0). Sempre lì va aggiornato README.md:74 al conteggio reale dei test dopo i merge (su questo branch 55; su develop era già 44 contro «40»).",
+  "Il merge di develop in feature/t8-obiettivi (05fbf60) è passato senza conflitti; README e tests/run_tests.py si sono fusi automaticamente. Le due copie di motore_bootstrap.py restano identiche: se un altro tema tocca la copia in it-pianificazione, va riallineata a questa, che ha in più finestra_nel_foglio, scarti_dal_foglio, l'avviso in leggi_finestra_derisk e le nuove docstring."
+ ]
+}
