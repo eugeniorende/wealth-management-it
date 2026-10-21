@@ -71,11 +71,49 @@ La suite di smoke test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-39 test in circa 15 secondi, con le dipendenze dei Prerequisiti e, per i tre test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+40 test in circa 15 secondi, con le dipendenze dei Prerequisiti e, per i tre test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Freshness fiscale
 
 I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marcatore `Verificato: AAAA-MM` e il test di freshness li considera **scaduti oltre i 12 mesi** (l'elenco `OBBLIGATI_FRESHNESS` in `tests/run_tests.py` fissa i file che devono portarlo: se uno ne è privo il test fallisce): le leggi di bilancio cambiano i numeri ogni anno, quindi il plugin "scade" per design finché non si riverifica alle fonti. Quel test non gira nella CI delle pull request (una scadenza normativa non deve bloccare un fix sul ribilanciamento) ma in un workflow dedicato, `.github/workflows/freshness.yml`, il primo di ogni mese: se fallisce apre una issue etichettata `freshness` con i file da riverificare, e la commenta ai run successivi finché resta aperta. Nota: GitHub esegue i workflow schedulati solo dal branch di default, che qui è `develop`: il cron controlla quindi i marcatori della versione in sviluppo. In locale: `python tests/run_tests.py --only freshness`.
+
+**Stato dei dati normativi.** `python tests/run_tests.py --tabella-freshness` stampa, per ogni file, la verifica più vecchia e il mese fino a cui vale. La tabella va rigenerata a ogni release:
+
+<!-- generata con: python tests/run_tests.py --tabella-freshness -->
+| File | Verificato | Valido fino a |
+|---|---|---|
+| `it-pianificazione/assets/importa-previdenza.py` | 2026-06 | 2027-06 |
+| `it-pianificazione/assets/proiezione-inps.py` | 2026-06 | 2027-06 |
+| `it-pianificazione/references/previdenza-complementare.md` | 2026-06 | 2027-06 |
+| `it-tax-optimization/references/aliquote-12-5-26.md` | 2026-06 | 2027-06 |
+| `it-tax-optimization/references/etf-trap-redditi-capitale.md` | 2026-06 | 2027-06 |
+| `it-tax-optimization/references/regime-dichiarativo.md` | 2026-06 | 2027-06 |
+| `it-pianificazione/assets/netto-pensione.py` | 2026-07 | 2027-07 |
+| `it-pianificazione/assets/ponte-pensione.py` | 2026-07 | 2027-07 |
+| `it-pianificazione-autonomi/references/casse-professionali.md` | 2026-10 | 2027-10 |
+| `it-pianificazione-autonomi/references/fiscalita-forfettario.md` | 2026-10 | 2027-10 |
+| `it-pianificazione-autonomi/references/previdenza-gestione-separata.md` | 2026-10 | 2027-10 |
+| `it-pianificazione-obiettivi/references/asset-location.md` | 2026-10 | 2027-10 |
+| `it-pianificazione/SKILL.md` | 2026-10 | 2027-10 |
+| `it-pianificazione/references/previdenza-obbligatoria.md` | 2026-10 | 2027-10 |
+| `it-rebalance/SKILL.md` | 2026-10 | 2027-10 |
+| `it-revisione/assets/genera-ips.py` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/criptovalute-avanzate.md` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/criptovalute-casi-speciali.md` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/criptovalute.md` | 2026-10 | 2027-10 |
+
+**Calendario dei parametri da riverificare** (stato a ottobre 2026):
+
+| Quando | Cosa | Dove nel plugin |
+|---|---|---|
+| dicembre 2026 | Legge di bilancio 2027: IRPEF, plafond del fondo pensione, cripto, bollo, Tobin tax | SKILL.md e reference di it-tax-optimization, it-pianificazione, it-rebalance; `netto-pensione.py` |
+| entro fine 2026 | Decreto sui coefficienti di trasformazione 2027-2028 (il precedente è del 20/11/2024) | `previdenza-obbligatoria.md`, foglio Coefficienti di `proiezione-pensione.xlsx`, `proiezione-inps.py` |
+| 1° gennaio 2027 | Nuovi testi unici (TUIR D.Lgs. 117/2026 e collegati): cambiano gli articoli citati | doppie citazioni nelle reference |
+| gennaio 2027 | Aggiornamento annuale della serie Damodaran | `rendimenti-storici.csv` (due copie identiche) |
+| gennaio-febbraio 2027 | Circolari INPS su massimale, minimale e prima fascia 2027; aliquote della Gestione Separata | it-pianificazione, it-pianificazione-autonomi |
+| 2027-2028 | Requisiti di pensione già noti (Circ. INPS 28/2026), da applicare alla data | `previdenza-obbligatoria.md`, `previdenza-gestione-separata.md` |
+| giugno-luglio 2027 | Scadono i marcatori di giugno-luglio 2026: suite completa e workflow di release falliscono finché non si riverifica | tabella sopra |
+| ottobre 2027 | Scadono i marcatori di ottobre 2026 | tabella sopra |
 
 ### Changelog
 
@@ -398,7 +436,7 @@ Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cart
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (39 test, circa 15 secondi, richiede le dipendenze dei Prerequisiti). Tre test ricalcolano gli Excel con LibreOffice headless in locale italiano (`scripts/ricalcola-excel.py`): verificano che nessuna cella vada in errore e che le cache salvate nei file coincidano col ricalcolo. Senza LibreOffice risultano saltati; nella CI è installato e obbligatorio (`RICHIEDI_LIBREOFFICE=1`). Dopo aver modificato un Excel, `python scripts/ricalcola-excel.py FILE --in-place` ne aggiorna le cache. `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
+Dal repository: `python tests/run_tests.py` (40 test, circa 15 secondi, richiede le dipendenze dei Prerequisiti). Tre test ricalcolano gli Excel con LibreOffice headless in locale italiano (`scripts/ricalcola-excel.py`): verificano che nessuna cella vada in errore e che le cache salvate nei file coincidano col ricalcolo. Senza LibreOffice risultano saltati; nella CI è installato e obbligatorio (`RICHIEDI_LIBREOFFICE=1`). Dopo aver modificato un Excel, `python scripts/ricalcola-excel.py FILE --in-place` ne aggiorna le cache. `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 
@@ -463,16 +501,11 @@ Il concetto di "zainetto fiscale" è centrale e non ha equivalente diretto USA. 
 
 ## Contribuire
 
-Le regole fiscali italiane evolvono ogni Legge di Bilancio. Le sezioni più volatili:
-- Aliquote (Legge di Bilancio annuale)
-- Scaglioni IRPEF (legge di Bilancio 2024-2026 ha modificato sensibilmente)
-- Imposta di bollo dossier (massimali, eccezioni)
-- Regime cripto (Legge 197/2022 e successive integrazioni)
-
-Quando la normativa cambia, aggiornare:
-1. SKILL.md sezione "Regole fiscali fondamentali"
-2. Reference files con esempi numerici
-3. Footer con data ultima revisione
+Le regole fiscali italiane cambiano a ogni legge di bilancio: il calendario dei parametri da riverificare e lo stato dei marcatori sono nella sezione «Freshness fiscale». Quando la normativa cambia:
+1. verificare il dato su **fonte primaria** (Normattiva, Gazzetta Ufficiale, circolari INPS, Agenzia delle Entrate, COVIP); le fonti secondarie servono a trovarla, non a confermarlo;
+2. aggiornarlo in **tutte le copie** (`grep -rn` su `skills/`, `commands/` e README): le skill sono autosufficienti e duplicano alcuni dati;
+3. aggiornare il marcatore della parte verificata nel formato esatto `Verificato: AAAA-MM` (il test lo cerca così), senza ringiovanire la data di un file verificato solo in parte;
+4. eseguire `python tests/run_tests.py` e, se il dato compare in un Excel, `python scripts/ricalcola-excel.py FILE --in-place`.
 
 ## Release
 
