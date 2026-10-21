@@ -662,17 +662,34 @@ OBBLIGATI_FRESHNESS = (
 )
 
 
-@test("freshness fiscale: i file normativi portano 'Verificato: AAAA-MM' e nessuno supera i 12 mesi")
-def t_freshness():
-    import datetime
+def marcatori_freshness():
+    """[(file relativo a skills/, anno, mese)] per ogni «Verificato: AAAA-MM» nei .py e .md."""
     trovati = []
     for base, _, files in os.walk(SKILLS):
-        for f in files:
+        for f in sorted(files):
             if f.endswith((".py", ".md")):
                 rel = os.path.relpath(os.path.join(base, f), SKILLS)
                 testo = open(os.path.join(base, f), encoding="utf-8", errors="replace").read()
                 for m in re.finditer(r"Verificato: (\d{4})-(\d{2})", testo):
                     trovati.append((rel, int(m.group(1)), int(m.group(2))))
+    return trovati
+
+
+def tabella_freshness():
+    """Tabella Markdown per il README: per ogni file la verifica più vecchia e fin quando vale."""
+    piu_vecchia = {}
+    for rel, a, m in marcatori_freshness():
+        piu_vecchia[rel] = min(piu_vecchia.get(rel, (a, m)), (a, m))
+    righe = ["| File | Verificato | Valido fino a |", "|---|---|---|"]
+    for rel, (a, m) in sorted(piu_vecchia.items(), key=lambda kv: (kv[1], kv[0])):
+        righe.append(f"| `{rel}` | {a}-{m:02d} | {a + 1}-{m:02d} |")
+    return "\n".join(righe)
+
+
+@test("freshness fiscale: i file normativi portano 'Verificato: AAAA-MM' e nessuno supera i 12 mesi")
+def t_freshness():
+    import datetime
+    trovati = marcatori_freshness()
     marcati = {rel for rel, _, _ in trovati}
     mancanti = [rel for rel in OBBLIGATI_FRESHNESS if rel not in marcati]
     assert not mancanti, ("file normativi senza marcatore (verificarli alle fonti primarie e "
@@ -825,6 +842,16 @@ def t_filtro():
     assert r.returncode != 0, "nessun test selezionato deve essere un errore, non un verde vuoto"
 
 
+@test("runner: la tabella dello stato dei dati normativi elenca i file obbligati con la scadenza")
+def t_tabella_dati_normativi():
+    r = subprocess.run([sys.executable, os.path.abspath(__file__), "--tabella-freshness"],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr[-300:]
+    assert r.stdout.startswith("| File | Verificato | Valido fino a |"), r.stdout[:200]
+    for rel in OBBLIGATI_FRESHNESS:
+        assert f"| `{rel}` |" in r.stdout, f"{rel} assente dalla tabella"
+
+
 @test("pacchetto: lo zip per Cowork contiene solo il plugin, nome = versione del manifest")
 def t_pacchetto():
     import zipfile
@@ -874,7 +901,12 @@ def main():
                     help="esegui solo i test il cui nome contiene NOME (ripetibile)")
     ap.add_argument("--skip", action="append", metavar="NOME",
                     help="salta i test il cui nome contiene NOME (ripetibile)")
+    ap.add_argument("--tabella-freshness", action="store_true",
+                    help="stampa la tabella Markdown dello stato dei dati normativi (per il README) ed esce")
     args = ap.parse_args()
+    if args.tabella_freshness:
+        print(tabella_freshness())
+        sys.exit(0)
 
     print("=" * 74)
     print("SMOKE TEST SUITE — wealth-management-it")
