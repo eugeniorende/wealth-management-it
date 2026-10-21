@@ -101,7 +101,8 @@ SINONIMI_ZAIN = {
 COLONNE_NUMERICHE = ("quantita", "prezzo_carico", "valore_carico", "prezzo_attuale", "valore_attuale")
 
 # Stati UE e SEE (ISIN): OICR istituiti qui sono armonizzati o, se non lo sono, possono avere
-# un gestore vigilato; fuori da quest'area la plus va a IRPEF (art. 10-ter L. 77/1983).
+# un gestore vigilato; fuori da quest'area la plus va a IRPEF (art. 10-ter L. 77/1983; dal 2027
+# art. 59 del TU versamenti e riscossione, D.Lgs. 33/2025).
 UE_SEE = set("AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK "
              "IS LI NO".split())
 # Emittenti di ETF che emettono anche ETC (iShares Physical Gold, WisdomTree, Invesco) o hanno

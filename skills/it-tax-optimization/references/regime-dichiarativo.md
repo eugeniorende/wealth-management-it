@@ -79,7 +79,7 @@ A sfavore: l'**onere dichiarativo** (calcolo di plus/minus operazione per operaz
 
 ## Cripto e quadro RW
 
-Le cripto vanno nel **quadro RW** qualunque sia l'importo, perché l'art. 4 DL 167/1990 le nomina espressamente e la soglia di €15.000 vale solo per i conti: se detenute su exchange esteri o su wallet personali (non presso un intermediario italiano che applichi il bollo), si dichiarano e scontano l'**imposta sul valore delle cripto-attività** (ICA/IVCA), anch'essa **0,2%**, mutuamente esclusiva col bollo. Le plusvalenze cripto restano un compartimento separato a sé (33% dal 2026, vedi `criptovalute.md`): il dichiarativo non le fa compensare con azioni o ETF, neanche a zainetto unificato. Il ravvedimento per RW cripto omessi negli anni passati è in `criptovalute-avanzate.md`.
+Le cripto vanno nel **quadro RW** qualunque sia l'importo, perché l'art. 4 DL 167/1990 (dal 2027 art. 58 D.Lgs. 141/2026) le nomina espressamente e la soglia di €15.000 vale solo per i conti: se detenute su exchange esteri o su wallet personali (non presso un intermediario italiano che applichi il bollo), si dichiarano e scontano l'**imposta sul valore delle cripto-attività** (ICA/IVCA), anch'essa **0,2%**, mutuamente esclusiva col bollo. Le plusvalenze cripto restano un compartimento separato a sé (33% dal 2026, vedi `criptovalute.md`): il dichiarativo non le fa compensare con azioni o ETF, neanche a zainetto unificato. Il ravvedimento per RW cripto omessi negli anni passati è in `criptovalute-avanzate.md`.
 
 ## Checklist degli adempimenti con un broker estero
 
@@ -99,5 +99,5 @@ Il dichiarativo è il regime di chi usa broker senza sostituto d'imposta italian
 ---
 *Dati normativi (regole del regime dichiarativo e zainetto fiscale) — Verificato: 2026-06.*
 *LIFO in dichiarativo (art. 67 c. 1-bis TUIR, art. 76 c. 2 D.Lgs. 117/2026; istruzioni del quadro RT, Redditi PF 2026; per le cripto Circ. 30/E/2023 par. 3.2.1) — Verificato: 2026-10.*
-*Quadro RW: obbligo per titoli e cripto senza soglia, esonero dei soli conti fino a €15.000, IVAFE e sanzioni (art. 4-5 DL 167/1990, istruzioni Redditi PF 2026 e 730/2026) — Verificato: 2026-10.*
+*Quadro RW: obbligo per titoli e cripto senza soglia, esonero dei soli conti fino a €15.000, IVAFE e sanzioni (art. 4-5 DL 167/1990, istruzioni Redditi PF 2026 e 730/2026; dal 2027 art. 58 D.Lgs. 141/2026, art. 67 D.Lgs. 173/2024, art. 168 D.Lgs. 123/2025) — Verificato: 2026-10.*
 *Cambio del giorno (art. 9 c. 2 TUIR), valute (art. 67 c. 1 lett. c-ter e c. 1-ter TUIR; Ris. AdE 60/E/2024), riporto delle minus (art. 68 c. 5 TUIR), quadri RM e RT, IVAFE con codice 4043 e scadenze (istruzioni Redditi PF 2026, fasc. 2; scheda AdE sul Redditi PF 2026), passaggio di regime (art. 6 c. 2 e c. 5 D.Lgs. 461/97), corrispondenze nel D.Lgs. 117/2026 — Verificato: 2026-10.*

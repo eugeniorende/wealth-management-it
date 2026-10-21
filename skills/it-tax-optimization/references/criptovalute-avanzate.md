@@ -52,7 +52,7 @@ Esempio a ottobre 2026: €100.000 in cripto non dichiarati in RW per il 2022, 2
 
 **Perché ora**: la direttiva **DAC8** (D.Lgs. 194/2025) è operativa dal 1/1/2026 e i prestatori di servizi per le cripto-attività comunicheranno all'Agenzia i dati del 2026 entro il **30/6/2027**: gli exchange UE comunicheranno saldi, indirizzi dei wallet di prelievo e transazioni all'Agenzia, che incrocerà i saldi al 31/12 con il Quadro RW e farà emergere automaticamente le discrepanze. La finestra per regolarizzare il pregresso **senza** attendere il controllo si sta chiudendo. **Soglia penale**: l'omessa dichiarazione è reato (art. 5 D.Lgs. 74/2000, reclusione da 2 a 5 anni) se l'imposta evasa supera **€50.000** per singola annualità; se la dichiarazione è presentata ma il quadro RT è omesso o infedele si applica l'art. 4 (da 2 anni a 4 anni e 6 mesi) quando l'imposta evasa supera €100.000 e gli elementi sottratti superano il 10% o €2 milioni. L'omissione del solo quadro RW è un illecito amministrativo, non un reato. Ragione in più per non rinviare. La regolarizzazione di posizioni con più anni o plusvalenze significative richiede una mappatura analitica: è un lavoro da commercialista, non fai-da-te.
 
-*Ravvedimento, soglie penali e DAC8 (art. 13 D.Lgs. 472/1997, artt. 4-5 D.Lgs. 74/2000, D.Lgs. 194/2025) — Verificato: 2026-10.*
+*Ravvedimento, soglie penali e DAC8 (art. 13 D.Lgs. 472/1997, artt. 4-5 D.Lgs. 74/2000, D.Lgs. 194/2025; dal 2027 artt. 14, 76 e 77 D.Lgs. 173/2024) — Verificato: 2026-10.*
 
 ## Cosa rimane fuori / da verificare col commercialista
 

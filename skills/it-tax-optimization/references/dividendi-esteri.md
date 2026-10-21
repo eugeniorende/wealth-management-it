@@ -56,7 +56,7 @@ Prelievo totale                        371,00 (37,1%)  482,00 (48,2%)
 
 Senza W-8BEN si perdono €111 ogni €1.000 di dividendo lordo. Non sono €150 perché il netto frontiera attutisce: la ritenuta italiana si calcola su una base più piccola. Il W-8BEN è il primo controllo da fare su qualsiasi dossier con azioni USA.
 
-Per confronto, lo stesso dividendo incassato tramite un broker estero che non fa da sostituto d'imposta (regime dichiarativo). Secondo l'Agenzia, l'imposta sostitutiva del 26% (art. 18 TUIR) si calcola sul **lordo** (risposta 111/2020). Le istruzioni del Modello Redditi PF 2026 chiedono di indicare nel rigo RM31 l'importo «al lordo di eventuali ritenute subìte nello Stato estero»:
+Per confronto, lo stesso dividendo incassato tramite un broker estero che non fa da sostituto d'imposta (regime dichiarativo). Secondo l'Agenzia, l'imposta sostitutiva del 26% (art. 18 TUIR, dal 2027 art. 20 D.Lgs. 117/2026) si calcola sul **lordo** (risposta 111/2020). Le istruzioni del Modello Redditi PF 2026 chiedono di indicare nel rigo RM31 l'importo «al lordo di eventuali ritenute subìte nello Stato estero»:
 
 ```
 Dividendo lordo                      1.000,00
@@ -68,7 +68,7 @@ Netto                                  590,00   prelievo totale 41,0%
 
 ## Il credito per le imposte estere: posizione dell'Agenzia e giurisprudenza
 
-L'art. 165 TUIR ammette in detrazione le imposte pagate all'estero solo «se alla formazione del reddito complessivo concorrono redditi prodotti all'estero». I dividendi da partecipazioni non qualificate non entrano nel reddito complessivo: sono tassati con ritenuta a titolo d'imposta o con imposta sostitutiva, e il contribuente non può scegliere la tassazione ordinaria (istruzioni Redditi PF 2026, quadro RM). Per questo l'Agenzia delle Entrate ritiene che **il credito non spetti** (risposta 111/2020). In amministrato l'intermediario non applica alcun credito: l'unico sollievo è il netto frontiera.
+L'art. 165 TUIR (dal 2027 art. 185 D.Lgs. 117/2026) ammette in detrazione le imposte pagate all'estero solo «se alla formazione del reddito complessivo concorrono redditi prodotti all'estero». I dividendi da partecipazioni non qualificate non entrano nel reddito complessivo: sono tassati con ritenuta a titolo d'imposta o con imposta sostitutiva, e il contribuente non può scegliere la tassazione ordinaria (istruzioni Redditi PF 2026, quadro RM). Per questo l'Agenzia delle Entrate ritiene che **il credito non spetti** (risposta 111/2020). In amministrato l'intermediario non applica alcun credito: l'unico sollievo è il netto frontiera.
 
 La Cassazione ha preso una strada diversa in due sentenze (Sez. V, n. 25698/2022 e n. 10204/2024), relative a dividendi e redditi USA incassati direttamente. La convenzione Italia-USA esclude la detrazione solo quando l'imposizione mediante ritenuta a titolo d'imposta avviene «su richiesta del beneficiario». La Corte ne ha dedotto che, se la tassazione sostitutiva è obbligatoria, la convenzione prevale e l'imposta pagata negli USA va riconosciuta. Altre convenzioni (Cipro, Malta, Singapore e altre citate nelle sentenze) escludono invece il credito «anche su richiesta» del contribuente, cioè sempre. La formula «su richiesta» senza «anche» si ritrova nei testi pubblicati dal MEF e su Fedlex delle convenzioni con Svizzera, Francia, Germania e Paesi Bassi.
 

@@ -19,9 +19,9 @@ Uso:
 Regole fiscali incorporate (Verificato: 2026-07; periodo d'imposta 2026):
   - IRPEF a tre scaglioni: 23% fino a 28.000; 33% da 28.000 a 50.000
     (ridotta dal 35% dalla L. 199/2025, art. 1 co. 3); 43% oltre 50.000
-  - detrazione redditi da pensione (art. 13 TUIR): 1.955 € fino a 8.500 di
+  - detrazione redditi da pensione (art. 13 TUIR, dal 2027 art. 13 D.Lgs. 117/2026): 1.955 € fino a 8.500 di
     reddito, poi decrescente, zero oltre 50.000 (no tax area 8.500 €)
-  - detrazione lavoro dipendente (art. 13 TUIR): 1.955 € fino a 15.000, poi
+  - detrazione lavoro dipendente (art. 13 c. 1 TUIR, stesso comma dal 2027): 1.955 € fino a 15.000, poi
     decrescente, zero oltre 50.000
   - contributi IVS a carico del dipendente: 9,19% della RAL
   - addizionali regionale e comunale: parametriche (variano per territorio)
