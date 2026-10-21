@@ -1013,14 +1013,15 @@ def _scenari_autonomi(wb, nome):
                                                                 "Decadimento", "Rendimento netto fondo"))
         coeff_col = coeff * ((1 - d) / (1 - dec_base)) ** (n / 2)
         attesa = _pensione_autonomi(i, g, rv, n, massimale, coeff_col)
-        assert abs(r[f"{col}{riga('Pensione obbligatoria lorda')}"].value - attesa) <= 1e-6 * attesa, \
-            f"{nome} {col}: pensione {r[f'{col}{riga(chr(80) + 'ensione obbligatoria lorda')}'].value:,.2f} ≠ {attesa:,.2f}"
+        lorda = r[f"{col}{riga('Pensione obbligatoria lorda')}"].value
+        assert abs(lorda - attesa) <= 1e-6 * attesa, f"{nome} {col}: pensione {lorda:,.2f} ≠ {attesa:,.2f}"
         netta = netto.netto_pensionato(attesa, 0.02, 0.0)[0]
         assert abs(r[f"{col}{riga('Pensione obbligatoria netta')}"].value - netta) < 0.01, f"{nome} {col}: netta"
         montante = i["B31"].value * (1 + rend) ** n + sum(i["B28"].value * (1 + rend) ** (n - t) for t in range(n))
         rendita = (montante - tassa) * coeff_col
-        assert abs(r[f"{col}{riga('Rendita fondo')}"].value - rendita) <= 1e-6 * max(rendita, 1), \
-            f"{nome} {col}: rendita del fondo {r[f'{col}{riga(chr(82) + 'endita fondo')}'].value:,.2f} ≠ {rendita:,.2f}"
+        nel_foglio = r[f"{col}{riga('Rendita fondo')}"].value
+        assert abs(nel_foglio - rendita) <= 1e-6 * max(rendita, 1), \
+            f"{nome} {col}: rendita del fondo {nel_foglio:,.2f} ≠ {rendita:,.2f}"
         tot = netta + rendita
         assert abs(r[f"{col}{riga('Pensione totale netta')}"].value - tot) < 0.01, f"{nome} {col}: totale netto"
         assert abs(r[f"{col}{riga('Spesa target')}"].value - spesa) < 0.01, f"{nome} {col}: spesa target in euro di oggi"
