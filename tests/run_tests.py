@@ -1686,7 +1686,8 @@ def t_t13_dividendi():
     assert netto_dich == 1000 - 150 - 260 and "41,0%" in div, netto_dich
     assert re.search(r"lordo[^.\n]*netto frontiera|netto frontiera[^.\n]*lordo", div.split("## Cosa resta da verificare")[1]), \
         "dichiarativo: la base del 26% (lordo o netto frontiera) tra le cose da verificare"
-    assert re.search(r"25%[^.\n]*(5000|rimborso)", div), "Francia: il caso del 25% se il beneficiario non è documentato"
+    francia = next(r for r in righe if r[0] == "Francia")
+    assert "25%" in francia[5] and "rimborso" in francia[5], "Francia: il caso del 25% se il beneficiario non è documentato"
 
 
 @test("T13: successione e donazione, esempi ricalcolati e costo fiscale degli eredi")
@@ -1710,6 +1711,9 @@ def t_t13_successione():
         "citazione non verificata dentro un file marcato «Verificato»"
     assert "`it-pianificazione-obiettivi/references/asset-location.md`" in suc and "(vedi `asset-location.md`)" not in suc
     skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    indice = skill.split("## Riferimenti")[1].split("\n## ")[0]
+    for ref in ("dividendi-esteri.md", "successione-donazione.md"):
+        assert f"- `references/{ref}` — " in indice, f"SKILL.md: {ref} non è nell'elenco dei Riferimenti"
     casi_limite = next(r for r in skill.splitlines() if "Casi limite" in r)
     assert "references/successione-donazione.md" in casi_limite, casi_limite
     costi = skill.split("### Costi fiscali non compensabili")[1].split("## Workflow")[0]
