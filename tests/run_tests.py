@@ -2379,7 +2379,8 @@ def t_reference_indicizzate():
         cartella = os.path.join(SKILLS, skill, "references")
         if not os.path.isdir(cartella):
             continue
-        indice = open(os.path.join(SKILLS, skill, "SKILL.md"), encoding="utf-8").read()
+        indice = open(os.path.join(SKILLS, skill, "SKILL.md"), encoding="utf-8").read().split("\n## Riferimenti")[1]
+        indice = indice.split("\n## ")[0]
         mancanti += [f"{skill}/{f}" for f in sorted(os.listdir(cartella))
                      if f.endswith(".md") and f"references/{f}" not in indice]
     assert not mancanti, f"reference fuori dall'indice: {mancanti}"
@@ -2448,6 +2449,29 @@ def t_t13_successione():
     assert "references/successione-donazione.md" in casi_limite, casi_limite
     costi = skill.split("### Costi fiscali non compensabili")[1].split("## Workflow")[0]
     assert "references/dividendi-esteri.md" in costi and "W-8BEN" in costi, "costi non compensabili senza le ritenute estere"
+    # l'intervallo del prelievo nel bullet = minimo e massimo della tabella della reference
+    div = open(os.path.join(TAX, "references", "dividendi-esteri.md"), encoding="utf-8").read()
+    tabella = div.split("## Le ritenute nei principali Paesi")[1].split("\n\n(*)")[0]
+    valori = [_perc_t13(x) for r in tabella.splitlines()[2:] for x in re.findall(r"(\d+,\d)%", "|".join(r.split("|")[4:6]))]
+    bullet = next(r for r in costi.splitlines() if "Ritenute estere" in r)
+    nel_bullet = [_perc_t13(x) for x in re.findall(r"(\d+,\d)%", bullet)]
+    assert min(nel_bullet) == min(valori) and max(nel_bullet) == max(valori), (bullet[:200], min(valori), max(valori))
+    # aliquote e franchigie: tabella della reference e copia cripto coincidono
+    tab = suc.split("| Beneficiario |")[1].split("\n\n")[0]
+    righe = {r.split("|")[1].strip(): [c.strip() for c in r.split("|")[2:4]] for r in tab.splitlines()[2:] if r.startswith("|")}
+    assert righe["Coniuge e parenti in linea retta"] == ["€1.000.000", "4%"], righe
+    assert righe["Fratelli e sorelle"] == ["€100.000", "6%"], righe
+    assert righe["Altri soggetti"] == ["nessuna", "8%"], righe
+    assert righe["Persona con disabilità grave (art. 3 c. 3 L. 104/1992)"][0] == "€1.500.000", righe
+    assert any(k.startswith("Altri parenti fino al quarto grado, affini in linea retta, affini in linea collaterale fino al terzo grado")
+               and v == ["nessuna", "6%"] for k, v in righe.items()), righe
+    cripto_cs = open(os.path.join(TAX, "references", "criptovalute-casi-speciali.md"), encoding="utf-8").read()
+    for atteso in ("4% per coniuge e parenti in linea retta oltre la franchigia di €1.000.000 ciascuno",
+                   "6% per fratelli e sorelle oltre €100.000", "8% per gli altri soggetti",
+                   "franchigia di €1.500.000 per i disabili gravi"):
+        assert atteso in cripto_cs, f"criptovalute-casi-speciali: «{atteso}»"
+    assert re.search(r"nella donazione non godono dell'esenzione: l'art\. 59", suc), "titoli di Stato in donazione"
+    assert re.search(r"il testo vigente \*\*non esclude\*\* successioni e donazioni", suc), "OICR: l'eccezione per successione non c'è più"
     seq = open(os.path.join(SKILLS, "it-rebalance", "references", "sequenza-liquidazione.md"), encoding="utf-8").read()
     assert "netto frontiera" in seq and "it-tax-optimization/references/dividendi-esteri.md" in seq
     assert "Finalità successoria" in seq and "it-tax-optimization/references/successione-donazione.md" in seq
@@ -2461,6 +2485,30 @@ def t_t13_successione():
     cripto = open(os.path.join(TAX, "references", "criptovalute-casi-speciali.md"), encoding="utf-8").read()
     assert "successione-donazione.md" in cripto and not re.search(r"per gli altri parenti fino al quarto grado e per gli affini\b", cripto), \
         "criptovalute-casi-speciali: aliquote di successione diverse dalla reference"
+    assert "per ciascun beneficiario" in alloc, "bucket Eredità: la franchigia è per ciascun beneficiario"
+    assert re.search(r"lordo[^.\n]*dividendi esteri|dividendi esteri[^.\n]*lordo", dich.split("## In sintesi")[1]), \
+        "regime-dichiarativo, sintesi: la base dei dividendi esteri cambia"
+
+
+@test("T13: le regole su eredità di ETF, BTP in donazione e dividendi in dichiarativo valgono in ogni copia")
+def t_t13_propagazione():
+    # REGRESSIONE revisione T13: le regole erano vincolate solo nella reference; una copia
+    # che le contraddice (ETF che «azzerano la plus» in eredità, BTP esenti anche in donazione,
+    # dividendi in dichiarativo sul netto) passava.
+    errori = []
+    for rel, testo in _testi_regole().items():
+        for blocco in _blocchi(testo):
+            if re.search(r"\b(ETF|fondi)\b", blocco) and re.search(r"\bered|successione", blocco, re.I) \
+                    and re.search(r"plusvalenz[ae][^.\n]*azzer|azzer[^.\n]*plusvalenz", blocco):
+                if not re.search(r"\bcessione|non è garantit|da verificare|può (quindi )?non esistere|non vale con certezza", blocco):
+                    errori.append(f"{rel}: ETF in eredità senza riserva: «{blocco.strip()[:120]}»")
+            if re.search(r"\bBTP\b|titoli di Stato|PIR", blocco) and re.search(r"esent", blocco) and re.search(r"donazion", blocco):
+                for frase in _frasi(blocco):
+                    if re.search(r"esent[^.\n]*donazion|donazion[^.\n]*esent", frase) and not re.search(r"\bnon\b", frase):
+                        errori.append(f"{rel}: esenzione in donazione: «{frase.strip()[:120]}»")
+            if re.search(r"dividend", blocco) and re.search(r"lordo[^.\n]{0,40}come in amministrato|netto frontiera,? come in amministrato|in dichiarativo[^.\n]{0,40}sul netto frontiera", blocco):
+                errori.append(f"{rel}: dividendi in dichiarativo: «{blocco.strip()[:120]}»")
+    assert not errori, "\n  ".join(errori[:10])
 
 
 # ══════════════════════ fiscalità e tracker ══════════════════════
