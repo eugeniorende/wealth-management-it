@@ -112,7 +112,7 @@ L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si
 python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]
 ```
 
-Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, in anni interi): proporlo quando l'output finisce in chat o in un documento da condividere.
+Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): proporlo quando l'output finisce in chat o in un documento da condividere.
 
 Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico movimenti del fondo pensione** (CSV), e produce: anzianità e retribuzioni per anno, la ricostruzione del montante contributivo (contributi × aliquota, capitalizzati coi tassi ufficiali ISTAT — tabella verificata nello script, ±qualche % rispetto al dato esatto de "La mia pensione futura"), montante del fondo per comparto con stima euristica del mix azionario, versamenti per anno/fonte, e il blocco di parametri pronti per `proiezione-inps.py` e `montecarlo-pensione.py`. I dati reali battono sempre quelli dichiarati a memoria.
 

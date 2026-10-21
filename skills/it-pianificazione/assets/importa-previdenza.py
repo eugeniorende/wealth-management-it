@@ -18,7 +18,7 @@ e produce:
 Uso:
     python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]
 
-Con --anonimo non stampa intestatario e data di nascita (l'età resta, in anni interi): utile
+Con --anonimo non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): utile
 quando l'output finisce in chat o in un documento condiviso.
 
 ONESTÀ METODOLOGICA
@@ -252,11 +252,21 @@ def quota_azionaria(nome_comparto):
 
 # ================================ MAIN ================================
 
+def eta_stampata(eta, anonimo):
+    """Età da incollare in ETA_ATTUALE: con --anonimo in anni interi ARROTONDATI (proiezione-inps.py
+    usa round(ETA_PENSIONAMENTO − ETA_ATTUALE): troncare allungherebbe l'orizzonte di un anno)."""
+    return round(eta) if anonimo else round(eta, 1)
+
+
 def main():
+    uso = "Uso: python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]"
     args = [a for a in sys.argv[1:] if a != "--anonimo"]
     anonimo = len(args) < len(sys.argv) - 1
-    if not args:
-        sys.exit("Uso: python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]")
+    # argomenti validati PRIMA di stampare qualsiasi dato: un flag sbagliato non deve rivelare i dati
+    sconosciuti = [a for a in args if a.startswith(("-", "\u2014", "\u2013"))]
+    if not args or sconosciuti or len(args) > 2:
+        sys.exit(f"{uso}\n" + (f"Argomento non riconosciuto: {sconosciuti[0]}" if sconosciuti else
+                                (f"Troppi argomenti: {' '.join(args[2:])}" if len(args) > 2 else "")))
     path_xml = args[0]
     path_csv = args[1] if len(args) > 1 else None
     oggi = datetime.date.today()
@@ -364,8 +374,7 @@ def main():
     print(f"  RAL_ATTUALE      = {ral_rif:,.0f}".replace(",", "_") +
           "   # ultima annualità completa dall'estratto: verifica con la RAL da contratto")
     if "nascita" in anag:
-        eta = (oggi - anag["nascita"]).days / 365.25
-        print(f"  ETA_ATTUALE      = {int(eta) if anonimo else round(eta, 1)}")
+        print(f"  ETA_ATTUALE      = {eta_stampata((oggi - anag['nascita']).days / 365.25, anonimo)}")
     if fp_montante is not None:
         print("per montecarlo-pensione.py:")
         print(f"  FP_POT_ATTUALE      = {fp_montante:,.0f}".replace(",", "_"))
