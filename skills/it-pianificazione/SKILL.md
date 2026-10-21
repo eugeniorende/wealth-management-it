@@ -76,9 +76,9 @@ Strategie di copertura del gap (vedi `references/proiezione-tenore-vita.md`):
 | €28.001 - €50.000 | **33%** (ridotta da 35%) |
 | Oltre €50.000 | 43% |
 
-No tax area: €8.500 (dipendenti/pensionati). Detrazione lavoro dipendente max: €1.955. Detrazione pensione: art. 13 c. 3 TUIR, formula nella sezione «Tassazione assegno pensionistico».
+No tax area: €8.500 (dipendenti/pensionati). Detrazione lavoro dipendente max: €1.955. Detrazione pensione: art. 13 c. 3 TUIR (dal 2027 art. 13 c. 3 D.Lgs. 117/2026), formula nella sezione «Tassazione assegno pensionistico».
 
-Sterilizzazione benefit per redditi > €200.000: le detrazioni per oneri al 19% (escluse le spese sanitarie), per erogazioni ai partiti politici e per premi di polizze contro eventi calamitosi sono ridotte di €440 (art. 16-ter c. 5-bis TUIR, introdotto dalla L. 199/2025): neutralizza il risparmio massimo della riduzione di aliquota (2% × €22.000).
+Sterilizzazione benefit per redditi > €200.000: le detrazioni per oneri al 19% (escluse le spese sanitarie), per erogazioni ai partiti politici e per premi di polizze contro eventi calamitosi sono ridotte di €440 (art. 16-ter c. 5-bis TUIR, introdotto dalla L. 199/2025; dal 2027 art. 18 c. 6 D.Lgs. 117/2026): neutralizza il risparmio massimo della riduzione di aliquota (2% × €22.000).
 
 *Scaglioni IRPEF 2026 (art. 11 TUIR, mod. L. 199/2025 c. 3; dal 2027 art. 11 D.Lgs. 117/2026), detrazione lavoro dipendente max €1.955 e no tax area €8.500 (art. 13 TUIR; dal 2027 art. 13), riduzione di €440 per redditi > €200.000 (art. 16-ter c. 5-bis TUIR; dal 2027 art. 18 c. 6) — Verificato: 2026-10.*
 
@@ -93,13 +93,13 @@ Sterilizzazione benefit per redditi > €200.000: le detrazioni per oneri al 19%
 
 - **Accantonamento annuo**: RAL_lordo × (1 / 13,5) ≈ 6,91% (formula esatta: RAL ÷ 13,5 deducendo lo 0,5% destinato a INPS Fondo di Garanzia)
 - **Rivalutazione TFR in azienda**: 1,5% + 75% inflazione ISTAT (art. 2120 c.c.), con imposta sostitutiva del **17%** sulla rivalutazione di ogni anno
-- **Tassazione TFR liquidato in azienda**: separata (art. 17 e 19 TUIR), sulle quote senza le rivalutazioni già tassate, all'aliquota media del «reddito di riferimento» (TFR × 12 / anni di servizio); gli uffici poi riliquidano sull'aliquota media dei 5 anni precedenti (tipicamente 23-30%)
+- **Tassazione TFR liquidato in azienda**: separata (artt. 17 e 19 TUIR; dal 2027 nel D.Lgs. 117/2026, articoli da verificare), sulle quote senza le rivalutazioni già tassate, all'aliquota media del «reddito di riferimento» (TFR × 12 / anni di servizio); gli uffici poi riliquidano sull'aliquota media dei 5 anni precedenti (tipicamente 23-30%)
 - **Tassazione TFR conferito a fondo**: 15% scendente al 9% (vedi sopra) sulle sole quote di TFR; i rendimenti, già tassati ogni anno nel fondo, sono esclusi
 
 ### Tassazione assegno pensionistico
 
 L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si applicano:
-- Detrazione pensionati (art. 13 c. 3 TUIR, R = reddito complessivo): €1.955 fino a €8.500 (no tax area); 700 + 1.255 × (28.000 − R) / 19.500 fino a €28.000; 700 × (50.000 − R) / 22.000 fino a €50.000; zero oltre; +€50 tra €25.000 e €29.000 (c. 3-bis). È la formula di `assets/netto-pensione.py`
+- Detrazione pensionati (art. 13 c. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026; R = reddito complessivo): €1.955 fino a €8.500 (no tax area); 700 + 1.255 × (28.000 − R) / 19.500 fino a €28.000; 700 × (50.000 − R) / 22.000 fino a €50.000; zero oltre; +€50 tra €25.000 e €29.000 (c. 3-bis). È la formula di `assets/netto-pensione.py`
 - Addizionali regionali e comunali (variabili: 0,7-3,33% regionale, 0-0,9% comunale)
 
 ## Workflow operativo
@@ -186,7 +186,7 @@ coefficiente_proiettato = coefficiente_attuale × (1 - decadimento_biennale)^bie
 pensione_lorda_annua = montante_finale × coefficiente_proiettato
 
 # Pensione netta
-detrazione_pensionati = calcola_detrazione(pensione_lorda_annua)  # art. 13 c. 3 TUIR, come netto-pensione.py
+detrazione_pensionati = calcola_detrazione(pensione_lorda_annua)  # art. 13 c. 3 TUIR (dal 2027 stesso articolo e comma), come netto-pensione.py
 IRPEF = applica_scaglioni(pensione_lorda_annua) - detrazione_pensionati
 addizionali = pensione_lorda × ~2%  # stima medio
 pensione_netta_annua = pensione_lorda_annua - IRPEF - addizionali

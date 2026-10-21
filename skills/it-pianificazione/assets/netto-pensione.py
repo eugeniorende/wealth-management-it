@@ -51,7 +51,7 @@ ONESTÀ METODOLOGICA
 - Semplificazioni dichiarate: nessun altro reddito IRPEF, nessuna detrazione
   per carichi di famiglia od oneri, niente trattamento integrativo.
 - Rendita del fondo: la parte della rata che viene dai rendimenti maturati
-  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR) è tassata a parte
+  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 D.Lgs. 117/2026, lettera da verificare) è tassata a parte
   dall'erogatore al 26% (12,5% sui titoli di Stato) e non è modellata.
 Questo strumento è educativo e non costituisce consulenza fiscale.
 """
@@ -129,7 +129,7 @@ def aliquota_rendita_fp(anni_iscrizione):
 
 def rendita_netta_fp(lorda, anni_iscrizione, quota_imponibile):
     """Rendita del fondo al netto della ritenuta 15→9%, applicata alla sola quota imponibile
-    (TFR e contributi dedotti: art. 11 c. 6 D.Lgs. 252/2005)."""
+    (TFR e contributi dedotti: art. 11 c. 6 D.Lgs. 252/2005, dal 2027 art. 258 c. 4 D.Lgs. 117/2026)."""
     return lorda * (1 - aliquota_rendita_fp(anni_iscrizione) * quota_imponibile)
 
 

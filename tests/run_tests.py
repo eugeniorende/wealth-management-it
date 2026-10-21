@@ -2637,6 +2637,46 @@ def t_t13_successione():
         "criptovalute-casi-speciali: aliquote di successione diverse dalla reference"
 
 
+# ══════════════════════ T11: testi unici dal 2027 ══════════════════════
+
+# Norme abrogate o rinumerate dal 1/1/2027 (mappa in it-tax-optimization/references/mappa-nuovo-tuir.md).
+# Restano in vigore, e non servono qui: art. 24 c. 11 DL 201/2011, gli altri articoli del D.Lgs.
+# 252/2005, art. 34 DPR 601/1973, art. 3 DL 66/2014.
+_NORME_2027 = re.compile(
+    r"art\.\s?\d+[\w-]*(?:[^;\n()]{0,30}?)(?<!nuovo)\s(?:TUIR|DPR 917/1986)\b"
+    r"|D\.\s?Lgs\.\s?461/(?:19)?97|L\.\s?77/1983|26-quinquies|DL 167/1990|D\.\s?Lgs\.\s?472/(?:19)?97"
+    r"|D\.\s?Lgs\.\s?74/2000|L\.\s?228/2012|art\.\s?19[^.;\n]{0,20}DL 201/2011|D\.\s?Lgs\.\s?346/(?:19)?90"
+    r"|art\.\s?(?:17|11 c\.\s?(?:6|4-ter|4-quater|4-quinquies))\s?D\.\s?Lgs\.\s?252/2005"
+    r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?24 L\.\s?207/2024|lett(?:era|\.)\s?\*{0,2}c-(?:bis|ter|quater|quinquies|sexies)")
+_SUCCESSORE_2027 = re.compile(r"2027|117/2026|141/2026|173/2024|174/2024|33/2025|123/2025|\bTU\b|testo unico")
+# T6 riscrive i testi degli autonomi: le loro doppie citazioni arrivano dopo il suo merge.
+_RINVIATI_T11 = ("skills/it-pianificazione-autonomi/",)
+
+
+@test("T11: ogni norma che cambia dal 2027 è citata anche col testo unico che la sostituisce")
+def t_t11_doppie_citazioni():
+    # REGRESSIONE F035: dal 1/1/2027 i testi unici abrogano e rinumerano le norme citate; la
+    # roadmap chiede la doppia citazione. Riga per riga, su skill, comandi e README.
+    errori = []
+    for rel, testo in sorted(_testi_regole().items()):
+        if rel.startswith(_RINVIATI_T11) or rel.endswith("mappa-nuovo-tuir.md"):
+            continue
+        for n, riga in enumerate(testo.splitlines(), start=1):
+            if _NORME_2027.search(riga) and not _SUCCESSORE_2027.search(riga):
+                errori.append(f"{rel}:{n}: «{riga.strip()[:100]}»")
+    assert not errori, f"{len(errori)} citazioni senza il riferimento dal 2027:\n  " + "\n  ".join(errori[:15])
+    tax = os.path.join(SKILLS, "it-tax-optimization")
+    mappa = open(os.path.join(tax, "references", "mappa-nuovo-tuir.md"), encoding="utf-8").read()
+    assert "## Da verificare" in mappa and mappa.rstrip().endswith("Verificato: 2026-10.*"), "mappa: sezione «Da verificare» e marcatore"
+    for riga in ("| art. 68 c. 9-bis TUIR (cripto: costo zero, proventi da detenzione) | art. 77 c. 11 |",
+                 "| art. 6 D.Lgs. 461/1997 (amministrato): c. 1 (48,08%) / 1-bis / 2 / 4 / 5 / 6 / 7 | art. 306: c. 1 / 2 / 3 / 5 / 6 / 7 / 8 |"):
+        assert riga in mappa, f"mappa: «{riga}»"
+    skill = open(os.path.join(tax, "SKILL.md"), encoding="utf-8").read()
+    assert "- `references/mappa-nuovo-tuir.md` — " in skill.split("## Riferimenti")[1], "SKILL.md: mappa fuori dall'elenco dei Riferimenti"
+    regole = skill.split("## Regole fiscali fondamentali")[1].split("\n### ")[0]
+    assert "references/mappa-nuovo-tuir.md" in regole, "SKILL.md: le regole fondamentali non rimandano alla mappa del 2027"
+
+
 # ══════════════════════ fiscalità e tracker ══════════════════════
 
 @test("netto-pensione: IRPEF 2026, detrazioni e aliquota rendita FP (valori chiusi)")
@@ -2886,6 +2926,7 @@ OBBLIGATI_FRESHNESS = (
     "it-tax-optimization/references/successione-donazione.md",
     "it-tax-optimization/references/multi-intermediario.md",
     "it-tax-optimization/references/import-dati-broker.md",
+    "it-tax-optimization/references/mappa-nuovo-tuir.md",
     "it-pianificazione/SKILL.md",
     "it-pianificazione/references/previdenza-obbligatoria.md",
     "it-pianificazione/references/previdenza-complementare.md",

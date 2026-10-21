@@ -31,8 +31,8 @@ Plusvalenza maturata in vita (80.000)    mai tassata come reddito
 
 Le precisazioni da conoscere:
 
-- **De cuius non residente e titoli esteri.** Se il defunto non era residente in Italia, l'imposta di successione italiana colpisce solo i beni esistenti in Italia (art. 2 c. 2 D.Lgs. 346/1990). Per azioni e obbligazioni di società estere, detenute all'estero e quindi fuori dall'imposta, l'Agenzia ritiene che l'erede debba usare il **costo sostenuto dal de cuius**: manca il presupposto per la rivalutazione, e la plusvalenza latente non si azzera (risposta 675/2021). Se il defunto era residente, l'imposta riguarda tutti i beni, anche esteri (art. 2 c. 1), e vale la regola generale.
-- **Dichiarazione non obbligatoria.** Se l'eredità va al coniuge e ai parenti in linea retta, l'attivo non supera €100.000 e non ci sono immobili, la dichiarazione di successione non è obbligatoria (art. 28 c. 7 D.Lgs. 346/1990). Quale valore l'intermediario riconosca allora come costo va verificato con lui.
+- **De cuius non residente e titoli esteri.** Se il defunto non era residente in Italia, l'imposta di successione italiana colpisce solo i beni esistenti in Italia (art. 2 c. 2 D.Lgs. 346/1990; dal 2027 art. 88 D.Lgs. 123/2025). Per azioni e obbligazioni di società estere, detenute all'estero e quindi fuori dall'imposta, l'Agenzia ritiene che l'erede debba usare il **costo sostenuto dal de cuius**: manca il presupposto per la rivalutazione, e la plusvalenza latente non si azzera (risposta 675/2021). Se il defunto era residente, l'imposta riguarda tutti i beni, anche esteri (art. 2 c. 1), e vale la regola generale.
+- **Dichiarazione non obbligatoria.** Se l'eredità va al coniuge e ai parenti in linea retta, l'attivo non supera €100.000 e non ci sono immobili, la dichiarazione di successione non è obbligatoria (art. 28 c. 7 D.Lgs. 346/1990; dal 2027 nel D.Lgs. 123/2025, articolo da verificare). Quale valore l'intermediario riconosca allora come costo va verificato con lui.
 - **Documenti.** L'intermediario deve conoscere il valore dichiarato. Conviene consegnargli copia della dichiarazione di successione quando i titoli passano sul dossier degli eredi.
 
 ## Fondi ed ETF: il testo della legge non prevede l'eccezione
@@ -42,7 +42,7 @@ Per le quote di fondi ed ETF la plusvalenza è reddito di capitale, e il trasfer
 - art. 26-quinquies c. 6 DPR 600/73 per gli OICR italiani (dal 2027 art. 58 c. 7 dell'allegato al D.Lgs. 33/2025);
 - art. 10-ter c. 3 L. 77/1983 per gli OICR esteri, compresi gli ETF UCITS irlandesi e lussemburghesi (dal 2027 art. 59 c. 5 dell'allegato al D.Lgs. 33/2025).
 
-Entrambi considerano cessione, ai fini della ritenuta, il trasferimento delle quote a un diverso intestatario, e il testo vigente **non esclude** successioni e donazioni. L'esclusione c'era nell'art. 26-quinquies fino al 12 maggio 2012 (versioni storiche su Normattiva). Su quel testo si basava la circolare AdE 33/E/2011, che indicava come costo per gli eredi il costo storico del de cuius.
+Entrambi considerano cessione, ai fini della ritenuta, il trasferimento delle quote a un diverso intestatario, e il testo vigente **non esclude** successioni e donazioni. L'esclusione c'era nell'art. 26-quinquies fino al 12 maggio 2012 (versioni storiche su Normattiva; dal 2027 la norma è l'art. 58 del testo unico versamenti e riscossione). Su quel testo si basava la circolare AdE 33/E/2011, che indicava come costo per gli eredi il costo storico del de cuius.
 
 Letta alla lettera, la norma porta a tassare al 26% la plusvalenza maturata sulle quote nel momento in cui vengono intestate all'erede o al donatario, con la provvista chiesta al contribuente. Come l'intermediario la applichi in pratica, e quale costo riconosca poi all'erede, va **verificato con l'intermediario e con il commercialista**. Per un portafoglio di ETF il vantaggio del «tenere fino alla successione», descritto più avanti, può quindi non esistere.
 

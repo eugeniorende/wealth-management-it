@@ -18,7 +18,7 @@ all'italiana e «1.000» vale mille.
 
 Regole fiscali applicate (vedi SKILL.md e le reference):
 - La plus da vendita di ETF e fondi mobiliari è reddito di CAPITALE, non compensabile con lo
-  zainetto (art. 44 c. 1 lett. g TUIR); la minus è reddito diverso. Gli OICR non armonizzati
+  zainetto (art. 44 c. 1 lett. g TUIR, dal 2027 art. 46 c. 1 lett. h); la minus è reddito diverso. Gli OICR non armonizzati
   fuori UE/SEE vanno a IRPEF progressiva (reddito_capitale_irpef). Azioni, obbligazioni ed
   ETC/ETN sono reddito diverso. Senza colonna "tipo fiscale" la categoria si deduce dalla
   DESCRIZIONE, non dal prefisso ISIN (DE/FR/IE/LU coprono anche azioni singole); se la

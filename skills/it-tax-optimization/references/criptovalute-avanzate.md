@@ -4,7 +4,7 @@ Estensione di `criptovalute.md` nelle zone più tecniche e **meno consolidate** 
 
 ## DeFi: staking, lending, yield
 
-I proventi da **detenzione** di cripto-attività (staking, lending, yield, "earn") che non siano EMT in euro sono **redditi diversi** (art. 67 c-sexies + art. 68 co. 9-bis ultimo periodo TUIR), tassati al **33% (2026)** sull'**intero ammontare lordo** ricevuto, **senza deduzione** di costi o commissioni della piattaforma. Punti operativi:
+I proventi da **detenzione** di cripto-attività (staking, lending, yield, "earn") che non siano EMT in euro sono **redditi diversi** (art. 67 c-sexies + art. 68 co. 9-bis ultimo periodo TUIR; dal 2027 art. 76 c. 1 lett. i e art. 77 c. 11), tassati al **33% (2026)** sull'**intero ammontare lordo** ricevuto, **senza deduzione** di costi o commissioni della piattaforma. Punti operativi:
 
 - **Momento impositivo**: si tassa alla **percezione** (quando i token entrano nella disponibilità del contribuente, il "claim"), al **valore di mercato in euro** del giorno, non alla maturazione contabile sul protocollo. Per le persone fisiche fuori da impresa vale il principio di cassa. *Attenzione*: per lo staking "locked" (premi che maturano ma non sono ancora prelevabili) il confine maturazione/disponibilità è **dibattuto** — alcune fonti tassano alla maturazione, l'orientamento prevalente alla disponibilità effettiva. Documentare le date di claim e il valore in euro a ciascuna.
 - **Doppia rilevanza**: il provento è tassato una prima volta alla ricezione (reddito diverso) e **diventa il costo di carico** del token; alla successiva cessione si tassa l'eventuale ulteriore plusvalenza (differenza tra prezzo di vendita e valore alla ricezione). Non è doppia imposizione sullo stesso importo: sono due eventi distinti.
@@ -41,7 +41,7 @@ La tassazione NFT richiede prima di tutto di identificare **chi sei** rispetto a
 
 Chi non ha dichiarato cripto negli anni passati può sanare **spontaneamente** con il **ravvedimento operoso** (art. 13 D.Lgs. 472/1997; dal 1/1/2027 il testo unico sanzioni D.Lgs. 173/2024, rinviato dal DL 200/2025), **prima** che l'Agenzia notifichi un accertamento o inizi un controllo. Punto cruciale spesso sbagliato: ci sono **due violazioni autonome**, con sanzioni e ravvedimenti **distinti**, da regolarizzare separatamente e **anno per anno**:
 
-1. **Omessa/infedele compilazione del Quadro RW** (monitoraggio): sanzione **dal 3% al 15%** del valore non dichiarato, **per ciascun anno** (art. 5 co. 2 DL 167/1990). Sulle sanzioni RW non maturano interessi.
+1. **Omessa/infedele compilazione del Quadro RW** (monitoraggio): sanzione **dal 3% al 15%** del valore non dichiarato, **per ciascun anno** (art. 5 co. 2 DL 167/1990; dal 2027 art. 67 c. 2 D.Lgs. 173/2024). Sulle sanzioni RW non maturano interessi.
 2. **Omessa/infedele dichiarazione delle plusvalenze (Quadro RT)** + **omesso versamento** dell'imposta sostitutiva e dell'**IVCA**: sanzione sul tributo (post-riforma D.Lgs. 87/2024, indicativamente **70%** per infedele, **120%** per omessa dichiarazione), più imposta dovuta e interessi legali.
 
 Il ravvedimento **riduce** queste sanzioni a una frazione del minimo, con due tabelle diverse a seconda di quando è stata commessa la violazione (la dichiarazione omessa o infedele):
