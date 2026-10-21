@@ -127,11 +127,13 @@ POLICY_RIBILANCIAMENTO = [
     ("**Bande 5/25.** Si interviene su una classe quando devia di oltre 5 punti percentuali in "
      "assoluto, oppure di oltre il 25% in relativo rispetto al peso target (vale la soglia che "
      "scatta prima)."),
-    ("**Modulazione per volatilità.** Bande un po' più larghe per le componenti volatili, più "
-     "strette per le stabili (fattore limitato 0,7–1,6): meno interventi inutili, al costo di una "
-     "lieve deviazione dall'ottimo teorico."),
     ("**Attenzione ai costi.** Prima si ribilancia coi flussi (versamenti e prelievi), solo poi "
-     "vendendo, per non realizzare plusvalenze e costi evitabili."),
+     "vendendo, per non realizzare plusvalenze e costi evitabili. Una vendita che paga imposta si "
+     "fa solo oltre il doppio della soglia."),
+    ("**Rientro.** A target se la correzione è a costo zero (flussi, minusvalenze, plusvalenze "
+     "compensate dallo zainetto); fino a metà banda per la parte che paga imposta."),
+    ("**Modulazione per volatilità (opzionale).** Spenta di default; se accesa, bande un po' più "
+     "larghe per le componenti volatili e più strette per le stabili (fattore limitato 0,7–1,6)."),
     ("**Frequenza.** Controllo trimestrale delle soglie; azione solo se una banda è violata. "
      "Niente ribilanciamenti \u201ca calendario\u201d fini a sé stessi."),
 ]

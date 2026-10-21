@@ -10,11 +10,11 @@ Per finanziare il prelievo annuo, attingere in quest'ordine:
 
 **2. Flussi già incassati — imposta già assolta.** Dividendi e cedole sono già tassati alla fonte (26%, o 12,5% per i titoli di Stato). Se sono già stati incassati, **spenderli** invece di reinvestirli e poi vendere altro: si evita un realizzo aggiuntivo. Per i dividendi esteri il netto incassato sconta anche la ritenuta dello Stato estero, e il 26% italiano si applica sul netto frontiera. L'eventuale eccedenza rispetto alla convenzione si recupera solo con le pratiche estere (W-8BEN, rimborsi): vedi `it-tax-optimization/references/dividendi-esteri.md`.
 
-**3. Vendite dal dossier titoli — imposta sui realizzi (26%), da minimizzare.** Quando le prime due fonti non bastano, si vende. Qui si applica la **stessa gerarchia delle leve** del ribilanciamento, perché il problema è identico (scegliere cosa e dove vendere per minimizzare la plus tassata):
-   - prima le posizioni in **minus** (Leva 3): zero/negativo, alimentano lo zainetto;
-   - poi le posizioni a **plus latente minore** in proporzione al valore (sul prezzo medio di carico);
-   - usando lo **zainetto** per compensare le plus, con l'ottimizzazione **broker × tipo fiscale** (vendere reddito diverso presso il broker con zainetto, mai dare per scontata la compensazione cross-broker — vedi `ribilanciamento-multibroker.md`).
-   Lo strumento `assets/ribilanciamento-multibroker.py` calcola direttamente questa sequenza: basta impostare la "riduzione" richiesta pari all'importo da liquidare.
+**3. Vendite dal dossier titoli — imposta sui realizzi (26%, o 12,5% per i titoli di Stato), da minimizzare.** Quando le prime due fonti non bastano, si vende. Qui si applica la **stessa gerarchia delle leve** del ribilanciamento, perché il problema è identico (scegliere cosa e dove vendere per minimizzare la plus tassata):
+   - prima le posizioni in **minus** (Leva 3): zero/negativo, alimentano lo zainetto, e si eseguono per prime;
+   - poi la quota compensata dallo **zainetto**, con l'ottimizzazione **broker × tipo fiscale** (vendere reddito diverso presso il broker con zainetto, mai dare per scontata la compensazione cross-broker — vedi `ribilanciamento-multibroker.md`);
+   - poi le posizioni con la **minore imposta per euro venduto**, plus/valore × aliquota (sul prezzo medio di carico).
+   Lo strumento `assets/ribilanciamento-multibroker.py` calcola direttamente questa sequenza: basta impostare `PRELIEVO` pari all'importo netto da prelevare. Le vendite partono dalle classi più sopra il target, con la priorità fiscale qui sopra e una vendita per posizione, coprono anche l'imposta, e la cassa prelevata non si reinveste; il report mostra vendite lorde, imposta e netto prelevato.
 
    **Finalità successoria.** Per azioni e obbligazioni detenute direttamente gli eredi ricevono come costo il valore di successione: la plusvalenza latente si azzera. Se una parte del dossier è destinata agli eredi, le posizioni dirette con la plusvalenza latente più alta sono le ultime da vendere. Per fondi ed ETF il testo vigente tratta l'intestazione agli eredi come una cessione: da verificare. Vedi `it-tax-optimization/references/successione-donazione.md`.
 
