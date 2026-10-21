@@ -20,9 +20,13 @@ Uso:
 
 ONESTÀ METODOLOGICA
 - La ricostruzione del montante è un'approssimazione (±qualche %): l'estratto conto elenca i
-  contributi ma non li capitalizza. La tabella dei tassi copre 1996-2025; l'anno in corso non ha
-  ancora un tasso, quindi i suoi contributi restano al valore nominale.
+  contributi ma non li capitalizza. La tabella dei tassi copre 1996-2025; il tasso dell'anno in
+  corso non è ancora pubblicato, quindi il montante al 31/12 dell'anno scorso non è ancora
+  rivalutato per quest'anno (i contributi dell'anno, per legge, si rivalutano solo dall'anno dopo).
   Il valore ESATTO è nel servizio "La mia pensione futura" sul portale INPS: se lo hai, usa quello.
+- Solo il sistema contributivo: le retribuzioni prima del 1996 appartengono alla quota retributiva
+  (L. 335/1995 art. 1 c. 12-13), che lo script non calcola; restano fuori dal montante e un avviso
+  lo dice.
 - La stima del mix azionario del fondo è EURISTICA (dal nome del comparto): verificala sulla
   nota informativa del fondo.
 """
@@ -46,7 +50,7 @@ ALIQUOTA_COMPUTO = 0.33   # aliquota IVS dipendenti (autonomi ~0,24; gestione se
 # recupero dal DL 65/2015 — Verificato: 2026-10. I valori applicati da INPS per 2014, 2021 e 2022
 # (minimo e recupero) vengono dai messaggi INPS 840/2024 e 707/2026, letti in copia.
 TASSI_CAPITALIZZAZIONE = {
-    1996: 1.062054,   # INPS parte dal 1997: per i contributivi puri il montante al 31/12/1995 è zero
+    1996: 1.062054,   # rivaluta il montante al 31/12/1995, che nel contributivo è zero (INPS pubblica dal 1997)
     1997: 1.055871, 1998: 1.053597, 1999: 1.056503, 2000: 1.051781, 2001: 1.047781,
     2002: 1.043698, 2003: 1.041614, 2004: 1.039272, 2005: 1.040506, 2006: 1.035386,
     2007: 1.033937, 2008: 1.034625, 2009: 1.033201, 2010: 1.017935, 2011: 1.016165,
@@ -61,9 +65,12 @@ TASSI_CAPITALIZZAZIONE = {
     2025: 1.040445,   # rivaluta il montante al 31/12/2024 (decorrenze 2026)
 }
 # Anni senza tasso: quelli dopo l'ultimo pubblicato (l'ISTAT lo comunica in ottobre-novembre
-# dell'anno stesso) e quelli prima del 1996 (sistema retributivo o misto, fuori dal perimetro).
-# Nessuna rivalutazione inventata: i contributi di quegli anni restano al valore nominale.
+# dell'anno stesso). Nessuna rivalutazione inventata: il montante resta quello dell'ultimo tasso.
 TASSO_CAP_DEFAULT = 1.000
+# Primo anno del sistema contributivo: le retribuzioni precedenti valgono per la quota retributiva
+# (L. 335/1995 art. 1 c. 12-13: fino al 1995, o fino al 2011 con 18 anni di contributi al 31/12/1995)
+# e non entrano nel montante.
+INIZIO_CONTRIBUTIVO = 1996
 
 # Stima euristica della quota azionaria di un comparto dal suo nome (keyword → % azioni).
 # Prima corrispondenza vince: le keyword SPECIFICHE precedono le generiche
@@ -148,13 +155,17 @@ def ricostruisci_montante(retrib_per_anno, anno_corrente):
 
     Meccanica (L.335/1995): al 31/12 di ogni anno X il montante accumulato al 31/12/(X-1)
     si rivaluta col tasso dell'anno X; i contributi dell'anno X entrano senza rivalutazione.
+    Contano solo le retribuzioni dal 1996 (INIZIO_CONTRIBUTIVO): le precedenti sono quota retributiva.
     Restituisce (montante, contributi_nominali, anni_con_tasso_default).
     """
     montante, nominali, anni_default = 0.0, 0.0, []
-    for anno in range(min(retrib_per_anno), anno_corrente + 1):
+    anni = [a for a in retrib_per_anno if a >= INIZIO_CONTRIBUTIVO]
+    if not anni:
+        return montante, nominali, anni_default
+    for anno in range(min(anni), anno_corrente + 1):
         tasso = TASSI_CAPITALIZZAZIONE.get(anno)
         if tasso is None:
-            if anno > min(retrib_per_anno):  # il primo anno parte da montante 0: il tasso non serve
+            if anno > min(anni):  # il primo anno parte da montante 0: il tasso non serve
                 anni_default.append(anno)
             tasso = TASSO_CAP_DEFAULT
         montante *= tasso
@@ -281,14 +292,21 @@ def main():
     print(f"  rivalutazione con tassi ufficiali ISTAT (PIL nominale quinquennale)")
     ultimo = max(TASSI_CAPITALIZZAZIONE)
     dopo = [a for a in anni_def if a > ultimo]
-    prima = [a for a in anni_def if a < min(TASSI_CAPITALIZZAZIONE)]
+    prima = sorted(a for a in retrib if a < INIZIO_CONTRIBUTIVO)
     if dopo:
         print(f"  ⚠ tasso {ultimo + 1}{'-' + str(max(dopo)) if max(dopo) > ultimo + 1 else ''} "
-              f"non ancora pubblicato: il montante è quello al 31/12/{ultimo}, "
-              f"i contributi successivi sono al valore nominale")
+              f"non ancora pubblicato: il montante al 31/12/{ultimo} non è ancora rivalutato "
+              f"per gli anni successivi")
     if prima:
-        print(f"  ⚠ contributi prima del 1996 ({prima[0]}-{prima[-1]}): sistema retributivo o misto, "
-              "fuori dal perimetro dello script; qui non sono rivalutati")
+        anni_prima = sum(sett[a] for a in prima) / 52
+        intervallo = f"{prima[0]}-{prima[-1]}" if len(prima) > 1 else f"{prima[0]}"
+        print(f"  ⚠ retribuzioni prima del 1996 ({intervallo}, ≈ {anni_prima:.1f} anni): posizione mista, "
+              "con una quota retributiva che lo script non calcola (L. 335/1995 art. 1 c. 12-13). "
+              "Il montante sopra conta solo i contributi dal 1996")
+        if anni_prima >= 18:
+            print("    con 18 anni o più al 31/12/1995 la quota retributiva arriva al 2011: "
+                  "il montante sopra è ancora più lontano dalla tua posizione")
+        print("    per la pensione usa \"La mia pensione futura\" sul portale INPS, non proiezione-inps.py")
     print("  ⚠ ricostruzione ±qualche %: il valore esatto è ne \"La mia pensione futura\" (portale INPS)")
 
     # -------------------------- FONDO PENSIONE --------------------------
@@ -334,7 +352,8 @@ def main():
     print("PARAMETRI PRONTI (da incollare negli script della skill)")
     print("=" * 72)
     print("per proiezione-inps.py:")
-    print(f"  MONTANTE_ATTUALE = {montante:,.0f}".replace(",", "_"))
+    print(f"  MONTANTE_ATTUALE = {montante:,.0f}".replace(",", "_") +
+          ("   # solo i contributi dal 1996: posizione mista, vedi l'avviso sopra" if prima else ""))
     print(f"  RAL_ATTUALE      = {ral_rif:,.0f}".replace(",", "_") +
           "   # ultima annualità completa dall'estratto: verifica con la RAL da contratto")
     if "nascita" in anag:

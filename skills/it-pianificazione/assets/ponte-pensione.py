@@ -34,15 +34,18 @@ ONESTÀ METODOLOGICA
   contributiva, APE…) NON sono modellati: se ne maturi i requisiti, il ponte
   si accorcia e questo calcolo diventa un limite superiore del fabbisogno.
   Per un contributivo puro il canale tipico è l'anticipata contributiva: 64 anni
-  (64 e 1 mese nel 2027, 64 e 3 mesi dal 2028), 20 anni di contribuzione
-  effettiva e prima rata ≥ 3 volte l'assegno sociale (2,8 e 2,6 per le madri,
-  3,2 dal 2030), con l'assegno limitato a 5 volte il trattamento minimo fino
-  alla vecchiaia (art. 24 c. 11 DL 201/2011; Circ. INPS 19/2026 e 28/2026,
-  Verificato: 2026-10). Per stimarla: proiezione-inps.py --set
-  ETA_PENSIONAMENTO=64 e confronto con la soglia. Abbassare
-  ETA_PENSIONE_VECCHIAIA a 64 accorcia il ponte INPS ma sposta anche la
-  finestra della RITA, che per legge resta legata alla vecchiaia: in quel caso
-  leggere la parte RITA con cautela (o RITA_ATTIVA=False).
+  e 20 anni di contribuzione effettiva nel 2026; 64 anni e 1 mese e 20 anni e
+  1 mese nel 2027; 64 anni e 3 mesi e 20 anni e 3 mesi dal 2028. Serve una
+  prima rata ≥ 3 volte l'assegno sociale (2,8 e 2,6 per le madri, 3,2 dal
+  2030), l'assegno è limitato a 5 volte il trattamento minimo fino alla
+  vecchiaia e la pensione decorre tre mesi dopo la maturazione dei requisiti
+  (art. 24 c. 11 DL 201/2011; Circ. INPS 19/2026 e 28/2026, Verificato:
+  2026-10). Per stimarla: proiezione-inps.py --set ETA_PENSIONAMENTO=64 e
+  confronto con la soglia. Per il ponte, ETA_PENSIONE_VECCHIAIA = 64.25 nel
+  2026 (64.33 nel 2027, 64.5 dal 2028), cioè l'età più la finestra: accorcia
+  il ponte INPS ma sposta anche la finestra della RITA, che per legge resta
+  legata alla vecchiaia: in quel caso leggere la parte RITA con cautela (o
+  RITA_ATTIVA=False).
 - Il drag fiscale sui prelievi dal capitale ordinario (26% sui capital gain
   realizzati) è approssimato da un parametro annuo sul rendimento.
 Questo strumento è educativo e non costituisce consulenza finanziaria o previdenziale.

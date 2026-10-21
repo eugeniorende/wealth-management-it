@@ -161,11 +161,12 @@ Lo script `assets/proiezione-inps.py` implementa questo calcolo in forma paramet
 montante_oggi = montante_da_estratto_conto              # se disponibile
 
 #    FALLBACK se non disponibile (stima): tiene conto sia della RAL passata più bassa
-#    (cresciuta a g) sia della rivalutazione dei contributi già versati (a riv).
-#    q = (1 + rivalutazione) / (1 + crescita_RAL):
-montante_oggi ≈ RAL_attuale × 0,33 × Σ(k=1..anzianità) q^k
-#    Si riduce alla vecchia stima grezza (anzianità × RAL × 0,33) quando riv ≈ g, perché i
-#    due effetti si compensano; diverge (correttamente) quando rivalutazione e crescita differiscono.
+#    (cresciuta a g) sia della rivalutazione dei contributi già versati (a riv), anno per anno.
+#    k = anni fa (k=1 è l'anno scorso); il massimale è costante in euro di oggi e il contributo
+#    dell'anno scorso non si è ancora rivalutato (L. 335/1995):
+montante_oggi ≈ Σ(k=1..anzianità) min(RAL_attuale / (1+g)^k, massimale) × 0,33 × (1+riv)^(k-1)
+#    Senza massimale si avvicina alla vecchia stima grezza (anzianità × RAL × 0,33) quando
+#    riv ≈ g, perché i due effetti si compensano; diverge (correttamente) quando differiscono.
 
 # 2) Proiezione FUTURA anno per anno (foglio "Pubblica"), in euro di oggi: ogni anno il
 #    montante è rivalutato al PIL reale e vi si aggiunge il contributo dell'anno
@@ -332,7 +333,7 @@ Il template `assets/proiezione-pensione.xlsx` (incluso nella skill) è il delive
 
 Il template usa convenzioni industry-standard (blu = input, nero = formule, verde = cross-sheet) e si auto-aggiorna quando l'utente modifica le celle blu. Il ricalcolo in locale italiano con LibreOffice (CI) verifica che nessuna cella vada in errore. **Il coefficiente di trasformazione è proiettato in calo** all'anno di pensionamento (non usa quello attuale), così la pensione stimata è realistica anche su orizzonti lunghi.
 
-✅ **Montante INPS iniziale (migliorato in v0.3)**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma `RAL × 33% × Σ q^k` con `q = (1+rivalutazione)/(1+crescita_RAL)`, che tiene conto della retribuzione passata più bassa e della rivalutazione dei contributi già versati (e si riduce alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis su mypensione.it via SPID/CIE).
+✅ **Montante INPS iniziale (migliorato in v0.3)**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma la somma anno per anno di `min(RAL/(1+g)^k, massimale) × 33% × (1+rivalutazione)^(k−1)`, che tiene conto della retribuzione passata più bassa, del massimale (costante in euro di oggi) e della rivalutazione dei contributi già versati (e si avvicina alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis sul portale INPS, www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo").
 
 ### Disclaimer (obbligatorio in fondo)
 
