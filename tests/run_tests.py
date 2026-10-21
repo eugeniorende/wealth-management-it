@@ -2755,9 +2755,11 @@ def t_revisione_spazio_deducibile():
                 "skills/it-revisione/assets/template-revisione.md", "commands/revisione.md"):
         testo = " ".join(open(os.path.join(ROOT, rel), encoding="utf-8").read().split())
         assert "spazio deducibile residuo" in testo, f"{rel}: manca lo spazio deducibile residuo"
-        assert re.search(r"5\.300 − (?:contributo del )?datore − (?:contributo )?dovuto", testo), \
-            f"{rel}: lo spazio residuo va calcolato come plafond − datore − dovuto"
-        assert re.search(r"non dedott[^.]*9-15%", testo), f"{rel}: manca la perdita del 9-15% sui non dedotti non comunicati"
+        assert "max(0, €5.300 − datore − dovuto − volontari già versati nell'anno)" in testo, \
+            f"{rel}: lo spazio residuo è max(0, plafond − datore − dovuto − volontari già versati)"
+        assert "forfettario" in testo and "altri redditi IRPEF" in testo, f"{rel}: manca il caso del forfettario"
+        assert re.search(r"non dedott[^.]*9-15%[^.]*23%", testo), \
+            f"{rel}: perdita sui non dedotti non comunicati: 9-15%, 23% con anticipazioni e riscatti per altre cause"
 
 
 @test("scadenze di fine anno: ovunque c'è il fondo pensione c'è anche la comunicazione dei non dedotti")
