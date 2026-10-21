@@ -408,7 +408,7 @@ Le sei skill attive formano un sistema coordinato attorno a un flusso end-to-end
 
 ### Prerequisiti
 
-Python 3.10+ con le dipendenze degli script: `pip install numpy openpyxl python-docx` (oppure `pip install -r tests/requirements.txt`, lo stesso file usato dalla CI).
+Python 3.11 o successivo (la CI prova 3.11 e 3.14) con le dipendenze degli script: `pip install "numpy>=1.26" "openpyxl>=3.1" "python-docx>=1.1"` (oppure `pip install -r tests/requirements.txt`, lo stesso file usato dalla CI).
 
 ### Claude Code
 
