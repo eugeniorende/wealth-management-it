@@ -25,6 +25,7 @@ L'imposta sostitutiva **sostituisce**: IRPEF, addizionali regionali e comunali, 
 | Professioni / attività scientifiche, tecniche, sanitarie (include **sviluppo software, consulenza IT**, ATECO 62.x, 70-74) | **78%** |
 | Costruzioni e attività immobiliari | 86% |
 | Intermediari del commercio | 62% |
+| Commercio ambulante di prodotti non alimentari | 54% |
 | Commercio (ingrosso e dettaglio) | 40% |
 | Industrie alimentari e bevande | 40% |
 | Servizi di alloggio e ristorazione | 40% |
@@ -32,7 +33,7 @@ L'imposta sostitutiva **sostituisce**: IRPEF, addizionali regionali e comunali, 
 
 Per developer/consulenti IT il coefficiente è **78%**: il 78% dei ricavi è reddito tassabile, il 22% è abbattimento forfettario che rappresenta le "spese" riconosciute a forfait.
 
-⚠️ I coefficienti del 40% e del 62% (commercio, alimentari, ristorazione, intermediari) riguardano attività di solito iscritte alle gestioni INPS di artigiani e commercianti, che hanno contributi fissi sul minimale e sono fuori dal perimetro della skill: in quel caso rinviare a INPS o al commercialista.
+⚠️ I coefficienti del 40%, 54%, 62% e 86% (commercio e ambulanti, alimentari, ristorazione, intermediari, costruzioni e attività immobiliari) riguardano attività di solito iscritte alle gestioni INPS di artigiani e commercianti, che hanno contributi fissi sul minimale e sono fuori dal perimetro della skill. Decide la gestione di iscrizione, non il coefficiente: chiederla sempre e, se è artigiani o commercianti, rinviare a INPS o al commercialista.
 
 ### Requisiti 2026
 
@@ -76,7 +77,7 @@ Fonte: Modello Redditi PF 2026, quadro LM. La prassi dell'Agenzia delle Entrate 
 
 ### L'eccezione: forfettario CON altri redditi IRPEF
 
-Se il forfettario ha **anche** redditi soggetti a IRPEF — affitti tassati IRPEF (non cedolare secca), un lavoro dipendente part-time, redditi occasionali, ecc. — allora il contributo al fondo pensione **deduce da quei redditi IRPEF**, fino a capienza.
+Se il forfettario ha **anche** redditi soggetti a IRPEF — affitti tassati IRPEF (non cedolare secca), un lavoro dipendente part-time, redditi occasionali, ecc. — allora il contributo al fondo pensione **deduce da quei redditi IRPEF**, fino a capienza. Il risparmio pieno vale per redditi senza detrazioni proprie (affitti a IRPEF ordinaria): con un lavoro dipendente o redditi occasionali le detrazioni dell'art. 13 TUIR riducono già l'IRPEF, e quindi il risparmio, fino ad azzerarlo per redditi piccoli.
 
 ```
 Esempio: forfettario IT con €30.000 di reddito forfettario

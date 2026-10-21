@@ -12,11 +12,11 @@ Workflow:
 1. **Ingestion**: chiedere all'utente (se non già nel contesto):
    - Profilo: tipo cassa (Gestione Separata / cassa professionale; artigiani e commercianti delle gestioni IVS INPS sono fuori perimetro: dirlo subito e rinviare a INPS o al commercialista), regime fiscale (forfettario / ordinario / forfettario 5%), codice ATECO o tipo attività, coefficiente di redditività (78% per IT/professioni)
    - Economici: ricavi annui incassati, crescita attesa, età corrente, età target pensionamento, anzianità contributiva
-   - **Altri redditi IRPEF** (affitti IRPEF, lavoro dipendente part-time): rilevante per la deducibilità del fondo pensione
+   - **Altri redditi IRPEF** (affitti a IRPEF ordinaria, lavoro dipendente part-time): rilevante per la deducibilità del fondo pensione; con lavoro dipendente le detrazioni riducono il risparmio
    - Fondo pensione esistente o in valutazione: montante, contributo, comparto, rendimento, anni partecipazione
    - Spese mensili attuali e fattore riduzione post-pensione
 
-2. **Previdenza obbligatoria**: base contributiva (ricavi × coefficiente per forfettari) × 26,07%, fino al massimale €122.295. Proiezione montante → coefficiente trasformazione → pensione lorda/netta. Evidenziare che il tasso di sostituzione è più basso che per i dipendenti (aliquota 26,07% vs 33%).
+2. **Previdenza obbligatoria**: base contributiva (ricavi × coefficiente per forfettari) × 26,07% versato, di cui il 25% a montante, fino al massimale €122.295. Proiezione montante → coefficiente trasformazione → pensione lorda/netta. Evidenziare che il tasso di sostituzione è più basso che per i dipendenti (aliquota di computo 25% vs 33%).
 
 3. **Previdenza complementare**: analisi CORRETTA della deducibilità (zero per forfettario puro; fino a capienza se ha redditi IRPEF; piena se ordinario). Confronto onesto fondo pensione vs PAC ETF per il forfettario puro: in uscita i versamenti non dedotti non sono tassati se comunicati al fondo entro il 31/12 dell'anno successivo.
 
