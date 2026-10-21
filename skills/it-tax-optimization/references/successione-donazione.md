@@ -55,7 +55,7 @@ Letta alla lettera, la norma porta a tassare al 26% la plusvalenza maturata sull
 
 ## Lo zainetto del defunto non passa agli eredi
 
-Le minusvalenze si recuperano nell'ambito dello stesso rapporto, oppure di un altro rapporto «intestato agli stessi soggetti intestatari» (art. 6 c. 5 D.Lgs. 461/1997; dal 2027 art. 306 c. 6 D.Lgs. 117/2026). In dichiarativo si riportano nella dichiarazione dello stesso contribuente (art. 68 c. 5 TUIR; dal 2027 art. 77 c. 6). Gli eredi sono soggetti diversi: lo **zainetto si estingue con il decesso** e non compensa le loro plusvalenze future. Nello stesso senso è citata la risoluzione AdE 120/E/2001, secondo cui le minusvalenze del defunto compensano solo le sue plusvalenze dell'anno del decesso: il testo va verificato sulla fonte ufficiale.
+Le minusvalenze si recuperano nell'ambito dello stesso rapporto, oppure di un altro rapporto «intestato agli stessi soggetti intestatari» (art. 6 c. 5 D.Lgs. 461/1997; dal 2027 art. 306 c. 6 D.Lgs. 117/2026). In dichiarativo si riportano nella dichiarazione dello stesso contribuente (art. 68 c. 5 TUIR; dal 2027 art. 77 c. 6). Gli eredi sono soggetti diversi: lo **zainetto si estingue con il decesso** e non compensa le loro plusvalenze future.
 
 La conseguenza pratica, combinata con la rivalutazione del costo: lo zainetto serve alle vendite che si fanno **in vita**. Per azioni e obbligazioni che passeranno agli eredi la plusvalenza latente si azzera comunque. Usare lo zainetto su quelle posizioni non fa risparmiare nulla agli eredi.
 
@@ -73,7 +73,7 @@ Aliquote e franchigie sono le stesse per successione e donazione (art. 7 per la 
 
 **Fuori dall'attivo ereditario** (art. 12 D.Lgs. 346/1990; dal 2027 art. 97 D.Lgs. 123/2025), tra gli altri:
 - i **titoli del debito pubblico** (BOT, BTP, CCT e simili) e gli altri titoli di Stato, garantiti dallo Stato o equiparati, **compresi quelli emessi dagli Stati dell'UE e dello Spazio economico europeo** (lett. h e i). Le quote di fondi ed ETF non sono in questo elenco, anche quando investono in titoli di Stato;
-- le indennità che spettano agli eredi per diritto proprio in forza di assicurazioni stipulate dal defunto (lett. c): è il caso delle polizze vita caso morte (vedi `asset-location.md`).
+- le indennità che spettano agli eredi per diritto proprio in forza di assicurazioni stipulate dal defunto (lett. c): è il caso delle polizze vita caso morte (vedi `it-pianificazione-obiettivi/references/asset-location.md`).
 
 **La riforma del D.Lgs. 139/2024**, per le successioni aperte e le donazioni fatte dal 1° gennaio 2025 (art. 9 c. 3):
 - **autoliquidazione**: gli eredi calcolano l'imposta sulla base della dichiarazione (art. 33 c. 1; dal 2027 art. 118 D.Lgs. 123/2025). La dichiarazione si presenta entro 12 mesi dall'apertura della successione (art. 31; dal 2027 art. 116), l'imposta si paga entro 90 giorni dal termine di presentazione (art. 37 c. 1; dal 2027 art. 120);

@@ -22,14 +22,14 @@ Valori per una persona fisica residente in Italia, con una partecipazione di por
 | Paese | Ritenuta interna | Tetto della convenzione con l'Italia | Prelievo totale senza rimborso | Prelievo totale con rimborso dell'eccedenza (*) | Come si ottiene il tetto |
 |---|---|---|---|---|---|
 | Stati Uniti | 30% | 15% | 37,1% con W-8BEN; 48,2% senza | 37,1% | Modulo W-8BEN consegnato all'intermediario prima del pagamento; dopo, solo con una dichiarazione fiscale USA (Form 1040-NR) |
-| Francia | 12,8% per le persone fisiche | 15% | 35,5% | non serve: la ritenuta interna è già sotto il tetto | Nessuna pratica |
+| Francia | 12,8% per le persone fisiche | 15% | 35,5% | non serve: la ritenuta interna è già sotto il tetto | Di norma nessuna pratica, se l'intermediario ti identifica come persona fisica. Se in estratto conto compare il 25% (aliquota per chi non è documentato come persona fisica), chiedere all'intermediario di correggere la documentazione; per l'eccedenza già trattenuta serve una domanda di rimborso all'amministrazione francese |
 | Germania | 26,375% (25% più il 5,5% di contributo di solidarietà) | 15% | 45,5% | 37,1% | Domanda di rimborso di 11,375 punti al BZSt, solo online, entro quattro anni dalla fine dell'anno d'incasso |
 | Svizzera | 35% | 15% | 51,9% | 37,1% | Domanda di rimborso di 20 punti all'ESTV, modulo 95 per i residenti in Italia |
 | Irlanda | 25% | 15%, ma la legge irlandese esenta i residenti UE | 44,5% | 26,0% | Modulo V2A certificato dall'Agenzia delle Entrate, consegnato alla società o all'intermediario; se la ritenuta è già stata applicata, domanda di rimborso |
 | Paesi Bassi | 15% | 15% | 37,1% | non serve | Nessuna pratica |
 | Regno Unito | Nessuna imposta per la generalità dei non residenti | 15% (non rilevante) | 26,0% | non serve | Nessuna pratica |
 
-(*) Ipotesi: anche la somma rimborsata dallo Stato estero sconta il 26% italiano, come in linea di principio dovrebbe, perché è parte del dividendo. Come dichiararla o farla tassare va verificato con l'intermediario o il commercialista. Con questa ipotesi tutti i Paesi con tetto al 15% convergono al 37,1%.
+(*) Ipotesi: anche la somma rimborsata dallo Stato estero sconta il 26% italiano, come in linea di principio dovrebbe, perché è parte del dividendo. Come dichiararla o farla tassare va verificato con l'intermediario o il commercialista. Con questa ipotesi i Paesi in cui la ritenuta effettiva resta al 15% (Stati Uniti con W-8BEN, Germania e Svizzera dopo il rimborso, Paesi Bassi) convergono al 37,1%. La Francia si ferma al 35,5% perché la ritenuta interna è sotto il tetto; Irlanda (con V2A) e Regno Unito al 26,0%, perché la ritenuta estera si azzera.
 
 Fonti delle aliquote:
 - **Stati Uniti**: 30% o aliquota di trattato con W-8BEN (IRS); tetto del 15% nell'art. 10 par. 2 lett. b della convenzione del 1999 (L. 20/2009). Il W-8BEN si consegna a chi lo richiede, non all'IRS, e vale fino alla fine del terzo anno solare successivo alla firma.
@@ -91,6 +91,7 @@ Come per la Tobin tax, l'impatto non va sovrastimato. Il profilo tipico del plug
 ## Cosa resta da verificare col commercialista
 
 - Il trattamento in Italia delle somme rimborsate dallo Stato estero (ritenuta dell'intermediario o dichiarazione).
+- In dichiarativo, se la base del 26% sia il lordo, come ritiene l'Agenzia (rigo RM31), o il netto frontiera, come in amministrato: sul dividendo USA la differenza è di 3,9 punti (41,0% contro 37,1%).
 - Le aliquote e i moduli dei Paesi che non sono in tabella. Per i dividendi da Stati a fiscalità privilegiata valgono regole diverse (art. 27 c. 4 lett. b DPR 600/73).
 - L'istanza di rimborso basata sulla giurisprudenza della Cassazione: requisiti, termini e probabilità di successo per la convenzione del singolo Paese.
 - I casi particolari: dividendi in azioni o in natura, REIT e fondi esteri quotati, ADR, partecipazioni qualificate.
