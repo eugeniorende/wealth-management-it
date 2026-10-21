@@ -1,7 +1,7 @@
 {
   "name": "wealth-management-it",
   "version": "0.9.6",
-  "description": "Wealth management plugin per la fiscalità italiana (regime amministrato). Fork derivato da anthropics/financial-services adattato alle regole TUIR su minusvalenze/plusvalenze, asimmetria redditi diversi vs redditi di capitale, scadenza zainetto 4 anni, metodo LIFO. NON COSTITUISCE CONSULENZA FISCALE.",
+  "description": "Wealth management plugin per la fiscalità italiana (regime amministrato). Fork derivato da anthropics/financial-services adattato alle regole TUIR su minusvalenze/plusvalenze, asimmetria redditi diversi vs redditi di capitale, scadenza zainetto 4 anni e certificazione alla chiusura del rapporto, costo medio ponderato (LIFO solo in dichiarativo). NON COSTITUISCE CONSULENZA FISCALE.",
   "author": {
     "name": "Eugenio Rende",
     "url": "https://github.com/eugeniorende"

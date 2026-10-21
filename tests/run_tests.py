@@ -319,8 +319,18 @@ def _coeff_excel(wb, eta):
     return next(c[f"C{r}"].value for r in range(5, 20) if c[f"A{r}"].value == eta)
 
 
+def _montante_stimato(ral, g, r, anzianita, massimale, aliquota):
+    """Replica indipendente della stima di Pubblica!E5 (montante al 31/12 dell'anno scorso):
+    la retribuzione dell'anno −k è RAL/(1+g)^k, il massimale è costante in euro di oggi
+    (L. 335/1995 art. 2 c. 18: rivalutato sui prezzi) e il contributo dell'anno −k si è
+    rivalutato k−1 volte (il contributo dell'anno scorso non ancora)."""
+    return sum(min(ral / (1 + g) ** k, massimale) * aliquota * (1 + r) ** (k - 1)
+               for k in range(1, int(anzianita) + 1))
+
+
 PP = ("it-pianificazione", "proiezione-pensione.xlsx")
 VARIANTI_PP = {"ral150k": {("Input", "B10"): 150_000, ("Input", "B12"): 0.0},
+               "ral150k_g": {("Input", "B10"): 150_000, ("Input", "B12"): 0.015},
                "ral8k": {("Input", "B10"): 8_000}}
 
 
@@ -333,10 +343,18 @@ def t_pubblica_vs_script():
     base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
     assert base["Input"]["B16"].value == inps.PIL_REALE, \
         f"PIL dell'Excel {base['Input']['B16'].value} ≠ PIL_REALE di proiezione-inps.py {inps.PIL_REALE}"
-    for nome, wb in (("default", base), ("ral150k", _varianti(*PP, VARIANTI_PP)["ral150k"])):
+    var = _varianti(*PP, VARIANTI_PP)
+    for nome, wb in (("default", base), ("ral150k", var["ral150k"]), ("ral150k_g", var["ral150k_g"])):
         i, p = wb["Input"], wb["Pubblica"]
         massimale = _per_etichetta(i, "Massimale contributivo")
         n = int(i["B6"].value - i["B5"].value)
+        # REGRESSIONE (revisione T5): E5 applicava il massimale alla RAL di oggi e poi lo
+        # deflazionava con la RAL, e rivalutava anche il contributo dell'anno scorso
+        assert not i["B14"].value, f"{nome}: la variante deve usare la stima del montante"
+        stima = _montante_stimato(i["B10"].value, i["B12"].value, i["B16"].value, i["B11"].value,
+                                  massimale, i["B13"].value)
+        assert abs(p["E5"].value - stima) <= 1e-6 * stima, \
+            f"{nome}: Pubblica!E5 = {p['E5'].value:,.2f}, stima anno per anno col massimale = {stima:,.2f}"
         atteso = _pensione_contributiva(p["E5"].value, i["B10"].value, i["B12"].value, i["B16"].value,
                                         n, massimale, i["B13"].value, p["B60"].value)
         assert abs(p["B61"].value - atteso) <= 1e-6 * atteso, \
@@ -381,33 +399,36 @@ def t_pubblica_netto():
 @test("proiezione-pensione.xlsx: Scenari in euro di oggi, Base = fogli di calcolo, parametri di colonna usati davvero")
 def t_scenari_reali():
     # REGRESSIONE F013: spesa target inflazionata contro pensione in euro di oggi (il gap cambiava
-    # segno) e righe crescita RAL / PIL / rendimento decorative.
+    # segno) e righe crescita RAL / PIL / rendimento decorative. Anche sopra il massimale
+    # (revisione T5): con i default il tetto di B11/D11 non scatta mai.
     from openpyxl import load_workbook
-    wb = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
-    s, i, p, c = wb["Scenari"], wb["Input"], wb["Pubblica"], wb["Complementare"]
-    for col in "BCD":
-        assert abs(s[f"{col}18"].value - i["B39"].value) < 0.01, \
-            f"Scenari!{col}18 = {s[f'{col}18'].value:,.0f}: la spesa target va in euro di oggi ({i['B39'].value:,.0f})"
-    for riga, (foglio, cella) in ((11, ("Pubblica", "B61")), (12, ("Pubblica", "B66")),
-                                  (13, ("Complementare", "B58")), (14, ("Complementare", "B61")),
-                                  (15, ("Complementare", "B62"))):
-        assert abs(s[f"C{riga}"].value - wb[foglio][cella].value) < 0.01, \
-            f"Base Scenari!C{riga} ≠ {foglio}!{cella}"
-    n = int(i["B6"].value - i["B5"].value)
-    massimale = _per_etichetta(i, "Massimale contributivo")
-    coeff = _coeff_excel(wb, i["B6"].value)
+    base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
     netto = _modulo_previdenza("netto-pensione.py")
-    for col in "BD":
-        g, r, d, rend = (s[f"{col}{k}"].value for k in (5, 6, 8, 9))
-        atteso = _pensione_contributiva(p["E5"].value, i["B10"].value, g, r, n, massimale, i["B13"].value,
-                                        coeff * (1 - d) ** (n / 2))
-        assert abs(s[f"{col}11"].value - atteso) <= 1e-6 * atteso, \
-            f"Scenari!{col}11 = {s[f'{col}11'].value:,.0f}, ricalcolo con i parametri di colonna = {atteso:,.0f}"
-        assert abs(s[f"{col}12"].value - netto.netto_pensionato(atteso, 0.02, 0.0)[0]) < 0.01, f"Scenari!{col}12"
-        fondo = _fondo_scenario(wb, g, rend, n)
-        assert abs(s[f"{col}13"].value - fondo) <= 1e-6 * fondo, \
-            f"Scenari!{col}13 = {s[f'{col}13'].value:,.0f}, fondo col rendimento di colonna = {fondo:,.0f}"
-    assert s["B11"].value < s["C11"].value < s["D11"].value and s["B13"].value < s["C13"].value < s["D13"].value
+    for nome, wb in (("default", base), ("ral150k", _varianti(*PP, VARIANTI_PP)["ral150k"])):
+        s, i, p = wb["Scenari"], wb["Input"], wb["Pubblica"]
+        for col in "BCD":
+            assert abs(s[f"{col}18"].value - i["B39"].value) < 0.01, \
+                f"{nome}: Scenari!{col}18 = {s[f'{col}18'].value:,.0f}: la spesa target va in euro di oggi ({i['B39'].value:,.0f})"
+        for riga, (foglio, cella) in ((11, ("Pubblica", "B61")), (12, ("Pubblica", "B66")),
+                                      (13, ("Complementare", "B58")), (14, ("Complementare", "B61")),
+                                      (15, ("Complementare", "B62"))):
+            assert abs(s[f"C{riga}"].value - wb[foglio][cella].value) < 0.01, \
+                f"{nome}: Base Scenari!C{riga} ≠ {foglio}!{cella}"
+        n = int(i["B6"].value - i["B5"].value)
+        massimale = _per_etichetta(i, "Massimale contributivo")
+        coeff = _coeff_excel(wb, i["B6"].value)
+        for col in "BD":
+            g, r, d, rend = (s[f"{col}{k}"].value for k in (5, 6, 8, 9))
+            atteso = _pensione_contributiva(p["E5"].value, i["B10"].value, g, r, n, massimale, i["B13"].value,
+                                            coeff * (1 - d) ** (n / 2))
+            assert abs(s[f"{col}11"].value - atteso) <= 1e-6 * atteso, \
+                f"{nome}: Scenari!{col}11 = {s[f'{col}11'].value:,.0f}, ricalcolo con i parametri di colonna = {atteso:,.0f}"
+            assert abs(s[f"{col}12"].value - netto.netto_pensionato(atteso, 0.02, 0.0)[0]) < 0.01, \
+                f"{nome}: Scenari!{col}12"
+            fondo = _fondo_scenario(wb, g, rend, n)
+            assert abs(s[f"{col}13"].value - fondo) <= 1e-6 * fondo, \
+                f"{nome}: Scenari!{col}13 = {s[f'{col}13'].value:,.0f}, fondo col rendimento di colonna = {fondo:,.0f}"
+        assert s["B11"].value < s["C11"].value < s["D11"].value and s["B13"].value < s["C13"].value < s["D13"].value, nome
 
 
 def _fondo_scenario(wb, g, rend, n):
@@ -421,11 +442,28 @@ def _fondo_scenario(wb, g, rend, n):
     return m
 
 
-@test("importa-previdenza: tassi di capitalizzazione ufficiali 1997-2025, carriera dal 1998 senza tassi inventati")
+def _estratto_inps_xml(retrib_per_anno, path):
+    """Estratto conto INPS sintetico: una riga di 52 settimane per anno."""
+    righe = "".join(
+        f"<RigaContributi><PeriodoDal><Giorno>01</Giorno><Mese>01</Mese><Anno>{a}</Anno></PeriodoDal>"
+        f"<PeriodoAl><Giorno>31</Giorno><Mese>12</Mese><Anno>{a}</Anno></PeriodoAl>"
+        f"<TipoContribuzione>Lavoro dipendente</TipoContribuzione><ContributiUtiliCalcolo>52</ContributiUtiliCalcolo>"
+        f"<RetribuzioneEuro>{r}</RetribuzioneEuro><Descrizione>AZIENDA TEST SRL</Descrizione></RigaContributi>"
+        for a, r in sorted(retrib_per_anno.items()))
+    with open(path, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?><EstrattoConto><DatiAnagrafici><Cognome>ROSSI</Cognome>'
+                '<Nome>MARIO</Nome></DatiAnagrafici><RegimeGenerale><Contributi>' + righe +
+                '</Contributi></RegimeGenerale></EstrattoConto>')
+
+
+@test("importa-previdenza: tassi di capitalizzazione ufficiali 1996-2025, solo contributi dal 1996, avvisi veri")
 def t_tassi_capitalizzazione():
     # REGRESSIONE F062: tabella limitata al 2021-2025, default 1,01 per gli anni precedenti
     # (sottostima ~8% per chi ha iniziato a fine anni '90) e anche per l'anno in corso, non pubblicato.
+    # Revisione T5: i contributi prima del 1996 entravano nel montante e si rivalutavano (×2,31)
+    # mentre l'avviso diceva il contrario, e l'avviso perdeva il primo anno (carriera dal 1995: nessuno).
     ufficiali = {  # nota ISTAT 16/10/2025 (lavoro.gov.it); 2014 e 2021 a 1, 2022 con recupero (DL 65/2015 art. 5)
+        1996: 1.062054,
         1997: 1.055871, 1998: 1.053597, 1999: 1.056503, 2000: 1.051781, 2001: 1.047781, 2002: 1.043698,
         2003: 1.041614, 2004: 1.039272, 2005: 1.040506, 2006: 1.035386, 2007: 1.033937, 2008: 1.034625,
         2009: 1.033201, 2010: 1.017935, 2011: 1.016165, 2012: 1.011344, 2013: 1.001643, 2014: 1.000000,
@@ -437,14 +475,39 @@ def t_tassi_capitalizzazione():
     retrib = {a: 30_000.0 for a in range(1998, 2026)}
     montante, _, mancanti = m.ricostruisci_montante(retrib, 2026)
     atteso = 0.0
-    for anno in range(1998, 2027):  # il 2026 non ha ancora un tasso: nessuna rivalutazione
-        atteso = atteso * ufficiali.get(anno, 1.0) + retrib.get(anno, 0.0) * m.ALIQUOTA_COMPUTO
+    for anno in range(1998, 2027):  # il 2026 non ha ancora un tasso: il montante al 31/12/2025 resta lì
+        atteso = atteso * ufficiali.get(anno, 1.0) + retrib.get(anno, 0.0) * 0.33
     assert abs(montante - atteso) < 0.01, f"montante {montante:,.2f} ≠ {atteso:,.2f}"
     assert mancanti == [2026], f"anni senza tasso pubblicato: {mancanti}"
+    # posizione mista: le retribuzioni prima del 1996 non entrano nel montante contributivo
+    # (L. 335/1995 art. 1 c. 12-13: quota retributiva), né come nominali né rivalutate
+    dal96 = {a: 30_000.0 for a in range(1996, 2026)}
+    solo96, nom96, _ = m.ricostruisci_montante(dal96, 2026)
+    for prima in ({1995: 25_000.0}, {1994: 30_000.0}, {a: 20_000.0 for a in range(1990, 1996)}):
+        misto, nom, _ = m.ricostruisci_montante({**prima, **dal96}, 2026)
+        assert abs(misto - solo96) < 0.01 and abs(nom - nom96) < 0.01, \
+            f"{sorted(prima)}: montante {misto:,.2f} ≠ {solo96:,.2f} dei soli contributi dal 1996"
     rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"),
                          os.path.join(FIXTURES, "estratto-inps-test.xml"))
     assert rc == 0, out[-300:]
     assert "sono i primi anni" not in out and "non ancora pubblicat" in out, out[-600:]
+    assert "prima del 1996" not in out, "carriera dal 2023: nessun avviso sugli anni prima del 1996"
+    tmp = tempfile.mkdtemp()
+    try:
+        for inizio, intervallo in ((1995, "(1995,"), (1990, "(1990-1995,")):
+            xml = os.path.join(tmp, f"da{inizio}.xml")
+            _estratto_inps_xml({a: 30_000 for a in range(inizio, 2026)}, xml)
+            rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), xml)
+            assert rc == 0, out[-300:]
+            avviso = next((r for r in out.splitlines() if "prima del 1996" in r), "")
+            assert intervallo in avviso and "retributiv" in avviso, f"carriera dal {inizio}: avviso «{avviso.strip()}»"
+            assert "non sono rivalutati" not in out, f"carriera dal {inizio}: avviso falso sulla rivalutazione"
+            atteso = m.ricostruisci_montante({a: 30_000.0 for a in range(1996, 2026)},
+                                             __import__("datetime").date.today().year)[0]
+            assert abs(euro(out, "MONTANTE CONTRIBUTIVO RICOSTRUITO") - atteso) <= 1, \
+                f"carriera dal {inizio}: il montante stampato deve contare solo i contributi dal 1996"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 @test("netto-pensione: netto dello stipendio con le misure L. 207/2024 c. 4-6 e il contributo IVS aggiuntivo")
@@ -467,6 +530,17 @@ def t_netto_stipendio():
     # RAL 80.000: 1% aggiuntivo sulla parte oltre la prima fascia di €56.224
     _, contr, _, _ = netto.netto_lavoratore(80_000, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)
     assert abs(contr - (80_000 * 0.0919 + (80_000 - 56_224) * 0.01)) < 0.01, f"RAL 80k: contributi {contr:,.2f}"
+    # RAL 150.000: niente contributi oltre il massimale di €122.295 (revisione T5, mutante «base = ral»)
+    _, contr, _, _ = netto.netto_lavoratore(150_000, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)
+    assert abs(contr - (122_295 * 0.0919 + (122_295 - 56_224) * 0.01)) < 0.01, f"RAL 150k: contributi {contr:,.2f}"
+    # fasce del c. 4: 7,1% fino a 8.500 di reddito, 5,3% fino a 15.000 (limiti inclusi)
+    for ral, quota in ((9_000, 0.071), (12_000, 0.053)):
+        n, _, irpef, _ = netto.netto_lavoratore(ral, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)
+        r = ral * (1 - 0.0919)
+        assert abs(n - (r - irpef + r * quota)) < 0.01, f"RAL {ral}: netto {n:,.2f}, somma esente al {quota:.1%} attesa"
+    assert netto.netto_lavoratore(9_000, netto.ALIQ_CONTRIBUTI_DIP, 0.0, 0.0)[2] == 0, "RAL 9k: IRPEF dovuta"
+    for r, quota in ((8_500, 0.071), (15_000, 0.053), (20_000, 0.048)):
+        assert abs(netto.cuneo_l207(r)[0] - r * quota) < 0.01, f"reddito {r}: «non superiore a» include il limite"
 
 
 def _file_testo(*basi):
@@ -550,7 +624,8 @@ VARIANTI_T4 = {
     "tfr_azienda": {("Input", "B21"): 0},
     "tfr40k": {("Input", "B5"): 37, ("Input", "B6"): 67, ("Input", "B10"): 40_000, ("Input", "B12"): 0.0,
                ("Input", "B22"): 0, ("Input", "B48"): 0, ("Input", "B29"): 0, ("Input", "B17"): 0.02,
-               ("Input", "B28"): 0.035, ("Input", "B21"): 1},
+               ("Input", "B28"): 0.025, ("Input", "B21"): 1},
+    "tfr_azienda_senza_saldo": {("Input", "B21"): 0, ("Input", "B22"): 0},
 }
 
 
@@ -569,9 +644,19 @@ def t_plafond_excel():
         assert abs(c[f"{nd}5"].value - non_dedotto) < 0.01, f"{nome}: non dedotto {c[f'{nd}5'].value}"
         attesi = i["B26"].value + i["B10"].value * _per_etichetta(i, "Contributo dovuto lavoratore")
         assert abs(c[f"{e}5"].value - attesi) < 0.01, f"{nome}: il contributo del lavoratore va tutto a montante"
-        somma = sum(c[f"{q}{r}"].value or 0 for r in range(5, 55))
-        assert abs(_per_etichetta(c, "Risparmio IRPEF") - somma * i["B37"].value) < 0.01, \
-            f"{nome}: il risparmio IRPEF va calcolato sulla quota deducibile"
+        # replica indipendente anno per anno (revisione T4: le righe dopo la prima non erano vincolate)
+        plafond = _per_etichetta(i, "Plafond deducibilità")
+        dovuto = _per_etichetta(i, "Contributo dovuto lavoratore")
+        deducibili = non_dedotti = 0.0
+        for t in range(int(i["B36"].value)):
+            ral = i["B10"].value * (1 + i["B12"].value) ** t
+            versato = i["B26"].value + ral * (dovuto + i["B27"].value)
+            deducibili += min(plafond, versato) - min(plafond, ral * (dovuto + i["B27"].value))
+            non_dedotti += max(0.0, versato - plafond)
+        assert abs(_per_etichetta(c, "Risparmio IRPEF") - deducibili * i["B37"].value) < 0.01, \
+            f"{nome}: risparmio IRPEF {_per_etichetta(c, 'Risparmio IRPEF'):,.2f} ≠ {deducibili * i['B37'].value:,.2f}"
+        assert abs(_per_etichetta(c, "Non dedotto da comunicare") - non_dedotti) < 0.01, \
+            f"{nome}: non dedotto {_per_etichetta(c, 'Non dedotto da comunicare'):,.2f} ≠ {non_dedotti:,.2f}"
     formula = load_workbook_formule(asset(*PP))["Complementare"][f"{_colonna(v['ral60k']['Complementare'], 'Quota deducibile')}5"].value
     assert "Input!$B$44" in formula, f"la quota deducibile deve usare la cella del plafond: {formula}"
 
@@ -588,11 +673,20 @@ def t_uscita_fondo_excel():
     from openpyxl import load_workbook
     base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
     v = _varianti(*PP, VARIANTI_T4)
-    for nome, wb in (("default", base), ("rend6", v["rend6"]), ("tfr_azienda", v["tfr_azienda"])):
+    for nome, wb in (("default", base), ("rend6", v["rend6"]), ("tfr_azienda", v["tfr_azienda"]),
+                     ("ral60k", v["ral60k"]), ("ral60k_dovuto", v["ral60k_dovuto"])):
         i, c = wb["Input"], wb["Complementare"]
         n = int(i["B36"].value)
         attesa = _base_uscita_fondo(i, i["B12"].value, n, i["B17"].value) * i["B38"].value
         assert abs(c["B60"].value - attesa) < 0.01, f"{nome}: tassa in uscita {c['B60'].value:,.2f} ≠ {attesa:,.2f}"
+    # ral60k: 900 € l'anno oltre il plafond, non dedotti e quindi fuori dalla base (revisione T4, NV0)
+    i = v["ral60k"]["Input"]
+    n = int(i["B36"].value)
+    tutti = (i["B22"].value * i["B21"].value + i["B25"].value) * (1 + i["B17"].value) ** -n + sum(
+        (i["B10"].value * (1 + i["B12"].value) ** t * (0.0691 * i["B21"].value + i["B27"].value) + i["B26"].value)
+        * (1 + i["B17"].value) ** (t - n) for t in range(n))
+    assert v["ral60k"]["Complementare"]["B60"].value < tutti * i["B38"].value - 1, \
+        "ral60k: i contributi non dedotti non vanno tassati in uscita"
     assert abs(v["rend6"]["Complementare"]["B60"].value - base["Complementare"]["B60"].value) < 0.01, \
         "il rendimento non deve cambiare la base imponibile in uscita"
     assert v["rend6"]["Complementare"]["B58"].value > base["Complementare"]["B58"].value
@@ -602,12 +696,14 @@ def t_uscita_fondo_excel():
     f = load_workbook_formule(asset(*PP))["Complementare"]
     assert "Input!$B$22*Input!$B$21" in f["G5"].value and "Input!$B$22*Input!$B$21" in f["H5"].value
     # Scenari: la prestazione netta di ogni colonna usa la stessa base, con crescita RAL e inflazione della colonna
-    s, i = base["Scenari"], base["Input"]
-    n = int(i["B36"].value)
-    for col in "BCD":
-        g, infl, rend = s[f"{col}5"].value, s[f"{col}7"].value, s[f"{col}9"].value
-        netta = _fondo_scenario(base, g, rend, n) - _base_uscita_fondo(i, g, n, infl) * i["B38"].value
-        assert abs(s[f"{col}14"].value - netta) <= 1e-6 * netta, f"Scenari!{col}14 = {s[f'{col}14'].value:,.0f} ≠ {netta:,.0f}"
+    for nome, wb in (("default", base), ("ral60k", v["ral60k"])):
+        s, i = wb["Scenari"], wb["Input"]
+        n = int(i["B36"].value)
+        for col in "BCD":
+            g, infl, rend = s[f"{col}5"].value, s[f"{col}7"].value, s[f"{col}9"].value
+            netta = _fondo_scenario(wb, g, rend, n) - _base_uscita_fondo(i, g, n, infl) * i["B38"].value
+            assert abs(s[f"{col}14"].value - netta) <= 1e-6 * netta, \
+                f"{nome}: Scenari!{col}14 = {s[f'{col}14'].value:,.0f} ≠ {netta:,.0f}"
 
 
 def _tfr_confronto(i):
@@ -618,14 +714,17 @@ def _tfr_confronto(i):
     art. 11 c. 6 D.Lgs. 252/2005)."""
     n, infl, rend = int(i["B36"].value), i["B17"].value, i["B28"].value
     r_tfr = (1 + (0.015 + 0.75 * infl) * 0.83) / (1 + infl) - 1
-    azienda = fondo = i["B22"].value
-    base = i["B22"].value * (1 + infl) ** -n
+    # il TFR già maturato in azienda ci resta (art. 8 c. 7 D.Lgs. 252/2005: si conferisce il maturando):
+    # se non è già nel fondo, la decisione riguarda solo le quote future (revisione T4)
+    saldo = i["B22"].value * i["B21"].value
+    azienda = fondo = saldo
+    base = saldo * (1 + infl) ** -n
     for t in range(n):
         quota = i["B10"].value * (1 + i["B12"].value) ** t * 0.0691
         azienda = azienda * (1 + r_tfr) + quota
         fondo = fondo * (1 + rend) + quota
         base += quota * (1 + infl) ** (t - n)
-    rif = base * 12 / (_per_etichetta(i, "Anni di servizio già maturati") + n)
+    rif = base * 12 / (_per_etichetta(i, "Anni di servizio già maturati") * i["B21"].value + n)
     aliq_sep = _irpef(rif) / rif if rif > 0 else 0.0
     netto_azienda = azienda - base * aliq_sep
     netto_fondo = fondo - base * i["B38"].value
@@ -638,21 +737,56 @@ def t_tfr_confronto():
     from openpyxl import load_workbook
     v = _varianti(*PP, VARIANTI_T4)
     base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
-    for nome, wb in (("tfr40k", v["tfr40k"]), ("default", base)):
+    sopra = _varianti(*PP, VARIANTI_PP)["ral150k"]  # reddito di riferimento oltre €50.000: scaglione al 43%
+    for nome, wb in (("tfr40k", v["tfr40k"]), ("default", base), ("tfr_azienda", v["tfr_azienda"]),
+                     ("ral150k", sopra)):
         i, c = wb["Input"], wb["Complementare"]
         azienda, fondo = _tfr_confronto(i)
         assert abs(_per_etichetta(c, "TFR in azienda NETTO") - azienda) < 0.01, \
             f"{nome}: TFR in azienda netto {_per_etichetta(c, 'TFR in azienda NETTO'):,.2f} ≠ {azienda:,.2f}"
         assert abs(_per_etichetta(c, "TFR nel fondo NETTO") - fondo) < 0.01, f"{nome}: TFR nel fondo netto"
         assert abs(_per_etichetta(c, "Vantaggio netto del fondo") - (fondo - azienda)) < 0.01, f"{nome}: delta"
-    # valore chiuso del caso RAL 40k × 30 anni (inflazione 2%, comparto 3,5% reale, nessun saldo)
+    assert _per_etichetta(sopra["Complementare"], "Aliquota media della tassazione separata") > 0.33, \
+        "ral150k: il reddito di riferimento supera €50.000 e deve toccare lo scaglione al 43%"
+    # il saldo già in azienda resta lì in entrambi i rami: il conto della decisione non dipende dal saldo
+    d_saldo = _per_etichetta(v["tfr_azienda"]["Complementare"], "Vantaggio netto del fondo")
+    d_zero = _per_etichetta(v["tfr_azienda_senza_saldo"]["Complementare"], "Vantaggio netto del fondo")
+    assert abs(d_saldo - d_zero) < 0.01, f"TFR in azienda: delta {d_saldo:,.2f} con il saldo, {d_zero:,.2f} senza"
+    # valore chiuso del caso RAL 40k × 30 anni (inflazione 2%, comparto 2,5% reale, nessun saldo)
     delta = _per_etichetta(v["tfr40k"]["Complementare"], "Vantaggio netto del fondo")
-    # azienda: lordo 88.963,53, base 61.903,80 al 23% → netto 74.725,66; fondo: 142.685,08 − 10,5% della base
-    assert abs(delta - 61_459.52) < 0.5, f"RAL 40k × 30 anni: vantaggio del fondo {delta:,.2f} ≠ 61.459,52"
+    # azienda: lordo 88.963,53, base 61.903,80 al 23% → netto 74.725,66; fondo: 121.347,07 − 10,5% della base
+    assert abs(delta - DELTA_TFR40K) < 0.5, f"RAL 40k × 30 anni: vantaggio del fondo {delta:,.2f} ≠ {DELTA_TFR40K:,.2f}"
+    # la forbice della reference contiene l'esempio calcolato (revisione T4)
+    azienda, fondo = _tfr_confronto(v["tfr40k"]["Input"])
+    pc = open(os.path.join(SKILLS, "it-pianificazione", "references", "previdenza-complementare.md"), encoding="utf-8").read()
+    lo, hi = map(int, re.search(r"\+(\d+)-(\d+)% di prestazione netta", pc).groups())
+    assert lo <= (fondo / azienda - 1) * 100 <= hi, f"forbice +{lo}-{hi}% senza l'esempio (+{(fondo / azienda - 1) * 100:.0f}%)"
     s = v["tfr_azienda"]["Scenari"]
-    assert abs(s["C16"].value - _per_etichetta(v["tfr_azienda"]["Complementare"], "TFR in azienda NETTO")) < 0.01, \
+    assert abs(s["C16"].value - _tfr_azienda_scenario(v["tfr_azienda"], "C")) < 0.01, \
         "Scenari: con il TFR in azienda il suo netto va mostrato come capitale fuori dalla rendita"
+    for col in "BD":  # colonne con crescita RAL e inflazione proprie (revisione T4, NV2)
+        assert abs(s[f"{col}16"].value - _tfr_azienda_scenario(v["tfr_azienda"], col)) < 0.01, f"Scenari!{col}16"
+        assert abs(s[f"{col}34"].value - s[f"{col}16"].value * 0.055) < 0.01, f"Scenari!{col}34: rendita equivalente"
     assert base["Scenari"]["C16"].value == 0, "con il TFR nel fondo la riga del TFR in azienda è zero"
+
+
+DELTA_TFR40K = 40_121.51
+
+
+def _tfr_azienda_scenario(wb, col):
+    """TFR effettivamente in azienda (saldo compreso) netto al pensionamento con crescita RAL e
+    inflazione della colonna degli Scenari: rivalutazione 1,5% + 75% dell'inflazione tassata al 17%,
+    tassazione separata sul reddito di riferimento (saldo e quote, anni già maturati + residui)."""
+    i, s = wb["Input"], wb["Scenari"]
+    n, g, infl = int(i["B36"].value), s[f"{col}5"].value, s[f"{col}7"].value
+    r_tfr = (1 + (0.015 + 0.75 * infl) * 0.83) / (1 + infl) - 1
+    lordo, base = i["B22"].value, i["B22"].value * (1 + infl) ** -n
+    for t in range(n):
+        quota = i["B10"].value * (1 + g) ** t * 0.0691
+        lordo = lordo * (1 + r_tfr) + quota
+        base += quota * (1 + infl) ** (t - n)
+    rif = base * 12 / (_per_etichetta(i, "Anni di servizio già maturati") + n)
+    return lordo - base * (_irpef(rif) / rif)
 
 
 PA = ("it-pianificazione-autonomi", "proiezione-pensione-autonomi.xlsx")
@@ -660,6 +794,9 @@ VARIANTI_PA_T4 = {
     "forf_comunica": {("Input", "B28"): 3_000, ("Input", "B19"): 1},
     "forf_non_comunica": {("Input", "B28"): 3_000, ("Input", "B19"): 1, ("Input", "B47"): 0},
     "ordinario": {("Input", "B28"): 6_000, ("Input", "B19"): 2},
+    "ordinario_montante": {("Input", "B28"): 6_000, ("Input", "B19"): 2, ("Input", "B31"): 20_000},
+    "forf_montante": {("Input", "B28"): 3_000, ("Input", "B19"): 1, ("Input", "B31"): 20_000},
+    "ordinario_plafond_2025": {("Input", "B28"): 6_000, ("Input", "B19"): 2, ("Input", "B48"): 5_164.57},
 }
 
 
@@ -668,7 +805,9 @@ def t_uscita_fondo_autonomi():
     # REGRESSIONE F014: Complementare!B60 tassava l'intero versato anche per il forfettario puro, che
     # non deduce e, comunicando i non dedotti, in uscita non paga nulla su quella parte.
     v = _varianti(*PA, VARIANTI_PA_T4)
-    for nome, dedotto_annuo, comunica in (("forf_comunica", 0, 1), ("forf_non_comunica", 0, 0), ("ordinario", 5_300, 1)):
+    for nome, dedotto_annuo, comunica in (("forf_comunica", 0, 1), ("forf_non_comunica", 0, 0), ("ordinario", 5_300, 1),
+                                          ("ordinario_montante", 5_300, 1), ("forf_montante", 0, 1),
+                                          ("ordinario_plafond_2025", 5_164.57, 1)):
         i, c = v[nome]["Input"], v[nome]["Complementare"]
         n, infl = int(i["B7"].value), i["B39"].value
         assert _per_etichetta(i, "Versamento dedotto") == dedotto_annuo, f"{nome}: dedotto {_per_etichetta(i, 'Versamento dedotto')}"
@@ -677,13 +816,80 @@ def t_uscita_fondo_autonomi():
         tassa = _per_etichetta(c, "Tassa finale")
         assert abs(tassa - attesa) < 0.01, f"{nome}: tassa in uscita {tassa:,.2f} ≠ {attesa:,.2f}"
     assert _per_etichetta(v["forf_comunica"]["Complementare"], "Tassa finale") == 0
+    # montante già accumulato: trattato come dedotto, al valore riportato a oggi (revisione T4, NV3)
+    i = v["forf_montante"]["Input"]
+    attesa = 20_000 * (1 + i["B39"].value) ** -int(i["B7"].value) * i["B38"].value
+    assert abs(_per_etichetta(v["forf_montante"]["Complementare"], "Tassa finale") - attesa) < 0.01, "forf_montante"
+    # un solo plafond nel foglio: Fiscalità deduce quanto Input!B46 (revisione T4)
+    for nome in ("ordinario", "ordinario_plafond_2025"):
+        f, i = v[nome]["Fiscalità"], v[nome]["Input"]
+        assert abs(f["C8"].value - _per_etichetta(i, "Versamento dedotto")) < 0.01, \
+            f"{nome}: Fiscalità!C8 = {f['C8'].value} ≠ versamento dedotto {_per_etichetta(i, 'Versamento dedotto')}"
+        assert f["B8"].value == 0, f"{nome}: il forfettario non deduce il fondo"
+    # nessun plafond cablato nelle formule dei due Excel
+    for skill, nome_xlsx in (PP, PA):
+        for ws in load_workbook_formule(asset(skill, nome_xlsx)).worksheets:
+            for riga in ws.iter_rows():
+                for cella in riga:
+                    if isinstance(cella.value, str) and cella.value.startswith("="):
+                        assert not re.search(r"(?<![\d.])(5300|5164)", cella.value), \
+                            f"{nome_xlsx} {ws.title}!{cella.coordinate}: plafond cablato {cella.value[:80]}"
+
+
+@test("proiezione-pensione.xlsx: rendimento del comparto dichiarato reale, default = montecarlo-pensione.py")
+def t_rendimento_reale_fondo():
+    # Revisione T5/T4: il foglio è in euro di oggi ma il campo era «Rendimento netto comparto» al 3,5%,
+    # contro il 2,5% reale del Monte Carlo.
+    from openpyxl import load_workbook
+    wb = load_workbook(asset(*PP))
+    i = wb["Input"]
+    mc = _modulo_previdenza("montecarlo-pensione.py")
+    assert "reale" in i["A28"].value.lower() and i["B28"].value == mc.FP_RENDIMENTO_ATTESO_REALE, \
+        f"Input!A28 «{i['A28'].value}» = {i['B28'].value}, Monte Carlo {mc.FP_RENDIMENTO_ATTESO_REALE}"
+    assert "inflazione" in i["C28"].value
+    assert "reale" in wb["Scenari"]["A9"].value.lower()
 
 
 @test("previdenza complementare: base in uscita, non dedotti, nuove erogazioni 2026, capitale al 50%, marcatore")
 def t_testi_fondo():
     pc = open(os.path.join(SKILLS, "it-pianificazione", "references", "previdenza-complementare.md"), encoding="utf-8").read()
-    for atteso in ("non dedott", "durata definita", "frazionata", "9-15%", "6,91%"):
+    for atteso in ("durata definita", "frazionata"):
         assert atteso in pc, f"previdenza-complementare.md: manca «{atteso}»"
+    # ancorati alle frasi nuove (revisione T4: le stringhe sciolte erano già nel file di prima)
+    assert re.search(r"non dedott[^\n]*31/12[^\n]*9-15%", pc), "perdita del 9-15% sui non dedotti non comunicati"
+    assert "si applica al TFR conferito e ai contributi dedotti" in pc, "base in uscita sulle sole quote dedotte"
+    # vantaggio del TFR nel fondo: niente stime vecchie, vantaggio fiscale separato da quello di rendimento
+    for vietato in ("decine di migliaia", "15-25%", "27% medio"):
+        assert vietato not in pc, f"previdenza-complementare.md: stima superata «{vietato}»"
+    # nuove forme di erogazione con i vincoli (art. 11 c. 3-quater e 3-quinquies, delibera COVIP 25/6/2026)
+    nuove = pc[pc.index("### Nuove forme di erogazione"):pc.index("## Heuristic per la skill")]
+    for atteso in ("rate maturate", "irrevocabil", "RITA", "31/12/2026", "3-quinquies"):
+        assert atteso in nuove, f"nuove forme di erogazione: manca il vincolo «{atteso}»"
+    assert "mix 50/50" not in pc, "regola pratica capitale/rendita come default consulenziale"
+    # esempio RAL 60k: gli ultimi ~850 € della deduzione cadono nello scaglione al 33%
+    netto = _modulo_previdenza("netto-pensione.py")
+    imp = 60_000 - netto.contributi_lavoratore(60_000, netto.ALIQ_CONTRIBUTI_DIP)
+    risparmio = netto.irpef_lorda(imp) - netto.irpef_lorda(imp - 5_300)
+    assert f"€{round(risparmio):,}".replace(",", ".") in pc, f"esempio RAL 60k: risparmio atteso €{risparmio:,.0f}"
+    assert "€2.279" not in pc
+    # doppia citazione dal 2027 della base in uscita (art. 258 c. 4 TU imposte sui redditi, D.Lgs. 117/2026)
+    for rel in ("it-pianificazione/references/previdenza-complementare.md", "it-pianificazione/SKILL.md",
+                "it-pianificazione/references/proiezione-tenore-vita.md",
+                "it-pianificazione-autonomi/references/fiscalita-forfettario.md"):
+        testo = open(os.path.join(SKILLS, rel), encoding="utf-8").read()
+        for par in testo.split("\n\n"):
+            if "art. 11 c. 6 D.Lgs. 252/2005" in par:
+                assert "258" in par, f"{rel}: art. 11 c. 6 D.Lgs. 252/2005 senza «dal 2027 art. 258»: {par.strip()[:90]}"
+    # stessa regola nelle altre skill: it-rebalance e l'esempio J1
+    sl = open(os.path.join(SKILLS, "it-rebalance", "references", "sequenza-liquidazione.md"), encoding="utf-8").read()
+    for vietato in ("almeno il 50% va in rendita vitalizia", "solo sulla parte di capitale", "non a chiamata"):
+        assert vietato not in sl, f"sequenza-liquidazione.md: «{vietato}»"
+    for atteso in ("durata definita", "prelievi", "contributi dedotti"):
+        assert atteso in sl, f"sequenza-liquidazione.md: manca «{atteso}»"
+    joint = open(os.path.join(SKILLS, "it-pianificazione", "references", "integrazione-fiscale-joint.md"), encoding="utf-8").read()
+    assert "€86.700" not in joint and "11,4%" in joint, "J1: tassa in uscita sull'intero montante"
+    sk = open(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"), encoding="utf-8").read()
+    assert "max 50% montante in molte forme" not in sk
     assert "Verificato: 2026-06" not in pc, "marcatore di giugno non aggiornato dopo la riverifica"
     assert re.search(r"201-204[^\n]*Verificato: 2026-10|Verificato: 2026-10[^\n]*201-204", pc), "marcatore senza i commi 201-204"
     assert "contributi + rendimenti già tassati" not in pc, "base imponibile in uscita con i rendimenti già tassati"
@@ -805,6 +1011,49 @@ def t_casse_fonti():
     assert "2.785" in per_nome["Inarcassa"] and "3%" not in per_nome["Inarcassa"], per_nome["Inarcassa"][:160]
     assert "20%" in per_nome["Cassa Forense"] and "131.800" in per_nome["Cassa Forense"], per_nome["Cassa Forense"][:160]
     assert "209.300" in per_nome["CNPADC"] and "856" in per_nome["ENPAP"], "CNPADC/ENPAP"
+
+
+@test("previdenza: requisiti 2027-2028 completi nelle due reference, tassi storici veri, nessun dominio inesistente")
+def t_requisiti_e_link_inps():
+    # Revisione T5. Requisiti: Circ. INPS 28/2026, All. 2 (anticipata ordinaria 43a1m/42a1m dal 2028,
+    # contributi dell'anticipata contributiva adeguati anche loro, finestra di 3 mesi).
+    dip = open(os.path.join(SKILLS, "it-pianificazione", "references", "previdenza-obbligatoria.md"),
+               encoding="utf-8").read()
+    gs = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "references", "previdenza-gestione-separata.md"),
+              encoding="utf-8").read()
+    for nome, testo in (("previdenza-obbligatoria.md", dip), ("previdenza-gestione-separata.md", gs)):
+        for req in ("42 anni e 11 mesi", "43 anni e 1 mese", "42 anni e 1 mese", "20 anni e 1 mese", "20 anni e 3 mesi"):
+            assert req in testo, f"{nome}: manca «{req}» tra i requisiti 2027-2028"
+    assert not re.search(r"Dal 2027: 42 anni e 11 mesi", dip), "anticipata ordinaria: «dal 2027» copre anche il 2028"
+    for req in ("71 anni e 3 mesi", "41 anni e 3 mesi"):
+        assert req in dip, f"previdenza-obbligatoria.md: manca «{req}»"
+    ponte = open(asset("it-pianificazione", "ponte-pensione.py"), encoding="utf-8").read()
+    inizio = ponte.index('"""') + 3
+    doc = " ".join(ponte[inizio:ponte.index('"""', inizio)].split())
+    assert "20 anni e 1 mese" in doc and "20 anni e 3 mesi" in doc and re.search(r"(tre|3) mesi dopo", doc), \
+        "ponte-pensione: anticipata contributiva senza i contributi adeguati o senza la finestra di 3 mesi"
+    # tassi nominali di rivalutazione: medie dalla tabella ufficiale dello script, non «1,5-2,5%»
+    tassi = carica_modulo(asset("it-pianificazione", "importa-previdenza.py")).TASSI_CAPITALIZZAZIONE
+    def media(da, a):
+        prodotto = 1.0
+        for anno in range(da, a + 1):
+            prodotto *= tassi[anno]
+        return prodotto ** (1 / (a - da + 1)) - 1
+    for da in (1996, 2006):
+        cifra = f"~{media(da, 2025) * 100:.1f}%".replace(".", ",")
+        assert f"{cifra} annuo nel {da}-2025" in dip, f"previdenza-obbligatoria.md: media {da}-2025 attesa {cifra}"
+    assert "1,5-2,5% annuo negli ultimi decenni" not in dip
+    # mypensione.it non è un dominio INPS: le credenziali SPID vanno solo sul portale INPS
+    for rel, testo in _file_testo(SKILLS, os.path.join(ROOT, "commands")):
+        assert "mypensione" not in testo.lower(), f"{rel}: rimando a «mypensione», dominio che non è dell'INPS"
+        assert "PIN/CIE/SPID" not in testo, f"{rel}: il PIN INPS dei cittadini non esiste più dal 2021"
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "mypensione" not in readme.lower(), "README: rimando a «mypensione»"
+    # cuneo L. 207/2024: il c. 6 (ulteriore detrazione) vale fino al 2026, poi il TUIR 2027
+    netto = open(asset("it-pianificazione", "netto-pensione.py"), encoding="utf-8").read()
+    netto = " ".join(netto.split())
+    assert re.search(r"c\. 6 vale fino al 2026", netto) and "D.Lgs. 117/2026" in netto, \
+        "netto-pensione: il c. 6 della L. 207/2024 senza la doppia citazione dal 2027"
 
 
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════
@@ -1041,6 +1290,250 @@ def t_ips_quota():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ══════════════════════ it-tax-optimization (T1-T3) ══════════════════════
+
+TAX = os.path.join(SKILLS, "it-tax-optimization")
+
+
+def _testi_regole():
+    """{percorso relativo: testo} di skill, comandi, README (senza il changelog storico) e
+    descrizione del plugin.json, con il grassetto Markdown tolto. Il changelog del README
+    racconta le versioni passate: gli errata li aggiunge chi rilascia, non questi controlli."""
+    testi = {}
+    for base in (SKILLS, os.path.join(ROOT, "commands")):
+        for cartella, _, files in os.walk(base):
+            for f in files:
+                if f.endswith((".md", ".py")):
+                    p = os.path.join(cartella, f)
+                    testi[os.path.relpath(p, ROOT)] = open(p, encoding="utf-8").read()
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    testi["README.md"] = re.sub(r"\n### Changelog\n.*?(?=\n## )", "\n", readme, flags=re.S)
+    plugin = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
+    testi[".claude-plugin/plugin.json"] = plugin["description"]
+    return {k: v.replace("*", "") for k, v in testi.items()}
+
+
+def _frasi(testo):
+    """Spezza in frasi (punto/punto e virgola seguiti da maiuscola), righe e celle di tabella.
+    Le abbreviazioni come «art. 67» o «c. 1-bis» restano unite perché segue una cifra."""
+    return [f for f in re.split(r"(?<=[.!?;])\s+(?=[A-ZÀ-Ý«(`\[])|\n|\|", testo) if f.strip()]
+
+
+_LIFO = re.compile(r"\bL\.?I\.?F\.?O\b\.?", re.I)
+_REGIME = re.compile(r"amministrat|dichiarativ", re.I)
+_CONFINE = re.compile(r"[,;:]|\bmentre\b|\binvece\b", re.I)
+# LIFO legato subito al dichiarativo: «LIFO in dichiarativo», «LIFO (dichiarativo)», «LIFO solo in
+# dichiarativo», «il LIFO vale solo in dichiarativo»; oppure «in dichiarativo è il LIFO».
+_LIFO_DICH_DOPO = re.compile(r"\s*\)?\s*\(?\s*(?:vale\s+)?(?:solo\s+)?(?:in|nel|per\s+il)?\s*(?:regime\s+)?dichiarativ", re.I)
+_LIFO_DICH_PRIMA = re.compile(r"dichiarativ\w*[^.;:,()]{0,25}$", re.I)
+_ELENCO_USA = re.compile(r"HIFO\s*/\s*L\.?I\.?F\.?O|L\.?I\.?F\.?O\.?\s*/\s*Spec", re.I)
+
+
+def _lifo_errato(frase):
+    """True se la frase riferisce il LIFO all'amministrato, o lo nomina senza alcun regime fuori
+    dall'elenco dei metodi USA (HIFO/LIFO/SpecID). Ogni occorrenza (anche «Lifo», «L.I.F.O.») si
+    lega al regime della propria clausola (confini: , ; : «mentre» «invece»); se la clausola non
+    ne nomina, al regime nominato più vicino prima di lei nella frase, o al primo dopo."""
+    for m in _LIFO.finditer(frase):
+        if _LIFO_DICH_DOPO.match(frase, m.end()) or _LIFO_DICH_PRIMA.search(frase, 0, m.start()):
+            continue
+        inizio = max([0] + [c.end() for c in _CONFINE.finditer(frase, 0, m.start())])
+        dopo = _CONFINE.search(frase, m.end())
+        clausola = frase[inizio:dopo.start() if dopo else len(frase)]
+        if re.search(r"amministrat", clausola, re.I):
+            return True
+        if re.search(r"dichiarativ", clausola, re.I):
+            continue
+        prima = list(_REGIME.finditer(frase, 0, m.start()))
+        regime = prima[-1] if prima else _REGIME.search(frase, m.end())
+        if regime is None:
+            if not _ELENCO_USA.search(frase[max(0, m.start() - 8):m.end() + 8]):
+                return True
+        elif regime.group(0).lower().startswith("amministrat"):
+            return True
+    return False
+
+
+@test("T1: nessun LIFO riferito al regime amministrato (costo medio ponderato, art. 6 c. 4 D.Lgs. 461/97)")
+def t_t1_lifo_amministrato():
+    # REGRESSIONE F012: in amministrato la base è il costo medio ponderato; il LIFO
+    # (art. 67 c. 1-bis TUIR) individua i titoli ceduti solo in dichiarativo. Ogni LIFO deve
+    # quindi essere legato al dichiarativo (o all'elenco dei metodi USA), non all'amministrato.
+    for frase in ("- ❌ Assumere HIFO o Specific ID per la scelta del lotto: in amministrato è sempre LIFO.",
+                  "In regime amministrato la plus si calcola con il LIFO, mentre in dichiarativo si usa il costo medio ponderato.",
+                  "- ❌ Ignorare il LIFO: la scelta del lotto NON è libera come negli USA, e influenza la plus realizzata.",
+                  "LIFO obbligatorio in regime amministrato",
+                  "In regime amministrato il metodo di valorizzazione è Lifo per default.",
+                  "In amministrato i lotti si scaricano con il L.I.F.O."):
+        assert _lifo_errato(frase), f"il controllo non riconosce: «{frase}»"
+    for frase in ("Costo medio ponderato in amministrato, LIFO in dichiarativo: il lotto non si sceglie",
+                  "costo medio ponderato (LIFO solo in dichiarativo)",
+                  "la base è il costo medio ponderato (il LIFO vale solo in dichiarativo).",
+                  "Cambiano il metodo del costo, che in dichiarativo è il LIFO e non il costo medio ponderato dell'amministrato",
+                  "Scelta investitore (HIFO/LIFO/SpecID)"):
+        assert not _lifo_errato(frase), f"falso positivo: «{frase}»"
+    errori = []
+    for rel, testo in _testi_regole().items():
+        for frase in _frasi(testo):
+            if _lifo_errato(frase):
+                errori.append(f"{rel}: «{frase.strip()[:110]}»")
+    assert not errori, "LIFO riferito all'amministrato o senza regime:\n  " + "\n  ".join(errori[:12])
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    assert re.search(r"costo medio ponderato[^\n]*art\. 6 c\. 4", skill), "SKILL.md: manca la regola del costo medio (art. 6 c. 4)"
+    dich = open(os.path.join(TAX, "references", "regime-dichiarativo.md"), encoding="utf-8").read()
+    assert re.search(r"LIFO[^\n]*art\. 67 c\. 1-bis", dich), "regime-dichiarativo.md: manca il LIFO con l'art. 67 c. 1-bis"
+    assert "identiche all'amministrato" not in dich, "regime-dichiarativo.md: regole «identiche» all'amministrato, ma il metodo del costo cambia"
+    # Cripto in dichiarativo: la legge non richiama la lettera c-sexies, ma la Circ. 30/E/2023
+    # (par. 3.2.1) prescrive il LIFO: non è una prassi «per analogia» da concordare.
+    metodo = open(os.path.join(TAX, "references", "criptovalute.md"), encoding="utf-8").read().split("Metodo di valorizzazione")[1].split("\n")[0]
+    assert re.search(r"LIFO[^\n]*Circ\. 30/E/2023, par\. 3\.2\.1", metodo), "criptovalute.md: manca il LIFO della Circ. 30/E/2023 par. 3.2.1"
+    assert "analogia" not in metodo and "da concordare" not in metodo, "criptovalute.md: il LIFO cripto presentato come scelta da concordare"
+
+
+_NA = r"(?:non[ -]armonizzat|non[ -]UCITS|US-listed)"
+_NA_COMPENSABILE = (
+    re.compile(_NA + r"[^→\n|]*→\s*`?reddito[ _]divers", re.I),          # «ETF non armonizzato → `reddito_diverso`»
+    re.compile(r"reddit[oi][ _]divers[oi]`?\s*\([^)\n]*" + _NA, re.I),  # «`reddito_diverso` (azioni, ETF non armonizzati)»
+    re.compile(_NA + r"[^\n]{0,40}?(?<!non )(?<!mai )compensabil", re.I),  # «ETF non armonizzati (compensabili)»
+    re.compile(_NA + r"[^\n→]*→\s*SÌ"),                                   # «plus su ... ETF non armonizzati → SÌ, consumato»
+)
+
+
+@test("T1: nessun ETF o fondo non armonizzato tra gli strumenti compensabili con lo zainetto")
+def t_t1_non_armonizzati():
+    # REGRESSIONE F003: la plus di un OICR non armonizzato è reddito di capitale (art. 44
+    # c. 1 lett. g TUIR; art. 10-ter L. 77/1983), mai compensabile; solo la minus è reddito diverso.
+    # Su tutti i testi, riga per riga (gli anti-pattern «❌» descrivono l'errore e si saltano).
+    errori = []
+    for rel, testo in _testi_regole().items():
+        for riga in testo.splitlines():
+            if "❌" not in riga and any(p.search(riga) for p in _NA_COMPENSABILE):
+                errori.append(f"{rel}: «{riga.strip()[:110]}»")
+    assert not errori, "non armonizzati tra i compensabili:\n  " + "\n  ".join(errori[:12])
+    joint = open(os.path.join(SKILLS, "it-pianificazione", "references", "integrazione-fiscale-joint.md"),
+                 encoding="utf-8").read()
+    mappa = joint.split("```")[1].splitlines()
+    col = next(r for r in mappa if "Imposta sostitutiva" in r).index("Imposta sostitutiva")
+    for r in mappa:
+        assert not re.search(_NA, r[col:], re.I), f"integrazione-fiscale-joint: non armonizzati nella colonna della sostitutiva: {r.strip()}"
+    assert re.search(r"regime dichiarativo[^\n]*non armonizzat[^\n]*quadro RL|regime dichiarativo[^\n]*quadro RL[^\n]*non armonizzat", joint.replace("*", "")), \
+        "integrazione-fiscale-joint: in dichiarativo manca l'eccezione IRPEF dei non armonizzati"
+    etf = open(os.path.join(TAX, "references", "etf-trap-redditi-capitale.md"), encoding="utf-8").read()
+    amici = etf.split('## Strumenti "amici"')[1].split('## Strumenti "nemici"')[0]
+    assert "armonizzat" not in amici, "etf-trap: un OICR non armonizzato nella tabella «amici»"
+    assert re.search(r'## Strumenti "nemici".*non armonizzat', etf, re.S), "etf-trap: non armonizzati assenti dai «nemici»"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    riga = next(r for r in skill.splitlines() if r.startswith("| **Reddito diverso** (art. 67"))
+    assert "armonizzat" not in riga, f"SKILL.md: riga reddito diverso: {riga[:120]}"
+    assert "reddito_capitale_irpef" in skill, "SKILL.md: manca la categoria reddito_capitale_irpef per gli OICR extra UE/SEE"
+    assert re.search(r"non armonizzat[^\n]*→\s*`reddito_capitale`[^\n]*`reddito_capitale_irpef`", skill), \
+        "SKILL.md: la deduzione della categoria non manda i non armonizzati a reddito_capitale/_irpef"
+    reb = open(os.path.join(SKILLS, "it-rebalance", "SKILL.md"), encoding="utf-8").read()
+    assert re.search(r"`tipo_fiscale`[^\n]*`reddito_capitale`\s*\([^)\n]*non armonizzat", reb), \
+        "it-rebalance: la riga tipo_fiscale non mette i non armonizzati sotto reddito_capitale"
+    trovate = 0
+    for r in reb.splitlines():
+        if "reddito diverso" in r and "**può**" in r:
+            trovate += 1
+            assert "armonizzat" not in r, f"it-rebalance: {r[:120]}"
+    assert trovate >= 1, "it-rebalance: manca la riga su cosa il reddito diverso può compensare"
+    mb = open(os.path.join(SKILLS, "it-rebalance", "references", "ribilanciamento-multibroker.md"), encoding="utf-8").read()
+    m = re.search(r"compensa solo i \*\*redditi diversi\*\* \(([^)]*)\)", mb)
+    assert m and "armonizzat" not in m.group(1), "ribilanciamento-multibroker.md: elenco dei redditi diversi"
+
+
+@test("T1: alla chiusura del rapporto le minus si certificano (art. 6 c. 5 D.Lgs. 461/97), non «si perdono»")
+def t_t1_chiusura_rapporto():
+    # REGRESSIONE F011: chiudendo il rapporto (o revocando l'opzione) l'intermediario certifica
+    # le minus residue, utilizzabili su un altro rapporto con gli stessi intestatari o in
+    # dichiarazione entro la scadenza originaria. Il grassetto è tolto prima del confronto.
+    for rel, testo in _testi_regole().items():
+        assert not re.search(r"si\s+perde\s+definitivamente", testo), f"{rel}: «si perde definitivamente»"
+        assert "unico modo per consolidare" not in testo, f"{rel}: il dichiarativo presentato come unica via"
+    for rel in ("references/multi-intermediario.md", "SKILL.md"):
+        testo = open(os.path.join(TAX, rel), encoding="utf-8").read()
+        assert "certificazione" in testo and "art. 6 c. 5" in testo, f"{rel}: manca la certificazione ex art. 6 c. 5"
+    skill = open(os.path.join(TAX, "SKILL.md"), encoding="utf-8").read()
+    assert "Pattern E" in skill, "SKILL.md: manca il Pattern E (consolidamento via certificazione)"
+    multi = open(os.path.join(TAX, "references", "multi-intermediario.md"), encoding="utf-8").read()
+    pratico = multi.split("## Caso pratico")[1].split("\n---\n")[0]   # senza il marcatore in fondo
+    assert "Verificato" not in pratico, "caso pratico: il taglio include il marcatore"
+    for lettera, chiave in (("a", "consumo in loco"), ("b", "certificazione"), ("c", "dichiarativo")):
+        assert re.search(rf"^\*\*Scenario \({lettera}\)[^\n]*{chiave}", pratico, re.M), \
+            f"caso pratico: manca l'intestazione dello scenario ({lettera}) «{chiave}»"
+        assert re.search(rf"^\| \({lettera}\) ", pratico, re.M), f"caso pratico: manca la riga ({lettera}) della tabella riassuntiva"
+    # I totali seguono le regole dei Pattern A, D ed E applicate alla tabella dei rapporti: il
+    # dichiarativo vale dall'anno dopo e non salva le minus che scadono il 31/12/N.
+    rapporti = re.findall(r"^\| (\w[\w ]*?) \| ([\d.]+) \| (31/12/N(?:\+\d)?|—) \| ([\d.]+) \|$", pratico, re.M)
+    assert len(rapporti) == 3, f"caso pratico: tabella dei rapporti illeggibile ({rapporti})"
+    num = lambda s: int(s.replace(".", ""))
+    in_loco = sum(min(num(z), num(p)) for _, z, _, p in rapporti)
+    residuo = {b: num(z) - min(num(z), num(p)) for b, z, _, p in rapporti}
+    capienza = sum(num(p) - min(num(z), num(p)) for _, z, _, p in rapporti)
+    scade_ora = [b for b, _, s, _ in rapporti if s == "31/12/N" and residuo[b] > 0]
+    assert scade_ora, "caso pratico: nessun rapporto con minus in scadenza il 31/12/N"
+    eur = lambda x: "€" + f"{round(x * 0.26):,}".replace(",", ".")
+    certificate = min(sum(residuo[b] for b in scade_ora), capienza)
+    tutte = min(sum(residuo.values()), capienza)
+    dichiarativo = min(sum(r for b, r in residuo.items() if b not in scade_ora), capienza)
+    for lettera, attesi in (("a", [in_loco]), ("b", [in_loco + certificate, in_loco + tutte]),
+                            ("c", [in_loco + dichiarativo])):
+        riga = re.search(rf"^\| \({lettera}\) [^\n]*", pratico, re.M).group(0)
+        for x in attesi:
+            assert eur(x) in riga, f"caso pratico, riga ({lettera}): atteso {eur(x)} — {riga}"
+    # Pattern D senza le minus in scadenza nell'anno; Pattern E con la capienza della destinazione
+    # divisa tra le origini (le stesse plus non si contano due volte).
+    pattern_d = skill.split("**Pattern D")[1].split("**Pattern E")[0]
+    assert re.search(r"anno_scadenza\s*>\s*anno_corrente", pattern_d), "Pattern D: lo zainetto consolidato conta anche le minus che scadono nell'anno"
+    assert "Pattern E" in pattern_d.split("```")[1], "Pattern D: la proposta non passa dal confronto con il Pattern E"
+    pattern_e = skill.split("**Pattern E")[1].split("### Step 4")[0]
+    assert re.search(r"capienza\s*[−-]=\s*recuperabile", pattern_e), "Pattern E: la capienza della destinazione non si riduce tra un'origine e l'altra"
+
+
+@test("T1: scarto di emissione e coefficiente 48,08% con fonte corretta, marcatori delle reference")
+def t_t1_scarto_marcatori():
+    # REGRESSIONE F052/F035/F042: BOT e zero coupon tenuti a scadenza non consumano zainetto;
+    # il 48,08% viene dall'art. 3 c. 5 DL 66/2014, non dall'art. 68 c. 6 TUIR.
+    aliq = open(os.path.join(TAX, "references", "aliquote-12-5-26.md"), encoding="utf-8").read()
+    assert "art. 68 c. 6 TUIR, art. 7 DLgs 461/97" not in aliq, "aliquote: fonte del coefficiente superata"
+    assert "art. 3 c. 5 DL 66/2014" in aliq, "aliquote: manca la fonte del 48,08%"
+    assert re.search(r"### Esempio D[^\n]*(BOT|zero coupon)", aliq), "aliquote: manca l'esempio BOT/zero coupon"
+    assert "prezzo di emissione" in aliq and "scarto di emissione" in aliq, "aliquote: esempio senza prezzo di emissione"
+    for rel in ("it-tax-optimization/references/etf-trap-redditi-capitale.md",
+                "it-tax-optimization/references/multi-intermediario.md",
+                "it-tax-optimization/references/aliquote-12-5-26.md",
+                "it-pianificazione-obiettivi/references/asset-location.md"):
+        testo = open(os.path.join(SKILLS, rel), encoding="utf-8").read()
+        assert "Verificato: 2026-10" in testo, f"{rel}: manca il marcatore della verifica di ottobre 2026"
+    al = open(os.path.join(SKILLS, "it-pianificazione-obiettivi", "references", "asset-location.md"), encoding="utf-8").read()
+    assert "rischio demografico" in al, "asset-location: polizze esenti IRPEF solo per il rischio demografico"
+
+
+@test("T1: le citazioni del D.Lgs. 461/97 e dell'art. 10-ter L. 77/1983 portano il riferimento dal 2027")
+def t_t1_doppie_citazioni():
+    # Regola della roadmap «Citazioni dal 2027»: l'art. 6 D.Lgs. 461/97 confluisce nell'art. 306
+    # del TU D.Lgs. 117/2026 (c. 2 → c. 3, c. 4 → c. 5, c. 5 → c. 6, c. 7 → c. 8), l'art. 5 nel 304,
+    # l'art. 10-ter L. 77/1983 nell'art. 59 dell'All. 1 al D.Lgs. 33/2025. Nei file del tema T1
+    # ogni riga che cita la norma vecchia nomina anche quella nuova.
+    file_t1 = ["README.md",
+               "skills/it-pianificazione/references/integrazione-fiscale-joint.md",
+               "skills/it-rebalance/SKILL.md",
+               "skills/it-rebalance/assets/ribilanciamento-multibroker.py",
+               "skills/it-rebalance/references/ribilanciamento-multibroker.md",
+               "skills/it-rebalance/references/sequenza-liquidazione.md",
+               "skills/it-tax-optimization/SKILL.md"] + [
+               f"skills/it-tax-optimization/references/{f}" for f in
+               ("aliquote-12-5-26.md", "criptovalute.md", "etf-trap-redditi-capitale.md",
+                "multi-intermediario.md", "regime-dichiarativo.md")]
+    testi = _testi_regole()
+    errori = []
+    for rel in file_t1:
+        for riga in testi[rel].splitlines():
+            if re.search(r"D\.\s?Lgs\.\s?461|10-ter", riga) and not re.search(r"30[4-7]|TU 2027|117/2026|33/2025", riga):
+                errori.append(f"{rel}: «{riga.strip()[:110]}»")
+    assert not errori, "citazioni senza il riferimento dal 2027:\n  " + "\n  ".join(errori)
+
+
 # ══════════════════════ fiscalità e tracker ══════════════════════
 
 @test("netto-pensione: IRPEF 2026, detrazioni e aliquota rendita FP (valori chiusi)")
@@ -1063,6 +1556,31 @@ def t_netto():
     att_irpef = 27_138 * 0.23 - (700 + 1_255 * (28_000 - 27_138) / 19_500)
     assert abs(irpef - att_irpef) < 0.01 and abs(addiz - 27_138 * 0.0223) < 0.01
     assert abs(netto - (27_138 - att_irpef - 27_138 * 0.0223)) < 0.01
+
+
+@test("netto-pensione: ritenuta del fondo sulla sola quota imponibile della rendita (TFR e dedotti)")
+def t_netto_quota_imponibile():
+    # Revisione T4: lo script tassava l'intera rendita mentre le reference dicevano «come in netto-pensione.py».
+    m = _modulo_previdenza("netto-pensione.py")
+    assert m.QUOTA_IMPONIBILE_FP == 1.0, "default prudente: tutta la rendita"
+    assert abs(m.rendita_netta_fp(10_000, 37, 0.6) - 10_000 * (1 - 0.09 * 0.6)) < 1e-9
+    assert abs(m.rendita_netta_fp(10_000, 20, 1.0) - 10_000 * (1 - 0.135)) < 1e-9
+    tmp = tempfile.mkdtemp()
+    try:
+        out_json = os.path.join(tmp, "n.json")
+        rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--set", "QUOTA_IMPONIBILE_FP=0.6",
+                             "--set", "ANNI_ISCRIZIONE_FP=37", "--json", out_json)
+        assert rc == 0, out[-300:]
+        d = json.load(open(out_json, encoding="utf-8"))
+        assert d["quota_imponibile_fp"] == 0.6
+        for sc in d["scenari"]:
+            assert abs(sc["rendita_netta"] - round(sc["rendita_lorda"] * (1 - 0.09 * 0.6), 2)) < 0.011, sc
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    tv = " ".join(open(os.path.join(SKILLS, "it-pianificazione", "references", "proiezione-tenore-vita.md"),
+                       encoding="utf-8").read().split())
+    assert "come in netto-pensione.py" not in tv and "QUOTA_IMPONIBILE_FP" in tv, \
+        "proiezione-tenore-vita.md: il rimando allo script deve nominare il parametro della quota imponibile"
 
 
 @test("proiezione-pensione.xlsx: detrazione pensionati = netto-pensione.py (art. 13 c. 3 TUIR)")

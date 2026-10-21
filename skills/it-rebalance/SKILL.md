@@ -1,6 +1,6 @@
 ---
 name: it-rebalance
-description: Ribilanciamento di portafoglio tax-aware sotto la fiscalità italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di ribilanciamento, rebalancing, riequilibrio del portafoglio, allocazione target vs effettiva, drift dell'asset allocation, portafoglio sbilanciato, "le azioni sono cresciute troppo", riportare i pesi all'allocazione obiettivo, ribilanciare con/senza vendere, ribilanciamento tramite nuovi versamenti (cashflow), ribilanciamento di fine anno coordinato con le minusvalenze. Trigger anche quando l'utente ha un portafoglio multi-asset (azioni/obbligazioni/ETF) e chiede come ririportarlo ai pesi voluti minimizzando l'impatto fiscale. Coordina con `it-tax-optimization` perché in Italia ogni vendita per ribilanciare è un evento fiscale (realizzo plus/minus, LIFO obbligatorio, interazione con lo zainetto). NON è consulenza di investimento: la skill è fiscale e operativa, non raccomanda QUALE asset allocation scegliere. NON copre fondi pensione (vincolati) né dipendenti pubblici.
+description: Ribilanciamento di portafoglio tax-aware sotto la fiscalità italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di ribilanciamento, rebalancing, riequilibrio del portafoglio, allocazione target vs effettiva, drift dell'asset allocation, portafoglio sbilanciato, "le azioni sono cresciute troppo", riportare i pesi all'allocazione obiettivo, ribilanciare con/senza vendere, ribilanciamento tramite nuovi versamenti (cashflow), ribilanciamento di fine anno coordinato con le minusvalenze. Trigger anche quando l'utente ha un portafoglio multi-asset (azioni/obbligazioni/ETF) e chiede come ririportarlo ai pesi voluti minimizzando l'impatto fiscale. Coordina con `it-tax-optimization` perché in Italia ogni vendita per ribilanciare è un evento fiscale (realizzo plus/minus sul costo medio ponderato, interazione con lo zainetto). NON è consulenza di investimento: la skill è fiscale e operativa, non raccomanda QUALE asset allocation scegliere. NON copre fondi pensione (vincolati) né dipendenti pubblici.
 ---
 
 # it-rebalance
@@ -59,9 +59,9 @@ LEVA 4 (costo fiscale POSITIVO ma ottimizzabile): Vendita di posizioni in PLUS
 
 A differenza degli USA, dove si ribilancia dentro un IRA/401k senza conseguenze, in Italia il dossier titoli ordinario tassa ogni realizzo. Vendere €10.000 di un ETF azionario cresciuto del 40% realizza ~€2.857 di plusvalenza → tassa 26% = ~€743. Questo costo va **sempre** quantificato prima di proporre una vendita.
 
-### LIFO obbligatorio determina quale lotto si vende
+### La plus realizzata si calcola sul costo medio ponderato
 
-In regime amministrato il metodo è **LIFO** (Last In First Out): si vendono prima i lotti acquistati più di recente. Implicazione per il ribilanciamento: i lotti recenti tipicamente hanno **plus latente minore** (comprati a prezzi più vicini all'attuale), quindi una vendita parziale LIFO può avere un impatto fiscale più contenuto rispetto a quello che si avrebbe vendendo i lotti più vecchi. Questo a volte rende le vendite parziali di ribilanciamento meno care del previsto. Conoscere la stratificazione dei lotti è critico.
+In regime amministrato la plus o minus di una vendita si calcola sul **costo medio ponderato** del titolo in quel rapporto (art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027): (prezzo − PMC) × quantità venduta. Il lotto non si sceglie e l'ordine degli acquisti non conta: una vendita parziale realizza una plus proporzionale e lascia invariato il PMC del residuo. Per ridurre la plus realizzata si sceglie quale **posizione** vendere (quella con la plus latente più bassa in proporzione al valore), non quale lotto. Il LIFO dell'art. 67 c. 1-bis TUIR vale solo per i conti in dichiarativo, fuori dallo scope di questa skill. *(Costo medio ponderato in amministrato — Verificato: 2026-10.)*
 
 ### L'asimmetria redditi diversi vs capitale (vedi it-tax-optimization)
 
@@ -96,7 +96,7 @@ Raccogliere:
 - `asset_class` — es. azionario_globale, azionario_EU, obbligazionario_governativo, obbligazionario_corporate, monetario, oro/commodity, ecc.
 - `tipo_fiscale` — `reddito_diverso` (azioni dirette, certificates, ETC) o `reddito_capitale` (ETF e fondi, UCITS e non armonizzati). Se non noto, dedurre da descrizione (ETF o fondo → capitale)
 - `quantita`
-- `pmc` (prezzo medio di carico) o dettaglio lotti con `data_acquisto`/`quantita`/`prezzo`
+- `pmc` (prezzo medio di carico), che in amministrato è la base fiscale delle vendite
 - `prezzo_corrente` o `controvalore_attuale`
 
 **Allocazione target** (input utente, NON suggerita dalla skill):
@@ -170,7 +170,7 @@ per posizione in (sovrappesate AND plus_latente > 0):
     # solo plus realizzate al broker A, e solo su strumenti reddito_diverso.
     priorità 1: vendere reddito_diverso PRESSO un broker che ha zainetto capiente
                 (la plus viene assorbita → costo netto ≈ zero)
-    priorità 2: vendere posizioni con plus latente minore (spesso lotti LIFO recenti)
+    priorità 2: vendere posizioni con plus latente minore in proporzione al valore (sul PMC)
     priorità 3: per ultime le posizioni reddito_capitale (ETF UCITS: plus MAI
                 compensabile) o presso broker senza zainetto (plus tassata piena)
     # gate cost-aware (banda dinamica): una vendita che lascia imposta NETTA
@@ -233,14 +233,14 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 
 ### Disclaimer (obbligatorio in fondo)
 
-> **Disclaimer**: questo report ha finalità informative di pianificazione personale. Non costituisce consulenza di investimento, finanziaria o fiscale professionale. La skill NON raccomanda quale asset allocation adottare: l'allocazione target è fornita dall'utente. Le strategie sono di efficienza fiscale e operativa del ribilanciamento, non di selezione titoli. I calcoli si basano sui dati forniti e sulle regole del regime amministrato vigenti. Verificare sempre saldi, stratificazione lotti (LIFO) e zainetto fiscale sul portale del proprio intermediario prima di operare. Per la definizione della strategia di portafoglio e per casi specifici consultare un consulente finanziario abilitato.
+> **Disclaimer**: questo report ha finalità informative di pianificazione personale. Non costituisce consulenza di investimento, finanziaria o fiscale professionale. La skill NON raccomanda quale asset allocation adottare: l'allocazione target è fornita dall'utente. Le strategie sono di efficienza fiscale e operativa del ribilanciamento, non di selezione titoli. I calcoli si basano sui dati forniti e sulle regole del regime amministrato vigenti. Verificare sempre saldi, prezzo medio di carico e zainetto fiscale sul portale del proprio intermediario prima di operare. Per la definizione della strategia di portafoglio e per casi specifici consultare un consulente finanziario abilitato.
 
 ## Anti-pattern (NON FARE MAI)
 
 - ❌ Raccomandare quale asset allocation scegliere. La skill prende il target come input; non è un robo-advisor.
 - ❌ Proporre vendite (Leve 3-4) prima di aver esaurito nuovi versamenti e flussi (Leve 1-2). La vendita è l'ultima risorsa, non la prima.
 - ❌ Trattare il ribilanciamento come fiscalmente neutro: ogni vendita in Italia è un evento fiscale. Mai dimenticarlo (errore tipico di chi ragiona col modello USA tax-deferred).
-- ❌ Ignorare il LIFO: la scelta del lotto NON è libera, e influenza la plus realizzata.
+- ❌ Simulare le vendite lotto per lotto: in amministrato la plus si calcola sul costo medio ponderato e il lotto non si sceglie (il LIFO vale solo in dichiarativo).
 - ❌ Vendere ETF UCITS armonizzati in plus quando si potrebbero vendere azioni dirette compensabili con zainetto: si butta via la possibilità di compensazione.
 - ❌ Trattare un ETF non armonizzato (es. domiciliato USA) come compensabile: la plus è reddito di capitale, spesso a IRPEF progressiva, e lo zainetto resta intatto.
 - ❌ Ribilanciare per scostamenti dentro la banda di tolleranza: genera costi senza beneficio.

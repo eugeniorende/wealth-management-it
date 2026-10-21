@@ -9,7 +9,13 @@ sistematicamente la copertura pensionistica:
   - la PENSIONE INPS non paga contributi e ha detrazioni dedicate;
   - la RENDITA del fondo pensione NON entra nell'IRPEF: paga un'imposta
     sostitutiva del 15%, ridotta dello 0,30% per ogni anno di partecipazione
-    oltre il 15°, fino al minimo del 9% (D.Lgs. 252/2005, art. 11).
+    oltre il 15°, fino al minimo del 9%, sulla sola parte imponibile: TFR e
+    contributi dedotti, non i rendimenti già tassati né i non dedotti comunicati
+    (D.Lgs. 252/2005, art. 11 c. 6; dal 2027 art. 258 c. 4 D.Lgs. 117/2026).
+    La quota imponibile è il parametro QUOTA_IMPONIBILE_FP: 1,0 (default) tassa
+    tutta la rendita ed è una stima prudente, perché i rendimenti possono valere
+    il 30-45% del montante. Il dato si ricava dal foglio Complementare
+    dell'Excel (tassa in uscita / (aliquota × montante)) o dal fondo.
 Questo script calcola il confronto giusto: pensione netta / ultimo stipendio netto.
 
 Uso:
@@ -28,9 +34,11 @@ Regole fiscali incorporate (Verificato: 2026-07; periodo d'imposta 2026):
     il massimale (€122.295, iscritti dal 1996)
   - cuneo fiscale L. 207/2024 art. 1 c. 4-6 (solo lavoro dipendente, pensionati
     esclusi): fino a 20.000 € di reddito una somma esente pari al 7,1% / 5,3% /
-    4,8% del reddito di lavoro; tra 20.000 e 32.000 un'ulteriore detrazione di
-    1.000 €, che scende a zero tra 32.000 e 40.000
-    (Verificato: 2026-10: Normattiva L. 207/2024, Circ. AdE 4/E/2025, Circ. INPS 6/2026)
+    4,8% del reddito di lavoro (c. 4-5); tra 20.000 e 32.000 un'ulteriore
+    detrazione di 1.000 €, che scende a zero tra 32.000 e 40.000 (c. 6)
+    (Verificato: 2026-10: Normattiva L. 207/2024, Circ. AdE 4/E/2025, Circ. INPS 6/2026).
+    Il c. 6 vale fino al 2026: dal 1/1/2027 lo abroga il D.Lgs. 117/2026, che
+    riporta l'ulteriore detrazione nell'art. 13 del nuovo TUIR (comma da verificare)
   - addizionali regionale e comunale: parametriche (variano per territorio)
 
 ONESTÀ METODOLOGICA
@@ -42,6 +50,9 @@ ONESTÀ METODOLOGICA
   regione/comune per il risultato puntuale.
 - Semplificazioni dichiarate: nessun altro reddito IRPEF, nessuna detrazione
   per carichi di famiglia od oneri, niente trattamento integrativo.
+- Rendita del fondo: la parte della rata che viene dai rendimenti maturati
+  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR) è tassata a parte
+  dall'erogatore al 26% (12,5% sui titoli di Stato) e non è modellata.
 Questo strumento è educativo e non costituisce consulenza fiscale.
 """
 
@@ -60,6 +71,8 @@ RENDITE_FP = [
 ]
 ANNI_ISCRIZIONE_FP = 37          # anni di partecipazione al fondo alla decorrenza
                                  # (il TRASFERIMENTO tra fondi conserva l'anzianità)
+QUOTA_IMPONIBILE_FP = 1.0        # parte della rendita fatta di TFR e contributi dedotti: la sola tassata
+                                 # (1,0 = tutta, prudente; dall'Excel: tassa in uscita / (aliquota × montante))
 
 RAL_FINALE_LORDA = 58_000.0      # ultimo stipendio lordo (per il confronto netto/netto)
 
@@ -112,6 +125,12 @@ def detrazione_lavoro(reddito):
 def aliquota_rendita_fp(anni_iscrizione):
     """15% − 0,30% per ogni anno oltre il 15°, floor 9% (D.Lgs. 252/2005 art. 11)."""
     return max(0.09, 0.15 - 0.003 * max(0, anni_iscrizione - 15))
+
+
+def rendita_netta_fp(lorda, anni_iscrizione, quota_imponibile):
+    """Rendita del fondo al netto della ritenuta 15→9%, applicata alla sola quota imponibile
+    (TFR e contributi dedotti: art. 11 c. 6 D.Lgs. 252/2005)."""
+    return lorda * (1 - aliquota_rendita_fp(anni_iscrizione) * quota_imponibile)
 
 
 def netto_pensionato(inps_lorda, add_reg, add_com):
@@ -187,13 +206,17 @@ def main():
     # rendita complementare
     aliq_fp = aliquota_rendita_fp(ANNI_ISCRIZIONE_FP)
     print(f"\nRENDITA FONDO PENSIONE — imposta sostitutiva {aliq_fp:.1%} "
-          f"({ANNI_ISCRIZIONE_FP} anni di partecipazione; fuori IRPEF)")
+          f"({ANNI_ISCRIZIONE_FP} anni di partecipazione; fuori IRPEF) "
+          f"sul {QUOTA_IMPONIBILE_FP:.0%} della rendita")
+    if QUOTA_IMPONIBILE_FP >= 1:
+        print("  stima prudente: tassa anche i rendimenti già tassati; imposta QUOTA_IMPONIBILE_FP "
+              "con la quota di TFR e contributi dedotti")
 
     print(f"\n{'scenario':<10}{'rendita lorda':>14}{'rendita netta':>14}"
           f"{'pens. netta tot':>16}{'TASSO NETTO':>13}{'(lordo)':>9}")
     ral_lorda_tot = RAL_FINALE_LORDA
     for nome, lorda in RENDITE_FP:
-        netta = lorda * (1 - aliq_fp)
+        netta = rendita_netta_fp(lorda, ANNI_ISCRIZIONE_FP, QUOTA_IMPONIBILE_FP)
         tot = netto_inps + netta
         t_netto = tot / netto_lav
         t_lordo = (PENSIONE_INPS_LORDA + lorda) / ral_lorda_tot
@@ -215,11 +238,14 @@ def main():
             "netto_ultimo_stipendio": round(netto_lav, 2),
             "netto_pensione_inps": round(netto_inps, 2),
             "aliquota_rendita_fp": aliq_fp,
+            "quota_imponibile_fp": QUOTA_IMPONIBILE_FP,
             "scenari": [
                 {"nome": nome, "rendita_lorda": lorda,
-                 "rendita_netta": round(lorda * (1 - aliq_fp), 2),
-                 "pensione_netta_totale": round(netto_inps + lorda * (1 - aliq_fp), 2),
-                 "tasso_sostituzione_netto": round((netto_inps + lorda * (1 - aliq_fp)) / netto_lav, 4),
+                 "rendita_netta": round(rendita_netta_fp(lorda, ANNI_ISCRIZIONE_FP, QUOTA_IMPONIBILE_FP), 2),
+                 "pensione_netta_totale": round(
+                     netto_inps + rendita_netta_fp(lorda, ANNI_ISCRIZIONE_FP, QUOTA_IMPONIBILE_FP), 2),
+                 "tasso_sostituzione_netto": round(
+                     (netto_inps + rendita_netta_fp(lorda, ANNI_ISCRIZIONE_FP, QUOTA_IMPONIBILE_FP)) / netto_lav, 4),
                  "tasso_sostituzione_lordo": round((PENSIONE_INPS_LORDA + lorda) / RAL_FINALE_LORDA, 4)}
                 for nome, lorda in RENDITE_FP],
         })

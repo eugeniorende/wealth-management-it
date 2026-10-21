@@ -1,0 +1,41 @@
+{
+ "branch": "feature/t1-asimmetria-zainetto",
+ "commit": "1cf2a7a",
+ "applicati": [
+  "Confermato 8 + 6 (cripto in dichiarativo, Circ. 30/E/2023 par. 3.2.1 letta sul testo integrale): il LIFO è prescritto dall'Agenzia, non è una prassi «per analogia» da concordare; marcatore limitato a par. 2.3.1, 3.2.1, 3.2.2 — skills/it-tax-optimization/references/criptovalute.md:53, references/regime-dichiarativo.md:28 e marcatore :57",
+  "Confermato 0 (metodo del costo nella description e nel rimando): description con etichetta neutra «metodo del costo di carico»; il rimando a criptovalute.md cita la Circ. 30/E/2023 — skills/it-tax-optimization/SKILL.md:3 e :348",
+  "Confermato 5 (regole «identiche» all'amministrato): righe 17 e 53 dicono che cambia il metodo del costo (LIFO in dichiarativo) — skills/it-tax-optimization/references/regime-dichiarativo.md",
+  "Confermato 4 (Pattern D e aggregazione cross-broker): conta solo le minus con anno_scadenza > anno_corrente; il dichiarativo si propone nel confronto con il Pattern E, non in automatico; sul caso pratico il delta è €624 — skills/it-tax-optimization/SKILL.md (Step 2, Pattern D), più la propagazione in references/regime-dichiarativo.md:42",
+  "Conteso 0 (Pattern E): capienza della destinazione al netto del suo zainetto, scalata tra le origini in ordine di scadenza, con la nota sul recupero certo dell'anno — skills/it-tax-optimization/SKILL.md (Pattern E)",
+  "Confermati 7 e 9 (doppio riferimento TU 2027, mappa verificata su Normattiva: art. 6 c. 1-bis/2/4/5/7 → art. 306 c. 2/3/5/6/8; art. 5 c. 2 → 304 c. 1; art. 10-ter cc. 6-7 → art. 59 cc. 9-10 All. 1 D.Lgs. 33/2025; 26% da art. 3 c. 1 DL 66/2014) — README.md:513, it-rebalance references/ribilanciamento-multibroker.md:7 e :43, references/sequenza-liquidazione.md:34, assets/ribilanciamento-multibroker.py (docstring), it-tax-optimization SKILL.md:37, Pattern D, marcatore Pattern E e anti-pattern, criptovalute.md:53 e :73, multi-intermediario.md:36, :69 e marcatore, etf-trap-redditi-capitale.md (marcatore), it-pianificazione/references/integrazione-fiscale-joint.md (Pattern J3)",
+  "Conteso 1 (integrazione-fiscale-joint, il «Solo»): in dichiarativo concorrono all'IRPEF (quadro RL) anche i proventi dei non armonizzati fuori UE/SEE o senza gestore vigilato; tolto l'esempio dei dividendi qualificati pre-2018, il cui regime transitorio vale per le delibere fino al 2022 (L. 205/2017 c. 1006, verificato); mappa allineata a «fuori UE/SEE o senza gestore vigilato» — skills/it-pianificazione/references/integrazione-fiscale-joint.md",
+  "Conteso 2, in parte (residui del modello a lotti): disclaimer dello script (NOTA_CSV e stdout) su «prezzo medio di carico»; tolta la voce «tracciabilità storica del PMC» tra i motivi per il dichiarativo — skills/it-rebalance/assets/ribilanciamento-multibroker.py, skills/it-tax-optimization/references/multi-intermediario.md",
+  "Confermato 1 (test LIFO debole): nuova _lifo_errato, che lega ogni LIFO (anche «Lifo» e «L.I.F.O.») al regime della sua clausola, con casi fissi positivi e negativi; i mutanti M1-M4 passavano col test vecchio e ora falliscono; più asserzioni su criptovalute.md e regime-dichiarativo.md, verificate per mutazione — tests/run_tests.py (t_t1_lifo_amministrato)",
+  "Confermato 2 (test F003 debole): quattro pattern su tutti i testi di _testi_regole(), controllo della colonna della sostitutiva in integrazione-fiscale-joint, verifiche in positivo su tipo_fiscale e sulla deduzione, assert trovate >= 1, eccezione IRPEF in dichiarativo; i mutanti (a)-(d) ed etf-trap:52 passavano e ora falliscono — tests/run_tests.py (t_t1_non_armonizzati)",
+  "Confermato 3 (caso pratico): taglio prima del marcatore, intestazioni e righe di tabella per (a), (b), (c), totali ricalcolati dalle regole dei Pattern A, D ed E (208, 598/1.222, 832), vincoli sullo pseudocodice dei Pattern D ed E; mutanti P1, P2, E1 e D1 falliscono — tests/run_tests.py (t_t1_chiusura_rapporto)",
+  "Nuovo test di igiene t_t1_doppie_citazioni: nei file di T1 ogni riga che cita il D.Lgs. 461 o l'art. 10-ter nomina anche il riferimento dal 2027 — tests/run_tests.py"
+ ],
+ "scartati": [
+  {
+   "titolo": "Confermato 6, nella direzione proposta dal rilievo (riscrivere SKILL.md:3 e :338 come «nessun criterio di legge, LIFO per analogia»)",
+   "motivo": "La correzione andava nella direzione opposta. Il par. 3.2.1 della Circ. 30/E/2023 (p. 55, testo integrale) prescrive il LIFO per le cripto-attività in dichiarativo. Era sbagliata la reference, non SKILL.md, e lo dicono anche i due verificatori. Ho corretto criptovalute.md e regime-dichiarativo.md."
+  },
+  {
+   "titolo": "Confermato 0, parte sui titoli rideterminati o affrancati (eccezione Circ. 16/E/2023) e su README.md:297",
+   "motivo": "Entrambi i verificatori la respingono: la Circ. 16/E/2023 conferma il costo medio in amministrato, con un sottoconto per i rideterminati. README:297 è changelog storico, fuori perimetro. Anche il changelog v0.5 della skill resta com'è: ora è corretto."
+  },
+  {
+   "titolo": "Conteso 2, parte su commands/ribilancia.md:11 e commands/minusvalenze.md:11",
+   "motivo": "ribilancia.md è fuori perimetro. minusvalenze.md («PMC o lotti») è già coerente con SKILL.md:110: i lotti servono in dichiarativo o per ricostruire il PMC."
+  }
+ ],
+ "suite": "49/49 test passati",
+ "note_integratore": [
+  "Changelog del README e ROADMAP.md non toccati: la voce per queste correzioni va scritta in fase di rilascio.",
+  "README.md:74 parla ancora di «40 test», ma la suite ora ne ha 49 (il conteggio era già vecchio prima di questo branch).",
+  "Fuori dal diff di T1, da sistemare in T11: skills/it-tax-optimization/references/criptovalute-casi-speciali.md:9 cita «art. 6 c. 6 D.Lgs. 461/1997» senza successore. Il successore verificato è l'art. 306 c. 7 TU D.Lgs. 117/2026.",
+  "Facoltativo, fuori perimetro: commands/ribilancia.md:11 «PMC (o lotti)» potrebbe dire che i lotti servono solo a ricostruire il PMC, come it-rebalance/SKILL.md:99.",
+  "Fonte della Circ. 30/E/2023: il link diretto al PDF sul sito AdE dà 404. Ho usato la copia integrale di 118 pagine su dirittobancario.it. Il comunicato stampa AdE del 27/10/2023 conferma che il documento è ufficiale. Le norme vengono da Normattiva (testi vigenti e versioni dal 1/1/2027). I file scaricati sono in <scratchpad>/fonti-t1. Nessun contenuto web conteneva istruzioni.",
+  "Il merge di develop era già incorporato (9e65e28): git merge ha risposto «Already up to date», quindi non c'è un nuovo merge commit. Il worktree è stato rimosso e il branch è libero. Niente push, nessuna PR."
+ ]
+}

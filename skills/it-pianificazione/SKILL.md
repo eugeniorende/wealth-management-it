@@ -49,7 +49,7 @@ Tre forme: fondo negoziale (di categoria), fondo aperto, PIP (Piano Individuale 
 
 Tassazione:
 - Sui rendimenti annui (fase accumulo): **20%** (12,5% sulla quota in titoli di Stato whitelist)
-- Sulle prestazioni finali: **15%** di base, scende di 0,30 punti % per ogni anno di partecipazione oltre il 15esimo, fino a un minimo del **9%** (al 35° anno)
+- Sulle prestazioni finali: **15%** di base, scende di 0,30 punti % per ogni anno di partecipazione oltre il 15esimo, fino a un minimo del **9%** (al 35° anno), sui soli TFR conferito e contributi dedotti (rendimenti già tassati e non dedotti comunicati esclusi)
 
 Vedi `references/previdenza-complementare.md` per: scelta tra forma (negoziale vs aperto vs PIP), conferimento TFR, scelta comparto (garantito/obbligazionario/bilanciato/azionario), anticipazioni, riscatti, opzione capitale vs rendita.
 
@@ -161,11 +161,12 @@ Lo script `assets/proiezione-inps.py` implementa questo calcolo in forma paramet
 montante_oggi = montante_da_estratto_conto              # se disponibile
 
 #    FALLBACK se non disponibile (stima): tiene conto sia della RAL passata più bassa
-#    (cresciuta a g) sia della rivalutazione dei contributi già versati (a riv).
-#    q = (1 + rivalutazione) / (1 + crescita_RAL):
-montante_oggi ≈ RAL_attuale × 0,33 × Σ(k=1..anzianità) q^k
-#    Si riduce alla vecchia stima grezza (anzianità × RAL × 0,33) quando riv ≈ g, perché i
-#    due effetti si compensano; diverge (correttamente) quando rivalutazione e crescita differiscono.
+#    (cresciuta a g) sia della rivalutazione dei contributi già versati (a riv), anno per anno.
+#    k = anni fa (k=1 è l'anno scorso); il massimale è costante in euro di oggi e il contributo
+#    dell'anno scorso non si è ancora rivalutato (L. 335/1995):
+montante_oggi ≈ Σ(k=1..anzianità) min(RAL_attuale / (1+g)^k, massimale) × 0,33 × (1+riv)^(k-1)
+#    Senza massimale si avvicina alla vecchia stima grezza (anzianità × RAL × 0,33) quando
+#    riv ≈ g, perché i due effetti si compensano; diverge (correttamente) quando differiscono.
 
 # 2) Proiezione FUTURA anno per anno (foglio "Pubblica"), in euro di oggi: ogni anno il
 #    montante è rivalutato al PIL reale e vi si aggiunge il contributo dell'anno
@@ -228,6 +229,8 @@ risparmio_fiscale_annuo = volontario_deducibile × aliquota_marginale
 rendimento_lordo_comparto = parametro(comparto)
 # Tipici: garantito 1-2%, obbligazionario 2-3%, bilanciato 3-4,5%, azionario 5-7%
 rendimento_netto_annuo = rendimento_lordo × (1 - 0,20)  # ~tassa 20%, ~12,5% per quota titoli stato
+# i tipici sopra sono nominali: l'Excel e lo Step 4 sono in euro di oggi e vogliono il REALE
+rendimento_reale ≈ rendimento_netto_annuo − costi − inflazione  # bilanciato ~2,5% (come montecarlo-pensione.py)
 montante_finale = capitalizza(montante_attuale, contributi_totali_annui, rendimento_netto_annuo, anni_residui)
 
 # Tassazione finale
@@ -235,7 +238,7 @@ anni_partecipazione_totali = anni_partecipazione_correnti + anni_residui
 aliquota_finale = max(9%, 15% - 0,30% × max(0, anni_partecipazione_totali - 15))
 prestazione_lorda = montante_finale
 # base imponibile: TFR conferito + contributi dedotti; esclusi i rendimenti già tassati
-# e i contributi non dedotti comunicati al fondo (art. 11 c. 6 D.Lgs. 252/2005)
+# e i contributi non dedotti comunicati al fondo (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026)
 prestazione_netta = montante_finale - (tfr_conferito + contributi_dedotti) × aliquota_finale
 ```
 
@@ -243,7 +246,7 @@ Confronto chiave: **TFR azienda vs TFR conferito al fondo**, sulle medesime ipot
 - TFR azienda: capitale netto = TFR_rivalutato − quote × aliquota_media_separata (~23-27%); la rivalutazione (1,5% + 75% dell'inflazione) paga già il 17% ogni anno
 - TFR fondo: capitale netto = montante_TFR − quote × aliquota_fondo (9-15%); i rendimenti, già tassati al 20%, non pagano altro
 
-Il foglio Complementare dell'Excel fa il conto (blocco «Confronto TFR»): con RAL €40.000 per 30 anni, inflazione 2% e comparto al 3,5% reale il fondo vale ~€61.500 netti in più in euro di oggi, di cui ~€7.700 di tasse risparmiate e il resto dal rendimento atteso, che è incerto. Il vantaggio fiscale è certo, quello di rendimento no.
+Il foglio Complementare dell'Excel fa il conto (blocco «Confronto TFR»): con RAL €40.000 per 30 anni, inflazione 2% e comparto al 2,5% reale il fondo vale ~€40.100 netti in più in euro di oggi, di cui ~€7.700 di tasse risparmiate (a scaglioni di oggi) e il resto dal rendimento atteso, che è incerto. Il vantaggio fiscale è certo, quello di rendimento no. Si conferisce il TFR futuro: quello già maturato di regola resta in azienda, e con il TFR ancora in azienda il blocco confronta le sole quote future.
 
 ### Step 4: Proiezione tenore vita
 
@@ -272,7 +275,7 @@ Per ciascun pattern di copertura, quantificare l'impatto:
 - **Pattern P1 — Massimizzare contributo deducibile**: se contributi del lavoratore e del datore insieme non saturano i €5.300/anno, calcolare il delta montante finale + il risparmio IRPEF cumulato
 - **Pattern P2 — Cambiare comparto**: se l'utente è in garantito con 25+ anni alla pensione, mostrare il delta atteso passando a bilanciato/azionario
 - **Pattern P3 — Ritardare pensionamento**: confronto 64/67/70 anni — più anni contributi + coefficiente migliore + meno anni di pensione (ma tenore di vita)
-- **Pattern P4 — Conferire TFR**: se ancora in azienda, simulare il delta cumulato sulla parte TFR
+- **Pattern P4 — Conferire TFR**: se ancora in azienda, simulare il delta cumulato sulle quote future di TFR (il maturato resta in azienda), come scenario: la scelta è irrevocabile
 - **Pattern P5 — Risparmio non previdenziale**: copertura del residuo gap via PAC ETF (rinviare a competenze separate)
 
 Per ogni pattern: pro, contro, vincoli (es. €5.300 cap, rischio comparto), orizzonte temporale.
@@ -333,11 +336,11 @@ Il template `assets/proiezione-pensione.xlsx` (incluso nella skill) è il delive
 
 - **Complementare**: proiezione fondo pensione anno per anno (TFR se conferito, contributi del lavoratore e del datore, rendimenti), con quota deducibile e non dedotto da comunicare (plafond condiviso), spazio deducibile residuo, prestazione finale netta (tassa sui soli TFR e contributi dedotti), rendita stimata, risparmio IRPEF sulla quota deducibile e il **confronto TFR in azienda vs fondo**.
 
-- **Scenari**: confronto Conservativo / Base / Ottimistico, tutto in euro di oggi. Base coincide con i fogli di calcolo; gli altri due ricalcolano pensione INPS e fondo con crescita RAL, PIL reale, decadimento del coefficiente e rendimento della propria colonna. GAP (spesa target − reddito pensione) in euro di oggi e, in una riga a parte, in € del pensionamento.
+- **Scenari**: confronto Conservativo / Base / Ottimistico, tutto in euro di oggi. Base coincide con i fogli di calcolo; gli altri due ricalcolano pensione INPS e fondo con crescita RAL, PIL reale, decadimento del coefficiente e rendimento della propria colonna. GAP (spesa target − reddito pensione) in euro di oggi e, in una riga a parte, in € del pensionamento. Con il TFR in azienda il suo netto è capitale fuori dal gap (riga 16), tradotto in rendita equivalente al 5,5% nella riga 34 per confrontare le due scelte. Le soglie fiscali (scaglioni, plafond) restano quelle di oggi in euro di oggi.
 
 Il template usa convenzioni industry-standard (blu = input, nero = formule, verde = cross-sheet) e si auto-aggiorna quando l'utente modifica le celle blu. Il ricalcolo in locale italiano con LibreOffice (CI) verifica che nessuna cella vada in errore. **Il coefficiente di trasformazione è proiettato in calo** all'anno di pensionamento (non usa quello attuale), così la pensione stimata è realistica anche su orizzonti lunghi.
 
-✅ **Montante INPS iniziale (migliorato in v0.3)**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma `RAL × 33% × Σ q^k` con `q = (1+rivalutazione)/(1+crescita_RAL)`, che tiene conto della retribuzione passata più bassa e della rivalutazione dei contributi già versati (e si riduce alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis su mypensione.it via SPID/CIE).
+✅ **Montante INPS iniziale (migliorato in v0.3)**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma la somma anno per anno di `min(RAL/(1+g)^k, massimale) × 33% × (1+rivalutazione)^(k−1)`, che tiene conto della retribuzione passata più bassa, del massimale (costante in euro di oggi) e della rivalutazione dei contributi già versati (e si avvicina alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis sul portale INPS, www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo").
 
 ### Disclaimer (obbligatorio in fondo)
 
@@ -352,7 +355,7 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 - ❌ Dimenticare il beneficio fiscale immediato del contributo volontario al fondo (per RAL nel secondo scaglione, con €800 di contributo datore: (€5.300 − €800) × 33% = €1.485 di risparmio IRPEF annuo)
 - ❌ Confondere "comparto garantito" con "investimento sicuro": il garantito ha rendimento atteso 1-2% lordo, sotto inflazione media → erosione del potere d'acquisto
 - ❌ Raccomandare di non aderire a fondo pensione "perché non si fida" senza quantificare il costo opportunità
-- ❌ Trattare l'opzione capitale al pensionamento (max 50% montante in molte forme) come reddito pensionistico — è patrimonio, va gestito separatamente
+- ❌ Trattare l'opzione capitale al pensionamento (max 50% del montante, art. 11 c. 3; il 100% solo se la rendita sul 70% del montante è sotto il 50% dell'assegno sociale) come reddito pensionistico — è patrimonio, va gestito separatamente
 - ❌ Dimenticare il contributo datore di lavoro: è "soldi gratis" se previsto dal CCNL e si attiva solo aderendo
 - ❌ Ignorare che per dipendenti pubblici (Cassa CPDEL, CPI, ecc.) le regole sono **diverse** — questa skill NON li copre
 

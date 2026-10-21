@@ -91,7 +91,10 @@ Due regimi possibili:
 rendita_lorda_mensile = (montante × tasso_conversione_annuo) / 12
 rendita_netta_mensile = rendita_lorda − ritenuta 15%→9% sulla parte imponibile
     # parte imponibile = TFR e contributi dedotti; fuori dall'IRPEF progressiva
-    # (art. 11 c. 6 D.Lgs. 252/2005), come in netto-pensione.py
+    # (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026).
+    # netto-pensione.py la applica alla quota QUOTA_IMPONIBILE_FP (default 1,0:
+    # tutta la rendita, stima prudente). I rendimenti maturati durante
+    # l'erogazione pagano a parte il 26% (12,5% sui titoli di Stato)
 ```
 
 Tassi di conversione tipici (immediata vitalizia, persona singola, senza opzioni):
@@ -191,7 +194,7 @@ TFR_fondo_netto = montante_TFR_in_fondo - quote × aliquota_fondo (15% → 9%)
 delta = TFR_fondo_netto - TFR_azienda_netto
 ```
 
-Il foglio Complementare dell'Excel lo calcola (blocco «Confronto TFR»). Con RAL €40.000 per 30 anni, inflazione 2% e comparto al 3,5% reale, il delta è ~€61.500 in euro di oggi: ~€7.700 di tasse risparmiate (certe) e il resto dal rendimento atteso (incerto). Vincolo: decisione irrevocabile una volta presa.
+Il foglio Complementare dell'Excel lo calcola (blocco «Confronto TFR»). Con RAL €40.000 per 30 anni, inflazione 2% e comparto al 2,5% reale, il delta è ~€40.100 in euro di oggi: ~€7.700 di tasse risparmiate (certe, a scaglioni di oggi) e il resto dal rendimento atteso (incerto). Si conferisce il TFR futuro: il maturato di regola resta in azienda, e il blocco ne tiene conto. Vincolo: decisione irrevocabile una volta presa.
 
 ### P5: Risparmio non previdenziale (PAC, immobili, finanziario)
 

@@ -12,7 +12,8 @@ Pensione                         Plus/minus certificates, ETC
 Affitti (ordinaria)              Plus/minus obbligazioni
 Lavoro autonomo                  Cedole, dividendi
 Plus ETF non armonizzati         ETF UCITS armonizzati (no compensaz.)
-  extra UE/SEE (no compensaz.)
+  fuori UE/SEE o senza gestore
+  vigilato (no compensaz.)
 Deducibili:
   Fondo pensione (€5.300)         (nessuna compensazione cross-regime)
   Contributi obbligatori
@@ -31,7 +32,7 @@ Deducibili:
 - **A — Fondo pensione complementare** (entro €5.300 deducibili):
   - Deduzione IRPEF immediata = €X × aliquota_marginale
   - Capitalizzazione interna tassata 20% (12,5% titoli Stato)
-  - Tassazione finale 9-15% (in base ad anni partecipazione)
+  - Tassazione finale 9-15% (in base ad anni partecipazione) sui soli contributi dedotti e TFR conferito; rendimenti già tassati e non dedotti comunicati esclusi
 - **B — Investimento finanziario su dossier titoli normale** (ETF/azioni):
   - No deduzione IRPEF
   - Tassazione 26% sui gains realizzati (12,5% se titoli Stato whitelist)
@@ -53,9 +54,12 @@ Scenario A — €3.000/anno al fondo pensione (bilanciato, rendimento netto 3,5
   Risparmio IRPEF annuo: €3.000 × 33% = €990
   Risparmio IRPEF cumulato: €990 × 22 = €21.780
   Montante a pensione (capitalizzato 22 anni): €98.500
-  Aliquota finale fondo: ~12% (27 anni partecipazione)
-  Netto finale: €86.700
-  TOTALE valore: €86.700 + €21.780 = €108.480 (in nominale)
+  Aliquota finale fondo: 11,4% (27 anni di partecipazione: 15% − 0,30 × 12)
+  Tassa in uscita: €66.000 di contributi dedotti (€3.000 × 22) × 11,4% ≈ €7.500;
+    i rendimenti, già tassati al 20% nel fondo, sono esclusi (art. 11 c. 6
+    D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026)
+  Netto finale: ≈ €91.000
+  TOTALE valore: ≈ €91.000 + €21.780 ≈ €112.800 (in nominale)
 
 Scenario B — €3.000/anno su ETF MSCI World UCITS (rendimento lordo 6%)
   Nessuna deduzione IRPEF
@@ -103,9 +107,9 @@ Doing entrambe le cose nello stesso anno:
 
 **Setup**: l'utente realizza plus significative nel corso dell'anno (es. vendita di un portafoglio storico) e ha redditi da lavoro vicini al limite di scaglione.
 
-**Falso allarme**: l'utente potrebbe pensare "le plus aumentano il mio reddito IRPEF, mi spingono nello scaglione superiore". **Non è vero**: le plus su finanziari in regime amministrato sono **escluse dal reddito IRPEF complessivo** (sostitutiva, separata).
+**Falso allarme**: l'utente potrebbe pensare "le plus aumentano il mio reddito IRPEF, mi spingono nello scaglione superiore". **Non è vero**: le plus su finanziari in regime amministrato sono **escluse dal reddito IRPEF complessivo** (sostitutiva, separata). **Eccezione**: le plus di ETF e fondi non armonizzati fuori UE/SEE o senza gestore vigilato (per esempio ETF domiciliati negli USA) sono reddito di capitale che concorre al reddito complessivo, con ritenuta del 26% a titolo d'acconto e quadro RL anche in amministrato (art. 10-ter cc. 6-7 L. 77/1983, vigente fino al 31/12/2026, dal 2027 art. 59 cc. 9-10 dell'All. 1 al D.Lgs. 33/2025; aliquota del 26% dall'art. 3 c. 1 DL 66/2014): quelle sì possono spingere nello scaglione superiore.
 
-**Eccezione importante**: per chi è in **regime dichiarativo** (no sostituto d'imposta), le plus finanziarie sono sì soggette a sostitutiva 26% nel quadro RT del Modello Redditi PF, ma non concorrono comunque all'IRPEF ordinaria. Solo i **redditi di capitale** distribuiti (cedole, dividendi) in alcuni casi specifici (es. dividendi di partecipazioni qualificate pre-2018) entrano nell'IRPEF ordinaria.
+**Eccezione importante**: per chi è in **regime dichiarativo** (no sostituto d'imposta), le plus finanziarie che sono redditi diversi vanno nel quadro RT del Modello Redditi PF con la sostitutiva del 26% e non concorrono all'IRPEF ordinaria. Vi concorrono invece, nel quadro RL, i proventi di ETF e fondi non armonizzati fuori UE/SEE o senza gestore vigilato, sia distribuiti sia da cessione o rimborso (vedi sopra): con un broker estero è il caso tipico degli ETF domiciliati negli USA.
 
 **Conclusione operativa**: l'ottimizzazione finanziaria (it-tax-optimization) e l'ottimizzazione IRPEF (it-pianificazione) sono **disaccoppiate** per le casistiche standard del lavoratore dipendente. Coordinarle non offre vantaggi cross-regime, ma evita errori (es. l'utente che evita di vendere "perché entrerebbe in scaglione superiore" sbaglia).
 
