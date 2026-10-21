@@ -102,5 +102,5 @@ Questo è il caso più sottile e spesso trascurato: anche se cambi la formula da
 
 ---
 *Dati normativi (qualificazione fiscale di ETF/fondi come redditi di capitale) — Verificato: 2026-06.*
-*OICR non armonizzati (art. 10-ter L. 77/1983, Circ. 21/E/2014) e scarto di emissione (artt. 44-45 e 68 c. 7 TUIR) — Verificato: 2026-10.*
+*OICR non armonizzati (art. 10-ter L. 77/1983, vigente fino al 31/12/2026, → art. 59 All. 1 D.Lgs. 33/2025; Circ. 21/E/2014) e scarto di emissione (artt. 44-45 e 68 c. 7 TUIR) — Verificato: 2026-10.*
 *Corrispondenze nel TU 2027 (artt. 46, 47, 76 e 77 D.Lgs. 117/2026) — Verificato: 2026-10.*

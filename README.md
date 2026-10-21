@@ -510,7 +510,7 @@ Più disclaimer obbligatorio.
 
 ## Differenza chiave: zainetto fiscale
 
-Il concetto di "zainetto fiscale" è centrale e non ha equivalente diretto USA. È il registro di minusvalenze pregresse custodito dall'intermediario in regime amministrato, con scadenza a 4 anni e regole asimmetriche di compensazione (vedi `skills/it-tax-optimization/references/etf-trap-redditi-capitale.md`). Chiudendo il rapporto non si perde: l'intermediario certifica le minus residue, che si usano su un altro rapporto con gli stessi intestatari o in dichiarazione fino alla scadenza originaria (art. 6 c. 5 D.Lgs. 461/97, vedi `multi-intermediario.md`).
+Il concetto di "zainetto fiscale" è centrale e non ha equivalente diretto USA. È il registro di minusvalenze pregresse custodito dall'intermediario in regime amministrato, con scadenza a 4 anni e regole asimmetriche di compensazione (vedi `skills/it-tax-optimization/references/etf-trap-redditi-capitale.md`). Chiudendo il rapporto non si perde: l'intermediario certifica le minus residue, che si usano su un altro rapporto con gli stessi intestatari o in dichiarazione fino alla scadenza originaria (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027, vedi `multi-intermediario.md`).
 
 ## Contribuire
 
