@@ -413,10 +413,11 @@ def t_scenari_reali():
 def _fondo_scenario(wb, g, rend, n):
     """Montante del fondo (foglio Complementare) ricalcolato con crescita RAL g e rendimento rend."""
     i = wb["Input"]
-    m = i["B22"].value + i["B25"].value
+    dovuto = _per_etichetta(i, "Contributo dovuto lavoratore")
+    m = i["B22"].value * i["B21"].value + i["B25"].value   # il saldo TFR entra solo se conferito
     for t in range(n):
         ral = i["B10"].value * (1 + g) ** t
-        m = m * (1 + rend) + ral * 0.0691 * i["B21"].value + min(i["B26"].value, 5300) + ral * i["B27"].value
+        m = m * (1 + rend) + ral * (0.0691 * i["B21"].value + i["B27"].value + dovuto) + i["B26"].value
     return m
 
 
@@ -507,6 +508,189 @@ def t_coerenza_parametri_2026():
     assert np_.MASSIMALE_CONTRIBUTIVO == massimale and np_.PRIMA_FASCIA_PENSIONABILE == prima_fascia
     wb = load_workbook(asset(*PP))
     assert _per_etichetta(wb["Input"], "Massimale contributivo") == massimale, "massimale dell'Excel dipendenti"
+    plafond = next(iter(trovati["plafond"]))
+    for skill, nome in (PP, ("it-pianificazione-autonomi", "proiezione-pensione-autonomi.xlsx")):
+        assert _per_etichetta(load_workbook(asset(skill, nome))["Input"], "Plafond deducibilità") == plafond, \
+            f"{nome}: plafond diverso da €{plafond:,.0f}"
+
+
+def _colonna(ws, testo, riga=4):
+    """Lettera della colonna la cui intestazione (riga 4) contiene testo."""
+    from openpyxl.utils import get_column_letter
+    for c in range(1, ws.max_column + 1):
+        if testo.lower() in str(ws.cell(riga, c).value or "").lower():
+            return get_column_letter(c)
+    raise AssertionError(f"{ws.title}: nessuna colonna «{testo}» in riga {riga}")
+
+
+def _irpef(r):
+    return r * 0.23 if r <= 28_000 else 6_440 + (r - 28_000) * 0.33 if r <= 50_000 else 13_700 + (r - 50_000) * 0.43
+
+
+def _base_uscita_fondo(i, g, n, infl):
+    """Base imponibile in uscita del fondo dei dipendenti, in euro di oggi: TFR conferito e contributi
+    dedotti (lavoratore + datore entro il plafond), al valore nominale riportato a oggi. Esclusi i
+    rendimenti già tassati e i contributi non dedotti comunicati (art. 11 c. 6 D.Lgs. 252/2005)."""
+    plafond = _per_etichetta(i, "Plafond deducibilità")
+    dovuto = _per_etichetta(i, "Contributo dovuto lavoratore")
+    base = (i["B22"].value * i["B21"].value + i["B25"].value) * (1 + infl) ** -n
+    for t in range(n):
+        ral = i["B10"].value * (1 + g) ** t
+        dedotti = min(plafond, i["B26"].value + ral * (dovuto + i["B27"].value))
+        base += (ral * 0.0691 * i["B21"].value + dedotti) * (1 + infl) ** (t - n)
+    return base
+
+
+VARIANTI_T4 = {
+    "ral60k": {("Input", "B10"): 60_000, ("Input", "B27"): 0.02, ("Input", "B26"): 5_000},
+    "ral60k_dovuto": {("Input", "B10"): 60_000, ("Input", "B27"): 0.02, ("Input", "B47"): 0.01},
+    "rend6": {("Input", "B28"): 0.06},
+    "tfr_azienda": {("Input", "B21"): 0},
+    "tfr40k": {("Input", "B5"): 37, ("Input", "B6"): 67, ("Input", "B10"): 40_000, ("Input", "B12"): 0.0,
+               ("Input", "B22"): 0, ("Input", "B48"): 0, ("Input", "B29"): 0, ("Input", "B17"): 0.02,
+               ("Input", "B28"): 0.035, ("Input", "B21"): 1},
+}
+
+
+@test("proiezione-pensione.xlsx: plafond condiviso col datore, quota deducibile e spazio residuo (RAL 60k, datore 2% → €4.100)")
+def t_plafond_excel():
+    # REGRESSIONE F007: Complementare!E5 tappava solo il volontario a 5.300 e B64 deduceva tutto il
+    # volontario anche quando il datore aveva già usato parte del plafond.
+    v = _varianti(*PP, VARIANTI_T4)
+    for nome, residuo, deducibile, non_dedotto in (("ral60k", 4_100, 4_100, 900), ("ral60k_dovuto", 3_500, 2_000, 0)):
+        wb = v[nome]
+        i, c = wb["Input"], wb["Complementare"]
+        assert abs(_per_etichetta(c, "Spazio deducibile residuo") - residuo) < 0.01, \
+            f"{nome}: spazio residuo {_per_etichetta(c, 'Spazio deducibile residuo')} ≠ {residuo}"
+        q, nd, e = _colonna(c, "Quota deducibile"), _colonna(c, "Non dedotto"), _colonna(c, "Contrib. lavoratore")
+        assert abs(c[f"{q}5"].value - deducibile) < 0.01, f"{nome}: quota deducibile {c[f'{q}5'].value}"
+        assert abs(c[f"{nd}5"].value - non_dedotto) < 0.01, f"{nome}: non dedotto {c[f'{nd}5'].value}"
+        attesi = i["B26"].value + i["B10"].value * _per_etichetta(i, "Contributo dovuto lavoratore")
+        assert abs(c[f"{e}5"].value - attesi) < 0.01, f"{nome}: il contributo del lavoratore va tutto a montante"
+        somma = sum(c[f"{q}{r}"].value or 0 for r in range(5, 55))
+        assert abs(_per_etichetta(c, "Risparmio IRPEF") - somma * i["B37"].value) < 0.01, \
+            f"{nome}: il risparmio IRPEF va calcolato sulla quota deducibile"
+    formula = load_workbook_formule(asset(*PP))["Complementare"][f"{_colonna(v['ral60k']['Complementare'], 'Quota deducibile')}5"].value
+    assert "Input!$B$44" in formula, f"la quota deducibile deve usare la cella del plafond: {formula}"
+
+
+def load_workbook_formule(path):
+    from openpyxl import load_workbook
+    return load_workbook(path)
+
+
+@test("proiezione-pensione.xlsx: tassa in uscita solo su TFR e contributi dedotti, TFR in azienda fuori dal fondo")
+def t_uscita_fondo_excel():
+    # REGRESSIONE F014/F037: B60 tassava l'intero montante (rendimenti già tassati compresi) e
+    # G5/H5 sommavano al fondo il saldo TFR anche con il TFR lasciato in azienda.
+    from openpyxl import load_workbook
+    base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
+    v = _varianti(*PP, VARIANTI_T4)
+    for nome, wb in (("default", base), ("rend6", v["rend6"]), ("tfr_azienda", v["tfr_azienda"])):
+        i, c = wb["Input"], wb["Complementare"]
+        n = int(i["B36"].value)
+        attesa = _base_uscita_fondo(i, i["B12"].value, n, i["B17"].value) * i["B38"].value
+        assert abs(c["B60"].value - attesa) < 0.01, f"{nome}: tassa in uscita {c['B60'].value:,.2f} ≠ {attesa:,.2f}"
+    assert abs(v["rend6"]["Complementare"]["B60"].value - base["Complementare"]["B60"].value) < 0.01, \
+        "il rendimento non deve cambiare la base imponibile in uscita"
+    assert v["rend6"]["Complementare"]["B58"].value > base["Complementare"]["B58"].value
+    c, i = v["tfr_azienda"]["Complementare"], v["tfr_azienda"]["Input"]
+    assert c["D5"].value == 0 and abs(c["H5"].value - (i["B25"].value * (1 + i["B28"].value) + c["E5"].value + c["F5"].value)) < 0.01, \
+        "con il TFR in azienda il saldo TFR non entra nel montante del fondo"
+    f = load_workbook_formule(asset(*PP))["Complementare"]
+    assert "Input!$B$22*Input!$B$21" in f["G5"].value and "Input!$B$22*Input!$B$21" in f["H5"].value
+    # Scenari: la prestazione netta di ogni colonna usa la stessa base, con crescita RAL e inflazione della colonna
+    s, i = base["Scenari"], base["Input"]
+    n = int(i["B36"].value)
+    for col in "BCD":
+        g, infl, rend = s[f"{col}5"].value, s[f"{col}7"].value, s[f"{col}9"].value
+        netta = _fondo_scenario(base, g, rend, n) - _base_uscita_fondo(i, g, n, infl) * i["B38"].value
+        assert abs(s[f"{col}14"].value - netta) <= 1e-6 * netta, f"Scenari!{col}14 = {s[f'{col}14'].value:,.0f} ≠ {netta:,.0f}"
+
+
+def _tfr_confronto(i):
+    """Confronto TFR in azienda vs nel fondo, in euro di oggi, replicato dalle regole di legge:
+    quota RAL × 6,91%; in azienda rivalutazione 1,5% + 75% dell'inflazione tassata al 17% e
+    tassazione separata all'aliquota media sul reddito di riferimento (base × 12 / anni);
+    nel fondo rendimento del comparto e 15%→9% sulle sole quote (art. 2120 c.c., art. 19 TUIR,
+    art. 11 c. 6 D.Lgs. 252/2005)."""
+    n, infl, rend = int(i["B36"].value), i["B17"].value, i["B28"].value
+    r_tfr = (1 + (0.015 + 0.75 * infl) * 0.83) / (1 + infl) - 1
+    azienda = fondo = i["B22"].value
+    base = i["B22"].value * (1 + infl) ** -n
+    for t in range(n):
+        quota = i["B10"].value * (1 + i["B12"].value) ** t * 0.0691
+        azienda = azienda * (1 + r_tfr) + quota
+        fondo = fondo * (1 + rend) + quota
+        base += quota * (1 + infl) ** (t - n)
+    rif = base * 12 / (_per_etichetta(i, "Anni di servizio già maturati") + n)
+    aliq_sep = _irpef(rif) / rif if rif > 0 else 0.0
+    netto_azienda = azienda - base * aliq_sep
+    netto_fondo = fondo - base * i["B38"].value
+    return netto_azienda, netto_fondo
+
+
+@test("proiezione-pensione.xlsx: confronto TFR in azienda vs fondo (RAL 40k per 30 anni) e TFR in azienda negli Scenari")
+def t_tfr_confronto():
+    # F037: il confronto era promesso dalla skill ma nessuno strumento lo calcolava.
+    from openpyxl import load_workbook
+    v = _varianti(*PP, VARIANTI_T4)
+    base = load_workbook(xlsx_ricalcolati()[asset(*PP)], data_only=True)
+    for nome, wb in (("tfr40k", v["tfr40k"]), ("default", base)):
+        i, c = wb["Input"], wb["Complementare"]
+        azienda, fondo = _tfr_confronto(i)
+        assert abs(_per_etichetta(c, "TFR in azienda NETTO") - azienda) < 0.01, \
+            f"{nome}: TFR in azienda netto {_per_etichetta(c, 'TFR in azienda NETTO'):,.2f} ≠ {azienda:,.2f}"
+        assert abs(_per_etichetta(c, "TFR nel fondo NETTO") - fondo) < 0.01, f"{nome}: TFR nel fondo netto"
+        assert abs(_per_etichetta(c, "Vantaggio netto del fondo") - (fondo - azienda)) < 0.01, f"{nome}: delta"
+    # valore chiuso del caso RAL 40k × 30 anni (inflazione 2%, comparto 3,5% reale, nessun saldo)
+    delta = _per_etichetta(v["tfr40k"]["Complementare"], "Vantaggio netto del fondo")
+    # azienda: lordo 88.963,53, base 61.903,80 al 23% → netto 74.725,66; fondo: 142.685,08 − 10,5% della base
+    assert abs(delta - 61_459.52) < 0.5, f"RAL 40k × 30 anni: vantaggio del fondo {delta:,.2f} ≠ 61.459,52"
+    s = v["tfr_azienda"]["Scenari"]
+    assert abs(s["C16"].value - _per_etichetta(v["tfr_azienda"]["Complementare"], "TFR in azienda NETTO")) < 0.01, \
+        "Scenari: con il TFR in azienda il suo netto va mostrato come capitale fuori dalla rendita"
+    assert base["Scenari"]["C16"].value == 0, "con il TFR nel fondo la riga del TFR in azienda è zero"
+
+
+PA = ("it-pianificazione-autonomi", "proiezione-pensione-autonomi.xlsx")
+VARIANTI_PA_T4 = {
+    "forf_comunica": {("Input", "B28"): 3_000, ("Input", "B19"): 1},
+    "forf_non_comunica": {("Input", "B28"): 3_000, ("Input", "B19"): 1, ("Input", "B47"): 0},
+    "ordinario": {("Input", "B28"): 6_000, ("Input", "B19"): 2},
+}
+
+
+@test("proiezione-pensione-autonomi.xlsx: forfettario che comunica i non dedotti → tassa in uscita zero")
+def t_uscita_fondo_autonomi():
+    # REGRESSIONE F014: Complementare!B60 tassava l'intero versato anche per il forfettario puro, che
+    # non deduce e, comunicando i non dedotti, in uscita non paga nulla su quella parte.
+    v = _varianti(*PA, VARIANTI_PA_T4)
+    for nome, dedotto_annuo, comunica in (("forf_comunica", 0, 1), ("forf_non_comunica", 0, 0), ("ordinario", 5_300, 1)):
+        i, c = v[nome]["Input"], v[nome]["Complementare"]
+        n, infl = int(i["B7"].value), i["B39"].value
+        assert _per_etichetta(i, "Versamento dedotto") == dedotto_annuo, f"{nome}: dedotto {_per_etichetta(i, 'Versamento dedotto')}"
+        tassato = dedotto_annuo + (0 if comunica else i["B28"].value - dedotto_annuo)
+        attesa = (i["B31"].value * (1 + infl) ** -n + sum(tassato * (1 + infl) ** (t - n) for t in range(n))) * i["B38"].value
+        tassa = _per_etichetta(c, "Tassa finale")
+        assert abs(tassa - attesa) < 0.01, f"{nome}: tassa in uscita {tassa:,.2f} ≠ {attesa:,.2f}"
+    assert _per_etichetta(v["forf_comunica"]["Complementare"], "Tassa finale") == 0
+
+
+@test("previdenza complementare: base in uscita, non dedotti, nuove erogazioni 2026, capitale al 50%, marcatore")
+def t_testi_fondo():
+    pc = open(os.path.join(SKILLS, "it-pianificazione", "references", "previdenza-complementare.md"), encoding="utf-8").read()
+    for atteso in ("non dedott", "durata definita", "frazionata", "9-15%", "6,91%"):
+        assert atteso in pc, f"previdenza-complementare.md: manca «{atteso}»"
+    assert "Verificato: 2026-06" not in pc, "marcatore di giugno non aggiornato dopo la riverifica"
+    assert re.search(r"201-204[^\n]*Verificato: 2026-10|Verificato: 2026-10[^\n]*201-204", pc), "marcatore senza i commi 201-204"
+    assert "contributi + rendimenti già tassati" not in pc, "base imponibile in uscita con i rendimenti già tassati"
+    assert not re.search(r"(?:fino al|massimo) 60%", pc), "il capitale resta al 50% (DL 62/2026)"
+    ff = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "references", "fiscalita-forfettario.md"), encoding="utf-8").read()
+    assert "12.800" not in ff and "15→9% sulla prestazione" not in ff, "fiscalita-forfettario.md: uscita del forfettario ancora tassata"
+    for rel in ("it-pianificazione/SKILL.md", "it-pianificazione-autonomi/SKILL.md"):
+        testo = open(os.path.join(SKILLS, rel), encoding="utf-8").read()
+        assert "tassazione agevolata della prestazione finale (15→9%)" not in testo, f"{rel}: uscita del forfettario"
 
 
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════

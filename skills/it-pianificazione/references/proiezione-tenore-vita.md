@@ -88,8 +88,10 @@ Due regimi possibili:
 
 **Se rendita vitalizia**: contribuisce direttamente al reddito mensile.
 ```
-rendita_lorda_mensile = (montante_netto_post_tax × tasso_conversione_annuo) / 12
-rendita_netta_mensile = rendita_lorda × (1 - aliquota_IRPEF_marginale_pensione)
+rendita_lorda_mensile = (montante × tasso_conversione_annuo) / 12
+rendita_netta_mensile = rendita_lorda − ritenuta 15%→9% sulla parte imponibile
+    # parte imponibile = TFR e contributi dedotti; fuori dall'IRPEF progressiva
+    # (art. 11 c. 6 D.Lgs. 252/2005), come in netto-pensione.py
 ```
 
 Tassi di conversione tipici (immediata vitalizia, persona singola, senza opzioni):
@@ -134,11 +136,12 @@ Quando gap > 0 (manca copertura), proporre pattern ordinati per impatto stimato:
 
 ### P1: Massimizzare contributo deducibile complementare
 
-Se l'utente versa meno di €5.300/anno volontari:
+Se i contributi del lavoratore (dovuti e volontari) e del datore insieme non saturano il plafond di €5.300 (il TFR non conta):
 
 ```
-delta_montante_finale = (5300 - contributo_attuale) × CAGR_compounding(rendimento_netto, anni_residui)
-risparmio_fiscale_annuo = (5300 - contributo_attuale) × aliquota_marginale_IRPEF
+spazio_deducibile = max(0, 5300 - contributo_datore - contributo_dovuto - volontario_attuale)
+delta_montante_finale = spazio_deducibile × CAGR_compounding(rendimento_netto, anni_residui)
+risparmio_fiscale_annuo = spazio_deducibile × aliquota_marginale_IRPEF
 risparmio_fiscale_cumulato = risparmio_fiscale_annuo × anni_residui  # in nominale, non scontato
 beneficio_totale_v.t. = delta_montante_finale + risparmio_fiscale_cumulato
 ```
@@ -180,13 +183,15 @@ Trade-off: 3 anni di vita lavorativa in più vs 3 anni di "libertà" in meno. No
 Per chi ha ancora TFR in azienda, calcolare il delta cumulato:
 
 ```
-TFR_azienda_finale_netto = TFR_lordo_finale × (1 - aliquota_separata ~0,27)
-TFR_fondo_finale_netto = montante_TFR_in_fondo × (1 - aliquota_fondo ~0,11)
-# considerando 35+ anni partecipazione → 9% e arrotondando alle altre tasse periodiche
-delta = TFR_fondo_finale_netto - TFR_azienda_finale_netto
+TFR_azienda_netto = TFR_rivalutato - quote × aliquota_media_separata
+    # rivalutazione 1,5% + 75% dell'inflazione, già tassata al 17% anno per anno;
+    # aliquota media sul reddito di riferimento = quote × 12 / anni di servizio
+TFR_fondo_netto = montante_TFR_in_fondo - quote × aliquota_fondo (15% → 9%)
+    # i rendimenti del fondo sono già tassati al 20% e non pagano altro in uscita
+delta = TFR_fondo_netto - TFR_azienda_netto
 ```
 
-Tipicamente positivo per €5.000-30.000 nominali su carriere di 25-35 anni. Vincolo: decisione irrevocabile una volta presa.
+Il foglio Complementare dell'Excel lo calcola (blocco «Confronto TFR»). Con RAL €40.000 per 30 anni, inflazione 2% e comparto al 3,5% reale, il delta è ~€61.500 in euro di oggi: ~€7.700 di tasse risparmiate (certe) e il resto dal rendimento atteso (incerto). Vincolo: decisione irrevocabile una volta presa.
 
 ### P5: Risparmio non previdenziale (PAC, immobili, finanziario)
 
