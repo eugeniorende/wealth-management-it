@@ -169,7 +169,7 @@ Prese il 20/10/2026.
   - CHANGELOG.md;
   - commands come alias delle skill;
   - plugin.json senza warning.
-- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release.
+- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatta il 21/10/2026 la prova locale: marketplace locale e `/plugin install` in un profilo Claude Code vuoto, poi gli script lanciati dalla copia in cache da una cartella di lavoro. Restano GitHub senza accesso (dopo la pubblicazione) e Cowork.
 - [x] Supply chain della CI: action fissate per SHA con test di igiene, claude-code a versione fissa (PR #15). Dependabot su pip non serve: le dipendenze hanno solo versioni minime.
 - [ ] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4).
 - [ ] README coerente con un repository pubblico: marketplace e Releases.
