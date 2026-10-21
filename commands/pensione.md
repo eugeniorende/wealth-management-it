@@ -18,9 +18,9 @@ Workflow:
 
 2. **Calcolo previdenza obbligatoria**: montante contributivo proiettato × coefficiente di trasformazione all'età target. Stimare pensione lorda e netta, tasso di sostituzione.
 
-3. **Calcolo previdenza complementare**: proiezione montante a pensionamento (capitalizzazione contributi + rendimenti), tassazione finale 15→9%, beneficio fiscale cumulato dalle deduzioni.
+3. **Calcolo previdenza complementare**: proiezione montante a pensionamento (capitalizzazione contributi + rendimenti), tassazione finale 15→9% sui soli TFR e contributi dedotti, beneficio fiscale cumulato dalle deduzioni. Il plafond di €5.300 è condiviso con il contributo del datore e con quello dovuto del lavoratore: lo spazio per i volontari è quello che resta. Ricordare la comunicazione al fondo dei contributi non dedotti.
 
-4. **Confronto TFR azienda vs fondo**: simulazione comparativa con tassazione separata vs aliquota fondo. Quasi sempre il fondo vince, ma quantificare di quanto.
+4. **Confronto TFR azienda vs fondo**: blocco «Confronto TFR» del foglio Complementare dell'Excel (rivalutazione 1,5% + 75% dell'inflazione tassata al 17% e tassazione separata, contro 15→9% sulle quote nel fondo). Distinguere il vantaggio fiscale, certo, da quello di rendimento, che dipende dal comparto.
 
 5. **Proiezione tenore di vita**: gap analysis tra pensione totale attesa e spesa proiettata. Identificare il gap in valore assoluto e in % del tenore desiderato.
 

@@ -8,7 +8,7 @@ In **regime amministrato**, lo zainetto fiscale (registro delle minus pregresse)
 - Il broker A non comunica con il broker B su questioni fiscali
 - L'AdE non vede un quadro consolidato (in amministrato sei "esonerato" dalla dichiarazione su questi redditi, ma per il fisco non hai un cumulato)
 
-In **regime dichiarativo**, invece, lo zainetto è dell'investitore: tu lo dichiari nel quadro RT del Modello Redditi PF e puoi cumulare cross-broker.
+In **regime dichiarativo**, invece, lo zainetto è dell'investitore: tu lo dichiari nel quadro RT del Modello Redditi PF (o nel quadro T del 730) e puoi cumulare cross-broker.
 
 Tra i due c'è una terza via, spesso ignorata: alla **chiusura del rapporto** le minus residue vengono **certificate** e si portano su un altro rapporto (Caso 2).
 
@@ -57,7 +57,7 @@ L'opzione per l'amministrato si esercita all'apertura del rapporto o, per i rapp
 Optando per dichiarativo:
 - L'intermediario NON è più sostituto d'imposta per i tuoi redditi finanziari
 - Le ritenute non vengono applicate alla fonte (broker non trattiene il 26%)
-- TU sei responsabile di dichiarare in Modello Redditi PF, quadro RT (per redditi diversi) e quadro RM (per redditi di capitale dove pertinente)
+- TU sei responsabile di dichiarare in Modello Redditi PF, quadro RT (per redditi diversi) e quadro RM (per redditi di capitale dove pertinente), o nei quadri T e M del 730
 - Le minus si dichiarano nel quadro RT e fanno cumulo cross-broker
 
 ### Pro

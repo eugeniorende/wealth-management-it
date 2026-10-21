@@ -18,7 +18,7 @@ Workflow:
 
 2. **Previdenza obbligatoria**: base contributiva (ricavi × coefficiente per forfettari) × 26,07%, fino al massimale €122.295. Proiezione montante → coefficiente trasformazione → pensione lorda/netta. Evidenziare che il tasso di sostituzione è più basso che per i dipendenti (aliquota 26,07% vs 33%).
 
-3. **Previdenza complementare**: analisi CORRETTA della deducibilità (zero per forfettario puro; fino a capienza se ha redditi IRPEF; piena se ordinario). Confronto onesto fondo pensione vs PAC ETF per il forfettario puro.
+3. **Previdenza complementare**: analisi CORRETTA della deducibilità (zero per forfettario puro; fino a capienza se ha redditi IRPEF; piena se ordinario). Confronto onesto fondo pensione vs PAC ETF per il forfettario puro: in uscita i versamenti non dedotti non sono tassati se comunicati al fondo entro il 31/12 dell'anno successivo.
 
 4. **Gap analysis tenore di vita**: scenari conservativo/base/ottimistico.
 
