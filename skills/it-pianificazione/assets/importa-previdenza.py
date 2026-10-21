@@ -39,7 +39,7 @@ from collections import defaultdict
 
 # ============================== PARAMETRI ==============================
 
-ALIQUOTA_COMPUTO = 0.33   # aliquota IVS dipendenti (autonomi ~0,24; gestione separata ~0,2607)
+ALIQUOTA_COMPUTO = 0.33   # aliquota di computo IVS dipendenti (artigiani e commercianti 0,24; gestione separata 0,25, sul 26,07% versato)
 
 # Tassi di capitalizzazione del montante (L. 335/1995 art. 1 c. 8-9: variazione media quinquennale
 # del PIL nominale calcolata dall'ISTAT, mai sotto 1 dal DL 65/2015 art. 5, con recupero sugli anni

@@ -6,7 +6,7 @@ Tre output:
 
 1. TASSO DI PRELIEVO SOSTENIBILE (Monte Carlo). Dato un capitale, un prelievo annuo
    reale e un orizzonte, simula migliaia di percorsi (bootstrap a blocchi dalla serie
-   storica reale, che preserva la SEQUENZA dei rendimenti) e calcola la probabilità che
+   storica, che preserva la SEQUENZA dei rendimenti) e calcola la probabilità che
    il capitale duri tutto l'orizzonte. Più una tabella di sensibilità su più tassi.
 
 2. RISCHIO DI SEQUENZA DEI RENDIMENTI. In prelievo conta l'ORDINE dei rendimenti, non
@@ -20,8 +20,12 @@ Tre output:
    sequenza. Lo script confronta la probabilità di successo e il capitale finale mediano
    con e senza buffer, rendendo visibile il trade-off (il buffer protegge ma rende ~0).
 
-⚠️ La serie storica è S&P 500 + US T-Bond (Damodaran): il mercato USA è storicamente
-ECCEZIONALE, quindi i tassi di successo qui sono OTTIMISTICI per un investitore europeo.
+⚠️ La serie storica è S&P 500 + US T-Bond (Damodaran): rendimenti NOMINALI in dollari, che
+lo script porta in termini reali anno per anno con l'inflazione USA storica (CPI dicembre su
+dicembre, colonna del CSV): la stagflazione degli anni '70 resta nella serie, dove il rischio
+di sequenza pesa di più. Nessuna componente di cambio: è l'esperienza di un investitore USA.
+Il mercato USA è storicamente ECCEZIONALE, quindi i tassi di successo qui sono OTTIMISTICI
+per un investitore europeo.
 La celebre "regola del 4%" nasce su questi dati e su orizzonte 30 anni; va presa come
 punto di partenza, non come garanzia. Vedi decumulo.md per i caveat. NON è consulenza.
 
@@ -29,18 +33,19 @@ Dipendenze: numpy   (pip install numpy)
 Uso:        python decumulo-obiettivi.py
 """
 
-import os
-
 import numpy as np
 
-from motore_bootstrap import applica_override
+from motore_bootstrap import applica_override, carica_inflazione, carica_storico, deflaziona
 
 # ─────────────────────────── INPUT (editabili) ───────────────────────────
 CAPITALE_INIZIALE     = 500000     # capitale a inizio decumulo (€)
 PRELIEVO_ANNUO_REALE  = 20000      # prelievo annuo in € di OGGI, costante in termini reali (qui 4%)
 ORIZZONTE_ANNI        = 30         # durata del decumulo
 PESO_AZIONARIO        = 0.60       # quota azionaria (il resto obbligazionario)
-INFLAZIONE            = 0.02       # per convertire i rendimenti storici nominali in reali
+INFLAZIONE            = None       # None = inflazione USA storica anno per anno (colonna del CSV);
+                                   # un numero (es. 0.02) = inflazione costante, che però appiattisce
+                                   # gli anni '70 (inflazione a due cifre) proprio dove la sequenza conta
+INFLAZIONE_RIPIEGO    = 0.02       # usata se la serie (propria) non ha la colonna inflazione
 BUFFER_ANNI           = 2          # anni di prelievo tenuti in liquidità (0 = nessun buffer)
 DERATING_AZIONARIO    = 0.015      # scarto verso il basso sull'azionario reale, per trasformare
                                    # "storia USA" in "scenario globale" (USA-vs-mondo ≈ -1,5%, fonte DMS).
@@ -54,27 +59,26 @@ TASSI_SENSIBILITA     = [0.03, 0.035, 0.04, 0.045, 0.05, 0.06]  # prelievi % del
 # ──────────────────────────────────────────────────────────────────────────
 
 
+def inflazione_usata():
+    """Inflazione per deflazionare la serie: l'array storico, o una costante (INFLAZIONE o il
+    ripiego se la serie non ha la colonna). Ritorna (inflazione, descrizione)."""
+    if INFLAZIONE is not None:
+        return INFLAZIONE, f"inflazione costante {INFLAZIONE*100:.1f}%"
+    storica = carica_inflazione(FILE_STORICO)
+    if storica is None:
+        return INFLAZIONE_RIPIEGO, (f"inflazione costante {INFLAZIONE_RIPIEGO*100:.1f}% "
+                                    "(la serie non ha la colonna inflazione)")
+    return storica, "inflazione USA storica anno per anno (CPI dicembre su dicembre)"
+
+
 def carica_rendimenti_reali(derating=0.0):
     """Serie annuale di rendimenti REALI del portafoglio (azionario/obbligazionario pesati).
-    `derating` è uno scarto sottratto al solo azionario reale (USA → scenario globale)."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), FILE_STORICO)
-    az, ob = [], []
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or line.startswith("anno"):
-                continue
-            parts = line.split(",")
-            if len(parts) < 3:
-                continue
-            try:
-                az.append(float(parts[1]) / 100)
-                ob.append(float(parts[2]) / 100)
-            except ValueError:
-                continue
-    az, ob = np.array(az), np.array(ob)
-    az_real = (1 + az) / (1 + INFLAZIONE) - 1 - derating   # azionario reale, de-ratato
-    ob_real = (1 + ob) / (1 + INFLAZIONE) - 1              # obbligazionario reale
+    La serie del CSV è nominale in dollari: ogni anno si deflaziona con l'inflazione di
+    quell'anno. `derating` è uno scarto sottratto al solo azionario reale (USA → scenario globale)."""
+    az, ob = carica_storico(FILE_STORICO)
+    inflazione, _ = inflazione_usata()
+    az_real = deflaziona(az, inflazione) - derating   # azionario reale, de-ratato
+    ob_real = deflaziona(ob, inflazione)              # obbligazionario reale
     return PESO_AZIONARIO * az_real + (1 - PESO_AZIONARIO) * ob_real
 
 
@@ -150,8 +154,9 @@ def stampa():
     print(f"DECUMULO — capitale €{CAPITALE_INIZIALE:,.0f}, orizzonte {ORIZZONTE_ANNI} anni, "
           f"{PESO_AZIONARIO*100:.0f}/{(1-PESO_AZIONARIO)*100:.0f}")
     print(f"{'='*72}")
-    print("Dati: S&P 500 + US T-Bond (Damodaran), bootstrap a blocchi. "
+    print("Dati: S&P 500 + US T-Bond (Damodaran), nominali in dollari, bootstrap a blocchi. "
           "USA = caso storicamente favorevole → successi ottimistici.")
+    print(f"Termini reali: {inflazione_usata()[1]}.")
 
     # 1) tasso sostenibile (base)
     p, fin_med, _ = monte_carlo(PRELIEVO_ANNUO_REALE, BUFFER_ANNI)
@@ -218,5 +223,5 @@ if __name__ == "__main__":
 #   ma esiti diversi: "peggiori-prima" finisce sempre ≤ "migliori-prima" (di norma uno
 #   esaurisce e l'altro sopravvive con ampio margine). È la dimostrazione del rischio di
 #   sequenza ed è strutturalmente garantita dall'ordinamento.
-# • Sui dati USA al 4% su 30 anni il successo è alto (storicamente ~90%+), coerente con
-#   la regola del 4% — ma è il caso favorevole: per l'Europa va scontato.
+# • Sui dati USA al 4% su 30 anni il successo è alto (~90%, con l'inflazione storica anno per
+#   anno), coerente con la regola del 4% — ma è il caso favorevole: per l'Europa va scontato.
