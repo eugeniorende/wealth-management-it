@@ -2845,6 +2845,56 @@ def t_ponte():
     assert euro(out, "Rendita fondo:") == 50 * anni, "rendita persa a r = 0 ≠ versamento × anni × coeff."
 
 
+@test("ponte-pensione: serie storica deflazionata anno per anno con la CPI USA, come il decumulo")
+def t_ponte_reale():
+    # Nota del § 4 dell'handoff (dopo T8): il ponte confrontava rendimenti NOMINALI in dollari con una
+    # spesa in euro di oggi. Sui default la probabilità scende da circa 44% a circa 21%.
+    righe = open(asset("it-pianificazione", "rendimenti-storici.csv"), encoding="utf-8").read().splitlines()
+    dati = {int(r.split(",")[0]): [float(x) / 100 for x in r.split(",")[1:]] for r in righe if r and r[0].isdigit()}
+    mod = _modulo_previdenza("ponte-pensione.py")
+    assert mod.INFLAZIONE is None and mod.INFLAZIONE_RIPIEGO == 0.02
+    peso = mod.PESO_AZIONARIO_PONTE
+    port = mod.rendimenti_reali_ponte()
+    for anno in (1974, 1980, 2008, 2022):
+        az, ob, inf = dati[anno]
+        atteso = peso * ((1 + az) / (1 + inf) - 1) + (1 - peso) * ((1 + ob) / (1 + inf) - 1)
+        assert abs(port[anno - 1928] - atteso) < 1e-12, f"{anno}: reale {port[anno - 1928]:.4f}, atteso {atteso:.4f}"
+    mod.INFLAZIONE = 0.02  # override esplicito: inflazione costante
+    az, ob, _ = dati[1974]
+    assert abs(mod.rendimenti_reali_ponte()[1974 - 1928] - (peso * ((1 + az) / 1.02 - 1) + (1 - peso) * ((1 + ob) / 1.02 - 1))) < 1e-12
+    # valore chiuso sui default (seed 42): la serie reale, non quella nominale
+    rc, out = run_script(asset("it-pianificazione", "ponte-pensione.py"))
+    assert rc == 0, out[-300:]
+    prob = float(re.search(r"PROBABILITÀ di coprire il ponte: ([\d.]+)%", out).group(1))
+    assert prob == PROB_PONTE_DEFAULT, f"probabilità sui default {prob}% ≠ {PROB_PONTE_DEFAULT}%"
+    assert "CPI" in out, "lo stdout deve dire con quale inflazione è deflazionata la serie"
+
+
+PROB_PONTE_DEFAULT = 21.1
+
+
+@test("pensione: la serie storica è dichiarata nominale in dollari, non «reale», in script, SKILL e reference")
+def t_serie_pensione_nominale():
+    # Nota del § 4 dell'handoff (critica dell'audit a T8): montecarlo-pensione e it-pianificazione
+    # chiamavano «reale» una serie nominale in USD.
+    for rel in ("assets/montecarlo-pensione.py", "SKILL.md", "references/montecarlo-pensione.md"):
+        testo = " ".join(open(os.path.join(SKILLS, "it-pianificazione", rel), encoding="utf-8").read().split())
+        assert "serie storica reale" not in testo and "FORMA reale" not in testo, f"{rel}: serie storica detta reale"
+        assert re.search(r"nominale in dollari", testo, re.I) and "ricentrat" in testo, \
+            f"{rel}: dire che la serie è nominale in dollari e che se ne usa solo la forma (media ricentrata)"
+    # senza ricentratura la serie si deflaziona: mai la media nominale in dollari contro euro di oggi
+    import numpy as np
+    mc = _modulo_previdenza("montecarlo-pensione.py")
+    righe = open(asset("it-pianificazione", "rendimenti-storici.csv"), encoding="utf-8").read().splitlines()
+    dati = np.array([[float(x) / 100 for x in r.split(",")[1:]] for r in righe if r and r[0].isdigit()])
+    az, ob, inf = dati[:, 0], dati[:, 1], dati[:, 2]
+    w = mc.FP_PESO_AZIONARIO
+    assert abs(mc.serie_portafoglio(az, ob).mean() - mc.FP_RENDIMENTO_ATTESO_REALE) < 1e-12, "media ricentrata"
+    mc.RICENTRA_MEDIA = False
+    reale = w * ((1 + az) / (1 + inf) - 1) + (1 - w) * ((1 + ob) / (1 + inf) - 1)
+    assert np.allclose(mc.serie_portafoglio(az, ob), reale, atol=1e-12), "RICENTRA_MEDIA=False: serie non deflazionata"
+
+
 @test("cruscotto TWR: ultima riga dinamica (5 o 14 rilevazioni), righe vuote senza −100%")
 def t_twr_dinamico():
     # REGRESSIONE F049: il foglio funzionava solo con 13 righe esatte (meno → −100%,
