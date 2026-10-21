@@ -15,7 +15,7 @@ Workflow:
 
 3. **Profilo di allocazione per obiettivo**: in base all'orizzonte, proporre il profilo-tipo (preservazione <2a / conservativo 2-4a / moderato 4-7a / crescita 7-12a / crescita massima >12a) come punto di partenza illustrativo. Spiegare la logica orizzonte→rischio. Far calibrare all'utente.
 
-4. **Piano di accumulo**: per ogni obiettivo, target proiettato a nominale (inflazione), rendimento atteso del profilo, versamento mensile necessario.
+4. **Piano di accumulo**: per ogni obiettivo, target proiettato a nominale (inflazione), rendimento atteso del profilo (nominale, netto di costi e imposte), versamento mensile necessario. Per gli obiettivi terminanti il versamento sconta il de-risking degli ultimi anni (glide path), come il pianificatore Excel.
 
 5. **Riconciliazione multi-obiettivo**: somma versamenti vs capacità. Se non basta, mostrare il gap e le leve (fondo emergenza prima, debiti cari prima degli investimenti discrezionali, allungare orizzonte, ridurre target, posticipare per priorità, sfruttare la sequenza temporale). La scelta è dell'utente.
 
