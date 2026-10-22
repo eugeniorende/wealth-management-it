@@ -1,6 +1,6 @@
 # Roadmap
 
-Stato al 20/10/2026, sulla v0.9.6. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 22/10/2026, con la 0.10.0 rilasciata (ondata 0, T1-T8, T10, T11 e parte di T13). La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
@@ -66,52 +66,52 @@ Prese il 20/10/2026.
 - I marcatori nuovi sono circoscritti alle parti verificate: dove un file è stato riverificato solo in parte, la data del file intero resta quella di prima.
 - Restano da verificare su fonte primaria, e sono esclusi dai marcatori: le righe Inarcassa, Forense, CNPADC ed ENPAP; la leva ETN/ETC su cripto; le minus pregresse di Scalable; gli articoli dei testi unici 2027 che sostituiscono l'art. 13 TUIR e i commi 76-84 della L. 190/2014. Finiscono in T3, T6 e T11.
 
-### Ondata 1 — fiscale, novembre
+### Ondata 1 — fiscale (chiusa il 21/10/2026, PR #20, #22, #29)
 
-- [ ] **T1 Asimmetria fiscale e zainetto** (P0, L): F003, F011, F012, F042, F052.
+- [x] **T1 Asimmetria fiscale e zainetto** (P0, L): F003, F011, F012, F042, F052 (PR #20).
   - ETF non armonizzati classificati correttamente.
   - Certificazione delle minus alla chiusura del rapporto (art. 6 c. 5 D.Lgs. 461/97).
   - Costo medio in amministrato.
   - Scarto di emissione e polizze.
   - Test di igiene sulle formulazioni vietate.
-- [ ] **T2 Importatore estratti broker** (P0, M): F001, F034. Viene dopo T1.
+- [x] **T2 Importatore estratti broker** (P0, M): F001, F034 (PR #22).
   - «Da classificare» al posto del default «diverso».
   - Scadenza a 4 anni.
   - Conversione 12,5/26 nei due versi.
   - `--json` su file e migliaia in formato italiano.
   - Test numerico sull'esempio: plus compensabili 0, zainetto 800.
-- [ ] **T3 Broker esteri, dichiarativo e cripto** (P0, M): F006, F036, F053.
+- [x] **T3 Broker esteri, dichiarativo e cripto** (P0, M): F006, F036, F053 (PR #29).
   - Quadro RW.
   - Stato per broker, con data di verifica: Trade Republic, Scalable, IBKR, Degiro.
   - Cambio del giorno.
   - Solo principi (decisione 3).
 
-### Ondata 2 — previdenza, novembre-dicembre
+### Ondata 2 — previdenza (chiusa il 21/10/2026, PR #23, #24, #26)
 
-- [ ] **T4 Fondo pensione** (P0, L): F007, F010, F014, F020, F037.
+- [x] **T4 Fondo pensione** (P0, L): F007, F010, F014, F020, F037 (PR #24).
   - Quota deducibile nell'Excel.
   - Uscita del forfettario senza tassare contributi non dedotti e rendimenti.
   - Novità della L. 199/2025.
   - Confronto TFR in azienda o nel fondo.
-- [ ] **T5 Pensione pubblica dipendenti** (P0, L): F002, F008, F009, F013, F062.
+- [x] **T5 Pensione pubblica dipendenti** (P0, L): F002, F008, F009, F013, F062 (PR #23).
   - Foglio Scenari tutto in euro di oggi.
   - Requisiti 2026.
   - Tassi di capitalizzazione.
   - Test contro `netto-pensione.py` e `proiezione-inps.py`.
 
-### Ondata 3 — strumenti, dicembre
+### Ondata 3 — strumenti (chiusa il 21/10/2026, PR #25, #26, #33)
 
-- [ ] **T7 Ribilanciamento tax-aware** (P0, L): F004, F019, F030, F044, F045, F046, F047. Viene dopo T1.
+- [x] **T7 Ribilanciamento tax-aware** (P0, L): F004, F019, F030, F044, F045, F046, F047 (PR #33).
   - Versamenti in entrata.
   - Vendita parziale a costo zero.
   - Aliquota per posizione.
   - Regola di rientro unica e bande coerenti tra script, Excel e skill.
   - Prelievo in decumulo.
-- [ ] **T6 Autonomi e forfettari** (P0, L): F015, F016, F038, F039. Riusa la logica di T4.
+- [x] **T6 Autonomi e forfettari** (P0, L): F015, F016, F038, F039 (PR #26).
   - Massimale e minimale.
   - Foglio completo: altri redditi, netto, scenari.
   - Primo test della skill.
-- [ ] **T8 Pianificazione obiettivi** (P0, L): F017, F018, F022, F029, F040, F041, F043.
+- [x] **T8 Pianificazione obiettivi** (P0, L): F017, F018, F022, F029, F040, F041, F043 (PR #25).
   - Glide path nel calcolo del versamento.
   - Convenzione dei rendimenti netti.
   - Test che catturano i mutanti.
@@ -119,9 +119,9 @@ Prese il 20/10/2026.
 
 ### Trasversale, entro il 31/12
 
-- [ ] **T11 Governance normativa** (P1, M): F024, F035.
+- [x] **T11 Governance normativa** (P1, M): F024, F035.
   - [x] Elenco dei file obbligati al marcatore (PR #13).
-  - [ ] `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 in vigore dal 1/1/2027.
+  - [x] `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 che si applica dal 1/1/2027, e doppie citazioni con un test per citazione (PR #34). Le voci «Da verificare» della mappa vanno chiuse su Normattiva prima del 1/1/2027.
   - [x] Tabella dello stato dei dati nel README, generata da `run_tests.py --tabella-freshness` (PR #14).
   - [x] Calendario dei parametri annuali: coefficienti di trasformazione 2027-28, legge di bilancio 2027, massimale e requisiti 2027 (PR #14).
 
@@ -129,6 +129,7 @@ Prese il 20/10/2026.
 
 - A inizio dicembre si valuta l'avanzamento. Se si è in ritardo, T8 e il foglio completo di T6 (F039) passano a una 0.10.1. T11 non slitta, perché il nuovo TUIR entra in vigore il 1/1/2027.
 - `release/0.10.0` parte da develop verso metà dicembre. La suite completa, freshness compresa, deve essere verde prima del tag.
+- [x] Rilasciata il 22/10/2026, in anticipo sulla linea di taglio: tutti i temi P0 e T11 sono entrati, niente 0.10.1.
 
 ## 0.11 — script e test
 
@@ -177,7 +178,7 @@ Prese il 20/10/2026.
 ## Dopo — da decidere
 
 - [ ] **T13 Estensioni** (P1, L): F021, F054, F055, F063.
-  - [x] Reference sui dividendi esteri e su successione e donazione (F021, F054), anticipate nella 0.10.0 con l'indice, i rimandi da it-rebalance e it-pianificazione-obiettivi e i test sui numeri.
+  - [x] Reference sui dividendi esteri e su successione e donazione (F021, F054), anticipate nella 0.10.0 con l'indice, i rimandi da it-rebalance e it-pianificazione-obiettivi e i test sui numeri (PR #32).
   - [ ] Sezione sul riscatto della laurea (F055); la correzione della description di it-pianificazione si può anticipare con T14.
   - [ ] Casi frequenti del freelance (F063).
 

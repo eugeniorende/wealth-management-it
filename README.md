@@ -22,9 +22,9 @@ L'upstream è cablato sulla fiscalità USA: wash sale rule a 30 giorni, scelta d
 
 Un overlay/extension avrebbe creato conflitti dove Claude pesca dalla skill sbagliata. Meglio sostituzione completa.
 
-## Stato del progetto (v0.9.6)
+## Stato del progetto (v0.10.0)
 
-> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. L'ondata 0 (ottobre 2026) ha chiuso i quick win: quadro RW, ETF non armonizzati, detrazione pensionati, massimale e requisiti 2026, casse professionali, comunicazione dei contributi non dedotti, disclaimer. Restano aperti, tra gli altri, l'importatore broker (F001), il costo medio in amministrato (F012), la certificazione delle minus alla chiusura del rapporto (F011), il plafond del fondo pensione nell'Excel (F007) e il ribilanciamento con i versamenti (F004). Il piano, con la 0.10.0 entro il 31/12/2026, è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
+> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. La 0.10.0 chiude l'ondata 0 e i temi T1-T8, T10, T11 e parte di T13: tra gli altri l'importatore broker (F001), il ribilanciamento con i versamenti (F004), il plafond del fondo pensione nell'Excel (F007), la certificazione delle minus alla chiusura del rapporto (F011) e il costo medio in amministrato (F012). Restano aperti l'interfaccia comune degli script (T9), i test strutturali sugli Excel (T12), il riscatto della laurea e i casi del freelance (T13), la documentazione e il packaging (T14), e le corrispondenze del 2027 ancora «da verificare» nella mappa dei testi unici. Il piano è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
 
 Sei skill operative: `it-pianificazione-obiettivi` (pianificazione goals-based — il pezzo a monte), `it-tax-optimization` (ottimizzazione minus/plus, titoli e cripto), `it-pianificazione` (pensione dipendenti), `it-pianificazione-autonomi` (pensione autonomi/forfettari), `it-rebalance` (ribilanciamento tax-aware), e `it-revisione` (revisione periodica di sintesi — il livello che tiene insieme tutto).
 
@@ -71,7 +71,7 @@ La suite di smoke test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-40 test in circa 15 secondi, con le dipendenze dei Prerequisiti e, per i tre test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+107 test in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Freshness fiscale
 
@@ -82,9 +82,7 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 <!-- generata con: python tests/run_tests.py --tabella-freshness -->
 | File | Verificato | Valido fino a |
 |---|---|---|
-| `it-pianificazione/assets/importa-previdenza.py` | 2026-06 | 2027-06 |
 | `it-pianificazione/assets/proiezione-inps.py` | 2026-06 | 2027-06 |
-| `it-pianificazione/references/previdenza-complementare.md` | 2026-06 | 2027-06 |
 | `it-tax-optimization/references/aliquote-12-5-26.md` | 2026-06 | 2027-06 |
 | `it-tax-optimization/references/etf-trap-redditi-capitale.md` | 2026-06 | 2027-06 |
 | `it-tax-optimization/references/regime-dichiarativo.md` | 2026-06 | 2027-06 |
@@ -95,12 +93,20 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 | `it-pianificazione-autonomi/references/previdenza-gestione-separata.md` | 2026-10 | 2027-10 |
 | `it-pianificazione-obiettivi/references/asset-location.md` | 2026-10 | 2027-10 |
 | `it-pianificazione/SKILL.md` | 2026-10 | 2027-10 |
+| `it-pianificazione/assets/importa-previdenza.py` | 2026-10 | 2027-10 |
+| `it-pianificazione/references/previdenza-complementare.md` | 2026-10 | 2027-10 |
 | `it-pianificazione/references/previdenza-obbligatoria.md` | 2026-10 | 2027-10 |
 | `it-rebalance/SKILL.md` | 2026-10 | 2027-10 |
 | `it-revisione/assets/genera-ips.py` | 2026-10 | 2027-10 |
+| `it-tax-optimization/SKILL.md` | 2026-10 | 2027-10 |
 | `it-tax-optimization/references/criptovalute-avanzate.md` | 2026-10 | 2027-10 |
 | `it-tax-optimization/references/criptovalute-casi-speciali.md` | 2026-10 | 2027-10 |
 | `it-tax-optimization/references/criptovalute.md` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/dividendi-esteri.md` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/import-dati-broker.md` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/mappa-nuovo-tuir.md` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/multi-intermediario.md` | 2026-10 | 2027-10 |
+| `it-tax-optimization/references/successione-donazione.md` | 2026-10 | 2027-10 |
 
 **Calendario dei parametri da riverificare** (stato a ottobre 2026):
 
@@ -108,7 +114,7 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 |---|---|---|
 | dicembre 2026 | Legge di bilancio 2027: IRPEF, plafond del fondo pensione, cripto, bollo, Tobin tax | SKILL.md e reference di it-tax-optimization, it-pianificazione, it-rebalance; `netto-pensione.py` |
 | entro fine 2026 | Decreto sui coefficienti di trasformazione 2027-2028 (il precedente è del 20/11/2024) | `previdenza-obbligatoria.md`, foglio Coefficienti di `proiezione-pensione.xlsx`, `proiezione-inps.py` |
-| 1° gennaio 2027 | Nuovi testi unici (TUIR D.Lgs. 117/2026 e collegati): cambiano gli articoli citati | doppie citazioni nelle reference |
+| 1° gennaio 2027 | Nuovi testi unici (TUIR D.Lgs. 117/2026 e collegati): cambiano gli articoli citati. Le doppie citazioni ci sono già; restano da chiudere le voci «Da verificare» | `it-tax-optimization/references/mappa-nuovo-tuir.md` |
 | gennaio 2027 | Aggiornamento annuale della serie Damodaran e della CPI USA di dicembre 2026 (BLS, colonna inflazione) | `rendimenti-storici.csv` (due copie identiche) |
 | gennaio-febbraio 2027 | Circolari INPS su massimale, minimale e prima fascia 2027; aliquote della Gestione Separata | it-pianificazione, it-pianificazione-autonomi |
 | 2027-2028 | Requisiti di pensione già noti (Circ. INPS 28/2026), da applicare alla data | `previdenza-obbligatoria.md`, `previdenza-gestione-separata.md` |
@@ -117,7 +123,7 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 
 ### Changelog
 
-**v0.10.0** (in sviluppo, piano in [ROADMAP.md](ROADMAP.md)):
+**v0.10.0** (corrente):
 - **Freshness**: il workflow mensile gira con `shell: bash` (pipefail). Prima l'exit code era quello di `tee`, quindi lo step restava verde anche con i dati scaduti e la issue non si apriva mai. Nuovo test di igiene sulle pipe nei workflow.
 - **Ricalcolo degli Excel in CI**: `scripts/ricalcola-excel.py` ricalcola gli xlsx con LibreOffice headless in locale it-IT e segnala le celle in errore. Tre test nuovi: ricalcolo forzato e locale italiano (validati per mutazione), nessuna cella in errore, cache consegnate uguali al ricalcolo. Il runner distingue i test saltati.
 - **Bug trovati dal ricalcolo in italiano**: in `proiezione-pensione.xlsx` le otto ipotesi di `Scenari!B5:B8` e `D5:D8` erano testo ("0.022"). Con il punto come separatore delle migliaia diventavano 22 e la pensione degli scenari usciva a −1,7·10¹⁹; ora sono numeri. Nel cruscotto e nell'IPS, `TEXT(x;"0.0%")` dipendeva dal locale e perdeva il decimale; ora è `FIXED(x*100;1)&"%"`, quindi "10,0%" in italiano.
@@ -133,8 +139,19 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 - **Licenza** (PR #16): LICENSE e NOTICE (Apache-2.0) nel repository e nello zip di release, con l'attribuzione all'upstream fissata al commit `ef165e4160`.
 - **Revisione annuale** (PR #18): nel cruscotto il foglio TWR regge fino a 120 rilevazioni e legge da solo l'ultima; la Sintesi confronta la probabilità con la soglia della priorità; Allocazione e tracker usano la regola 5/25 per classe; costi dell'anno a scopo di confronto; foglio Leggimi con i limiti.
 - **Ponte pensionistico in euro di oggi**: `ponte-pensione.py` deflaziona anno per anno la serie storica (nominale in dollari) con l'inflazione USA dello stesso anno, come il decumulo degli obiettivi; prima confrontava rendimenti nominali con una spesa reale. **Output cambiati a parità di seed**: sui default la probabilità di coprire il ponte scende dal 44,0% al 21,1%, e il capitale necessario sale da €49.335 a €53.167 (85%) e da €52.750 a €58.619 (95%). Monte Carlo pensione e reference dicono che la serie è nominale in dollari e che se ne usa solo la forma.
+- **Asimmetria fiscale e zainetto** (T1, PR #20): in amministrato la base di costo è il costo medio ponderato, non il LIFO, che vale solo in dichiarativo. Alla chiusura del rapporto, o alla revoca dell'amministrato, le minus si certificano e si usano su un altro rapporto con gli stessi intestatari o nel quadro RT, entro la scadenza originaria (nuovo Pattern E; corretta la formula del Pattern D). OICR non armonizzati fuori UE/SEE come reddito di capitale e categoria «da classificare»; esempio su BOT e zero coupon con lo scarto di emissione.
+- **Importatore estratti broker** (T2, PR #22): un titolo non riconosciuto resta «da classificare» invece di finire tra i redditi diversi; la categoria si legge dalla descrizione, non dal prefisso ISIN (ETF USA a IRPEF, ETC fisici a reddito diverso). Il 12,5% vale anche per Bund, OAT, Treasury, Gilt, JGB e multilaterali; le altre obbligazioni estere restano al 26% con un avviso. Minus scadute dopo 4 anni escluse rispetto a `--anno`, conversione 12,5/26 nei due versi, zainetto per broker. Sugli esempi distribuiti: plus compensabili 0, zainetto 800 con `--anno 2027`.
+- **Broker esteri e regime dichiarativo** (T3, PR #29): stato dei broker verificato a ottobre 2026: Interactive Brokers e Degiro in dichiarativo, Trade Republic in amministrato per i nuovi clienti dal 30/1/2025 (cripto da verificare), Scalable in amministrato su richiesta dal 1/9/2026. Il dichiarativo è trattato come principi: quadri RT, RM e RW, LIFO, cambio del giorno, imposta del quadro RT senza acconti, IVAFE, checklist degli adempimenti. Nei conti in dichiarativo plus e minus si calcolano solo sui lotti in euro; `/minusvalenze` chiede il regime di ogni broker.
+- **Dividendi esteri e successioni** (T13, PR #32): due reference nuove in it-tax-optimization. `dividendi-esteri.md` dà le ritenute di sette Paesi con il prelievo totale, il 26% sul netto frontiera in amministrato e sul lordo in dichiarativo, W-8BEN e rimborsi, il credito dell'art. 165. `successione-donazione.md` dà il costo fiscale di eredi e donatari, lo zainetto che si estingue col decesso, aliquote e franchigie dopo il D.Lgs. 139/2024 e il confronto «vendo o lascio». Le richiamano it-rebalance e il bucket «Eredità» degli obiettivi.
+- **Pensione pubblica dei dipendenti** (T5, PR #23): `proiezione-pensione.xlsx` è tutto in euro di oggi (PIL reale 0,5% invece dell'1,8% nominale su una RAL reale) e gli Scenari ricalcolano davvero INPS e fondo. Massimale €122.295 anche in `proiezione-inps.py` e `netto-pensione.py`; addizionali solo se c'è IRPEF; tassi di capitalizzazione ufficiali 1996-2025 in `importa-previdenza.py`, che lascia fuori dal montante le retribuzioni prima del 1996. Requisiti 2027-2028 completi (Circ. INPS 28/2026). Con la nuova stima del montante la pensione lorda sui default passa da €31.007 a €30.945.
+- **Fondo pensione** (T4, PR #24): il plafond di €5.300 è condiviso tra lavoratore e datore; il foglio Complementare calcola anno per anno quota deducibile, non dedotto e spazio residuo. La tassa in uscita colpisce solo TFR conferito e contributi dedotti (art. 11 c. 6 D.Lgs. 252/2005). Si aggiungono il «Confronto TFR» in azienda contro fondo e le nuove forme di erogazione (durata definita, prelievi, frazionata). Il rendimento del comparto è reale al 2,5% (era 3,5% senza unità): l'esempio TFR con RAL 40k per 30 anni vale €40.121,51 di vantaggio.
+- **Autonomi** (T6, PR #26): `proiezione-pensione-autonomi.xlsx` ha il massimale €122.295 e la rivalutazione reale allo 0,5%, come il foglio dei dipendenti. A montante va l'aliquota di computo del 25% IVS (Circ. INPS 8/2026), non il 26,07% versato, con la nuova cella Input!B16: sui default la pensione lorda passa da €14.193 a €13.661. Si aggiungono altri redditi IRPEF, spesa target, pensione netta e Scenari conservativo / base / ottimistico col gap; tabella delle casse con link ufficiale e dati 2026 riverificati.
+- **Obiettivi** (T8, PR #25): il versamento dei terminanti tiene conto del glide path, con la finestra in `Parametri!B7` e il versamento in due fasi, nel pianificatore e negli script; un pianificatore senza `Parametri!B7` dà un avviso. Il rendimento del profilo è la media aritmetica annua; `rendimenti-storici.csv` è dichiarato nominale in dollari e il decumulo deflaziona anno per anno. **Output cambiati**: sui default il versamento per la casa sale da €478 a €500 e quello di lungo termine da €346 a €384; a parità di seed cambiano anche montecarlo-obiettivi e il decumulo.
+- **Ribilanciamento tax-aware** (T7, PR #33): in `ribilanciamento-multibroker.py` versamenti e flussi entrano nel totale prima del drift, e le minus realizzate ricaricano lo zainetto del broker. Le minus di tutte le classi si vendono prima delle plus e i CSV le elencano per prime; la Leva 4 va per imposta per euro venduto, con l'aliquota della posizione (12,5% per i titoli di Stato, nello zainetto al 48,08%). Regola 5/25 unica e rientro misto: a target se costa zero, a metà banda se tassato, con i due costi e il residuo rinviato nel report. Una sottopesata fuori banda si riempie anche vendendo da classi in banda. Il nuovo `PRELIEVO` calcola il lordo che copre anche l'imposta, con una vendita per posizione; la modulazione per volatilità è spenta di default.
+- **Privacy e plafond condiviso** (PR #27, #28, #31): con `--anonimo` `importa-previdenza.py` non stampa intestatario e data di nascita, che altrimenti entrano nel contesto del modello, ma solo `ETA_ATTUALE`. La revisione annuale chiede lo spazio deducibile residuo del fondo (€5.300 − datore − dovuto: un tetto fiscale per i volontari entro il 31/12, non un importo consigliato) e i contributi non dedotti da comunicare. Negli obiettivi SKILL.md, `asset-location.md` e `asset-location-optimizer.py` dicono che il plafond è condiviso col datore; i numeri sui default non cambiano.
+- **Testi unici dal 2027** (T11, PR #34): nuova reference `mappa-nuovo-tuir.md` in it-tax-optimization con le corrispondenze tra le norme citate e i testi unici che si applicano dal 1/1/2027 (TUIR nel D.Lgs. 117/2026, GU n. 152 del 3/7/2026; amministrato negli artt. 304-307; monitoraggio, versamenti, sanzioni, tributi minori e successioni), con l'elenco di quelle ancora da verificare. Skill, reference, script ed Excel citano la norma vigente e quella dal 2027, per esempio «art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6»; un test controlla ogni citazione. Nella skill fiscale la flat tax dei neo-residenti non è più ferma a €100.000.
 
-**v0.9.6** (corrente):
+**v0.9.6**:
 - **Integrazione GitHub**: repository su `github.com/eugeniorende/wealth-management-it` con `.gitignore`, campo `repository` e `author` strutturato nel manifest (passa `claude plugin validate`), `.claude-plugin/marketplace.json` effettivamente presente, istruzioni di installazione con il repository reale. Gitflow: feature su `develop`, release su `main`.
 - **GitHub Actions** (tre workflow): `tests` esegue la suite a ogni push su `main`/`develop` e su ogni PR, più il job `validate` sul manifest; `freshness` esegue il solo test di freshness fiscale il primo di ogni mese e apre una issue quando i dati normativi superano i 12 mesi, così una scadenza non blocca le PR; `release` su tag `vX.Y.Z` verifica il tag contro il manifest, esegue la suite completa (freshness inclusa) e pubblica la GitHub Release con lo zip per Cowork.
 - **Runner e packaging**: `tests/run_tests.py` accetta `--only`/`--skip`; `scripts/pacchetto.py` costruisce lo zip del plugin; `tests/requirements.txt` per le dipendenze. Dependabot sulle action, badge della CI. Suite: 24 test.
@@ -404,7 +421,7 @@ Roadmap di skill nel fork (stato corrente):
 | 2 | `financial-plan` | `it-pianificazione` | ✅ v0.11 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione) |
 | 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.3 (pensione autonomi/forfettari, casse professionali, Excel) |
 | 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.19 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo) |
-| 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.5 (tax-aware, multi-broker, bande dinamiche + per volatilità, sequenza di liquidazione, ordini CSV) |
+| 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.6 (tax-aware con versamenti, aliquota per posizione e rientro misto, multi-broker, bande 5/25, prelievo in decumulo, sequenza di liquidazione, ordini CSV) |
 | 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.6 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR) |
 
 Le sei skill attive formano un sistema coordinato attorno a un flusso end-to-end: `it-pianificazione-obiettivi` definisce gli obiettivi e le allocazioni (a monte), le due skill previdenziali coprono il secchiello pensione, `it-rebalance` mantiene le allocazioni nel tempo, `it-tax-optimization` ottimizza la fiscalità delle vendite, e `it-revisione` è il **livello di sintesi** che una volta l'anno tiene insieme tutto in un quadro unico con azioni prioritizzate. Vedi la sezione "Architettura" sotto. Note: il goals-based, che nell'upstream è spezzato tra `financial-plan` (modellazione obiettivi) e `investment-proposal` (allocazione/IPS), nel fork è unificato in `it-pianificazione-obiettivi` con postura personale/educativa; e le skill upstream rivolte al consulente (`client-review`, `client-report`, in parte `investment-proposal`) sono riformulate per chi gestisce i propri soldi nell'unica `it-revisione`.
