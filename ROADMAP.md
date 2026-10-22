@@ -121,7 +121,7 @@ Prese il 20/10/2026.
 
 - [x] **T11 Governance normativa** (P1, M): F024, F035.
   - [x] Elenco dei file obbligati al marcatore (PR #13).
-  - [x] `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 che si applica dal 1/1/2027, e doppie citazioni con un test per citazione (PR #34). Le voci «Da verificare» della mappa vanno chiuse su Normattiva prima del 1/1/2027.
+  - [x] `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 che si applica dal 1/1/2027, e doppie citazioni con un test per citazione (PR #34). Le voci «Da verificare» sono state chiuse su Normattiva il 22/10/2026; restano i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6, da seguire con i correttivi.
   - [x] Tabella dello stato dei dati nel README, generata da `run_tests.py --tabella-freshness` (PR #14).
   - [x] Calendario dei parametri annuali: coefficienti di trasformazione 2027-28, legge di bilancio 2027, massimale e requisiti 2027 (PR #14).
 

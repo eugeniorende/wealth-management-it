@@ -92,7 +92,7 @@ Come per la Tobin tax, l'impatto non va sovrastimato. Il profilo tipico del plug
 
 - Il trattamento in Italia delle somme rimborsate dallo Stato estero (ritenuta dell'intermediario o dichiarazione).
 - In dichiarativo, se la base del 26% sia il lordo, come ritiene l'Agenzia (rigo RM31), o il netto frontiera dell'amministrato: sul dividendo USA la differenza è di 3,9 punti (41,0% contro 37,1%).
-- Le aliquote e i moduli dei Paesi che non sono in tabella. Per i dividendi da Stati a fiscalità privilegiata valgono regole diverse (art. 27 c. 4 lett. b DPR 600/73; dal 2027 art. 55 dell'allegato al D.Lgs. 33/2025, comma da verificare).
+- Le aliquote e i moduli dei Paesi che non sono in tabella. Per i dividendi da Stati a fiscalità privilegiata valgono regole diverse (art. 27 c. 4 lett. b DPR 600/73; dal 2027 art. 55 c. 6 dell'allegato al D.Lgs. 33/2025).
 - L'istanza di rimborso basata sulla giurisprudenza della Cassazione: requisiti, termini e probabilità di successo per la convenzione del singolo Paese.
 - I casi particolari: dividendi in azioni o in natura, REIT e fondi esteri quotati, ADR, partecipazioni qualificate.
 - Le cedole di obbligazioni estere: seguono un meccanismo diverso, non trattato in questa reference.
