@@ -93,7 +93,7 @@ Sterilizzazione benefit per redditi > €200.000: le detrazioni per oneri al 19%
 
 - **Accantonamento annuo**: RAL_lordo × (1 / 13,5) ≈ 6,91% (formula esatta: RAL ÷ 13,5 deducendo lo 0,5% destinato a INPS Fondo di Garanzia)
 - **Rivalutazione TFR in azienda**: 1,5% + 75% inflazione ISTAT (art. 2120 c.c.), con imposta sostitutiva del **17%** sulla rivalutazione di ogni anno
-- **Tassazione TFR liquidato in azienda**: separata (artt. 17 e 19 TUIR; dal 2027 nel D.Lgs. 117/2026, articoli da verificare), sulle quote senza le rivalutazioni già tassate, all'aliquota media del «reddito di riferimento» (TFR × 12 / anni di servizio); gli uffici poi riliquidano sull'aliquota media dei 5 anni precedenti (tipicamente 23-30%)
+- **Tassazione TFR liquidato in azienda**: separata (artt. 17 e 19 TUIR; dal 2027 artt. 19 e 21 D.Lgs. 117/2026), sulle quote senza le rivalutazioni già tassate, all'aliquota media del «reddito di riferimento» (TFR × 12 / anni di servizio); gli uffici poi riliquidano sull'aliquota media dei 5 anni precedenti (tipicamente 23-30%)
 - **Tassazione TFR conferito a fondo**: 15% scendente al 9% (vedi sopra) sulle sole quote di TFR; i rendimenti, già tassati ogni anno nel fondo, sono esclusi
 
 ### Tassazione assegno pensionistico

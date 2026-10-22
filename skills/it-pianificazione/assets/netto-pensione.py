@@ -53,7 +53,7 @@ ONESTÀ METODOLOGICA
 - Semplificazioni dichiarate: nessun altro reddito IRPEF, nessuna detrazione
   per carichi di famiglia od oneri, niente trattamento integrativo.
 - Rendita del fondo: la parte della rata che viene dai rendimenti maturati
-  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 D.Lgs. 117/2026, lettera da verificare) è tassata a parte
+  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 c. 1 lett. n D.Lgs. 117/2026) è tassata a parte
   dall'erogatore al 26% (12,5% sui titoli di Stato) e non è modellata.
 Questo strumento è educativo e non costituisce consulenza fiscale.
 """

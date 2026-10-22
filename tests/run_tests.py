@@ -3184,11 +3184,12 @@ _NORME_2027 = re.compile(
     _ART + r"\s?\d+[\w-]*(?:[^;\n()]{0,30}?)(?<!nuovo)\s(?:TUIR|DPR 917/1986)\b"
     r"|" + _ART + r"\s?6[78]\b[^;\n()]{0,15}?\bc-(?:bis|ter|quater|quinquies|sexies)\b|\((?i:art)\.\s?44\)"
     r"|D\.\s?Lgs\.\s?461/(?:19)?97|L\.\s?77/1983|26-quinquies|DL 167/1990|D\.\s?Lgs\.\s?472/(?:19)?97"
-    r"|D\.\s?Lgs\.\s?74/2000|L\.\s?228/2012|" + _ART + r"\s?19\b[^;\n]{0,20}?DL 201/2011|D\.\s?Lgs\.\s?346/(?:19)?90"
+    r"|D\.\s?Lgs\.\s?74/2000|L\.\s?228/2012|DPR 642/(?:19)?72|" + _ART + r"\s?19\b[^;\n]{0,20}?DL 201/2011|D\.\s?Lgs\.\s?346/(?:19)?90"
     r"|" + _ART + r"\s?(?:17|11 c\.\s?(?:6|4-ter|4-quater|4-quinquies))\b[^;\n()]{0,40}?D\.\s?Lgs\.\s?252/2005"
     r"|" + _ART + r"\s?27\b[^;\n()]{0,30}?DPR 600/(?:19)?73"
     r"|L\.\s?232/2016,?\s?c\.\s?(?:153 e )?158\b|\bc\.\s?158\b[^;\n]{0,10}L\.\s?232/2016"
-    r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?24 L\.\s?207/2024"
+    r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?(?:24|6) L\.\s?207/2024"
+    r"|" + _ART + r"\s?11 c\.\s?3 D\.\s?Lgs\.\s?47/2000|D\.\s?Lgs\.\s?47/2000,? art\.\s?11 c\.\s?3\b"
     r"|lett(?:era|\.)\s?c-(?:bis|ter|quater|quinquies|sexies)")
 # il riferimento dal 2027: «dal 2027», una freccia o il numero di uno dei testi unici (non l'anno nudo,
 # che è anche una data)

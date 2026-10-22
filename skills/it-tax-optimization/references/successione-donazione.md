@@ -31,16 +31,16 @@ Plusvalenza maturata in vita (80.000)    mai tassata come reddito
 
 Le precisazioni da conoscere:
 
-- **De cuius non residente e titoli esteri.** Se il defunto non era residente in Italia, l'imposta di successione italiana colpisce solo i beni esistenti in Italia (art. 2 c. 2 D.Lgs. 346/1990; dal 2027 art. 88 D.Lgs. 123/2025). Per azioni e obbligazioni di società estere, detenute all'estero e quindi fuori dall'imposta, l'Agenzia ritiene che l'erede debba usare il **costo sostenuto dal de cuius**: manca il presupposto per la rivalutazione, e la plusvalenza latente non si azzera (risposta 675/2021). Se il defunto era residente, l'imposta riguarda tutti i beni, anche esteri (art. 2 c. 1), e vale la regola generale.
-- **Dichiarazione non obbligatoria.** Se l'eredità va al coniuge e ai parenti in linea retta, l'attivo non supera €100.000 e non ci sono immobili, la dichiarazione di successione non è obbligatoria (art. 28 c. 7 D.Lgs. 346/1990; dal 2027 nel D.Lgs. 123/2025, articolo da verificare). Quale valore l'intermediario riconosca allora come costo va verificato con lui.
+- **De cuius non residente e titoli esteri.** Se il defunto non era residente in Italia, l'imposta di successione italiana colpisce solo i beni esistenti in Italia (art. 2 c. 2 D.Lgs. 346/1990; dal 2027 art. 88 c. 2 D.Lgs. 123/2025). Per azioni e obbligazioni di società estere, detenute all'estero e quindi fuori dall'imposta, l'Agenzia ritiene che l'erede debba usare il **costo sostenuto dal de cuius**: manca il presupposto per la rivalutazione, e la plusvalenza latente non si azzera (risposta 675/2021). Se il defunto era residente, l'imposta riguarda tutti i beni, anche esteri (art. 2 c. 1), e vale la regola generale.
+- **Dichiarazione non obbligatoria.** Se l'eredità va al coniuge e ai parenti in linea retta, l'attivo non supera €100.000 e non ci sono immobili, la dichiarazione di successione non è obbligatoria (art. 28 c. 7 D.Lgs. 346/1990; dal 2027 art. 113 c. 8 D.Lgs. 123/2025). Quale valore l'intermediario riconosca allora come costo va verificato con lui.
 - **Documenti.** L'intermediario deve conoscere il valore dichiarato. Conviene consegnargli copia della dichiarazione di successione quando i titoli passano sul dossier degli eredi.
 
 ## Fondi ed ETF: il testo della legge non prevede l'eccezione
 
 Per le quote di fondi ed ETF la plusvalenza è reddito di capitale, e il trasferimento segue la disciplina della ritenuta sugli OICR:
 
-- art. 26-quinquies c. 6 DPR 600/73 per gli OICR italiani (dal 2027 art. 58 dell'allegato al D.Lgs. 33/2025, comma da verificare);
-- art. 10-ter c. 3 L. 77/1983 per gli OICR esteri, compresi gli ETF UCITS irlandesi e lussemburghesi (dal 2027 art. 59 dell'allegato al D.Lgs. 33/2025, comma da verificare).
+- art. 26-quinquies c. 6 DPR 600/73 per gli OICR italiani (dal 2027 art. 58 c. 7 dell'allegato al D.Lgs. 33/2025);
+- art. 10-ter c. 3 L. 77/1983 per gli OICR esteri, compresi gli ETF UCITS irlandesi e lussemburghesi (dal 2027 art. 59 c. 5 dell'allegato al D.Lgs. 33/2025).
 
 Entrambi considerano cessione, ai fini della ritenuta, il trasferimento delle quote a un diverso intestatario, e il testo vigente **non esclude** successioni e donazioni. L'esclusione c'era nell'art. 26-quinquies fino al 12 maggio 2012 (versioni storiche su Normattiva; dal 2027 la norma è l'art. 58 del testo unico versamenti e riscossione). Su quel testo si basava la circolare AdE 33/E/2011, che indicava come costo per gli eredi il costo storico del de cuius.
 
@@ -50,7 +50,7 @@ Letta alla lettera, la norma porta a tassare al 26% la plusvalenza maturata sull
 
 - Il donatario subentra nel **costo del donante** (art. 68 c. 6 TUIR; dal 2027 art. 77 c. 7). Donare titoli in plusvalenza a un figlio non azzera la plusvalenza: la pagherà lui quando venderà.
 - **Regola antielusiva.** Se il donatario, o un suo avente causa a titolo gratuito, cede i titoli ricevuti entro **cinque anni**, «è tenuto al pagamento dell'imposta sostitutiva come se la donazione non fosse stata fatta» (art. 16 c. 1 L. 383/2001; dal 2027 art. 305 D.Lgs. 117/2026). Quali effetti abbia in pratica oltre al costo del donante, per esempio sull'uso dello zainetto del donatario, va verificato con il commercialista.
-- I **titoli di Stato** sono esclusi dall'imposta di successione, ma nella donazione non godono dell'esenzione: l'art. 59 c. 1 lett. b D.Lgs. 346/1990 li esclude espressamente dal regime di favore (dal 2027 art. 136 D.Lgs. 123/2025, da verificare).
+- I **titoli di Stato** sono esclusi dall'imposta di successione, ma nella donazione non godono dell'esenzione: l'art. 59 c. 1 lett. b D.Lgs. 346/1990 li esclude espressamente dal regime di favore (dal 2027 art. 136 c. 1 lett. b D.Lgs. 123/2025).
 - Per fondi ed ETF donati vale quanto detto sopra: la lettera della legge tratta il trasferimento come cessione.
 
 ## Lo zainetto del defunto non passa agli eredi
@@ -61,7 +61,7 @@ La conseguenza pratica, combinata con la rivalutazione del costo: lo zainetto se
 
 ## L'imposta di successione e donazione
 
-Aliquote e franchigie sono le stesse per successione e donazione (art. 7 per la successione, art. 56 per la donazione, D.Lgs. 346/1990; dal 2027 art. 93 e, da verificare, art. 133 D.Lgs. 123/2025):
+Aliquote e franchigie sono le stesse per successione e donazione (art. 7 per la successione, art. 56 per la donazione, D.Lgs. 346/1990; dal 2027 artt. 93 e 133 D.Lgs. 123/2025):
 
 | Beneficiario | Franchigia per ciascun beneficiario | Aliquota sull'eccedenza |
 |---|---|---|
@@ -71,17 +71,17 @@ Aliquote e franchigie sono le stesse per successione e donazione (art. 7 per la 
 | Altri soggetti | nessuna | 8% |
 | Persona con disabilità grave (art. 3 c. 3 L. 104/1992) | €1.500.000 | quella del suo grado di parentela |
 
-**Fuori dall'attivo ereditario** (art. 12 D.Lgs. 346/1990; dal 2027 art. 97 D.Lgs. 123/2025), tra gli altri:
+**Fuori dall'attivo ereditario** (art. 12 D.Lgs. 346/1990; dal 2027 art. 97 c. 1 D.Lgs. 123/2025), tra gli altri:
 - i **titoli del debito pubblico** (BOT, BTP, CCT e simili) e gli altri titoli di Stato, garantiti dallo Stato o equiparati, **compresi quelli emessi dagli Stati dell'UE e dello Spazio economico europeo** (lett. h e i). Le quote di fondi ed ETF non sono in questo elenco, anche quando investono in titoli di Stato;
 - le indennità che spettano agli eredi per diritto proprio in forza di assicurazioni stipulate dal defunto (lett. c): è il caso delle polizze vita caso morte (vedi `it-pianificazione-obiettivi/references/asset-location.md`).
 
 **La riforma del D.Lgs. 139/2024**, per le successioni aperte e le donazioni fatte dal 1° gennaio 2025 (art. 9 c. 3):
-- **autoliquidazione**: gli eredi calcolano l'imposta sulla base della dichiarazione (art. 33 c. 1; dal 2027 art. 118 D.Lgs. 123/2025, da verificare). La dichiarazione si presenta entro 12 mesi dall'apertura della successione (art. 31; dal 2027 art. 116, da verificare), l'imposta si paga entro 90 giorni dal termine di presentazione (art. 37 c. 1; dal 2027 art. 120, da verificare);
+- **autoliquidazione**: gli eredi calcolano l'imposta sulla base della dichiarazione (art. 33 c. 1; dal 2027 art. 118 c. 1 D.Lgs. 123/2025). La dichiarazione si presenta entro 12 mesi dall'apertura della successione (art. 31; dal 2027 art. 116 c. 1), l'imposta si paga entro 90 giorni dal termine di presentazione (art. 37 c. 1; dal 2027 art. 120 c. 1);
 - **abrogato il coacervo successorio** (art. 8 c. 4): le donazioni fatte in vita dal defunto agli eredi e ai legatari non si sommano più al valore dell'asse;
-- **escluse dall'imposta le liberalità d'uso** (art. 770 c. 2 c.c.), insieme a quelle degli artt. 742 e 783 c.c. (art. 1 c. 4; dal 2027 art. 87 c. 4, da verificare);
+- **escluse dall'imposta le liberalità d'uso** (art. 770 c. 2 c.c.), insieme a quelle degli artt. 742 e 783 c.c. (art. 1 c. 4; dal 2027 art. 87 c. 4);
 - **resta il coacervo tra donazioni**: le donazioni precedenti dello stesso donante allo stesso donatario, al valore attuale, erodono la franchigia delle successive (art. 57; dal 2027 art. 134).
 
-**Dossier cointestati.** Per i titoli e i depositi cointestati con il defunto le quote si presumono uguali, salvo prova diversa (art. 11 c. 2; dal 2027 art. 96 c. 2, da verificare): in un dossier cointestato a due persone, metà entra nell'asse.
+**Dossier cointestati.** Per i titoli e i depositi cointestati con il defunto le quote si presumono uguali, salvo prova diversa (art. 11 c. 2; dal 2027 art. 96 c. 2): in un dossier cointestato a due persone, metà entra nell'asse.
 
 ## Vendo in decumulo o lascio in eredità?
 
@@ -142,4 +142,4 @@ Nell'esempio 2 il costo fiscale dell'erede comprende anche gli €80.000 di impo
 - Le donazioni indirette, le cointestazioni con quote diverse da metà e metà, i PIR (che hanno un regime proprio), le partecipazioni qualificate e i patti di famiglia: fuori dal perimetro di questa reference.
 - Gli aspetti civilistici (quote di legittima, testamento, accettazione dell'eredità): sono materia del notaio.
 
-*Costo fiscale per eredi e donatari (art. 68 c. 6 TUIR; dal 2027 art. 77 c. 7 D.Lgs. 117/2026), titoli esteri del de cuius non residente (risp. AdE 675/2021), trasferimenti in amministrato e zainetto (art. 6 c. 5-6 D.Lgs. 461/1997, dal 2027 art. 306 D.Lgs. 117/2026; art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), testo vigente sul trasferimento di quote di OICR (art. 26-quinquies c. 6 DPR 600/73; art. 10-ter c. 3 L. 77/1983; dal 2027 artt. 58-59 dell'all. al D.Lgs. 33/2025), regola antielusiva (art. 16 c. 1 L. 383/2001; dal 2027 art. 305 D.Lgs. 117/2026), aliquote, franchigie, esenzioni e riforma 2025 (artt. 1, 2, 7, 8, 11, 12, 28, 31, 33, 37, 56, 57 e 59 D.Lgs. 346/1990 come modificati dal D.Lgs. 139/2024; dal 2027 D.Lgs. 123/2025) — Verificato: 2026-10.*
+*Costo fiscale per eredi e donatari (art. 68 c. 6 TUIR; dal 2027 art. 77 c. 7 D.Lgs. 117/2026), titoli esteri del de cuius non residente (risp. AdE 675/2021), trasferimenti in amministrato e zainetto (art. 6 c. 5-6 D.Lgs. 461/1997, dal 2027 art. 306 D.Lgs. 117/2026; art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), testo vigente sul trasferimento di quote di OICR (art. 26-quinquies c. 6 DPR 600/73; art. 10-ter c. 3 L. 77/1983; dal 2027 art. 58 c. 7 e art. 59 c. 5 dell'all. al D.Lgs. 33/2025), regola antielusiva (art. 16 c. 1 L. 383/2001; dal 2027 art. 305 D.Lgs. 117/2026), aliquote, franchigie, esenzioni e riforma 2025 (artt. 1, 2, 7, 8, 11, 12, 28, 31, 33, 37, 56, 57 e 59 D.Lgs. 346/1990 come modificati dal D.Lgs. 139/2024; dal 2027 D.Lgs. 123/2025) — Verificato: 2026-10.*
