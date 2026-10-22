@@ -8,7 +8,7 @@ Per chi ha contributi prima del 31/12/1995:
 - **>18 anni di contribuzione al 31/12/1995**: sistema misto, con quota retributiva (più favorevole) fino al 2011 e contributiva dal 2012 in poi (riforma Fornero)
 - **<18 anni di contribuzione al 31/12/1995**: contributivo pro-rata dal 1° gennaio 1996
 
-Per Eugenio (developer, presumibilmente con primo lavoro post-1996) il sistema è interamente **contributivo**.
+Per chi ha iniziato a lavorare dopo il 1995 il sistema è interamente **contributivo**.
 
 ## Formula di calcolo (contributivo puro)
 
@@ -18,12 +18,17 @@ Step 1: Contributo annuo accreditato
   aliquota_di_computo (lavoratore dipendente) = 33%
 
 Step 2: Rivalutazione montante
-  Ogni anno il montante accumulato viene rivalutato in base alla 
-  media quinquennale del PIL nominale (con minimo 1)
-  
-  montante(t+1) = (montante(t) + contributo_anno(t+1)) × (1 + tasso_PIL)
-  
-  Storicamente tasso medio: 1,5-2,5% annuo (più alto in fasi inflattive)
+  Al 31 dicembre di ogni anno il montante accumulato fino all'anno prima
+  si rivaluta con la media quinquennale del PIL nominale (mai sotto 1);
+  il contributo dell'anno entra senza rivalutazione (L. 335/1995 art. 1 c. 8-9)
+
+  montante(t) = montante(t-1) × (1 + tasso_PIL(t)) + contributo_anno(t)
+
+  Tasso nominale: media ~2,8% annuo nel 1996-2025 e ~1,8% annuo nel 2006-2025
+  (da 0% a 6,2% nei singoli anni). Nel 2014 e nel 2021 il coefficiente è stato 1,
+  cioè rivalutazione nulla: l'ISTAT dava −0,19% e −0,02%, portati a 1 dal
+  DL 65/2015. In euro di oggi conta il PIL REALE, cioè il nominale meno
+  l'inflazione: ~0,5% annuo
 
 Step 3: Pensione lorda annua
   pensione_lorda = montante_finale × coefficiente_trasformazione(età)
@@ -32,9 +37,9 @@ Step 3: Pensione lorda annua
 ## Aliquote contributive lavoro dipendente privato 2026
 
 - **Aliquota di computo (totale)**: 33% (FPLD - Fondo Pensioni Lavoratori Dipendenti)
-- **A carico lavoratore**: 9,19% sulla retribuzione lorda fino al primo scaglione INPS; 10% sulla parte eccedente
+- **A carico lavoratore**: 9,19% sulla retribuzione lorda; sulla parte oltre la prima fascia di retribuzione pensionabile (€56.224 nel 2026) si aggiunge l'1%, quindi 10,19%
 - **A carico azienda**: 23,81%
-- **Tetto contributivo annuo 2026**: ~€120.607 (oltre questa soglia, per chi è interamente contributivo post-1995, **non si versa più contributo obbligatorio** sulla parte eccedente — e quindi non matura ulteriore montante)
+- **Tetto contributivo annuo 2026**: €122.295 (Circ. INPS 6/2026; era €120.607 nel 2025). Oltre questa soglia, per chi è interamente contributivo post-1995, **non si versa più contributo obbligatorio** sulla parte eccedente — e quindi non matura ulteriore montante. Il foglio Pubblica dell'Excel e `proiezione-inps.py` lo applicano
 
 Implicazione importante per RAL alti: per chi guadagna oltre il tetto, la pensione INPS smette di crescere col reddito. Diventa critico massimizzare la complementare per la parte sopra il tetto.
 
@@ -121,17 +126,17 @@ Quindi anche posticipare di pochi mesi ha un impatto numerico tangibile sull'ass
    coefficiente_proiettato = 5,608% × (1 − 0,018)^15 = 5,608% × 0,7615 = 4,271%
    ```
    Su un montante di €786k, questo significa €33.576 di pensione lorda invece di €44.100 (sovrastima del 31% se si usasse il coefficiente attuale). Il template Excel della skill calcola automaticamente il coefficiente proiettato; il tasso di decadimento è un parametro editabile (mettere 0 solo per lo scenario "coefficiente congelato", da etichettare come irrealistico).
-5. **Verifica sempre con INPS**: per chi è prossimo al pensionamento, rinviare a verifica diretta sul sito INPS (mypensione → estratto contributivo + simulazione) o patronato. La proiezione serve per chi è lontano dal pensionamento; chi è vicino usa il coefficiente reale del proprio biennio.
+5. **Verifica sempre con INPS**: per chi è prossimo al pensionamento, rinviare a verifica diretta sul portale INPS (www.inps.it, area riservata con SPID, CIE o CNS: "Estratto conto contributivo" e simulatore "La mia pensione futura") o patronato. La proiezione serve per chi è lontano dal pensionamento; chi è vicino usa il coefficiente reale del proprio biennio.
 
 ## Requisiti di accesso pensione 2026
 
 ### Pensione di vecchiaia
 
-- **Età anagrafica**: 67 anni (adeguamento speranza di vita: previsti aumenti di 1 mese nel 2027, 2 mesi nel 2028)
+- **Età anagrafica**: 67 anni nel 2026; 67 anni e 1 mese nel 2027, 67 anni e 3 mesi dal 2028 (adeguamento alla speranza di vita, Circ. INPS 28/2026)
 - **Anzianità contributiva**: 20 anni
-- **Importo soglia** (solo contributivi puri): pensione spettante ≥ 1,5 volte assegno sociale (per il 2026 circa €795 mensili)
+- **Importo soglia** (solo contributivi puri): pensione spettante ≥ 1 volta l'assegno sociale dal 2024 (L. 213/2023 c. 125; Circ. INPS 46/2024), cioè €546,24 al mese nel 2026
 
-Se l'importo soglia non è raggiunto a 67 anni, si può comunque andare in pensione a 71 anni con almeno 5 anni di contributi effettivi.
+Se l'importo soglia non è raggiunto a 67 anni, si può comunque andare in pensione a 71 anni (71 anni e 1 mese nel 2027, 71 anni e 3 mesi dal 2028) con almeno 5 anni di contributi effettivi.
 
 ### Pensione anticipata ordinaria
 
@@ -139,17 +144,24 @@ Requisiti contributivi puri (a prescindere dall'età):
 - **Uomini**: 42 anni e 10 mesi di contributi (con finestra mobile 3 mesi)
 - **Donne**: 41 anni e 10 mesi di contributi (finestra 3 mesi)
 
-Adeguamento alla speranza di vita previsto dal 2027.
+Nel 2027: 42 anni e 11 mesi per gli uomini, 41 anni e 11 mesi per le donne; dal 2028: 43 anni e 1 mese e 42 anni e 1 mese (Circ. INPS 28/2026, All. 2).
+
+### Pensione anticipata contributiva (solo contributivi puri)
+
+- **Età**: 64 anni nel 2026 (63 per legge più gli adeguamenti alla speranza di vita); 64 anni e 1 mese nel 2027, 64 anni e 3 mesi dal 2028
+- **Contributi**: almeno 20 anni di contribuzione effettiva (20 anni e 1 mese nel 2027, 20 anni e 3 mesi dal 2028)
+- **Importo soglia**: pensione ≥ 3 volte l'assegno sociale (€1.638,72 al mese nel 2026); 2,8 volte per le donne con un figlio, 2,6 volte con due o più. Dal 2030 il 3 diventa 3,2
+- **Tetto**: fino ai 67 anni l'assegno non supera 5 volte il trattamento minimo (€611,85 nel 2026, valore provvisorio); finestra di 3 mesi
+- Fonte: art. 24 c. 11 DL 201/2011. La computabilità della rendita del fondo pensione per raggiungere la soglia, introdotta dalla L. 207/2024, è stata abrogata dalla L. 199/2025 (Circ. INPS 19/2026)
 
 ### Misure sperimentali / Quota X
 
-In vigore o di prossima introduzione:
+Stato nel 2026:
 
-- **Quota 103** (prorogata): 62 anni + 41 contributi, ma con calcolo interamente contributivo (penalizzazione rispetto al misto)
-- **Quota 104**: ulteriore opzione, dettagli da Legge di Bilancio annuale
-- **Opzione donna**: 59-61 anni (variabile per categoria) + 35 contributi, con calcolo contributivo (penalizzazione)
+- **Quota 103**: non prorogata per il 2026; resta solo per chi ha maturato i requisiti (62 anni + 41 di contributi) entro il 31/12/2025, con calcolo interamente contributivo (Circ. INPS 19/2026)
+- **Opzione donna**: non prorogata; resta solo per chi ha maturato i requisiti entro il 31/12/2024, con calcolo contributivo (Circ. INPS 19/2026)
 - **APE Sociale**: 63 anni e 5 mesi + 30 contributi (lavoratori in difficoltà specifiche), prorogata al 31/12/2026 dalla Legge di Bilancio 2026
-- **Lavoratori precoci / Quota 41**: 41 anni di contributi (di cui almeno 1 prima dei 19 anni di età) per categorie tutelate
+- **Lavoratori precoci / Quota 41**: 41 anni di contributi (di cui almeno 1 prima dei 19 anni di età) per categorie tutelate; 41 anni e 1 mese nel 2027 e 41 anni e 3 mesi dal 2028, tranne chi svolge attività gravose, che resta a 41 anni (Circ. INPS 28/2026)
 
 Tutti questi richiedono ricostruzione della posizione contributiva con patronato/INPS.
 
@@ -164,15 +176,18 @@ Scaglioni standard: 23% / 33% / 43%. La pensione concorre a formare il reddito c
 ### Detrazioni pensionati 2026
 
 - No tax area: €8.500 (parificata ai lavoratori dipendenti dal 2024)
-- Detrazione max: €1.955 per redditi fino a €8.500
-- Detrazione decrescente tra €8.500 e €28.000
-- Detrazione minima oltre €28.000: ~€1.880
+- Detrazione (art. 13 c. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026; R = reddito complessivo):
+  - €1.955 fino a €8.500;
+  - 700 + 1.255 × (28.000 − R) / 19.500 tra €8.500 e €28.000;
+  - 700 × (50.000 − R) / 22.000 tra €28.000 e €50.000;
+  - zero oltre €50.000;
+  - +€50 se R è tra €25.000 e €29.000 (art. 13 c. 3-bis TUIR; dal 2027 art. 13 c. 4 D.Lgs. 117/2026).
 
-Le detrazioni pensionati sono leggermente diverse da quelle dei lavoratori dipendenti, ma simili in struttura.
+Rispetto ai lavoratori dipendenti la detrazione dei pensionati scende più in fretta e si azzera a €50.000. È la formula di `assets/netto-pensione.py` e del foglio Pubblica dell'Excel.
 
 ### Addizionali
 
-- **Regionale**: 0,70% - 3,33% (varia per regione; Calabria attualmente ~2,03%)
+- **Regionale**: 0,70% - 3,33% (varia per regione e per scaglione)
 - **Comunale**: 0% - 0,90% (varia per comune)
 
 ### Esempio numerico (pensione lorda annua €16.824 a 67 anni, residenza tipica)
@@ -180,11 +195,11 @@ Le detrazioni pensionati sono leggermente diverse da quelle dei lavoratori dipen
 ```
 Pensione lorda annua: €16.824
 IRPEF lorda (tutto nel primo scaglione 23%): €3.870
-Meno detrazione pensionati (su €16.824, decrescente): ~€1.920
-IRPEF netta: €1.950
+Meno detrazione pensionati: 700 + 1.255 × (28.000 − 16.824) / 19.500 = €1.419
+IRPEF netta: €2.450
 Addizionali (~2%): €336
-Pensione netta annua: €16.824 - €1.950 - €336 = €14.538
-Pensione netta mensile (su 13 mensilità): €1.118
+Pensione netta annua: €16.824 - €2.450 - €336 = €14.038
+Pensione netta mensile (su 13 mensilità): €1.080
 ```
 
 Nota: la pensione INPS si percepisce in **13 mensilità** (tredicesima a dicembre). Il calcolo mensile diviso per 13 dà la mensilità.
@@ -207,16 +222,20 @@ Per questa ragione la **complementare diventa strutturalmente necessaria**, non 
 
 ## Heuristic per la skill
 
-1. **Età corrente vs età target**: chiedere sempre, non assumere 67. Molti developer e profili tech mirano a 64 con anticipata o quota; molti vogliono valutare l'opzione di lavorare fino a 70.
+1. **Età corrente vs età target**: chiedere sempre, non assumere 67. Molti mirano a 64 con l'anticipata contributiva (20 anni di contributi e pensione ≥ 3 volte l'assegno sociale); molti vogliono valutare l'opzione di lavorare fino a 70.
 
-2. **Anzianità INPS corrente**: l'utente la trova nell'estratto conto INPS (PIN/CIE/SPID → mypensione → estratto contributivo). Se non disponibile, stimare da `eta_inizio_lavoro` ma flaggare l'approssimazione.
+2. **Anzianità INPS corrente**: l'utente la trova nell'estratto conto INPS (www.inps.it, area riservata con SPID, CIE o CNS → "Estratto conto contributivo"). Se non disponibile, stimare da `eta_inizio_lavoro` ma flaggare l'approssimazione.
 
-2-bis. **Montante contributivo già maturato**: è il dato che più pesa sul risultato, e il più incerto se stimato (dipende dall'intera carriera passata, che non conosciamo). Va **chiesto all'utente il valore reale**: lo trova sul sito INPS in "La mia pensione futura" o nell'estratto conto contributivo (il montante rivalutato a oggi). Se non disponibile, lo si **stima** dalla RAL attuale e dall'anzianità, ma la stima va dichiarata tale. La stima migliore non è la grezza `anzianità × RAL × 33%` (che assume RAL costante e nessuna rivalutazione dei contributi passati): è `RAL × 33% × Σ q^k` con `q = (1+rivalutazione)/(1+crescita_RAL)`, che tiene conto sia della retribuzione passata più bassa sia della rivalutazione dei versamenti già fatti. Quando rivalutazione ≈ crescita salariale le due distorsioni si compensano e si torna alla grezza; quando differiscono, la stima migliorata corregge nella direzione giusta. Il template Excel lo fa: se la cella "Montante INPS da estratto conto" è valorizzata usa quella, altrimenti applica la stima migliorata.
+2-bis. **Montante contributivo già maturato**: è il dato che più pesa sul risultato, e il più incerto se stimato (dipende dall'intera carriera passata, che non conosciamo). Va **chiesto all'utente il valore reale**: lo trova sul sito INPS in "La mia pensione futura" o nell'estratto conto contributivo (il montante rivalutato a oggi). Se non disponibile, lo si **stima** dalla RAL attuale e dall'anzianità, ma la stima va dichiarata tale. La stima migliore non è la grezza `anzianità × RAL × 33%` (che assume RAL costante e nessuna rivalutazione dei contributi passati): è la somma anno per anno `Σ(k=1..anzianità) min(RAL/(1+g)^k, massimale) × 33% × (1+rivalutazione)^(k−1)`, con k = anni fa. Tiene conto della retribuzione passata più bassa, del massimale (costante in euro di oggi, perché si rivaluta sui prezzi: L. 335/1995 art. 2 c. 18) e della rivalutazione dei versamenti già fatti; il contributo dell'anno scorso non è ancora rivalutato. Quando rivalutazione ≈ crescita salariale le due distorsioni si compensano e ci si avvicina alla grezza; quando differiscono, la stima migliorata corregge nella direzione giusta. Il template Excel lo fa: se la cella "Montante INPS da estratto conto" è valorizzata usa quella, altrimenti applica la stima migliorata.
 
 3. **Coefficienti aggiornati**: usare i valori 2025-2026 nei calcoli ma raccomandare **sempre** all'utente di verificare sul sito INPS per la propria età esatta al momento del pensionamento. Per chi si pensiona oltre il 2026, i coefficienti saranno diversi (più bassi) — quindi le proiezioni sono ottimistiche.
 
-4. **Rivalutazione PIL**: usare 1,8% di default (media storica) come scenario base. Permettere all'utente di variare in scenari (1,5% conservativo, 2,5% ottimistico).
+4. **Rivalutazione PIL**: la proiezione è in euro di oggi (RAL reale, spesa reale), quindi il montante si rivaluta al PIL **reale**: 0,5% di default, come `proiezione-inps.py` e l'Excel; scenari 0% (stagnazione) e 1%. Il PIL nominale (~1,8-2%) applicato a una RAL reale gonfia la pensione di oltre il 20%: si usa solo se anche RAL e spesa sono espresse in valori nominali.
 
 5. **Disclaimer obbligatori**: orizzonte temporale lungo + variabilità normativa + variabilità macroeconomica = range, non puntuale. Non promettere mai.
 
 6. **Riferimento patronato**: per dati esatti su anzianità contributiva, riscatto, totalizzazione, ricongiunzione, sempre rinviare a patronato (CGIL/CISL/UIL/INAS/etc.) o INPS. Sono servizi gratuiti.
+
+---
+*Massimale e prima fascia 2026 (Circ. INPS 6/2026), requisiti di vecchiaia, anticipata e precoci 2026-2028 (Circ. INPS 19/2026 e 28/2026, All. 2), detrazione pensionati (art. 13 c. 3 e 3-bis TUIR; dal 2027 art. 13 c. 3 e 4 D.Lgs. 117/2026) — Verificato: 2026-10.*
+*Meccanica di rivalutazione del montante (L. 335/1995 art. 1 c. 8-9, minimo 1 dal DL 65/2015 art. 5), massimale rivalutato sui prezzi (L. 335/1995 art. 2 c. 18) e tassi 1996-2025 (nota ISTAT del 16/10/2025) — Verificato: 2026-10.*

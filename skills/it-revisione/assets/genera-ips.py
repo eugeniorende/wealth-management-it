@@ -28,6 +28,7 @@ Questo strumento è educativo e non costituisce consulenza finanziaria.
 """
 
 import datetime
+import re
 import sys
 
 from docx import Document
@@ -94,8 +95,9 @@ DATI = {
         ("**Il resto della capacità** alimenta il lungo termine, che compone per 30 anni, "
          "oppure resta come buffer."),
         ("**Fondo pensione**: versare almeno la quota minima a proprio carico per sbloccare "
-         "il contributo del datore (se il CCNL lo prevede); deducibilità fino a €5.300/anno "
-         "(Legge di Bilancio 2026, TFR escluso)."),
+         "il contributo del datore (se il CCNL lo prevede); deducibilità fino a €5.300/anno, "
+         "contributo del datore compreso e TFR escluso (Legge di Bilancio 2026). I contributi non "
+         "dedotti vanno comunicati al fondo entro il 31/12 dell'anno successivo."),
     ],
 
     "strumenti": [
@@ -125,26 +127,36 @@ POLICY_RIBILANCIAMENTO = [
     ("**Bande 5/25.** Si interviene su una classe quando devia di oltre 5 punti percentuali in "
      "assoluto, oppure di oltre il 25% in relativo rispetto al peso target (vale la soglia che "
      "scatta prima)."),
-    ("**Modulazione per volatilità.** Bande un po' più larghe per le componenti volatili, più "
-     "strette per le stabili (fattore limitato 0,7–1,6): meno interventi inutili, al costo di una "
-     "lieve deviazione dall'ottimo teorico."),
     ("**Attenzione ai costi.** Prima si ribilancia coi flussi (versamenti e prelievi), solo poi "
-     "vendendo, per non realizzare plusvalenze e costi evitabili."),
+     "vendendo, per non realizzare plusvalenze e costi evitabili. Una vendita che paga imposta si "
+     "fa solo oltre il doppio della soglia."),
+    ("**Rientro.** A target se la correzione è a costo zero (flussi, minusvalenze, plusvalenze "
+     "compensate dallo zainetto); fino a metà banda per la parte che paga imposta."),
+    ("**Modulazione per volatilità (opzionale).** Spenta di default; se accesa, bande un po' più "
+     "larghe per le componenti volatili e più strette per le stabili (fattore limitato 0,7–1,6)."),
     ("**Frequenza.** Controllo trimestrale delle soglie; azione solo se una banda è violata. "
      "Niente ribilanciamenti \u201ca calendario\u201d fini a sé stessi."),
 ]
 
+# Verificato: 2026-10 — plus ETF/fondi = redditi di capitale (art. 44 c. 1 lett. g TUIR, dal 2027 art. 46 c. 1 lett. h; circ. 33/E/2011),
+# aliquote 26%/12,5% (art. 3 DL 66/2014), fondo pensione 20%/12,5% (art. 17 D.Lgs. 252/2005, dal 2027 art. 257 D.Lgs. 117/2026; L. 190/2014
+# c. 622, dal 2027 art. 257 c. 10), riporto delle minus 4 anni (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), comunicazione dei non dedotti (art. 8 c. 4
+# D.Lgs. 252/2005). Non verificata su fonte primaria la compensabilità dei certificati.
 POLICY_FISCALITA = [
     ("**La \u201ctrappola degli ETF\u201d.** In Italia le plusvalenze da ETF e fondi sono redditi di "
      "capitale: NON compensabili con le minusvalenze dello zainetto fiscale. Le minusvalenze "
-     "(redditi diversi) si compensano con le plus da azioni singole, obbligazioni, certificati."),
+     "(redditi diversi) si compensano con le plus da azioni singole, certificati e obbligazioni "
+     "(per queste solo la differenza di prezzo: cedole e scarto di emissione sono redditi di capitale)."),
     ("**Aliquote.** 26% sulla generalità delle rendite finanziarie; 12,5% sui titoli di Stato "
      "italiani e white-list."),
     ("**Asset location.** Il fondo pensione tassa i rendimenti al 20% (12,5% sulla quota in titoli "
-     "di Stato) ed è illiquido fino alla pensione: è il contenitore della crescita di lunghissimo "
-     "periodo. Il conto titoli ospita i secchielli investibili."),
+     "di Stato) ed è poco liquido fino alla pensione, salvo anticipazioni e riscatti: è il contenitore "
+     "della crescita di lunghissimo periodo. Il conto titoli ospita i secchielli investibili."),
     ("**Zainetto.** Le minusvalenze scadono (anno di realizzo + 4): coordinare plus e minus nello "
      "stesso anno fiscale."),
+    ("**Fondo pensione.** Entro il 31/12 dell'anno successivo al versamento (o prima, se nel "
+     "frattempo matura il diritto alla prestazione) comunicare al fondo i contributi non dedotti: "
+     "senza comunicazione, in uscita sono tassati come se fossero stati dedotti."),
 ]
 
 POLICY_GUARDRAIL = [
@@ -186,6 +198,7 @@ POLICY_CHECKLIST = [
         "Registrare allocazione target e **bande 5/25** nello strumento di ribilanciamento.",
         "Attivare i **versamenti ricorrenti** decisi nella politica dei versamenti.",
         "Promemoria **trimestrale** per il controllo delle bande; **revisione annuale** dell'IPS.",
+        "Ogni anno entro il 31/12: comunicare al fondo pensione i contributi non dedotti dell'anno precedente.",
     ]),
 ]
 
@@ -332,6 +345,10 @@ def nota_rischio(quota_azioni):
 
 # ═══════════════════════════════ COSTRUZIONE ═══════════════════════════════
 
+MESI = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
+        "agosto", "settembre", "ottobre", "novembre", "dicembre")  # strftime("%B") dipende dal locale
+
+
 def genera(dati, path_out):
     d = dict(DATI)
     d.update(dati or {})
@@ -343,7 +360,11 @@ def genera(dati, path_out):
     tot_cap = sum(o[4] for o in d["obiettivi"])
     if abs(tot_cap - d["capitale"]) > max(1, d["capitale"] * 0.005):
         print(f"⚠ i capitali per obiettivo sommano a €{tot_cap:,.0f} vs capitale €{d['capitale']:,.0f}")
-    quota_az = next((p for cl, _, p in d["allocazione"] if cl.lower().startswith("azion")), 0)
+    # tutte le classi azionarie ("Azionario sviluppati", "ETF azionario globale", "Equity"),
+    # non solo la prima; \b esclude "obbligazionario", che contiene "azion" a metà parola
+    quota_az = sum(p for cl, _, p in d["allocazione"] if re.search(r"\b(azion|equity)", cl, re.I))
+    if not quota_az:
+        print("⚠ nessuna classe azionaria riconosciuta nell'allocazione: la nota di rischio usa 0%")
 
     doc = Document()
     st = doc.styles["Normal"]
@@ -363,7 +384,8 @@ def genera(dati, path_out):
     para(doc, d["sottotitolo"], size=12, color=GREY, italic=True)
     doc.add_paragraph()
     para(doc, d["investitore"], size=15).runs[0].bold = True
-    data = d["data"] or datetime.date.today().strftime("%B %Y").capitalize()
+    oggi = datetime.date.today()
+    data = d["data"] or f"{MESI[oggi.month - 1].capitalize()} {oggi.year}"
     para(doc, data, size=12, color=GREY)
     for _ in range(3):
         doc.add_paragraph()

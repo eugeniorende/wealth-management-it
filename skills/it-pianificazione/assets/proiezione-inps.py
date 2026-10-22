@@ -21,6 +21,8 @@ ONESTÀ METODOLOGICA
   spostano il risultato di parecchi punti: per questo l'output include una tabella di sensibilità.
 - Il risultato è LORDO. Il netto è relativamente migliore (in pensione non si versano contributi
   e l'IRPEF su un reddito minore è più leggera).
+- Oltre il massimale contributivo (MASSIMALE_CONTRIBUTIVO) non si versano contributi: per le RAL
+  alte la pensione pubblica smette di crescere col reddito.
 """
 
 from motore_bootstrap import applica_override, percorso_json, scrivi_json
@@ -30,7 +32,7 @@ from motore_bootstrap import applica_override, percorso_json, scrivi_json
 MONTANTE_ATTUALE = 85_000.0   # montante contributivo a oggi (€) — da importa-previdenza.py
                               # o, meglio, da "La mia pensione futura" sul portale INPS
 RAL_ATTUALE      = 36_000.0   # retribuzione annua lorda attuale (€)
-ALIQUOTA_COMPUTO = 0.33       # IVS dipendenti (autonomi ~0,24; gestione separata ~0,2607)
+ALIQUOTA_COMPUTO = 0.33       # computo IVS dipendenti (artigiani e commercianti 0,24; gestione separata 0,25, sul 26,07% versato)
 
 ETA_ATTUALE        = 37.0     # età attuale (anche frazionaria)
 ETA_PENSIONAMENTO  = 69.0     # età di uscita ipotizzata (la vecchiaia è indicizzata alla
@@ -40,6 +42,8 @@ CRESCITA_REALE_RAL = 0.015    # crescita REALE annua della RAL (0 = carriera pia
                               # il tasso di sostituzione, usalo solo consapevolmente)
 PIL_REALE          = 0.005    # crescita REALE del PIL = rendimento reale del montante
                               # (media storica recente Italia ~0-1%; 0 = stagnazione)
+MASSIMALE_CONTRIBUTIVO = 122_295.0  # retribuzione massima su cui si versano contributi (post-1995),
+                              # tenuto costante in termini reali (Circ. INPS 6/2026; Verificato: 2026-10)
 
 # Coefficiente di trasformazione (montante → rendita) all'età di pensionamento:
 COEFF_ESPLICITO      = None   # se valorizzato (es. 0.048), vince su tabella e riduzione
@@ -73,12 +77,13 @@ def proietta(montante0, ral0, g_ral, pil, anni, coeff):
     """Montante e pensione a fine carriera, tutto in termini reali (moneta di oggi).
 
     Meccanica L.335/1995 rispettata: i contributi dell'anno t si rivalutano da t+1 in poi
-    (l'ultimo anno non si rivaluta). Ritorna (montante_finale, quota_attuale, quota_futuri, pensione).
+    (l'ultimo anno non si rivaluta) e la retribuzione oltre il massimale non versa contributi.
+    Ritorna (montante_finale, quota_attuale, quota_futuri, pensione).
     """
     fv_attuale = montante0 * (1 + pil) ** anni
     fv_futuri = 0.0
     for t in range(anni):
-        contributo = ral0 * (1 + g_ral) ** t * ALIQUOTA_COMPUTO
+        contributo = min(ral0 * (1 + g_ral) ** t, MASSIMALE_CONTRIBUTIVO) * ALIQUOTA_COMPUTO
         fv_futuri += contributo * (1 + pil) ** (anni - 1 - t)
     montante_fin = fv_attuale + fv_futuri
     return montante_fin, fv_attuale, fv_futuri, montante_fin * coeff

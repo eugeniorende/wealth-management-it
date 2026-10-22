@@ -25,7 +25,7 @@ Quindi l'asset location in Italia non è "distribuisci gli asset tra i conti age
 - **Massima flessibilità e liquidità, nessun vincolo temporale.** È il contenitore giusto per tutto ciò che non ha una ragione specifica per stare altrove.
 
 ### Fondo pensione (il contenitore agevolato per la PENSIONE)
-- Contributi **deducibili dall'IRPEF** (fino a €5.300/anno, vedi `it-pianificazione`), rendimenti tassati al **20%** (12,5% titoli di Stato), prestazione finale al **15%→9%**.
+- Contributi **deducibili dall'IRPEF** (fino a €5.300/anno insieme al contributo del datore, che usa una parte dello stesso plafond: vedi `it-pianificazione`), rendimenti tassati al **20%** (12,5% titoli di Stato), prestazione finale al **15%→9%**.
 - ⚠️ **Vincolato fino alla pensione** (con eccezioni: anticipo prima casa dopo 8 anni, spese sanitarie, RITA, ecc.).
 - È il contenitore **dominante per l'obiettivo pensione** (la deduzione + l'aliquota ridotta sui rendimenti + la tassazione agevolata della prestazione battono il dossier), ma proprio per il vincolo **non** è utilizzabile per obiettivi che si spendono prima (casa, università). Per i forfettari la deduzione non c'è (vedi `it-pianificazione-autonomi`).
 
@@ -38,7 +38,7 @@ Quindi l'asset location in Italia non è "distribuisci gli asset tra i conti age
 
 ### Polizze vita (Ramo I/III): differimento e successione
 - **Differimento**: i rendimenti sono tassati solo al riscatto (non annualmente), quindi compongono al lordo. Ramo I (gestione separata) offre garanzia del capitale e consolidamento; Ramo III (unit/index linked) è esposto al mercato.
-- **Successione**: la prestazione caso morte è **fuori dall'asse ereditario** (esente da imposta di successione) ed esente IRPEF per il beneficiario. È un vantaggio reale di pianificazione successoria.
+- **Successione**: la prestazione caso morte è **fuori dall'asse ereditario** ed esente dall'imposta di successione (art. 12 lett. c D.Lgs. 346/1990; dal 2027 art. 97 D.Lgs. 123/2025). L'esenzione IRPEF per il beneficiario, dal 2015, vale solo per la quota a copertura del **rischio demografico** (art. 34 DPR 601/1973; le temporanee caso morte pure restano esenti al 100%): la componente finanziaria è reddito di capitale, tassato dalla compagnia al 26% (12,5% sulla quota in titoli di Stato). Il bollo 0,2% riguarda solo i Rami III e V, non il Ramo I. È comunque un vantaggio reale di pianificazione successoria. *(Verificato: 2026-10, Circ. AdE 8/E/2016 e 7/E/2025.)*
 - ⚠️ **Costi tipicamente alti** (caricamenti, commissioni) che spesso mangiano il vantaggio fiscale. Strumento più di *estate planning* che di investimento puro: ha senso quando la finalità successoria è prioritaria, non come wrapper di rendimento.
 
 ### Conto deposito (liquidità)
@@ -56,7 +56,7 @@ Anche tenuti nel dossier, i titoli di Stato hanno aliquota **12,5%** ed **esenzi
 | **Medio termine (parte sicura)** | BTP nel dossier (12,5%) | — |
 | **Lungo termine (crescita)** | Dossier amministrato, ETF accumulazione | Una *quota* in PIR se si accetta concentrazione IT + lock 5 anni per lo 0% |
 | **Obiettivo con data fissa vicina** | Dossier (flessibilità) → conto deposito avvicinandosi | No fondo pensione (vincolato), cautela su PIR (concentrazione su goal rigido) |
-| **Trasferimento generazionale** | Polizza vita / BTP / PIR (esenti successione) | Solo se la finalità successoria è prioritaria e i costi sono accettabili |
+| **Trasferimento generazionale** | Polizza vita / BTP / PIR (esenti dall'imposta di successione, non da quella di donazione) | Solo se la finalità successoria è prioritaria e i costi sono accettabili. Costo fiscale degli eredi e confronto tra vendere e lasciare in eredità: `it-tax-optimization/references/successione-donazione.md` |
 
 Principio guida: **il dossier amministrato è il default flessibile**; si devia verso un contenitore vincolato (fondo pensione, PIR, polizza) **solo quando il vincolo di quel contenitore coincide con la natura dell'obiettivo** e il vantaggio fiscale supera costi e perdita di flessibilità/diversificazione.
 

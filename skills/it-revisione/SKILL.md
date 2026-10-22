@@ -30,14 +30,14 @@ Patrimonio netto (attività per contenitore fiscale − passività), composizion
 Versamenti effettuati vs pianificati; andamento del periodo **separando il rendimento di mercato dai versamenti** (foglio **Andamento** del cruscotto — è l'errore più comune del fai-da-te, vedi `references/metodo-revisione.md`); eventi della vita; cambiamenti normativi rilevanti (es. nuova Legge di Bilancio).
 
 ### 3. Avanzamento per dominio (richiamando le altre skill)
-- **Pensione** → `it-pianificazione` (dipendenti) o `it-pianificazione-autonomi` (P.IVA): il tasso di sostituzione proiettato è ancora in linea con l'obiettivo? C'è un **gap previdenziale**? Va aumentato il versamento al fondo pensione (verificando la deducibilità nel proprio regime)?
+- **Pensione** → `it-pianificazione` (dipendenti) o `it-pianificazione-autonomi` (P.IVA): il tasso di sostituzione proiettato è ancora in linea con l'obiettivo? C'è un **gap previdenziale**? Va aumentato il versamento al fondo pensione (verificando la deducibilità nel proprio regime)? Per il dipendente, qual è lo **spazio deducibile residuo** dell'anno: max(0, €5.300 − datore − dovuto − volontari già versati nell'anno), con il contributo del datore e quello minimo del lavoratore (il TFR non conta)? È il tetto fiscale dei volontari da versare ancora entro il 31/12, non un importo consigliato (foglio Complementare dell'Excel di `it-pianificazione`); per il forfettario la deduzione arriva solo fino agli altri redditi IRPEF (`it-pianificazione-autonomi`). Ciò che supera il plafond, o che il forfettario non deduce, va comunicato al fondo come non dedotto entro il 31/12 dell'anno dopo: senza comunicazione in uscita è tassato di nuovo, con una perdita del 9-15% su quella parte (23% se la posizione esce con un'anticipazione non sanitaria o un riscatto per altre cause).
 - **Obiettivi** → `it-pianificazione-obiettivi`: ogni obiettivo è **on track**? La **probabilità di successo** (Monte Carlo) è ancora adeguata? Il **glide path** richiede de-risking quest'anno? Va aggiustato il versamento mensile?
 - **Fiscalità** → `it-tax-optimization`: ci sono **minusvalenze in scadenza** (finestra 4 anni) da usare entro il 31/12? Plusvalenze da compensare? Opportunità di **harvesting**? (A fine anno questo passo ha priorità per via delle scadenze.)
 - **Allocazione** → `it-rebalance`: quanto è il **drift** rispetto al target? Va ribilanciato? Si può ribilanciare sfruttando le **minus in scadenza** per compensare le plus da vendita (coordinamento fiscale)?
 
 ### 4. Azioni prioritizzate
 Si raccolgono le azioni emerse e si **ordinano**, secondo la logica di `references/metodo-revisione.md`:
-1. **Scadenza** prima di tutto (minus in scadenza al 31/12, versamento fondo pensione entro il 31/12 per la deduzione).
+1. **Scadenza** prima di tutto (minus in scadenza al 31/12, versamento fondo pensione entro il 31/12 per la deduzione, comunicazione al fondo dei contributi non dedotti dell'anno precedente entro il 31/12).
 2. **Impatto strutturale** poi (gap previdenziale, obiettivo a rischio): agire presto vale più che agire tanto.
 3. **Manutenzione** infine (ribilanciamento entro le bande, de-risking del glide path).
 
@@ -62,16 +62,16 @@ Report in markdown, cinque sezioni che ricalcano il workflow. C'è un **template
 
 ## Lo strumento: il cruscotto patrimoniale
 
-`assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa della revisione. Sei fogli:
+`assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa della revisione. Un foglio Leggimi con istruzioni e limiti, poi sei fogli:
 
 - **Patrimonio**: attività per contenitore fiscale (dossier, fondo pensione, conto deposito, liquidità, polizze, immobili, cripto) meno passività → patrimonio netto e composizione.
-- **Allocazione**: per classe (azionario, obbligazionario, liquidità, immobiliare, alternativi), % attuale vs target, **drift** e segnale di ribilanciamento oltre la banda impostata.
-- **Andamento**: la decomposizione del periodo — **rendimento di mercato separato dai versamenti**, rendimento money-weighted semplificato (Dietz) e rendimento **reale** al netto dell'inflazione. È il foglio che impedisce di scambiare i versamenti per rendimento.
-- **Sintesi**: avanzamento di obiettivi (capitale attuale vs target, probabilità, stato on track/a rischio) e pensione (tasso di sostituzione proiettato vs obiettivo, gap), da compilare tirando i numeri dagli strumenti dedicati.
+- **Allocazione**: per classe (azionario, obbligazionario, liquidità, immobiliare, alternativi), % attuale vs target, **drift** e segnale di ribilanciamento oltre la soglia della **regola 5/25** (la minore tra la banda assoluta e il 25% del target della classe, come in `it-rebalance`).
+- **Andamento**: la decomposizione del periodo — **rendimento di mercato separato dai versamenti**, rendimento money-weighted semplificato (Dietz) e rendimento **reale** al netto dell'inflazione. È il foglio che impedisce di scambiare i versamenti per rendimento. Sotto, i **costi dell'anno** (bollo, commissioni e Tobin tax, TER medio ponderato, ISC del fondo pensione) a scopo di confronto: il rendimento calcolato sui valori di mercato li incorpora già, quindi non vanno sottratti di nuovo.
+- **Sintesi**: avanzamento di obiettivi (capitale attuale vs target, probabilità Monte Carlo, **priorità** e stato rispetto alla soglia della priorità: 85% essenziali, 75% importanti, 60% desiderabili) e pensione (tasso di sostituzione proiettato vs obiettivo, gap), da compilare tirando i numeri dagli strumenti dedicati.
 - **Azioni**: il tracker delle azioni emerse dalla revisione (azione, dominio, priorità, scadenza, stato), con la legenda della logica di prioritizzazione. È il ponte tra il report e l'esecuzione.
-- **Rendimento TWR**: il **time-weighted return** della strategia (rendimenti dei sotto-periodi tra un flusso e l'altro, incatenati), affiancato al **money-weighted esatto** (XIRR) sugli stessi dati. La differenza tra i due è l'effetto del timing dei versamenti; il TWR è il numero da confrontare con un benchmark. Si compila una riga per data di rilevazione (valore + flusso netto).
+- **Rendimento TWR**: il **time-weighted return** della strategia (rendimenti dei sotto-periodi tra un flusso e l'altro, incatenati), affiancato al **money-weighted esatto** (XIRR) sugli stessi dati. La differenza tra i due è l'effetto del timing dei versamenti; il TWR è il numero da confrontare con un benchmark. Si compila una riga per data di rilevazione (valore + flusso netto), dall'alto e senza righe vuote, fino a 120 righe: il riepilogo legge da solo l'ultima.
 
-Validare con `python /mnt/skills/public/xlsx/scripts/recalc.py <file>` (atteso `total_errors: 0`). Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
+Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo; dal repository del plugin, `python scripts/ricalcola-excel.py <file>` lo ricalcola in locale italiano e segnala le celle in errore. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
 
 ## Anti-pattern (NON FARE MAI)
 
@@ -79,7 +79,7 @@ Validare con `python /mnt/skills/public/xlsx/scripts/recalc.py <file>` (atteso `
 - ❌ **Confondere versamenti e rendimento**: se il saldo è salito di €18.000 ma hai versato €9.000, non hai reso €18.000. Sempre la decomposizione (foglio Andamento).
 - ❌ **Spingere a intervenire su un calo di mercato**: i cali fanno parte del piano. La revisione corregge la rotta su scadenze, gap e drift, non insegue il mercato. Una revisione settimanale è un anti-pattern.
 - ❌ **Trattare i quattro domini come liste separate**: il valore è nelle azioni cross-dominio (ribilanciare usando le minus, versare dove rende di più). Cercarle sempre.
-- ❌ **Ignorare le scadenze di fine anno**: a novembre-dicembre le minus in scadenza e il versamento al fondo pensione hanno priorità operativa, vanno prima dell'impatto strutturale.
+- ❌ **Ignorare le scadenze di fine anno**: a novembre-dicembre le minus in scadenza, il versamento al fondo pensione e la comunicazione dei contributi non dedotti hanno priorità operativa, vanno prima dell'impatto strutturale.
 - ❌ **Promettere risultati o dare raccomandazioni di investimento personalizzate**: la revisione mette ordine e propone, ma rinvia al professionista per le decisioni.
 
 ## Riferimenti

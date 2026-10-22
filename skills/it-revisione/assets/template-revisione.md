@@ -25,6 +25,8 @@
 
 > *Promemoria: il rendimento è la parte di mercato, non l'intera variazione del saldo. Non confondere i versamenti col rendimento.*
 
+**Costi dell'anno** (per confronto, già inclusi nel rendimento): bollo del dossier € [—] (0,2% del controvalore a fine periodo), commissioni e Tobin tax € [—], TER medio ponderato [—]%, ISC del fondo pensione [—]% contro l'ISC medio COVIP della stessa tipologia [—]%.
+
 ---
 
 ## 2. Cosa è cambiato — dall'ultima revisione
@@ -40,6 +42,8 @@
 
 ### Pensione *(da `it-pianificazione` / `it-pianificazione-autonomi`)*
 Tasso di sostituzione proiettato: **[—]%** (obiettivo [—]%). Gap: **[—]**. [in linea / da colmare]
+
+Fondo pensione: spazio deducibile residuo quest'anno **€ [—]** (max(0, €5.300 − datore − dovuto − volontari già versati nell'anno); per il forfettario fino agli altri redditi IRPEF; tetto fiscale, non importo consigliato). Contributi non dedotti dell'anno scorso da comunicare entro il 31/12: **€ [—]** (senza comunicazione, in uscita si perde il 9-15% di quella parte, il 23% con anticipazioni non sanitarie o riscatti per altre cause).
 
 ### Obiettivi *(da `it-pianificazione-obiettivi`)*
 
@@ -71,7 +75,7 @@ Drift massimo: [classe] a [+/−]%. [entro le bande / da ribilanciare]. Se da ri
 
 ## 5. Prossima revisione
 
-Prossima revisione completa: **[mese/anno]**. Mini-revisione fiscale di fine anno: **novembre-dicembre [anno]** (per le scadenze minus e il versamento al fondo pensione entro il 31/12).
+Prossima revisione completa: **[mese/anno]**. Mini-revisione fiscale di fine anno: **novembre-dicembre [anno]** (per le scadenze minus, il versamento al fondo pensione e la comunicazione dei contributi non dedotti entro il 31/12).
 
 ---
 

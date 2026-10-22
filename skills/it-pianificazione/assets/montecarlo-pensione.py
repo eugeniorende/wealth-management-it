@@ -17,9 +17,11 @@ Conseguenza pratica e onesta: la dispersione del tasso di sostituzione viene qua
 pilastro complementare; il pubblico la àncora. Lo script lo mostra esplicitamente.
 
 Il motore è lo stesso block bootstrap di montecarlo-obiettivi.py: ricampiona blocchi di anni
-consecutivi dalla serie storica reale (così code grasse, correlazioni e mean reversion sono quelle
-vere), ricentrando la media sul rendimento atteso del comparto (si calibra il LIVELLO sull'ipotesi,
-si mantiene la FORMA reale). Stessa serie Damodaran di obiettivi.
+consecutivi dalla serie storica USA (S&P 500 e T-Bond 1928-2025, Damodaran), che è NOMINALE in
+dollari. Di default ne usa solo la FORMA (code grasse, correlazioni e mean reversion storiche): la
+media viene ricentrata sul rendimento atteso reale del comparto, che fissa il LIVELLO. Con
+RICENTRA_MEDIA = False la serie si deflaziona anno per anno con l'inflazione USA (colonna del CSV),
+come nel ponte e nel decumulo, così resta in termini reali. Stessa serie di obiettivi.
 
 Termini: esprimi TUTTI i valori in modo coerente — consigliato in EURO DI OGGI (potere d'acquisto):
 rendimento reale del comparto, pensione INPS e RAL in moneta di oggi. Il bootstrap trapianta la
@@ -30,7 +32,8 @@ Dipendenze: numpy. Uso: python montecarlo-pensione.py
 
 import numpy as np
 
-from motore_bootstrap import applica_override, carica_storico, blocchi_bootstrap, pctl, percorso_json, scrivi_json
+from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_inflazione, carica_storico, deflaziona,
+                              pctl, percorso_json, scrivi_json)
 
 # ─────────────── INPS — pilastro pubblico (ÀNCORA deterministica) ───────────────
 PENSIONE_INPS_ANNUA = 21000.0      # pensione pubblica annua LORDA al pensionamento, dal foglio Excel
@@ -54,17 +57,30 @@ TASSO_SOSTITUZIONE_TARGET = 0.70   # soglia per la probabilità di "successo"
 # ─────────────── Monte Carlo ───────────────
 N_SIM = 20000
 BLOCCO = 5                         # lunghezza blocco (anni consecutivi): preserva la sequenza
-RICENTRA_MEDIA = True              # ricentra la media storica sul rendimento atteso del comparto
+RICENTRA_MEDIA = True              # ricentra la media storica sul rendimento atteso del comparto;
+                                   # False = serie storica deflazionata (rendimenti reali storici USA)
+INFLAZIONE_RIPIEGO = 0.02          # se la serie (propria) non ha la colonna inflazione
 SEED = 42                          # riproducibilità (rimuovere per casualità piena)
 FILE_STORICO = "rendimenti-storici.csv"
+
+
+def serie_portafoglio(az_hist, ob_hist):
+    """Rendimenti annui del comparto in termini reali: la serie nominale in dollari ricentrata sul
+    rendimento atteso reale (default), oppure deflazionata anno per anno con l'inflazione USA."""
+    if not RICENTRA_MEDIA:
+        inflazione = carica_inflazione(FILE_STORICO)
+        inflazione = INFLAZIONE_RIPIEGO if inflazione is None else inflazione
+        az_hist, ob_hist = deflaziona(az_hist, inflazione), deflaziona(ob_hist, inflazione)
+    port = FP_PESO_AZIONARIO * az_hist + (1.0 - FP_PESO_AZIONARIO) * ob_hist
+    if RICENTRA_MEDIA:
+        port = port - port.mean() + FP_RENDIMENTO_ATTESO_REALE
+    return port
 
 
 def simula_fp(az_hist, ob_hist):
     """Distribuzione del montante del fondo pensione al pensionamento, via block bootstrap.
     Stessa logica di montecarlo-obiettivi.py, con versamenti ANNUI (contributi a metà anno)."""
-    port = FP_PESO_AZIONARIO * az_hist + (1.0 - FP_PESO_AZIONARIO) * ob_hist
-    if RICENTRA_MEDIA:
-        port = port - port.mean() + FP_RENDIMENTO_ATTESO_REALE
+    port = serie_portafoglio(az_hist, ob_hist)
     rendimenti = blocchi_bootstrap(port, N_SIM, ANNI, BLOCCO)
     saldi = np.full(N_SIM, FP_POT_ATTUALE, dtype=float)
     for y in range(ANNI):
@@ -94,7 +110,8 @@ def main():
     print(f"MONTE CARLO PENSIONE — {N_SIM:,} percorsi, {ANNI} anni, bootstrap a blocchi di {BLOCCO}")
     print(f"{'='*70}")
     print(f"Comparto fondo pensione: {FP_PESO_AZIONARIO*100:.0f}% azionario, "
-          f"rendimento reale atteso {FP_RENDIMENTO_ATTESO_REALE*100:.1f}%")
+          + (f"rendimento reale atteso {FP_RENDIMENTO_ATTESO_REALE*100:.1f}% (media storica ricentrata)"
+             if RICENTRA_MEDIA else "rendimenti reali storici USA (serie deflazionata, media non ricentrata)"))
 
     print(f"\n— PILASTRO COMPLEMENTARE (fondo pensione) — la parte a rischio di mercato —")
     print(f"   Montante al pensionamento:   P10 € {pctl(pot,10):>10,.0f}   "

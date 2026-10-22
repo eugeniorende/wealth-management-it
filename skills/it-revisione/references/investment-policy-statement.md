@@ -19,7 +19,7 @@ Un IPS personale efficace è **breve** (una-due pagine) e copre questi punti, ci
 5. **Regole nei drawdown** — il cuore comportamentale: cosa si fa, e soprattutto cosa **non** si fa, quando i mercati cadono. Es. "non vendo per panico; ribilancio secondo le bande comprando il sceso; non guardo il portafoglio più di una volta al mese". È la pre-decisione che evita l'errore più costoso.
 6. **Politica di versamento** — quanto si versa e dove si indirizza (alla classe sottopesata per ribilanciare via flussi; al fondo pensione se c'è gap previdenziale e la deducibilità conviene). *Fonte: `it-rebalance` (Leva 1) e `it-pianificazione`.*
 7. **Politica di prelievo (decumulo)** — se/quando si entra in decumulo: il tasso di prelievo sostenibile e la sequenza di liquidazione fiscale. *Fonte: `it-pianificazione-obiettivi/references/decumulo.md` e `it-rebalance/references/sequenza-liquidazione.md`.*
-8. **Vincoli fiscali da rispettare** — le regole ricorrenti: usare le minus in scadenza entro il 31/12, versare al fondo pensione entro fine anno per la deduzione, preferire strumenti compensabili quando c'è zainetto. *Fonte: `it-tax-optimization`.*
+8. **Vincoli fiscali da rispettare** — le regole ricorrenti: usare le minus in scadenza entro il 31/12, versare al fondo pensione entro fine anno per la deduzione, comunicare al fondo entro il 31/12 i contributi non dedotti dell'anno precedente, preferire strumenti compensabili quando c'è zainetto. *Fonte: `it-tax-optimization`.*
 9. **Cadenza di revisione** — quando si rivede l'IPS e l'aderenza ad esso (annuale + finestra fiscale di fine anno). *Fonte: `it-revisione` (`metodo-revisione.md`).*
 
 L'IPS non si riscrive a ogni revisione: si **rivede** annualmente e si **modifica solo** quando cambia qualcosa di strutturale (un nuovo obiettivo, un cambio di reddito o di fase di vita), mai in reazione a un movimento di mercato. Anzi, la regola "non modifico l'IPS durante un crollo" andrebbe scritta nell'IPS stesso.
@@ -34,7 +34,7 @@ L'IPS non si riscrive a ogni revisione: si **rivede** annualmente e si **modific
 >
 > **3. Allocazione strategica.** Aggregata: [—]% azionario / [—]% obbligazionario / [—]% liquidità / [altro]. Per obiettivo: [obiettivo → profilo]. Glide path: [finestra di de-risking e atterraggio].
 >
-> **4. Ribilanciamento.** Bande: regola 5/25 (minore tra 5 punti assoluti e 25% relativi), allargata quando correggere costa imposta. Sempre a costo fiscale minimo (flussi prima delle vendite; minus prima delle plus; zainetto per compensare).
+> **4. Ribilanciamento.** Bande: regola 5/25 (minore tra 5 punti assoluti e 25% relativi), allargata quando correggere costa imposta. Sempre a costo fiscale minimo (flussi prima delle vendite; minus prima delle plus; zainetto per compensare). Rientro a target se la correzione costa zero, a metà banda per la parte che paga imposta.
 >
 > **5. Nei drawdown.** [es. "Non vendo per panico. Ribilancio secondo le bande comprando il sceso. Controllo il portafoglio al massimo una volta al mese. Non modifico questo IPS durante un crollo."]
 >
@@ -42,7 +42,7 @@ L'IPS non si riscrive a ogni revisione: si **rivede** annualmente e si **modific
 >
 > **7. Prelievi (decumulo).** Tasso iniziale [—]%. Fonti in ordine: liquidità/buffer → flussi → vendite tax-aware → fondo pensione.
 >
-> **8. Vincoli fiscali.** Usare le minus in scadenza entro il 31/12. Versare al fondo pensione entro il 31/12 per la deduzione. Preferire strumenti compensabili quando c'è zainetto.
+> **8. Vincoli fiscali.** Usare le minus in scadenza entro il 31/12. Versare al fondo pensione entro il 31/12 per la deduzione. Comunicare al fondo entro il 31/12 i contributi non dedotti dell'anno precedente. Preferire strumenti compensabili quando c'è zainetto.
 >
 > **9. Revisione.** Annuale a [mese] + mini-revisione fiscale a novembre-dicembre. Modifico l'IPS solo per eventi strutturali.
 >

@@ -26,13 +26,29 @@ Uso:
     python ponte-pensione.py --set ETA_USCITA=60 --set SPESA_ANNUA_PONTE=22000
 
 ONESTÀ METODOLOGICA
-- Tutto in termini REALI (€ di oggi). La RITA è modellata a rate costanti
+- Tutto in termini REALI (€ di oggi). La serie storica (S&P 500 e T-Bond USA 1928-2025,
+  Damodaran) è NOMINALE in dollari: si deflaziona anno per anno con l'inflazione USA dello
+  stesso anno (CPI, colonna del CSV), come in decumulo-obiettivi.py, così gli anni '70 restano
+  quello che erano per chi spende in termini reali. La RITA è modellata a rate costanti
   (capitale destinato al comparto garantito, ~0% reale: prassi prudente) e con
-  l'aliquota agevolata sull'INTERO importo (leggermente conservativo: la parte
-  di rendimenti già tassati sarebbe esente).
+  l'aliquota agevolata sull'INTERO importo (conservativo: la parte di
+  rendimenti già tassati, che può valere il 30-45% del montante, sarebbe esente).
 - I canali PUBBLICI di anticipo (pensione anticipata ordinaria, anticipata
   contributiva, APE…) NON sono modellati: se ne maturi i requisiti, il ponte
   si accorcia e questo calcolo diventa un limite superiore del fabbisogno.
+  Per un contributivo puro il canale tipico è l'anticipata contributiva: 64 anni
+  e 20 anni di contribuzione effettiva nel 2026; 64 anni e 1 mese e 20 anni e
+  1 mese nel 2027; 64 anni e 3 mesi e 20 anni e 3 mesi dal 2028. Serve una
+  prima rata ≥ 3 volte l'assegno sociale (2,8 e 2,6 per le madri, 3,2 dal
+  2030), l'assegno è limitato a 5 volte il trattamento minimo fino alla
+  vecchiaia e la pensione decorre tre mesi dopo la maturazione dei requisiti
+  (art. 24 c. 11 DL 201/2011; Circ. INPS 19/2026 e 28/2026, Verificato:
+  2026-10). Per stimarla: proiezione-inps.py --set ETA_PENSIONAMENTO=64 e
+  confronto con la soglia. Per il ponte, ETA_PENSIONE_VECCHIAIA = 64.25 nel
+  2026 (64.33 nel 2027, 64.5 dal 2028), cioè l'età più la finestra: accorcia
+  il ponte INPS ma sposta anche la finestra della RITA, che per legge resta
+  legata alla vecchiaia: in quel caso leggere la parte RITA con cautela (o
+  RITA_ATTIVA=False).
 - Il drag fiscale sui prelievi dal capitale ordinario (26% sui capital gain
   realizzati) è approssimato da un parametro annuo sul rendimento.
 Questo strumento è educativo e non costituisce consulenza finanziaria o previdenziale.
@@ -40,7 +56,8 @@ Questo strumento è educativo e non costituisce consulenza finanziaria o previde
 
 import numpy as np
 
-from motore_bootstrap import applica_override, carica_storico, blocchi_bootstrap, pctl, percorso_json, scrivi_json
+from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_inflazione, carica_storico, deflaziona,
+                              pctl, percorso_json, scrivi_json)
 
 # ============================== PARAMETRI ==============================
 
@@ -49,7 +66,9 @@ ETA_PENSIONE_VECCHIAIA = 69.0 # età in cui INPS + fondo ti coprono (da proiezio
 
 SPESA_ANNUA_PONTE = 25_000.0  # tenore di vita NETTO annuo nel ponte (€ reali di oggi)
 CAPITALE_PONTE = 45_000.0     # capitale-ponte disponibile ALL'USCITA (€ reali) — tipicamente
-                              # il secchiello "libertà finanziaria" proiettato a quella data
+                              # il secchiello "libertà finanziaria" proiettato a quella data, che
+                              # it-pianificazione-obiettivi dà in nominale: dividerlo per
+                              # (1 + inflazione)^anni all'uscita per riportarlo a euro di oggi
 PESO_AZIONARIO_PONTE = 0.30   # quota azionaria durante il ponte (de-risked: il glide path
                               # della libertà finanziaria atterra proprio verso l'uscita)
 DRAG_FISCALE_ANNUO = 0.004    # attrito fiscale sui prelievi (26% sui gain realizzati), approssimato
@@ -72,6 +91,10 @@ RENDIMENTO_FP_REALE = 0.030   # rendimento reale del fondo (per i versamenti per
 N_SIM = 20_000
 SEED = 42
 BLOCCO = 5                    # block bootstrap (anni consecutivi)
+FILE_STORICO = "rendimenti-storici.csv"
+INFLAZIONE = None             # None = inflazione USA storica anno per anno (colonna del CSV);
+                              # un numero (es. 0.02) = costante, che appiattisce gli anni '70
+INFLAZIONE_RIPIEGO = 0.02     # usata se la serie (propria) non ha la colonna inflazione
 
 # =======================================================================
 
@@ -79,6 +102,27 @@ BLOCCO = 5                    # block bootstrap (anni consecutivi)
 def aliquota_rita(anni_iscrizione):
     """15% − 0,30%/anno oltre il 15°, riduzione max 6 punti → floor 9%."""
     return max(0.09, 0.15 - 0.003 * max(0, anni_iscrizione - 15))
+
+
+def inflazione_usata():
+    """Inflazione per deflazionare la serie: l'array storico, o una costante (INFLAZIONE o il
+    ripiego se la serie non ha la colonna). Ritorna (inflazione, descrizione)."""
+    if INFLAZIONE is not None:
+        return INFLAZIONE, f"inflazione costante {INFLAZIONE*100:.1f}%"
+    storica = carica_inflazione(FILE_STORICO)
+    if storica is None:
+        return INFLAZIONE_RIPIEGO, (f"inflazione costante {INFLAZIONE_RIPIEGO*100:.1f}% "
+                                    "(la serie non ha la colonna inflazione)")
+    return storica, "inflazione USA storica anno per anno (CPI dicembre su dicembre)"
+
+
+def rendimenti_reali_ponte():
+    """Rendimenti REALI annui del portafoglio del ponte: la serie nominale in dollari deflazionata
+    anno per anno, poi pesata tra azionario e obbligazionario."""
+    az, ob = carica_storico(FILE_STORICO)
+    inflazione, _ = inflazione_usata()
+    return (PESO_AZIONARIO_PONTE * deflaziona(az, inflazione)
+            + (1 - PESO_AZIONARIO_PONTE) * deflaziona(ob, inflazione))
 
 
 def simula_ponte(capitale, rendimenti, prelievi):
@@ -135,8 +179,7 @@ def main():
     ])
 
     # ── Monte Carlo ──
-    az, ob = carica_storico("rendimenti-storici.csv")
-    port = PESO_AZIONARIO_PONTE * az + (1 - PESO_AZIONARIO_PONTE) * ob
+    port = rendimenti_reali_ponte()
     rendimenti = blocchi_bootstrap(port, N_SIM, anni_ponte, BLOCCO)
     vivi, saldi = simula_ponte(CAPITALE_PONTE, rendimenti, prelievi)
     prob = vivi.mean()
@@ -158,10 +201,11 @@ def main():
         eta = ETA_USCITA + y
         print(f"  {eta:.0f} → {eta+1:.0f} anni: € {prelievi[y]:>8,.0f}"
               + ("   (RITA attiva)" if prelievi[y] < SPESA_ANNUA_PONTE - 0.01 else ""))
-    print(f"  totale nominale: € {prelievi.sum():,.0f}")
+    print(f"  totale (euro di oggi, non scontato): € {prelievi.sum():,.0f}")
 
     print(f"\nMONTE CARLO ({N_SIM:,} percorsi, {PESO_AZIONARIO_PONTE:.0%} azioni, "
           f"drag fiscale {DRAG_FISCALE_ANNUO:.1%}):")
+    print(f"  serie storica USA nominale in dollari, deflazionata con {inflazione_usata()[1]}")
     print(f"  capitale-ponte disponibile: € {CAPITALE_PONTE:,.0f}")
     print(f"  → PROBABILITÀ di coprire il ponte: {prob:.1%}")
     if prob > 0:
@@ -179,7 +223,8 @@ def main():
         (((1 + PIL_REALE) ** anni_ponte - 1) / (PIL_REALE * anni_ponte) if PIL_REALE > 0 else 1.0)
     d_inps = d_montante_inps * COEFF_TRASFORMAZIONE
     r = RENDIMENTO_FP_REALE
-    d_fondo_vers = VERSAMENTO_FP_ANNUO * (((1 + r) ** anni_ponte - 1) / r) * COEFF_TRASFORMAZIONE
+    fattore = ((1 + r) ** anni_ponte - 1) / r if r else anni_ponte  # a r = 0 l'annuità è lineare
+    d_fondo_vers = VERSAMENTO_FP_ANNUO * fattore * COEFF_TRASFORMAZIONE
     d_fondo_rita = montante_rita * COEFF_TRASFORMAZIONE  # il montante usato non genera rendita a 69
 
     print(f"\nCOSTI PERMANENTI dell'uscita a {ETA_USCITA:.0f} (lordi, sulla pensione da "
@@ -201,6 +246,7 @@ def main():
         scrivi_json(json_out, {
             "anni_ponte": anni_ponte,
             "probabilita_successo": round(float(prob), 4),
+            "inflazione": inflazione_usata()[1],
             "capitale_ponte": CAPITALE_PONTE,
             "capitale_necessario": {f"{c:.0%}": round(v, 0) for c, v in necessari.items()},
             "rita": {"attiva": bool(RITA_ATTIVA), "eta_inizio": eta_inizio_rita,

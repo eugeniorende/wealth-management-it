@@ -46,32 +46,37 @@ contributi = min(base_contributiva, 122.295) × 0,2607
 La pensione si calcola esattamente come per i dipendenti privati post-1995:
 
 ```
-montante_contributivo = Σ (reddito_anno × 0,2607) rivalutato (media PIL 5 anni)
+montante_contributivo = Σ (reddito_anno × 0,25) rivalutato (media PIL 5 anni)
+# a montante va l'aliquota di computo, il 25% di IVS: lo 0,72% e lo 0,35% ISCRO
+# del 26,07% versato finanziano altre prestazioni (Circ. INPS 8/2026)
 pensione_lorda_annua = montante × coefficiente_trasformazione(età)
 ```
 
+Per legge la rivalutazione segue il PIL nominale. In una proiezione in euro di oggi si usa il PIL reale (~0,5%), e il contributo dell'anno si rivaluta solo dall'anno dopo, come in `it-pianificazione/references/previdenza-obbligatoria.md`.
+
 I **coefficienti di trasformazione sono gli stessi** dei dipendenti (sono fissati per legge a livello di sistema, non per categoria). Vedi la tabella ufficiale completa DM 20/11/2024 in `it-pianificazione/references/previdenza-obbligatoria.md`. A 67 anni = 5,608% per il biennio 2025-2026.
 
-### La differenza che conta: aliquota 26,07% vs 33%
+### La differenza che conta: aliquota di computo 25% vs 33%
 
-Il dipendente accantona il **33%** del reddito (di cui la maggior parte a carico azienda). L'autonomo in Gestione Separata accantona il **26,07%** (tutto a suo carico).
+Il dipendente accantona il **33%** del reddito (di cui la maggior parte a carico azienda). L'autonomo in Gestione Separata versa il **26,07%** (tutto a suo carico), di cui va a montante il **25%** di IVS.
 
-A parità di reddito, l'autonomo accumula un montante **circa il 21% più basso** del dipendente (26,07/33 = 0,79). Questo si traduce in una **pensione pubblica strutturalmente più bassa** a parità di reddito.
+A parità di reddito, l'autonomo accumula un montante **circa il 24% più basso** del dipendente (25/33 = 0,76). Questo si traduce in una **pensione pubblica strutturalmente più bassa** a parità di reddito.
 
 Esempio: reddito €40.000/anno per 35 anni.
 - Dipendente (33%): contributo annuo €13.200 → montante e pensione più alti
-- Autonomo (26,07%): contributo annuo €10.428 → montante ~21% più basso → pensione ~21% più bassa
+- Autonomo (26,07%): contributo annuo €10.428, di cui €10.000 a montante → montante ~24% più basso → pensione ~24% più bassa
 
 **Conseguenza**: per l'autonomo la previdenza complementare è ancora più necessaria che per il dipendente. Ma — paradosso del forfettario — senza il vantaggio fiscale della deduzione (vedi `fiscalita-forfettario.md`).
 
 ### Requisiti di accesso pensione (autonomi Gestione Separata)
 
 Gli stessi dei dipendenti contributivi puri:
-- **Vecchiaia**: 67 anni + 20 anni di contributi + importo soglia (1,5× assegno sociale)
-- **Anticipata ordinaria**: 64 anni + 20 anni di contribuzione effettiva (per i contributivi puri, con il requisito dell'importo soglia legato all'assegno sociale, e dal 2024 considerabile anche la rendita della complementare per raggiungere la soglia)
-- Adeguamenti speranza di vita dal 2027
+- **Vecchiaia**: 67 anni + 20 anni di contributi + importo soglia di 1× l'assegno sociale dal 2024 (€546,24 al mese nel 2026)
+- **Anticipata contributiva**: 64 anni + 20 anni di contribuzione effettiva + pensione ≥ 3 volte l'assegno sociale (€1.638,72 al mese nel 2026; 2,8 volte per le donne con un figlio, 2,6 con due o più)
+- **Anticipata ordinaria**: a qualunque età, con 42 anni e 10 mesi di contributi (uomini) o 41 anni e 10 mesi (donne)
+- Adeguamenti alla speranza di vita: nel 2027 vecchiaia a 67 anni e 1 mese, anticipata contributiva a 64 anni e 1 mese con 20 anni e 1 mese di contribuzione effettiva, anticipata ordinaria a 42 anni e 11 mesi (41 anni e 11 mesi per le donne); dal 2028 vecchiaia a 67 anni e 3 mesi, anticipata contributiva a 64 anni e 3 mesi con 20 anni e 3 mesi, anticipata ordinaria a 43 anni e 1 mese (42 anni e 1 mese per le donne) (Circ. INPS 28/2026, All. 2). Le anticipate decorrono tre mesi dopo la maturazione dei requisiti
 
-⚠️ Per i contributivi puri (tutti gli autonomi iscritti dal 1996) l'accesso alla pensione anticipata a 64 anni richiede che la pensione maturata superi una certa soglia. La Legge 207/2024 ha previsto che si possa considerare **anche la rendita della previdenza complementare** per raggiungere gli importi soglia — un motivo in più per avere un fondo pensione, anche per chi non ha il vantaggio della deduzione.
+⚠️ Per i contributivi puri (tutti gli autonomi iscritti dal 1996) l'anticipata a 64 anni richiede che la pensione maturata superi 3 volte l'assegno sociale. La L. 207/2024 aveva permesso di contare anche la rendita della previdenza complementare per raggiungere la soglia, ma la L. 199/2025 ha abrogato questa possibilità (Circ. INPS 19/2026): non è più un argomento a favore del fondo pensione. *(Requisiti 2026-2028 — Verificato: 2026-10.)*
 
 ## Le casse professionali (cenni)
 
@@ -107,6 +112,6 @@ Frequente nel mondo tech: dipendente che ha anche una P.IVA per attività extra 
 3. **Ricordare il massimale**: €122.295. Per redditi alti, la pubblica si appiattisce; segnalare che oltre il massimale serve la complementare.
 4. **Nessun contributo minimo**: non assumere minimi per la Gestione Separata (a differenza di artigiani/commercianti).
 5. **Coefficienti di trasformazione**: stessi dei dipendenti (tabella DM 20/11/2024 in `it-pianificazione/references/previdenza-obbligatoria.md`). Non duplicare, rinviare.
-6. **Tasso di sostituzione più basso**: per via dell'aliquota 26,07%, evidenziare che l'autonomo ha una pensione pubblica più magra a parità di reddito → la complementare è più necessaria.
-7. **Anzianità contributiva**: l'autonomo la verifica sull'estratto conto INPS (mypensione.it via SPID/CIE). Se non disponibile, stimare ma flaggare.
+6. **Tasso di sostituzione più basso**: per via dell'aliquota di computo del 25%, evidenziare che l'autonomo ha una pensione pubblica più magra a parità di reddito → la complementare è più necessaria.
+7. **Anzianità contributiva**: l'autonomo la verifica sull'estratto conto INPS (www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo"). Se non disponibile, stimare ma flaggare.
 8. **Rinvio al patronato/consulente**: per ricostruzione posizione, cumulo, totalizzazione, casse, sempre rinviare a professionista abilitato (servizi spesso gratuiti via patronato).
