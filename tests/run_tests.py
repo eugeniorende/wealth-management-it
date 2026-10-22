@@ -1109,6 +1109,9 @@ def t_casse_fonti():
     per_nome = {r.split("**")[1]: r for r in righe}
     assert "2.785" in per_nome["Inarcassa"] and "3%" not in per_nome["Inarcassa"], per_nome["Inarcassa"][:160]
     assert "reddito medio" in per_nome["Inarcassa"] and "non oltre i 35" in per_nome["Inarcassa"], "Inarcassa: limiti dell'agevolazione under 35"
+    # RGP art. 4.4 verificato: soglia = reddito medio del biennio precedente, contribuzione figurativa a 25 anni
+    assert "da verificare sul regolamento" not in per_nome["Inarcassa"] and "25 anni" in per_nome["Inarcassa"], \
+        "Inarcassa: condizioni under 35 dal RGP art. 4.4 (soglia di reddito, integrazione figurativa)"
     assert "20%" in per_nome["Cassa Forense"] and "131.800" in per_nome["Cassa Forense"], per_nome["Cassa Forense"][:160]
     assert "209.300" in per_nome["CNPADC"] and "856" in per_nome["ENPAP"], "CNPADC/ENPAP"
 
@@ -1154,6 +1157,9 @@ def t_requisiti_e_link_inps():
     netto = " ".join(netto.split())
     assert re.search(r"c\. 6 vale fino al 2026", netto) and "D.Lgs. 117/2026" in netto, \
         "netto-pensione: il c. 6 della L. 207/2024 senza la doppia citazione dal 2027"
+    # comma verificato sul testo in GU (S.O. 26 alla GU 152/2026): art. 13 c. 10, abrogazione art. 376 c. 1 lett. pppppp
+    assert "art. 13 c. 10" in netto and "comma da verificare" not in netto, \
+        "netto-pensione: l'ulteriore detrazione dal 2027 è l'art. 13 c. 10 D.Lgs. 117/2026"
 
 
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════

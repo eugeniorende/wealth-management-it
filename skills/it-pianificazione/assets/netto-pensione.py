@@ -37,8 +37,10 @@ Regole fiscali incorporate (Verificato: 2026-07; periodo d'imposta 2026):
     4,8% del reddito di lavoro (c. 4-5); tra 20.000 e 32.000 un'ulteriore
     detrazione di 1.000 €, che scende a zero tra 32.000 e 40.000 (c. 6)
     (Verificato: 2026-10: Normattiva L. 207/2024, Circ. AdE 4/E/2025, Circ. INPS 6/2026).
-    Il c. 6 vale fino al 2026: dal 1/1/2027 lo abroga il D.Lgs. 117/2026, che
-    riporta l'ulteriore detrazione nell'art. 13 del nuovo TUIR (comma da verificare)
+    Il c. 6 vale fino al 2026: dal 1/1/2027 lo abroga il D.Lgs. 117/2026
+    (art. 376 c. 1 lett. pppppp e art. 377), che riporta la stessa ulteriore
+    detrazione nell'art. 13 c. 10 del nuovo TUIR (testo in GU n. 152 del
+    3/7/2026, S.O. n. 26)
   - addizionali regionale e comunale: parametriche (variano per territorio)
 
 ONESTÀ METODOLOGICA
