@@ -3188,7 +3188,8 @@ _NORME_2027 = re.compile(
     r"|" + _ART + r"\s?(?:17|11 c\.\s?(?:6|4-ter|4-quater|4-quinquies))\b[^;\n()]{0,40}?D\.\s?Lgs\.\s?252/2005"
     r"|" + _ART + r"\s?27\b[^;\n()]{0,30}?DPR 600/(?:19)?73"
     r"|L\.\s?232/2016,?\s?c\.\s?(?:153 e )?158\b|\bc\.\s?158\b[^;\n]{0,10}L\.\s?232/2016"
-    r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?24 L\.\s?207/2024"
+    r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?(?:24|6) L\.\s?207/2024"
+    r"|" + _ART + r"\s?11 c\.\s?3 D\.\s?Lgs\.\s?47/2000|D\.\s?Lgs\.\s?47/2000,? art\.\s?11 c\.\s?3\b"
     r"|lett(?:era|\.)\s?c-(?:bis|ter|quater|quinquies|sexies)")
 # il riferimento dal 2027: «dal 2027», una freccia o il numero di uno dei testi unici (non l'anno nudo,
 # che è anche una data)

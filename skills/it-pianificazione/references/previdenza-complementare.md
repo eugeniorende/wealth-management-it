@@ -66,7 +66,7 @@ Se conferito al fondo, l'accantonamento TFR (~6,91% della RAL annua, vedi formul
 |---|---|
 | Rivalutazione fissa: 1,5% + 75% inflazione | Rivalutazione di mercato (dipende comparto) |
 | Rendimenti tassati al 17% | Rendimenti tassati al 20% (12,5% titoli Stato) |
-| Tassazione separata: aliquota media sul reddito di riferimento (TFR × 12 / anni di servizio), poi riliquidata sulla media dei 5 anni precedenti (art. 19 TUIR; dal 2027 nel D.Lgs. 117/2026, articolo da verificare) | 15→9% sulle sole quote di TFR al pensionamento |
+| Tassazione separata: aliquota media sul reddito di riferimento (TFR × 12 / anni di servizio), poi riliquidata sulla media dei 5 anni precedenti (art. 19 TUIR; dal 2027 art. 21 D.Lgs. 117/2026) | 15→9% sulle sole quote di TFR al pensionamento |
 | Garanzia datoriale (rischio default azienda) | Patrimonio segregato in fondo (rischio investimento) |
 | Pignorabilità simile a stipendio | Maggiore protezione da esecuzione forzata |
 | Liquidazione solo a fine rapporto | Anticipazioni più flessibili (vedi sotto) |
@@ -223,7 +223,7 @@ Erogato in un'unica soluzione. Tassato 15→9% (in base ad anni partecipazione).
 
 ### Rendita vitalizia
 
-Convertita dal fondo o da società assicurativa partner. Tasso di conversione tipico 5-6% del capitale (varia per età, sesso, opzioni di reversibilità). Versata mensilmente, con la ritenuta 15→9% sulla parte imponibile (TFR e contributi dedotti), fuori dall'IRPEF progressiva (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026). La parte della rata che viene dai rendimenti maturati durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 c. 1 D.Lgs. 117/2026, lettera da verificare) è tassata a parte, al 26% (12,5% sui titoli di Stato).
+Convertita dal fondo o da società assicurativa partner. Tasso di conversione tipico 5-6% del capitale (varia per età, sesso, opzioni di reversibilità). Versata mensilmente, con la ritenuta 15→9% sulla parte imponibile (TFR e contributi dedotti), fuori dall'IRPEF progressiva (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026). La parte della rata che viene dai rendimenti maturati durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 c. 1 lett. n D.Lgs. 117/2026) è tassata a parte, al 26% (12,5% sui titoli di Stato).
 
 **Pro**: copre tutta la vita (rischio longevità), integra la pensione INPS in modo coerente
 **Contro**: niente lascito nella vitalizia standard (nelle nuove forme del c. 3-bis il montante residuo va invece ai beneficiari indicati, c. 3-quinquies), tasso di conversione poco favorevole storicamente
@@ -243,7 +243,7 @@ La L. 199/2025 ha aggiunto il comma 3-bis all'art. 11 D.Lgs. 252/2005: la parte 
 - **prelievi liberamente determinabili** (dal 1/7/2026), di volta in volta entro la somma delle rate maturate e non ancora riscosse di una rendita teorica a durata definita (c. 3-quater): non un accesso libero al montante;
 - **erogazione frazionata** in almeno 5 anni (dal 31/10/2026).
 
-Fiscalità: rendita a durata definita e prelievi come il capitale (15% ridotto di 0,30 punti per anno oltre il 15° di partecipazione, fino al 9%); erogazione frazionata al 20%, ridotto di 0,25 punti per anno oltre il 15°, fino al 15% (art. 11 c. 6-ter). Dal 1/1/2027 le stesse regole sono nell'art. 258 del nuovo testo unico (D.Lgs. 117/2026). La COVIP ha adeguato le istruzioni con la delibera del 25/6/2026: condizioni e tempi di avvio vanno letti nel regolamento del proprio fondo.
+Fiscalità: rendita a durata definita e prelievi come il capitale (15% ridotto di 0,30 punti per anno oltre il 15° di partecipazione, fino al 9%); erogazione frazionata al 20%, ridotto di 0,25 punti per anno oltre il 15°, fino al 15% (art. 11 c. 6-ter; dal 2027 art. 258 c. 6). Dal 1/1/2027 le stesse regole sono nell'art. 258 del nuovo testo unico (D.Lgs. 117/2026). La COVIP ha adeguato le istruzioni con la delibera del 25/6/2026: condizioni e tempi di avvio vanno letti nel regolamento del proprio fondo.
 
 Vincoli (art. 11 c. 3-quater e 3-quinquies; delibera COVIP 25/6/2026):
 - le tre forme sono alternative alla vitalizia e non si combinano tra loro né con la vitalizia; a ciascuna si può affiancare il capitale fino al 50%;
@@ -278,5 +278,5 @@ Pesano il patrimonio fuori dal fondo, il timore di vivere più a lungo dell'atte
 7. **Mai consigliare il fondo come "investimento" alternativo a un PAC**: il fondo è specificamente uno strumento previdenziale con vincoli di accesso (no liquidità ordinaria fino al pensionamento). Va integrato con risparmio non vincolato per esigenze di liquidità di medio termine.
 
 ---
-*Tetto di deducibilità €5.300 (L. 199/2025 c. 201), capitale al 50% e caso del 100% (art. 11 c. 3, DL 62/2026 art. 16-ter), base imponibile e aliquote in uscita (art. 11 c. 6 e 6-ter; dal 2027 art. 258 D.Lgs. 117/2026), nuove forme di erogazione e loro vincoli (c. 3-bis, 3-quater e 3-quinquies), tassazione dei rendimenti (art. 17, L. 190/2014 c. 622; dal 2027 art. 257 c. 1 e 10 D.Lgs. 117/2026), TFR in azienda (art. 2120 c.c., D.Lgs. 47/2000 art. 11 c. 3, art. 19 TUIR; dal 2027 nel D.Lgs. 117/2026, articolo da verificare); commi 201-204 L. 199/2025 e delibera COVIP 25/6/2026 — Verificato: 2026-10.*
+*Tetto di deducibilità €5.300 (L. 199/2025 c. 201), capitale al 50% e caso del 100% (art. 11 c. 3, DL 62/2026 art. 16-ter), base imponibile e aliquote in uscita (art. 11 c. 6 e 6-ter; dal 2027 art. 258 c. 4 e 6 D.Lgs. 117/2026), nuove forme di erogazione e loro vincoli (c. 3-bis, 3-quater e 3-quinquies), tassazione dei rendimenti (art. 17, L. 190/2014 c. 622; dal 2027 art. 257 c. 1 e 10 D.Lgs. 117/2026), TFR in azienda (art. 2120 c.c., D.Lgs. 47/2000 art. 11 c. 3, dal 2027 art. 36 c. 1 D.Lgs. 33/2025; art. 19 TUIR; dal 2027 art. 21 D.Lgs. 117/2026); commi 201-204 L. 199/2025 e delibera COVIP 25/6/2026 — Verificato: 2026-10.*
 *Plafond condiviso con il contributo del datore, comunicazione dei non dedotti (art. 8 c. 4 D.Lgs. 252/2005), trasferimento con il contributo datoriale dal 31/10/2026 e adesione automatica dal 1/7/2026 — Verificato: 2026-10.*

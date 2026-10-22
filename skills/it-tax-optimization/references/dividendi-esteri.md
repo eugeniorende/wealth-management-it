@@ -56,7 +56,7 @@ Prelievo totale                        371,00 (37,1%)  482,00 (48,2%)
 
 Senza W-8BEN si perdono €111 ogni €1.000 di dividendo lordo. Non sono €150 perché il netto frontiera attutisce: la ritenuta italiana si calcola su una base più piccola. Il W-8BEN è il primo controllo da fare su qualsiasi dossier con azioni USA.
 
-Per confronto, lo stesso dividendo incassato tramite un broker estero che non fa da sostituto d'imposta (regime dichiarativo). Secondo l'Agenzia, l'imposta sostitutiva del 26% (art. 18 TUIR; dal 2027 nel D.Lgs. 117/2026, articolo da verificare) si calcola sul **lordo** (risposta 111/2020). Le istruzioni del Modello Redditi PF 2026 chiedono di indicare nel rigo RM31 l'importo «al lordo di eventuali ritenute subìte nello Stato estero»:
+Per confronto, lo stesso dividendo incassato tramite un broker estero che non fa da sostituto d'imposta (regime dichiarativo). Secondo l'Agenzia, l'imposta sostitutiva del 26% (art. 18 TUIR, dal 2027 art. 20 D.Lgs. 117/2026) si calcola sul **lordo** (risposta 111/2020). Le istruzioni del Modello Redditi PF 2026 chiedono di indicare nel rigo RM31 l'importo «al lordo di eventuali ritenute subìte nello Stato estero»:
 
 ```
 Dividendo lordo                      1.000,00
@@ -74,7 +74,7 @@ La Cassazione ha preso una strada diversa in due sentenze (Sez. V, n. 25698/2022
 
 Sono **aperture giurisprudenziali, non una regola**. Farle valere richiede un'istanza di rimborso all'Agenzia, con probabile contenzioso, e un commercialista che valuti la convenzione del singolo Paese. Se il credito fosse riconosciuto, nel caso dichiarativo dell'esempio il prelievo complessivo scenderebbe verso il 26%: è questa la posta in gioco.
 
-Dal 1° gennaio 2027 l'art. 165 TUIR diventa l'art. 185 del nuovo testo unico delle imposte sui redditi (D.Lgs. 117/2026), con lo stesso comma 1. L'art. 18 TUIR confluisce nel D.Lgs. 117/2026 (articolo da verificare).
+Dal 1° gennaio 2027 l'art. 165 TUIR diventa l'art. 185 del nuovo testo unico delle imposte sui redditi (D.Lgs. 117/2026), con lo stesso comma 1. L'art. 18 TUIR diventa l'art. 20 D.Lgs. 117/2026, con lo stesso comma 1.
 
 ## ETF ad accumulazione, ETF a distribuzione e azioni dirette
 
