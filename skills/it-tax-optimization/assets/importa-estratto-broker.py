@@ -35,9 +35,9 @@ Regole fiscali applicate (vedi SKILL.md e le reference):
   ente territoriale o di un organismo internazionale, l'aliquota va indicata nella colonna.
 - Le minus scadono il 31/12 del quarto anno successivo al realizzo: quelle scadute rispetto
   a --anno sono escluse (con avviso).
-- 12,5% e 26% si confrontano in «26%-equivalente» (coefficiente 48,08%, art. 6 c. 1 D.Lgs.
-  461/97): una minus al 12,5% vale 0,48 € per euro, e 1 € di minus al 26% assorbe 2,08 € di
-  plus al 12,5%.
+- 12,5% e 26% si confrontano in «26%-equivalente» (coefficiente 48,08%,
+  art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027): una minus al 12,5% vale 0,48 € per euro,
+  e 1 € di minus al 26% assorbe 2,08 € di plus al 12,5%.
 - Lo zainetto è per intermediario: con più broker la compensazione si calcola broker per broker.
 
 Limiti dichiarati: legge CSV, non i PDF della certificazione; lo zainetto è un secondo CSV;

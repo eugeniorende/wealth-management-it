@@ -187,5 +187,5 @@ Per la logica fiscale a valle (compensazione, gerarchia delle leve, regime dichi
 resto della skill; questo modulo si limita a trasformare un estratto grezzo nei numeri che servono.
 
 ---
-*Categorie fiscali applicate dall'importatore (artt. 44 c. 1 lett. g e 67 TUIR, art. 10-ter L. 77/1983, Circ. AdE 21/E/2014), scadenza e certificazione delle minus (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027), coefficiente 48,08% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) — Verificato: 2026-10.*
+*Categorie fiscali applicate dall'importatore (artt. 44 c. 1 lett. g e 67 TUIR → artt. 46 c. 1 lett. h e 76 TU 2027, art. 10-ter L. 77/1983 → art. 59 D.Lgs. 33/2025, Circ. AdE 21/E/2014), scadenza e certificazione delle minus (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027), coefficiente 48,08% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) — Verificato: 2026-10.*
 *Stato dei broker a ottobre 2026: comunicato stampa di Trade Republic del 30/1/2025 e help center di Scalable Capital; per Interactive Brokers e Degiro fonti di settore, da riverificare sul sito del broker.*

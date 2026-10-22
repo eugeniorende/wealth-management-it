@@ -99,7 +99,7 @@ Sterilizzazione benefit per redditi > €200.000: le detrazioni per oneri al 19%
 ### Tassazione assegno pensionistico
 
 L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si applicano:
-- Detrazione pensionati (art. 13 c. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026; R = reddito complessivo): €1.955 fino a €8.500 (no tax area); 700 + 1.255 × (28.000 − R) / 19.500 fino a €28.000; 700 × (50.000 − R) / 22.000 fino a €50.000; zero oltre; +€50 tra €25.000 e €29.000 (c. 3-bis). È la formula di `assets/netto-pensione.py`
+- Detrazione pensionati (art. 13 c. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026; R = reddito complessivo): €1.955 fino a €8.500 (no tax area); 700 + 1.255 × (28.000 − R) / 19.500 fino a €28.000; 700 × (50.000 − R) / 22.000 fino a €50.000; zero oltre; +€50 tra €25.000 e €29.000 (c. 3-bis; dal 2027 art. 13 c. 4 D.Lgs. 117/2026). È la formula di `assets/netto-pensione.py`
 - Addizionali regionali e comunali (variabili: 0,7-3,33% regionale, 0-0,9% comunale)
 
 ## Workflow operativo

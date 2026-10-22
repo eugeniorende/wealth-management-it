@@ -140,7 +140,7 @@ POLICY_RIBILANCIAMENTO = [
 
 # Verificato: 2026-10 — plus ETF/fondi = redditi di capitale (art. 44 c. 1 lett. g TUIR, dal 2027 art. 46 c. 1 lett. h; circ. 33/E/2011),
 # aliquote 26%/12,5% (art. 3 DL 66/2014), fondo pensione 20%/12,5% (art. 17 D.Lgs. 252/2005, dal 2027 art. 257 D.Lgs. 117/2026; L. 190/2014
-# c. 622), riporto delle minus 4 anni (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), comunicazione dei non dedotti (art. 8 c. 4
+# c. 622, dal 2027 art. 257 c. 10), riporto delle minus 4 anni (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), comunicazione dei non dedotti (art. 8 c. 4
 # D.Lgs. 252/2005). Non verificata su fonte primaria la compensabilità dei certificati.
 POLICY_FISCALITA = [
     ("**La \u201ctrappola degli ETF\u201d.** In Italia le plusvalenze da ETF e fondi sono redditi di "

@@ -3173,31 +3173,156 @@ def t_t13_propagazione():
 # Norme abrogate o rinumerate dal 1/1/2027 (mappa in it-tax-optimization/references/mappa-nuovo-tuir.md).
 # Restano in vigore, e non servono qui: art. 24 c. 11 DL 201/2011, gli altri articoli del D.Lgs.
 # 252/2005, art. 34 DPR 601/1973, art. 3 DL 66/2014.
+_ART = r"(?i:\bartt?)\."
 _NORME_2027 = re.compile(
-    r"art\.\s?\d+[\w-]*(?:[^;\n()]{0,30}?)(?<!nuovo)\s(?:TUIR|DPR 917/1986)\b"
+    _ART + r"\s?\d+[\w-]*(?:[^;\n()]{0,30}?)(?<!nuovo)\s(?:TUIR|DPR 917/1986)\b"
+    r"|" + _ART + r"\s?6[78]\b[^;\n()]{0,15}?\bc-(?:bis|ter|quater|quinquies|sexies)\b|\((?i:art)\.\s?44\)"
     r"|D\.\s?Lgs\.\s?461/(?:19)?97|L\.\s?77/1983|26-quinquies|DL 167/1990|D\.\s?Lgs\.\s?472/(?:19)?97"
-    r"|D\.\s?Lgs\.\s?74/2000|L\.\s?228/2012|art\.\s?19[^.;\n]{0,20}DL 201/2011|D\.\s?Lgs\.\s?346/(?:19)?90"
-    r"|art\.\s?(?:17|11 c\.\s?(?:6|4-ter|4-quater|4-quinquies))\s?D\.\s?Lgs\.\s?252/2005"
-    r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?24 L\.\s?207/2024|lett(?:era|\.)\s?\*{0,2}c-(?:bis|ter|quater|quinquies|sexies)")
-_SUCCESSORE_2027 = re.compile(r"2027|117/2026|141/2026|173/2024|174/2024|33/2025|123/2025|\bTU\b|testo unico")
+    r"|D\.\s?Lgs\.\s?74/2000|L\.\s?228/2012|" + _ART + r"\s?19\b[^;\n]{0,20}?DL 201/2011|D\.\s?Lgs\.\s?346/(?:19)?90"
+    r"|" + _ART + r"\s?(?:17|11 c\.\s?(?:6|4-ter|4-quater|4-quinquies))\b[^;\n()]{0,40}?D\.\s?Lgs\.\s?252/2005"
+    r"|" + _ART + r"\s?27\b[^;\n()]{0,30}?DPR 600/(?:19)?73"
+    r"|L\.\s?232/2016,?\s?c\.\s?(?:153 e )?158\b|\bc\.\s?158\b[^;\n]{0,10}L\.\s?232/2016"
+    r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?24 L\.\s?207/2024"
+    r"|lett(?:era|\.)\s?c-(?:bis|ter|quater|quinquies|sexies)")
+# il riferimento dal 2027: «dal 2027», una freccia o il numero di uno dei testi unici (non l'anno nudo,
+# che è anche una data)
+_SUCCESSORE_2027 = re.compile(r"(?i:dal (?:1/1/|1° gennaio )?2027)|→|TU 2027|117/2026|141/2026|173/2024|174/2024"
+                              r"|33/2025|123/2025")
+
+
+_ABBREVIAZIONI = {"art", "artt", "co", "lett", "conv", "circ", "risp", "par", "cfr", "es", "all", "mod", "fasc",
+                   "ris", "lgs", "dpr", "tab", "sez", "cass", "nt", "pag", "ss"}
+
+
+def _fine_frase(testo, da, a):
+    """Posizione della fine della prima frase in testo[da:a] (un punto che non chiude un'abbreviazione)."""
+    for f in re.finditer(r"\.\s+(?=[A-Z«])", testo[da:a]):
+        parola = re.search(r"(\w+)[)»\]]*$", testo[da:da + f.start()])
+        if parola and len(parola.group(1)) > 1 and parola.group(1).lower() not in _ABBREVIAZIONI:
+            return da + f.start()
+    return a
+
+
+def _citazioni_scoperte(testo, fino=None):
+    """Citazioni di norme che cambiano dal 2027 senza il successore, citazione per citazione.
+    Citazioni contigue («art. 67 TUIR, lettera c-sexies») formano un gruppo. Il successore va
+    cercato nella parentesi che contiene il gruppo (elenchi delle fonti: «(A, B; dal 2027 a, b)»)
+    o, fuori parentesi, tra il gruppo e la citazione successiva, entro la frase. Con `fino`, solo i
+    gruppi che iniziano prima di quella posizione (testo di una riga unito alla successiva)."""
+    chiusa, pila = {}, []          # apertura → chiusura delle parentesi della riga
+    for k, ch in enumerate(testo):
+        if ch == "(":
+            pila.append(k)
+        elif ch == ")" and pila:
+            chiusa[pila.pop()] = k
+    for k in pila:
+        chiusa[k] = len(testo)
+
+    def parentesi(pos):            # la parentesi più interna che contiene pos
+        dentro = [(a, c) for a, c in chiusa.items() if a < pos <= c]
+        return max(dentro) if dentro else None
+
+    m = list(_NORME_2027.finditer(testo))
+    scoperte, i = [], 0
+    while i < len(m):
+        j = i
+        while j + 1 < len(m):
+            tra = testo[m[j].end():m[j + 1].start()]
+            if len(tra) > 12 or "(" in tra or ")" in tra or _SUCCESSORE_2027.search(tra):
+                break
+            j += 1
+        par = parentesi(m[i].start())
+        if par:
+            fine = par[1]
+        else:
+            fine = _fine_frase(testo, m[j].end(), m[j + 1].start() if j + 1 < len(m) else len(testo))
+        if (fino is None or m[i].start() < fino) and not _SUCCESSORE_2027.search(testo, m[i].start(), fine):
+            scoperte.append(testo[m[i].start():m[j].end()])
+        i = j + 1
+    return scoperte
+
+
+def _righe_scoperte(testo, unisci=False):
+    """[(numero di riga, citazione)] delle citazioni senza successore. Con `unisci` (commenti e
+    docstring degli script, che vanno a capo) ogni riga si legge unita alla successiva: la
+    citazione spezzata su due righe si riconosce, e il successore può stare a capo."""
+    righe = testo.splitlines()
+    errori = []
+    for n, riga in enumerate(righe):
+        if unisci and n + 1 < len(righe):
+            unite = riga.rstrip() + " " + re.sub(r"^\s*#?\s*", "", righe[n + 1])
+            errori += [(n + 1, c) for c in _citazioni_scoperte(unite, fino=len(riga.rstrip()))]
+        else:
+            errori += [(n + 1, c) for c in _citazioni_scoperte(riga)]
+    return errori
+
+
 _RINVIATI_T11 = ()
+
+
+def _celle_scoperte(path):
+    """Le celle di testo di un Excel con citazioni senza il riferimento dal 2027."""
+    import openpyxl
+    errori = []
+    for ws in openpyxl.load_workbook(path).worksheets:
+        for row in ws.iter_rows():
+            for cella in row:
+                if isinstance(cella.value, str) and not cella.value.startswith("="):
+                    errori += [f"{os.path.basename(path)}!{ws.title}!{cella.coordinate}: «{c}»"
+                               for _, c in _righe_scoperte(cella.value)]
+    return errori
 
 
 @test("T11: ogni norma che cambia dal 2027 è citata anche col testo unico che la sostituisce")
 def t_t11_doppie_citazioni():
     # REGRESSIONE F035: dal 1/1/2027 i testi unici abrogano e rinumerano le norme citate; la
     # roadmap chiede la doppia citazione. Riga per riga, su skill, comandi e README.
+    # REVISIONE T11: il controllo era per riga (un successore copriva tutte le citazioni della riga)
+    # e accettava l'anno nudo; ora è per citazione, anche spezzata su due righe e negli Excel.
+    for caso, atteso in (("art. 68 c. 5 TUIR, comunicati entro il 30/6/2027", 1),
+                         ("art. 44 TUIR per i proventi, e l'art. 67 TUIR (dal 2027 art. 76)", 1),
+                         ("art. 44 e art. 67 TUIR (dal 2027 artt. 46 e 76)", 0),
+                         ("Art. 13 co. 3 TUIR, struttura vigente", 1), ("artt. 44-45 e 68 c. 7 TUIR", 1),
+                         ("(art. 67 c-sexies)", 1), ("art. 27 c. 4 lett. b DPR 600/73", 1), ("L. 232/2016, c. 158", 1)):
+        assert len(_citazioni_scoperte(caso)) == atteso, (caso, _citazioni_scoperte(caso))
+    assert _righe_scoperte("coefficiente 48,08%, art. 6 c. 1 D.Lgs.\n    461/97): una minus", unisci=True), "citazione spezzata"
+    assert not _righe_scoperte("# fondo pensione (art. 17 D.Lgs. 252/2005; L. 190/2014\n# c. 622, dal 2027 art. 257 c. 10)", unisci=True)
+    assert len(_citazioni_scoperte("l'art. 6 c. 1 D.Lgs. 461/97 (conv. L. 89/2014). Dal 2027 art. 306 c. 1")) == 1, "la frase finisce"
     errori = []
     for rel, testo in sorted(_testi_regole().items()):
         if rel.startswith(_RINVIATI_T11) or rel.endswith("mappa-nuovo-tuir.md"):
             continue
-        for n, riga in enumerate(testo.splitlines(), start=1):
-            if _NORME_2027.search(riga) and not _SUCCESSORE_2027.search(riga):
-                errori.append(f"{rel}:{n}: «{riga.strip()[:100]}»")
-    assert not errori, f"{len(errori)} citazioni senza il riferimento dal 2027:\n  " + "\n  ".join(errori[:15])
+        errori += [f"{rel}:{n}: «{c}»" for n, c in _righe_scoperte(testo, unisci=rel.endswith(".py"))]
+    import openpyxl
+    tmp = tempfile.mkdtemp()
+    try:                           # il controllo delle celle trova davvero una cella scoperta
+        wb = openpyxl.Workbook()
+        wb.active["B3"] = "Detrazione pensionati (art. 13 c. 3 TUIR)"
+        wb.save(os.path.join(tmp, "prova.xlsx"))
+        assert _celle_scoperte(os.path.join(tmp, "prova.xlsx")) == ["prova.xlsx!Sheet!B3: «art. 13 c. 3 TUIR»"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    for cartella, _, files in os.walk(SKILLS):
+        for f in files:
+            if f.endswith(".xlsx"):
+                errori += _celle_scoperte(os.path.join(cartella, f))
+    assert not errori, f"{len(errori)} citazioni senza il riferimento dal 2027:\n  " + "\n  ".join(errori[:25])
+    # il +€50 dei pensionati: dal 2027 è il c. 4 dell'art. 13, non il 3-bis
+    pian = os.path.join(SKILLS, "it-pianificazione")
+    for rel in ("SKILL.md", "references/previdenza-obbligatoria.md"):
+        for riga in open(os.path.join(pian, rel), encoding="utf-8").read().splitlines():
+            if "+€50" in riga and "3-bis" in riga:
+                assert "c. 4" in riga, f"it-pianificazione/{rel}: «{riga.strip()[:90]}»"
     tax = os.path.join(SKILLS, "it-tax-optimization")
     mappa = open(os.path.join(tax, "references", "mappa-nuovo-tuir.md"), encoding="utf-8").read()
     assert "## Da verificare" in mappa and mappa.rstrip().endswith("Verificato: 2026-10.*"), "mappa: sezione «Da verificare» e marcatore"
+    assert "GU n. 152 del 3/7/2026" in mappa, "mappa: riferimento alla Gazzetta Ufficiale"
+    # la regex conosce tutte le norme della colonna «fino al 31/12/2026» della mappa
+    for riga in mappa.splitlines():
+        celle = [c.strip() for c in riga.strip().strip("|").split("|")]
+        if riga.startswith("| ") and len(celle) == 2 and not celle[0].startswith(("Fino al", "---")) \
+                and not celle[1].startswith("invariat"):
+            assert _NORME_2027.search(celle[0].replace("*", "")), f"mappa: _NORME_2027 non riconosce «{celle[0]}»"
     for riga in ("| art. 68 c. 9-bis TUIR (cripto: costo zero, proventi da detenzione) | art. 77 c. 11 |",
                  "| art. 6 D.Lgs. 461/1997 (amministrato): c. 1 (48,08%) / 1-bis / 2 / 4 / 5 / 6 / 7 | art. 306: c. 1 / 2 / 3 / 5 / 6 / 7 / 8 |"):
         assert riga in mappa, f"mappa: «{riga}»"

@@ -101,7 +101,7 @@ def irpef_lorda(imponibile):
 
 
 def detrazione_pensione(reddito):
-    """Art. 13 co. 3 TUIR (redditi da pensione), struttura vigente 2026."""
+    """Art. 13 co. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026 (redditi da pensione), struttura vigente 2026."""
     if reddito <= 8_500:
         return 1_955.0
     if reddito <= 28_000:
@@ -112,7 +112,7 @@ def detrazione_pensione(reddito):
 
 
 def detrazione_lavoro(reddito):
-    """Art. 13 co. 1 TUIR (lavoro dipendente), struttura vigente 2026."""
+    """Art. 13 co. 1 TUIR, dal 2027 art. 13 c. 1 D.Lgs. 117/2026 (lavoro dipendente), struttura vigente 2026."""
     if reddito <= 15_000:
         return 1_955.0
     if reddito <= 28_000:
@@ -123,7 +123,7 @@ def detrazione_lavoro(reddito):
 
 
 def aliquota_rendita_fp(anni_iscrizione):
-    """15% − 0,30% per ogni anno oltre il 15°, floor 9% (D.Lgs. 252/2005 art. 11)."""
+    """15% − 0,30% per ogni anno oltre il 15°, floor 9% (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026)."""
     return max(0.09, 0.15 - 0.003 * max(0, anni_iscrizione - 15))
 
 

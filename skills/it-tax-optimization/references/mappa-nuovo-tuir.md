@@ -2,7 +2,7 @@
 
 Dal **1° gennaio 2027** si applicano i testi unici della riforma fiscale, che abrogano e rinumerano molte norme citate dal plugin:
 
-- **TUIR**: D.Lgs. 19/6/2026 n. 117 (art. 377). Abroga gli artt. 1-191 del DPR 917/1986 e, tra l'altro, gli artt. 5-7 del D.Lgs. 461/1997 (art. 376).
+- **TUIR**: D.Lgs. 19/6/2026 n. 117 (GU n. 152 del 3/7/2026, S.O. n. 26/L), che si applica dal 1/1/2027 (art. 377). Abroga gli artt. 1-191 del DPR 917/1986 e, tra l'altro, gli artt. 5-7 del D.Lgs. 461/1997 (art. 376).
 - **TU adempimenti e accertamento**: D.Lgs. 141/2026 (art. 368).
 - **TU sanzioni** (D.Lgs. 173/2024), **TU tributi erariali minori** (D.Lgs. 174/2024), **TU versamenti e riscossione** (D.Lgs. 33/2025), **TU registro e altri tributi indiretti** (D.Lgs. 123/2025): decorrenza rinviata al 1/1/2027 dall'art. 4, commi 1-5, del DL 200/2025 (conv. L. 26/2026).
 
@@ -22,6 +22,7 @@ Dal **1° gennaio 2027** si applicano i testi unici della riforma fiscale, che a
 | art. 44 TUIR (redditi di capitale); c. 1 lett. g (proventi OICR) | art. 46; c. 1 lett. h |
 | art. 45 TUIR (determinazione del reddito di capitale) | art. 47 |
 | art. 67 c. 1 TUIR, lett. c / c-bis / c-ter / c-quater / c-quinquies / c-sexies | art. 76 c. 1, lett. d / e / f / g / h / i |
+| art. 67 c. 1-bis TUIR (LIFO in dichiarativo) | art. 76 c. 2 |
 | art. 68 c. 5 TUIR (riporto delle minus nei 4 anni) | art. 77 c. 6 |
 | art. 68 c. 6 TUIR (corrispettivo e costo) | art. 77 c. 7 |
 | art. 68 c. 7 TUIR (redditi di capitale maturati, scarto) | art. 77 c. 8 |
@@ -82,6 +83,15 @@ Queste corrispondenze non sono confermate: non citarle come certe e restano fuor
 - **IVCA**: art. 168 c. 1 D.Lgs. 123/2025 secondo la pagina Normattiva; derivazione del comma da confermare.
 - **DM 21/02/2013** (attuazione Tobin tax): da verificare la lettura dei rinvii alla L. 228/2012 dopo il passaggio agli artt. 42-50 del D.Lgs. 174/2024.
 - **art. 11 c. 3 D.Lgs. 47/2000** (17% sulla rivalutazione del TFR): successore dal 2027 non individuato.
+- **art. 9 c. 2 TUIR** (cambio del giorno per corrispettivi e costi in valuta): articolo del D.Lgs. 117/2026 da individuare.
+- **artt. 17 e 19 TUIR** (tassazione separata del TFR): articoli del D.Lgs. 117/2026 da individuare.
+- **art. 18 TUIR** (imposta sostitutiva sui redditi di capitale di fonte estera): articolo da individuare; l'art. 20, indicato in una prima lettura, non è confermato.
+- **art. 44 c. 1 lett. g-quinquies TUIR** (rendimenti maturati durante l'erogazione della previdenza complementare): nell'art. 46 c. 1, lettera da individuare.
+- **art. 67 c. 1-ter TUIR** (soglia delle valute estere): nell'art. 76, comma da individuare.
+- **art. 1 c. 6 L. 207/2024** (ulteriore detrazione del cuneo fiscale): dal 2027 la detrazione passa nell'art. 13 del D.Lgs. 117/2026, comma da individuare.
+- **art. 11 c. 6-ter D.Lgs. 252/2005** (erogazione frazionata): nell'art. 258, comma da individuare.
+- **D.Lgs. 346/1990**, oltre alle righe in tabella: art. 1 c. 4 → art. 87 c. 4, art. 11 c. 2 → art. 96 c. 2, art. 31 → art. 116, art. 33 → art. 118, art. 37 → art. 120, art. 56 → art. 133 e art. 59 → art. 136 D.Lgs. 123/2025, come li indica `successione-donazione.md`, da confermare; art. 28 c. 7 da individuare.
+- **Commi del TU versamenti e riscossione**: art. 26-quinquies c. 6 DPR 600/1973 e art. 10-ter c. 3 L. 77/1983 passano agli artt. 58 e 59 (confermati), con i commi da individuare; art. 27 c. 4 lett. b DPR 600/1973 passa all'art. 55, comma da individuare.
 - Possibile refuso del D.Lgs. 117/2026: l'art. 306 c. 6 rinvia all'«art. 77, comma 4», mentre il riporto delle minus è al comma 6.
 
 *Corrispondenze confermate su Normattiva e Gazzetta Ufficiale — Verificato: 2026-10.*
