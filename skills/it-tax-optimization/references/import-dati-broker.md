@@ -40,8 +40,8 @@ broker, e:
    entrano tra le compensabili; quelle degli OICR fuori UE/SEE sono segnalate come IRPEF (quadro RL);
 3. deduce l'**aliquota**, salvo una colonna «aliquota» nel file. Il 12,5% spetta ai titoli di Stato
    italiani e agli equiparati (enti territoriali, organismi internazionali come BEI e BIRS) e alle
-   obbligazioni degli Stati della white list e dei loro enti territoriali (art. 6 c. 1 D.Lgs. 461/97
-   → art. 306 c. 1 TU 2027; vedi `aliquote-12-5-26.md`). Lo script lo riconosce dalla descrizione per
+   obbligazioni degli Stati della white list e dei loro enti territoriali
+   (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027; vedi `aliquote-12-5-26.md`). Lo script lo riconosce dalla descrizione per
    BTP, BOT, CCT, CTZ ed enti territoriali italiani (con ISIN IT o senza ISIN), per Bund, OAT, Bonos,
    Treasury, Gilt e JGB e per BEI, BERS, BIRS e le altre banche multilaterali. Le altre obbligazioni
    con ISIN estero restano al 26% **con un avviso**: se sono di uno Stato white list, di un suo ente
@@ -167,7 +167,7 @@ pilota.
 - **Lo zainetto è un input separato.** Sta in un documento diverso (la certificazione) rispetto
   all'estratto delle posizioni, quindi è un secondo CSV opzionale, non ricavabile dalle posizioni.
 - **La classificazione dalla descrizione è un'euristica.** La plus da vendita di ETF e fondi mobiliari
-  è reddito di **capitale** e non compensa lo zainetto (art. 44 c. 1 lett. g TUIR; circ. AdE 21/E/2014); solo
+  è reddito di **capitale** e non compensa lo zainetto (art. 44 c. 1 lett. g TUIR, dal 2027 art. 46 c. 1 lett. h; circ. AdE 21/E/2014); solo
   la minus è reddito diverso (vedi `etf-trap-redditi-capitale.md`). Lo script lo applica, ma
   riconosce gli strumenti dalla descrizione: quando sbaglia o non sa, la colonna «tipo fiscale»
   nel CSV ha la precedenza, e le posizioni senza indizi restano da classificare.
@@ -187,5 +187,5 @@ Per la logica fiscale a valle (compensazione, gerarchia delle leve, regime dichi
 resto della skill; questo modulo si limita a trasformare un estratto grezzo nei numeri che servono.
 
 ---
-*Categorie fiscali applicate dall'importatore (artt. 44 c. 1 lett. g e 67 TUIR, art. 10-ter L. 77/1983, Circ. AdE 21/E/2014), scadenza e certificazione delle minus (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027), coefficiente 48,08% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) — Verificato: 2026-10.*
+*Categorie fiscali applicate dall'importatore (artt. 44 c. 1 lett. g e 67 TUIR → artt. 46 c. 1 lett. h e 76 TU 2027, art. 10-ter L. 77/1983 → art. 59 D.Lgs. 33/2025, Circ. AdE 21/E/2014), scadenza e certificazione delle minus (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027), coefficiente 48,08% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) — Verificato: 2026-10.*
 *Stato dei broker a ottobre 2026: comunicato stampa di Trade Republic del 30/1/2025 e help center di Scalable Capital; per Interactive Brokers e Degiro fonti di settore, da riverificare sul sito del broker.*

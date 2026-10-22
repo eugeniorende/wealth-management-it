@@ -61,7 +61,7 @@ A differenza degli USA, dove si ribilancia dentro un IRA/401k senza conseguenze,
 
 ### La plus realizzata si calcola sul costo medio ponderato
 
-In regime amministrato la plus o minus di una vendita si calcola sul **costo medio ponderato** del titolo in quel rapporto (art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027): (prezzo − PMC) × quantità venduta. Il lotto non si sceglie e l'ordine degli acquisti non conta: una vendita parziale realizza una plus proporzionale e lascia invariato il PMC del residuo. Per ridurre l'imposta si sceglie quale **posizione** vendere (quella con l'imposta per euro venduto più bassa, plus/valore × aliquota), non quale lotto. Il LIFO dell'art. 67 c. 1-bis TUIR vale solo per i conti in dichiarativo, fuori dallo scope di questa skill. *(Costo medio ponderato in amministrato — Verificato: 2026-10.)*
+In regime amministrato la plus o minus di una vendita si calcola sul **costo medio ponderato** del titolo in quel rapporto (art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027): (prezzo − PMC) × quantità venduta. Il lotto non si sceglie e l'ordine degli acquisti non conta: una vendita parziale realizza una plus proporzionale e lascia invariato il PMC del residuo. Per ridurre l'imposta si sceglie quale **posizione** vendere (quella con l'imposta per euro venduto più bassa, plus/valore × aliquota), non quale lotto. Il LIFO dell'art. 67 c. 1-bis TUIR (→ art. 76 c. 2 TU 2027) vale solo per i conti in dichiarativo, fuori dallo scope di questa skill. *(Costo medio ponderato in amministrato — Verificato: 2026-10.)*
 
 ### L'asimmetria redditi diversi vs capitale (vedi it-tax-optimization)
 
@@ -79,7 +79,7 @@ Ogni vendita/acquisto di ribilanciamento comporta:
 - **Tobin tax** a carico dell'acquirente di **azioni di società italiane**: **0,4%** fuori mercato, **0,2%** su mercati regolamentati e MTF (aliquote raddoppiate dal 1/1/2026, L. 199/2025); escluse le azioni quotate di società con capitalizzazione media **< €500M**. **ETF, fondi (OICR, comprese le SICAV) e obbligazioni sono esclusi** (DM 21/02/2013, artt. 2 e 15) → per portafogli in ETF la Tobin tax sul ribilanciamento è zero.
 - **Imposta di bollo**: 0,2% annuo sul controvalore al 31/12, indipendente dal ribilanciamento (ma vendite di fine anno riducono marginalmente la base)
 
-*Imposta sulle transazioni finanziarie 2026 (art. 1 c. 491-494 L. 228/2012, mod. L. 199/2025 c. 29-31; esclusione di OICR e obbligazioni, DM 21/02/2013) — Verificato: 2026-10. Dal 2027 la disciplina passa agli artt. 42 ss. del D.Lgs. 174/2024.*
+*Imposta sulle transazioni finanziarie 2026 (art. 1 c. 491-494 L. 228/2012 → artt. 42-45 D.Lgs. 174/2024, mod. L. 199/2025 c. 29-31; esclusione di OICR e obbligazioni, DM 21/02/2013) — Verificato: 2026-10. Dal 2027 la disciplina passa agli artt. 42-50 del D.Lgs. 174/2024 (c. 491 → art. 42, c. 492 → 43, c. 493 → 44, c. 494 → 45).*
 
 Per un portafoglio tipico in ETF UCITS, il costo di transazione del ribilanciamento è essenzialmente solo le commissioni del broker.
 

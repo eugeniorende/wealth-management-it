@@ -18,7 +18,7 @@ all'italiana e «1.000» vale mille.
 
 Regole fiscali applicate (vedi SKILL.md e le reference):
 - La plus da vendita di ETF e fondi mobiliari è reddito di CAPITALE, non compensabile con lo
-  zainetto (art. 44 c. 1 lett. g TUIR); la minus è reddito diverso. Gli OICR non armonizzati
+  zainetto (art. 44 c. 1 lett. g TUIR, dal 2027 art. 46 c. 1 lett. h); la minus è reddito diverso. Gli OICR non armonizzati
   fuori UE/SEE vanno a IRPEF progressiva (reddito_capitale_irpef). Azioni, obbligazioni ed
   ETC/ETN sono reddito diverso. Senza colonna "tipo fiscale" la categoria si deduce dalla
   DESCRIZIONE, non dal prefisso ISIN (DE/FR/IE/LU coprono anche azioni singole); se la
@@ -35,9 +35,9 @@ Regole fiscali applicate (vedi SKILL.md e le reference):
   ente territoriale o di un organismo internazionale, l'aliquota va indicata nella colonna.
 - Le minus scadono il 31/12 del quarto anno successivo al realizzo: quelle scadute rispetto
   a --anno sono escluse (con avviso).
-- 12,5% e 26% si confrontano in «26%-equivalente» (coefficiente 48,08%, art. 6 c. 1 D.Lgs.
-  461/97): una minus al 12,5% vale 0,48 € per euro, e 1 € di minus al 26% assorbe 2,08 € di
-  plus al 12,5%.
+- 12,5% e 26% si confrontano in «26%-equivalente» (coefficiente 48,08%,
+  art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027): una minus al 12,5% vale 0,48 € per euro,
+  e 1 € di minus al 26% assorbe 2,08 € di plus al 12,5%.
 - Lo zainetto è per intermediario: con più broker la compensazione si calcola broker per broker.
 
 Limiti dichiarati: legge CSV, non i PDF della certificazione; lo zainetto è un secondo CSV;
@@ -101,7 +101,8 @@ SINONIMI_ZAIN = {
 COLONNE_NUMERICHE = ("quantita", "prezzo_carico", "valore_carico", "prezzo_attuale", "valore_attuale")
 
 # Stati UE e SEE (ISIN): OICR istituiti qui sono armonizzati o, se non lo sono, possono avere
-# un gestore vigilato; fuori da quest'area la plus va a IRPEF (art. 10-ter L. 77/1983).
+# un gestore vigilato; fuori da quest'area la plus va a IRPEF (art. 10-ter L. 77/1983; dal 2027
+# art. 59 del TU versamenti e riscossione, D.Lgs. 33/2025).
 UE_SEE = set("AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK "
              "IS LI NO".split())
 # Emittenti di ETF che emettono anche ETC (iShares Physical Gold, WisdomTree, Invesco) o hanno

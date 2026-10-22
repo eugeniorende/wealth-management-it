@@ -25,9 +25,9 @@ Uso:
 Regole fiscali incorporate (Verificato: 2026-07; periodo d'imposta 2026):
   - IRPEF a tre scaglioni: 23% fino a 28.000; 33% da 28.000 a 50.000
     (ridotta dal 35% dalla L. 199/2025, art. 1 co. 3); 43% oltre 50.000
-  - detrazione redditi da pensione (art. 13 TUIR): 1.955 € fino a 8.500 di
+  - detrazione redditi da pensione (art. 13 TUIR, dal 2027 art. 13 D.Lgs. 117/2026): 1.955 € fino a 8.500 di
     reddito, poi decrescente, zero oltre 50.000 (no tax area 8.500 €)
-  - detrazione lavoro dipendente (art. 13 TUIR): 1.955 € fino a 15.000, poi
+  - detrazione lavoro dipendente (art. 13 c. 1 TUIR, stesso comma dal 2027): 1.955 € fino a 15.000, poi
     decrescente, zero oltre 50.000
   - contributi IVS a carico del dipendente: 9,19% della RAL, +1% sulla parte
     oltre la prima fascia di retribuzione pensionabile (€56.224), niente oltre
@@ -51,7 +51,7 @@ ONESTÀ METODOLOGICA
 - Semplificazioni dichiarate: nessun altro reddito IRPEF, nessuna detrazione
   per carichi di famiglia od oneri, niente trattamento integrativo.
 - Rendita del fondo: la parte della rata che viene dai rendimenti maturati
-  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR) è tassata a parte
+  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 D.Lgs. 117/2026, lettera da verificare) è tassata a parte
   dall'erogatore al 26% (12,5% sui titoli di Stato) e non è modellata.
 Questo strumento è educativo e non costituisce consulenza fiscale.
 """
@@ -101,7 +101,7 @@ def irpef_lorda(imponibile):
 
 
 def detrazione_pensione(reddito):
-    """Art. 13 co. 3 TUIR (redditi da pensione), struttura vigente 2026."""
+    """Art. 13 co. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026 (redditi da pensione), struttura vigente 2026."""
     if reddito <= 8_500:
         return 1_955.0
     if reddito <= 28_000:
@@ -112,7 +112,7 @@ def detrazione_pensione(reddito):
 
 
 def detrazione_lavoro(reddito):
-    """Art. 13 co. 1 TUIR (lavoro dipendente), struttura vigente 2026."""
+    """Art. 13 co. 1 TUIR, dal 2027 art. 13 c. 1 D.Lgs. 117/2026 (lavoro dipendente), struttura vigente 2026."""
     if reddito <= 15_000:
         return 1_955.0
     if reddito <= 28_000:
@@ -123,13 +123,13 @@ def detrazione_lavoro(reddito):
 
 
 def aliquota_rendita_fp(anni_iscrizione):
-    """15% − 0,30% per ogni anno oltre il 15°, floor 9% (D.Lgs. 252/2005 art. 11)."""
+    """15% − 0,30% per ogni anno oltre il 15°, floor 9% (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026)."""
     return max(0.09, 0.15 - 0.003 * max(0, anni_iscrizione - 15))
 
 
 def rendita_netta_fp(lorda, anni_iscrizione, quota_imponibile):
     """Rendita del fondo al netto della ritenuta 15→9%, applicata alla sola quota imponibile
-    (TFR e contributi dedotti: art. 11 c. 6 D.Lgs. 252/2005)."""
+    (TFR e contributi dedotti: art. 11 c. 6 D.Lgs. 252/2005, dal 2027 art. 258 c. 4 D.Lgs. 117/2026)."""
     return lorda * (1 - aliquota_rendita_fp(anni_iscrizione) * quota_imponibile)
 
 

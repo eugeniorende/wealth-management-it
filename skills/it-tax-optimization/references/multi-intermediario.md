@@ -27,7 +27,7 @@ Le vie per consolidare sono due: chiudere il rapporto Directa e farsi certificar
 Se chiudi il rapporto con un broker dove hai zainetto attivo, le minus **non vanno perse**. L'art. 6 c. 5 D.Lgs. 461/97 (→ art. 306 c. 6 TU 2027) prevede che, quando il rapporto di custodia o amministrazione viene chiuso o l'opzione per l'amministrato viene revocata, l'intermediario rilasci un'apposita **certificazione** delle minus non utilizzate. Con quella certificazione le minus possono essere portate in deduzione:
 
 - dalle plus realizzate in **un altro rapporto in amministrato intestato agli stessi soggetti** del rapporto di provenienza. Con le cointestazioni gli intestatari devono coincidere: le minus di un dossier cointestato non passano a un dossier individuale. La norma non richiede che l'altro rapporto sia presso un intermediario diverso;
-- oppure in **dichiarazione**, nel quadro RT, nei righi dedicati alle «eccedenze di minusvalenze certificate dagli intermediari» (RT4, RT14 e RT44 nelle istruzioni Redditi PF 2026), secondo l'art. 68 c. 5 TUIR (il comma 5 richiama ancora l'art. 82 c. 4, la numerazione precedente al 2004).
+- oppure in **dichiarazione**, nel quadro RT, nei righi dedicati alle «eccedenze di minusvalenze certificate dagli intermediari» (RT4, RT14 e RT44 nelle istruzioni Redditi PF 2026), secondo l'art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6 (il comma 5 richiama ancora l'art. 82 c. 4, la numerazione precedente al 2004).
 
 **La scadenza non si azzera**: le minus certificate restano utilizzabili «non oltre il quarto periodo d'imposta successivo a quello del realizzo», come prima.
 
@@ -177,4 +177,4 @@ I tre rapporti hanno lo stesso intestatario. Directa è il conto di trading atti
 In questo caso la skill deve proporre per prima la certificazione di Banca Sella, con il calendario stretto di fine anno da verificare con i due broker. Per le minus di Directa la scelta è tra chiudere quel rapporto (b) e il dichiarativo (c): il Pattern D resta la via quando non si vuole chiudere alcun rapporto. Il confronto va presentato con i numeri, non come automatismo.
 
 ---
-*Zainetto per rapporto, certificazione alla chiusura e revoca dell'opzione (art. 6 c. 2, 5 e 7 e art. 5 c. 2 D.Lgs. 461/97, testo vigente fino al 31/12/2026; dal 2027 art. 306 c. 3, 6 e 8 e art. 304 c. 1 TU D.Lgs. 117/2026), riporto in dichiarazione (art. 68 c. 5 TUIR; righi RT4, RT14 e RT44 delle istruzioni Redditi PF 2026) — Verificato: 2026-10.*
+*Zainetto per rapporto, certificazione alla chiusura e revoca dell'opzione (art. 6 c. 2, 5 e 7 e art. 5 c. 2 D.Lgs. 461/97, testo vigente fino al 31/12/2026; dal 2027 art. 306 c. 3, 6 e 8 e art. 304 c. 1 TU D.Lgs. 117/2026), riporto in dichiarazione (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6; righi RT4, RT14 e RT44 delle istruzioni Redditi PF 2026) — Verificato: 2026-10.*

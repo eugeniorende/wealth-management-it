@@ -176,12 +176,12 @@ Scaglioni standard: 23% / 33% / 43%. La pensione concorre a formare il reddito c
 ### Detrazioni pensionati 2026
 
 - No tax area: €8.500 (parificata ai lavoratori dipendenti dal 2024)
-- Detrazione (art. 13 c. 3 TUIR, R = reddito complessivo):
+- Detrazione (art. 13 c. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026; R = reddito complessivo):
   - €1.955 fino a €8.500;
   - 700 + 1.255 × (28.000 − R) / 19.500 tra €8.500 e €28.000;
   - 700 × (50.000 − R) / 22.000 tra €28.000 e €50.000;
   - zero oltre €50.000;
-  - +€50 se R è tra €25.000 e €29.000 (c. 3-bis).
+  - +€50 se R è tra €25.000 e €29.000 (art. 13 c. 3-bis TUIR; dal 2027 art. 13 c. 4 D.Lgs. 117/2026).
 
 Rispetto ai lavoratori dipendenti la detrazione dei pensionati scende più in fretta e si azzera a €50.000. È la formula di `assets/netto-pensione.py` e del foglio Pubblica dell'Excel.
 
@@ -237,5 +237,5 @@ Per questa ragione la **complementare diventa strutturalmente necessaria**, non 
 6. **Riferimento patronato**: per dati esatti su anzianità contributiva, riscatto, totalizzazione, ricongiunzione, sempre rinviare a patronato (CGIL/CISL/UIL/INAS/etc.) o INPS. Sono servizi gratuiti.
 
 ---
-*Massimale e prima fascia 2026 (Circ. INPS 6/2026), requisiti di vecchiaia, anticipata e precoci 2026-2028 (Circ. INPS 19/2026 e 28/2026, All. 2), detrazione pensionati (art. 13 c. 3 TUIR) — Verificato: 2026-10.*
+*Massimale e prima fascia 2026 (Circ. INPS 6/2026), requisiti di vecchiaia, anticipata e precoci 2026-2028 (Circ. INPS 19/2026 e 28/2026, All. 2), detrazione pensionati (art. 13 c. 3 e 3-bis TUIR; dal 2027 art. 13 c. 3 e 4 D.Lgs. 117/2026) — Verificato: 2026-10.*
 *Meccanica di rivalutazione del montante (L. 335/1995 art. 1 c. 8-9, minimo 1 dal DL 65/2015 art. 5), massimale rivalutato sui prezzi (L. 335/1995 art. 2 c. 18) e tassi 1996-2025 (nota ISTAT del 16/10/2025) — Verificato: 2026-10.*
