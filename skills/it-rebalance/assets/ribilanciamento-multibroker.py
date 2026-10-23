@@ -67,7 +67,8 @@ import os
 # dell'attivo in titoli di Stato e white list che l'emittente certifica ogni semestre (non è
 # nel KID; vale quella del semestre della vendita), oppure direttamente l'"aliquota" effettiva
 # tra 0.125 e 0.26. Aliquota = 12,5% × quota + 26% × (1 − quota), e le minus del fondo entrano
-# nello zainetto per aliquota / 26% (DM 13/12/2011, art. 1; circ. AdE 19/E/2014, par. 5.1).
+# nello zainetto per aliquota / 26% (DM 13/12/2011, art. 1; misura del 48,08% dalla circ. AdE
+# 19/E/2014, par. 5.1).
 POSITIONS = [
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "capitale", "valore": 40000, "plus": 10000},
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "diverso",  "valore": 10000, "plus":  4000},
@@ -132,6 +133,9 @@ def valida():
             raise ErroreInput(f"posizione {n}: classe «{p.get('asset_class')}» assente da TARGET")
         if p.get("tipo") not in ("diverso", "capitale"):
             raise ErroreInput(f"posizione {n}: tipo «{p.get('tipo')}» (attesi «diverso» o «capitale»)")
+        for campo in ("aliquota", "quota_titoli_stato"):
+            if campo in p and (isinstance(p[campo], bool) or not isinstance(p[campo], (int, float))):
+                raise ErroreInput(f"posizione {n}: {campo} {p[campo]!r} non numerica (es. 0.125, non «12,5%»)")
         quota = p.get("quota_titoli_stato")
         if quota is not None:
             if p["tipo"] != "capitale":
@@ -184,7 +188,7 @@ def banda(target_w, asset_class=None):
 def _aliquota(p):
     """Aliquota effettiva della posizione. Per fondi ed ETF con quota_titoli_stato è la media
     12,5% × quota + 26% × (1 − quota): la parte di proventi riferibile ai titoli di Stato e white
-    list conta per il 48,08% (DM 13/12/2011, art. 1; circ. AdE 19/E/2014, par. 5.1)."""
+    list (DM 13/12/2011, art. 1) conta per il 48,08% (circ. AdE 19/E/2014, par. 5.1)."""
     if p.get("quota_titoli_stato") is not None:
         return 0.125 * p["quota_titoli_stato"] + 0.26 * (1 - p["quota_titoli_stato"])
     return p.get("aliquota", ALIQUOTA)
@@ -193,7 +197,7 @@ def _aliquota(p):
 def _coeff(p):
     """Peso nello zainetto (in minus al 26%) di un euro di plus o minus della posizione: aliquota
     / 26%, cioè 48,08% al 12,5% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) e, per un
-    fondo misto, 1 − 51,92% × quota (DM 13/12/2011, art. 1 cc. 4-5)."""
+    fondo misto, 1 − 51,92% × quota (DM 13/12/2011, art. 1 c. 4; circ. AdE 19/E/2014, par. 5.1)."""
     return _aliquota(p) * 100 / 26     # non / 0.26: 0.125 / 0.26 differisce di un ulp da 12,5 / 26
 
 
@@ -526,8 +530,14 @@ def _percento(x, decimali=1):
     return f"{x * 100:.{decimali}f}%".replace(".", ",")
 
 
+def _mista(a):
+    """Aliquota mista a un decimale, a due quando l'arrotondamento la farebbe sembrare 12,5% o 26%."""
+    testo = _percento(a)
+    return _percento(a, 2) if testo in ("12,5%", "26,0%") else testo
+
+
 def _etichetta_aliquota(a):
-    return "al 12,5%" if a == 0.125 else f"ad aliquota mista {_percento(a)}"
+    return "al 12,5%" if a == 0.125 else f"ad aliquota mista {_mista(a)}"
 
 
 def effetto_fiscale(s):
@@ -549,7 +559,10 @@ def effetto_fiscale(s):
         if s["plus_real"] - s["comp"] > 0.005:
             testo += f", il resto €{s['plus_real'] - s['comp']:,.0f} TASSATO"
         return testo
-    return f"plus €{s['plus_real']:,.0f} TASSATA (no zainetto compensabile qui)"
+    aliquota = "" if s["aliquota"] == 0.26 else f" {_etichetta_aliquota(s['aliquota'])}"
+    if s["tipo"] == "capitale":
+        return f"plus €{s['plus_real']:,.0f} TASSATA{aliquota} (reddito di capitale: non si compensa con lo zainetto)"
+    return f"plus €{s['plus_real']:,.0f} TASSATA{aliquota} (no zainetto compensabile qui)"
 
 
 def genera_ordini(plan):
@@ -674,7 +687,7 @@ def stampa(plan):
     for s in plan["vendite"]:
         nota = f"  → {effetto_fiscale(s)}" if s["plus_real"] else ""
         aliq = "" if s["aliquota"] == 0.26 else (" (12,5%)" if s["aliquota"] == 0.125
-                                                 else f" (aliquota mista {_percento(s['aliquota'])})")
+                                                 else f" (aliquota mista {_mista(s['aliquota'])})")
         motivo = "  [prelievo]" if s["forzata"] else (f"  [€{s['prelievo']:,.0f} per il prelievo]"
                                                        if s["prelievo"] > 0.005 else "")
         print(f"   VENDI €{s['vendi']:,.0f} {s['classe']}/{s['tipo']}{aliq} @ {s['broker']}"

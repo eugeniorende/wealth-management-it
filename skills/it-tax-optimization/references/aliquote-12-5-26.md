@@ -21,7 +21,7 @@ La white list include la maggior parte degli Stati con accordi di scambio inform
 
 ## L'edge case ETF/fondi sui titoli di Stato
 
-Un ETF UCITS armonizzato che investe in titoli di Stato whitelist NON è tassato uniformemente al 12,5%. I proventi si considerano riferibili ai titoli di Stato italiani ed equiparati e a quelli degli Stati white list in proporzione alla **percentuale media dell'attivo** del fondo investita in quei titoli (DM 13/12/2011, art. 1 cc. 1-2), e quella parte è tassata al 26% nel limite del 48,08%, cioè al netto del 51,92% (circ. AdE 19/E/2014, par. 5.1). In pratica:
+Un ETF UCITS armonizzato che investe in titoli di Stato whitelist NON è tassato uniformemente al 12,5%. I proventi si considerano riferibili ai titoli di Stato italiani ed equiparati e a quelli degli Stati white list in proporzione alla **percentuale media dell'attivo** del fondo investita in quei titoli (DM 13/12/2011, art. 1 cc. 1-2), e quella parte è tassata al 26% nel limite del 48,08%, cioè al netto del 51,92% (circ. AdE 19/E/2014, par. 5.1; il DM, scritto per l'aliquota del 20%, indica ancora il 62,5%). In pratica:
 
 - Quota whitelist dei proventi → tassata al 12,5%
 - Quota non-whitelist → tassata al 26%
@@ -29,9 +29,9 @@ Un ETF UCITS armonizzato che investe in titoli di Stato whitelist NON è tassato
 
 Questo vale sia per le **distribuzioni** sia per le **plusvalenze** all'uscita (entrambe sono reddito di capitale, ricordiamolo — non compensano minus pregresse).
 
-Vale anche per le **perdite** (DM 13/12/2011, art. 1 cc. 4-5): la minus da rimborso o cessione delle quote è un reddito diverso e va nello zainetto, ma la parte riferibile ai titoli di Stato vi entra ridotta del 51,92%. Una minus di €1.000 su un fondo con p = 60% vale €1.000 × (1 − 0,5192 × 0,6) = €688,5 di zainetto, cioè la minus × aliquota effettiva / 26% (17,9% / 26% = 68,85%).
+Vale anche per le **perdite** (DM 13/12/2011, art. 1 c. 4): la minus da rimborso o cessione delle quote è un reddito diverso e va nello zainetto, ma la parte riferibile ai titoli di Stato vi entra ridotta del 51,92% (circ. AdE 19/E/2014, par. 5.1, «per un importo ridotto del 51,92»; il 62,5% dell'art. 1 c. 5 del DM è la misura del regime al 20%). Una minus di €1.000 su un fondo con p = 60% vale €1.000 × (1 − 0,5192 × 0,6) = €688,5 di zainetto, cioè la minus × aliquota effettiva / 26% (17,9% / 26% = 68,85%).
 
-**Da dove viene p.** Non dal KID, che non la riporta: la comunica l'emittente agli intermediari ogni semestre (molti la pubblicano sul sito, nei documenti fiscali), rilevata sugli ultimi due prospetti semestrali o annuali redatti entro il semestre solare anteriore alla data della distribuzione, del rimborso o della cessione (DM 13/12/2011, art. 1 c. 3). Quindi p cambia ogni sei mesi e conta quella in vigore alla data della vendita; per una stima basta l'ultima certificazione.
+**Da dove viene p.** Non dal KID, che non la riporta: la comunica l'emittente agli intermediari ogni semestre (molti la pubblicano sul sito, nei documenti fiscali), rilevata sugli ultimi due prospetti semestrali o annuali redatti entro il semestre solare anteriore alla data della distribuzione, del rimborso o della cessione (DM 13/12/2011, art. 1 c. 3). Quindi p cambia ogni sei mesi e conta quella valida per il semestre della vendita. Le certificazioni escono prima del semestre a cui si applicano e ne indicano il periodo: per una vendita va usata quella del semestre della vendita, che non è sempre l'ultima pubblicata.
 
 Esempio della circolare (circ. 19/E/2014, par. 5.1): reddito di capitale da rimborso 300, percentuale media 26,5% → quota riferibile ai titoli pubblici 79,50; base imponibile 300 − 79,50 × 0,5192 = 258,72; ritenuta del 26% = 67,27 (aliquota effettiva 22,4%).
 
@@ -130,7 +130,7 @@ Quando in dubbio: chiedere al broker (servizio clienti) o richiedere il rendicon
 1. Se l'utente non specifica aliquote → assumere 26% di default
 2. Se compaiono ISIN che iniziano con `IT0` (titoli italiani con codice Banca d'Italia 0001-0006) o equivalenti, flaggare come potenzialmente 12,5%
 3. Per portafogli che dichiarano BTP/CCT/BOT, costruire due flussi separati di analisi e usare le formule di conversione sopra
-4. Per ETF UCITS che dichiarano esposizione titoli di Stato, NON applicare 12,5% — sono comunque reddito di capitale ad aliquota mista 12,5% × p + 26% × (1 − p), con p dall'ultima certificazione semestrale dell'emittente; le loro minus entrano nello zainetto per aliquota mista / 26%
+4. Per ETF UCITS che dichiarano esposizione titoli di Stato, NON applicare 12,5% — sono comunque reddito di capitale ad aliquota mista 12,5% × p + 26% × (1 − p), con p dalla certificazione dell'emittente valida per il semestre della vendita; le loro minus entrano nello zainetto per aliquota mista / 26%
 5. Quando si propone uno scenario cross-rate, mostrare esplicitamente la conversione (l'utente non deve fidarsi: deve poter verificare il calcolo)
 
 ---

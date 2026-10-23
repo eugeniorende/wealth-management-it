@@ -168,8 +168,9 @@ se flussi_attesi > 0:
 #         prima di qualsiasi vendita in plus
 per posizione in (sovrappesate AND plus_latente <= 0):
     vendere (parzialmente o totalmente) per correggere il sovrappeso
-    la minus realizzata entra subito nello zainetto di quel broker (al 48,08% se la
-    posizione è al 12,5%) e compensa solo le plus vendute DOPO sullo stesso broker
+    la minus realizzata entra subito nello zainetto di quel broker (per aliquota / 26%:
+    al 48,08% se la posizione è al 12,5%, meno del 100% per un fondo ad aliquota mista)
+    e compensa solo le plus vendute DOPO sullo stesso broker
     (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027): le vendite in minus si
     eseguono per prime, e i CSV le elencano per prime
     → costo fiscale: ZERO o NEGATIVO (genera zainetto / compensa plus)

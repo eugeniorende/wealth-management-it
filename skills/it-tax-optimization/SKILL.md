@@ -74,7 +74,7 @@ Quando minus e plus hanno aliquote diverse, si applica il **coefficiente di abba
 | 12,5% | 12,5% | €100 (1:1) |
 | 12,5% | 26% | €48 (svantaggioso: minus 12,5% "pesa di meno") |
 
-⚠️ **ETF UCITS che investono in titoli di Stato NON sono al 12,5%**: l'intermediario applica un'aliquota *mista* in base alla quota di NAV whitelist. Detenere BTP direttamente ≠ detenerli via ETF UCITS. Inoltre la plus su ETF UCITS resta sempre reddito di capitale (non compensabile con minus pregresse), indipendentemente dalla composizione.
+⚠️ **ETF UCITS che investono in titoli di Stato NON sono al 12,5%**: l'intermediario applica un'aliquota *mista* in base alla percentuale media dell'attivo del fondo in titoli di Stato e white list, certificata dall'emittente ogni semestre (non è nel KID). Detenere BTP direttamente ≠ detenerli via ETF UCITS. Inoltre la plus su ETF UCITS resta sempre reddito di capitale (non compensabile con minus pregresse), indipendentemente dalla composizione.
 
 Per dettagli normativi, esempi numerici e edge case (ETF "Government Bond" misti, edge case fondi), consultare `references/aliquote-12-5-26.md`.
 
@@ -350,7 +350,7 @@ La checklist di `references/regime-dichiarativo.md` applicata ai conti dell'uten
 - ❌ Trattare i broker come fungibili in amministrato: lo zainetto è **per-intermediario**. Mai proporre compensazioni cross-broker assumendo che avvengano automaticamente.
 - ❌ Suggerire trasferimenti titoli pensando di "spostare anche lo zainetto" — il PMC si sposta, lo zainetto **resta sul broker originario** finché quel rapporto non viene chiuso (Pattern E).
 - ❌ Dire che chiudendo il rapporto lo zainetto va perso: si chiede la **certificazione** (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027) e le minus restano utilizzabili su un altro rapporto con gli stessi intestatari, o in dichiarazione, fino alla scadenza originaria. Ma non proporre la chiusura senza aver verificato tempi, costi e accettazione della certificazione da parte del broker ricevente.
-- ❌ Trattare gli ETF UCITS su titoli di Stato come "tassati al 12,5%": l'aliquota effettiva è **mista** (dipende dalla quota di NAV whitelist).
+- ❌ Trattare gli ETF UCITS su titoli di Stato come "tassati al 12,5%": l'aliquota effettiva è **mista** (dipende dalla percentuale media dell'attivo in titoli di Stato e white list).
 - ❌ Applicare il coefficiente di abbattimento 12,5/26 senza esplicitare il calcolo: l'utente deve poter verificare.
 - ❌ Raccomandare il passaggio a dichiarativo senza quantificare il delta vs costi (commercialista, onere amministrativo).
 

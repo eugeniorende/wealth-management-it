@@ -1589,7 +1589,8 @@ def t_t7_coefficiente():
     az = [v for v in p["vendite"] if v["classe"] == "azionario"][0]
     assert abs(az["comp"] - 2000 * 12.5 / 26) < 0.01, az
     testo = _stampato(m, p)
-    assert re.search(r"minus €2,000[^\n]*€962[^\n]*48,08%", testo), testo
+    assert re.search(r"minus €2,000[^\n]*€962 di zainetto: minus al 12,5% computata al 48,08%", testo), testo
+    assert "VENDI €20,000 obbligazionario/diverso (12,5%) @ X" in testo, testo
     pos = [{"broker": "X", "asset_class": "obbligazionario", "tipo": "diverso", "valore": 38000, "plus": 3800, "aliquota": 0.125},
            {"broker": "X", "asset_class": "azionario", "tipo": "capitale", "valore": 62000, "plus": 0}]
     m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 300}, TARGET={"obbligazionario": 0.30, "azionario": 0.70})
@@ -1602,7 +1603,7 @@ def t_t7_coefficiente():
     assert p["drift"]["azionario"]["residuo_non_corretto"] == 0 and p["risultante"]["azionario"] == 1.0, p["drift"]["azionario"]
     m, p = _ribilancia(POSITIONS=btp, ZAINETTO={"X": 5000}, TARGET={"azionario": 1.0, "obbligazionario": 0.0})
     testo = _stampato(m, p)
-    assert re.search(r"compensata €3,000[^\n]*€1,442[^\n]*48,08%", testo), testo
+    assert re.search(r"compensata €3,000[^\n]*€1,442 di zainetto: plus al 12,5% computata al 48,08%", testo), testo
     nota = [o for o in m.genera_ordini(p) if o["operazione"] == "VENDITA"][0]["nota"]
     assert "1,442" in nota and "48,08%" in nota, nota
 
@@ -1733,6 +1734,15 @@ def t_t7_aliquota_mista():
     m, p = _ribilancia(POSITIONS=etf, ZAINETTO={"X": 0}, TARGET={"azionario": 1.0, "obbligazionario": 0.0})
     assert abs(p["imposta"] - 67.27) < 0.01, p["imposta"]
     assert abs(m._aliquota(etf[0]) - (0.125 * 0.265 + 0.26 * 0.735)) < 1e-12
+    nota = [o for o in m.genera_ordini(p) if o["operazione"] == "VENDITA"][0]["nota"]
+    assert "plus €300 TASSATA ad aliquota mista 22,4% (reddito di capitale: non si compensa" in nota, nota
+    # quota 1 → 12,5% pieno; vicino agli estremi l'etichetta passa a due decimali
+    for quota, etichetta, imposta in ((1.0, "obbligazionario/capitale (12,5%) @", 37.5),
+                                      (0.003, "(aliquota mista 25,96%)", 300 * (0.125 * 0.003 + 0.26 * 0.997)),
+                                      (0.9995, "(aliquota mista 12,51%)", 300 * (0.125 * 0.9995 + 0.26 * 0.0005))):
+        m, p = _ribilancia(POSITIONS=[dict(etf[0], quota_titoli_stato=quota), etf[1]], ZAINETTO={"X": 0},
+                           TARGET={"azionario": 1.0, "obbligazionario": 0.0})
+        assert abs(p["imposta"] - imposta) < 0.01 and etichetta in _stampato(m, p), (quota, p["imposta"])
     # la minus dell'ETF misto entra nello zainetto ridotta, e compensa così la plus di un'azione
     pos = [{"broker": "X", "asset_class": "obbligazionario", "tipo": "capitale", "valore": 10000, "plus": -1000,
             "quota_titoli_stato": 0.6},
@@ -1762,7 +1772,9 @@ def t_t7_aliquota_mista():
     for errato in ({"tipo": "diverso", "quota_titoli_stato": 0.5}, {"tipo": "capitale", "quota_titoli_stato": 1.2},
                    {"tipo": "capitale", "quota_titoli_stato": -0.1},
                    {"tipo": "capitale", "aliquota": 0.30}, {"tipo": "capitale", "aliquota": 0.10},
-                   {"tipo": "capitale", "aliquota": 0.2, "quota_titoli_stato": 0.5}):
+                   {"tipo": "capitale", "aliquota": 0.2, "quota_titoli_stato": 0.5},
+                   {"tipo": "capitale", "aliquota": "12,5%"}, {"tipo": "capitale", "quota_titoli_stato": "60%"},
+                   {"tipo": "capitale", "quota_titoli_stato": True}):
         pos = [dict({"broker": "X", "asset_class": "azionario", "valore": 100, "plus": 0}, **errato)]
         m = carica_modulo(asset("it-rebalance", "ribilanciamento-multibroker.py"))
         m.POSITIONS, m.TARGET = pos, {"azionario": 1.0}
@@ -1795,7 +1807,7 @@ def t_t7_testi():
                r"permette di scegliere «target» o «banda»", r"ribilanciamento parziale o attesa\"",
                r"Risparmio dal coordinamento: €582",
                # aliquota mista: ETF e fondi su titoli di Stato non più forzati al 26%
-               r"che lo script non rappresenta", r"imposta stimata è per eccesso"]
+               r"che lo script non rappresenta", r"imposta stimata è per eccesso", r"ultima certificazione"]
     for rel, testo in testi.items():
         for v in vietate:
             assert not re.search(v, testo), f"{rel}: «{v}»"
@@ -1806,9 +1818,11 @@ def t_t7_testi():
     for rel in ("SKILL.md", "commands/ribilancia.md", "references/ribilanciamento-multibroker.md"):
         assert "quota_titoli_stato" in testi[rel], f"{rel}: manca l'aliquota mista di ETF e fondi su titoli di Stato"
     aliquote = open(os.path.join(SKILLS, "it-tax-optimization", "references", "aliquote-12-5-26.md"), encoding="utf-8").read()
-    for frase in ("67,27", "Non dal KID", "art. 1 c. 3"):
+    for frase in ("67,27", "Non dal KID", "art. 1 c. 3", "valida per il semestre della vendita"):
         assert frase in aliquote, f"aliquote-12-5-26.md: manca «{frase}»"
-    assert re.search(r"\*\*perdite\*\* \(DM 13/12/2011, art\. 1 cc\. 4-5\)[^\n]*ridotta del 51,92%", aliquote), \
+    assert "ultima certificazione" not in aliquote, "aliquote-12-5-26.md: conta la certificazione del semestre della vendita"
+    assert re.search(r"\*\*perdite\*\* \(DM 13/12/2011, art\. 1 c\. 4\)[^\n]*ridotta del 51,92% \(circ\. AdE "
+                     r"19/E/2014, par\. 5\.1", aliquote), \
         "aliquote-12-5-26.md: le minus dei fondi su titoli di Stato entrano ridotte nello zainetto"
     # revisione T7: Leva 4 per imposta per euro venduto, minus eseguite per prime, sottopesate,
     # tre valori di OBIETTIVO_RIENTRO, gate nel coordinamento di fine anno, unità dello zainetto
