@@ -37,10 +37,14 @@ jobs:
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
       # LibreOffice per i test che ricalcolano gli Excel (scripts/ricalcola-excel.py).
+      # Di solito 25-40 s, ma su alcuni runner apt è rimasto 20-30 minuti fermo tra
+      # update e download: oltre i 10 minuti lo step fallisce e si rilancia il job.
+      # -q e non -qq: il log mostra quale indice o pacchetto è lento («Fetched … in …»).
       - name: Installa LibreOffice Calc
+        timeout-minutes: 10
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends libreoffice-calc
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends libreoffice-calc
       - run: python tests/run_tests.py --skip freshness
         env:
           RICHIEDI_LIBREOFFICE: "1"   # in CI i test degli Excel non si saltano
