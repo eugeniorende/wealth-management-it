@@ -29,12 +29,17 @@ jobs:
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
       # LibreOffice per i test che ricalcolano gli Excel (scripts/ricalcola-excel.py).
-      # Timeout e -q come in tests.yml: un mirror lento fa fallire lo step invece di bloccare il job.
+      # Cache dei .deb e timeout come in tests.yml (qui la cache si legge soltanto):
+      # un mirror lento non blocca il rilascio.
+      - name: Ripristina i .deb di LibreOffice
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/apt-libreoffice
+          key: apt-libreoffice-${{ runner.os }}-${{ runner.arch }}-
+          restore-keys: apt-libreoffice-${{ runner.os }}-${{ runner.arch }}-
       - name: Installa LibreOffice Calc
         timeout-minutes: 10
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends libreoffice-calc
+        run: bash scripts/installa-libreoffice.sh /tmp/apt-libreoffice
 
       - name: Suite completa (freshness inclusa)
         run: python tests/run_tests.py
