@@ -8,7 +8,7 @@ Esegui il ribilanciamento tax-aware del portafoglio seguendo la skill `it-rebala
 Workflow:
 
 1. **Ingestion**: chiedere all'utente (se non già nel contesto):
-   - Portafoglio attuale: per ogni posizione → broker, ISIN/ticker, descrizione, asset class, tipo fiscale (reddito diverso: azioni, certificates, ETC, obbligazioni e titoli di Stato / reddito capitale: ETF e fondi), aliquota se diversa dal 26% (12,5% per titoli di Stato e equiparati), quantità, PMC (i lotti servono solo a ricostruirlo se il broker non lo mostra), prezzo/controvalore corrente
+   - Portafoglio attuale: per ogni posizione → broker, ISIN/ticker, descrizione, asset class, tipo fiscale (reddito diverso: azioni, certificates, ETC, obbligazioni e titoli di Stato / reddito capitale: ETF e fondi), aliquota se diversa dal 26% (12,5% per titoli di Stato e equiparati; per ETF e fondi su titoli di Stato la quota di titoli di Stato e white list dell'ultima certificazione semestrale dell'emittente, `quota_titoli_stato`, che dà l'aliquota mista 12,5% × quota + 26% × (1 − quota)), quantità, PMC (i lotti servono solo a ricostruirlo se il broker non lo mostra), prezzo/controvalore corrente
    - **Allocazione target** (input dell'utente, NON suggerita): peso obiettivo per asset class
    - Eventuali bande di tolleranza diverse dalla regola 5/25 (punto 2)
    - Nuovi versamenti disponibili (per Leva 1) e flussi attesi/dividendi (per Leva 2)

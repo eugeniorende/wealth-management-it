@@ -95,7 +95,7 @@ Raccogliere:
 - `descrizione` — es. "iShares Core MSCI World UCITS ETF"
 - `asset_class` — es. azionario_globale, azionario_EU, obbligazionario_governativo, obbligazionario_corporate, monetario, oro/commodity, ecc.
 - `tipo_fiscale` — `reddito_diverso` (azioni dirette, certificates, ETC, obbligazioni e titoli di Stato) o `reddito_capitale` (ETF e fondi, UCITS e non armonizzati). Se non noto, dedurre da descrizione (ETF o fondo → capitale)
-- `aliquota` — 26% di default; 12,5% per titoli di Stato italiani e white list, enti territoriali e organismi internazionali (la loro plus consuma lo zainetto al 48,08%, vedi `it-tax-optimization/references/aliquote-12-5-26.md`). ETF e fondi su titoli di Stato hanno una tassazione mista che lo script non rappresenta: si indicano al 26%, e l'imposta stimata è per eccesso
+- `aliquota` — 26% di default; 12,5% per titoli di Stato italiani e white list, enti territoriali e organismi internazionali (la loro plus consuma lo zainetto al 48,08%, vedi `it-tax-optimization/references/aliquote-12-5-26.md`). ETF e fondi su titoli di Stato (reddito di capitale) hanno un'aliquota mista: si indica `quota_titoli_stato`, la quota media dell'attivo in titoli di Stato e white list che l'emittente certifica ogni semestre (non è nel KID; vale quella del semestre della vendita), e lo script applica 12,5% × quota + 26% × (1 − quota); in alternativa si dà direttamente l'`aliquota` effettiva, tra 12,5% e 26%. Le minus di questi fondi entrano nello zainetto per aliquota / 26%, cioè ridotte del 51,92% per la parte in titoli di Stato (DM 13/12/2011, art. 1; circ. AdE 19/E/2014, par. 5.1)
 - `quantita`
 - `pmc` (prezzo medio di carico), che in amministrato è la base fiscale delle vendite
 - `prezzo_corrente` o `controvalore_attuale`

@@ -39,7 +39,8 @@ Flussi: i versamenti e i flussi in entrata entrano nel totale prima di misurare 
 tutti; il PRELIEVO in decumulo esce dal totale, si finanzia con vendite (imposta compresa)
 e non si reinveste. Le minus realizzate ricaricano lo zainetto del broker per le vendite
 successive; ogni posizione ha la sua aliquota (26%, o 12,5% per titoli di Stato e
-equiparati, che compensano lo zainetto al 48,08%).
+equiparati, che compensano lo zainetto al 48,08%; per ETF e fondi su titoli di Stato
+un'aliquota mista, dalla quota di titoli di Stato e white list del fondo).
 
 Tutti i parametri sono editabili qui sotto. I valori di default sono un caso reale di
 validazione (vedi il commento ATTESO in fondo). plus = plusvalenza/minusvalenza latente
@@ -62,8 +63,11 @@ import os
 # Per posizione: broker, asset_class (una delle chiavi di TARGET), tipo ("diverso" o
 # "capitale"), valore e plus in euro, e se serve "aliquota" (0.26 di default; 0.125 per
 # titoli di Stato italiani e white list, enti territoriali e organismi internazionali).
-# ETF e fondi su titoli di Stato hanno una tassazione mista (aliquota effettiva tra il 12,5% e
-# il 26%) che qui non si rappresenta: indicarli al 26% sovrastima l'imposta (prudente).
+# ETF e fondi (tipo "capitale") su titoli di Stato: "quota_titoli_stato", la quota media
+# dell'attivo in titoli di Stato e white list che l'emittente certifica ogni semestre (non è
+# nel KID; vale quella del semestre della vendita), oppure direttamente l'"aliquota" effettiva
+# tra 0.125 e 0.26. Aliquota = 12,5% × quota + 26% × (1 − quota), e le minus del fondo entrano
+# nello zainetto per aliquota / 26% (DM 13/12/2011, art. 1; circ. AdE 19/E/2014, par. 5.1).
 POSITIONS = [
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "capitale", "valore": 40000, "plus": 10000},
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "diverso",  "valore": 10000, "plus":  4000},
@@ -115,9 +119,6 @@ BROKER_VERSAMENTI = "Fineco"   # broker su cui atterrano versamenti/flussi in en
 # ──────────────────────────────────────────────────────────────────────────
 
 
-K_12_5 = 12.5 / 26     # coefficiente 48,08%: una plus o minus al 12,5% vale così nello zainetto
-
-
 class ErroreInput(Exception):
     """Parametri in testa al file non validi: messaggio leggibile, uscita con codice 2."""
 
@@ -131,8 +132,19 @@ def valida():
             raise ErroreInput(f"posizione {n}: classe «{p.get('asset_class')}» assente da TARGET")
         if p.get("tipo") not in ("diverso", "capitale"):
             raise ErroreInput(f"posizione {n}: tipo «{p.get('tipo')}» (attesi «diverso» o «capitale»)")
-        if p.get("aliquota", ALIQUOTA) not in (0.26, 0.125):
-            raise ErroreInput(f"posizione {n}: aliquota {p.get('aliquota')} (attese 0.26 o 0.125)")
+        quota = p.get("quota_titoli_stato")
+        if quota is not None:
+            if p["tipo"] != "capitale":
+                raise ErroreInput(f"posizione {n}: quota_titoli_stato vale solo per fondi ed ETF (tipo «capitale»)")
+            if "aliquota" in p:
+                raise ErroreInput(f"posizione {n}: indicare quota_titoli_stato oppure aliquota, non entrambe")
+            if not 0 <= quota <= 1:
+                raise ErroreInput(f"posizione {n}: quota_titoli_stato {quota} (attesa tra 0 e 1)")
+        elif p["tipo"] == "diverso" and _aliquota(p) not in (0.26, 0.125):
+            raise ErroreInput(f"posizione {n}: aliquota {_aliquota(p)} (attese 0.26 o 0.125 per un titolo "
+                              f"detenuto direttamente)")
+        elif not 0.125 <= _aliquota(p) <= 0.26:
+            raise ErroreInput(f"posizione {n}: aliquota {_aliquota(p)} (per fondi ed ETF tra 0.125 e 0.26)")
         if p.get("valore", -1) < 0:
             raise ErroreInput(f"posizione {n}: valore negativo o mancante")
     if OBIETTIVO_RIENTRO not in ("misto", "target", "banda"):
@@ -170,12 +182,19 @@ def banda(target_w, asset_class=None):
 
 
 def _aliquota(p):
+    """Aliquota effettiva della posizione. Per fondi ed ETF con quota_titoli_stato è la media
+    12,5% × quota + 26% × (1 − quota): la parte di proventi riferibile ai titoli di Stato e white
+    list conta per il 48,08% (DM 13/12/2011, art. 1; circ. AdE 19/E/2014, par. 5.1)."""
+    if p.get("quota_titoli_stato") is not None:
+        return 0.125 * p["quota_titoli_stato"] + 0.26 * (1 - p["quota_titoli_stato"])
     return p.get("aliquota", ALIQUOTA)
 
 
 def _coeff(p):
-    """Peso nello zainetto (in minus al 26%) di un euro di plus o minus della posizione."""
-    return K_12_5 if _aliquota(p) == 0.125 else 1.0
+    """Peso nello zainetto (in minus al 26%) di un euro di plus o minus della posizione: aliquota
+    / 26%, cioè 48,08% al 12,5% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) e, per un
+    fondo misto, 1 − 51,92% × quota (DM 13/12/2011, art. 1 cc. 4-5)."""
+    return _aliquota(p) * 100 / 26     # non / 0.26: 0.125 / 0.26 differisce di un ulp da 12,5 / 26
 
 
 def effetto_vendita(p, vendi, zain):
@@ -503,19 +522,30 @@ NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non
             "sul portale del broker prima di operare.")
 
 
+def _percento(x, decimali=1):
+    return f"{x * 100:.{decimali}f}%".replace(".", ",")
+
+
+def _etichetta_aliquota(a):
+    return "al 12,5%" if a == 0.125 else f"ad aliquota mista {_percento(a)}"
+
+
 def effetto_fiscale(s):
-    """Effetto fiscale di una vendita del piano, con il consumo reale dello zainetto (al 48,08% per
-    le plus e minus al 12,5%) e l'avviso d'ordine per le minus."""
-    al_12_5 = s["aliquota"] == 0.125
+    """Effetto fiscale di una vendita del piano, con il consumo reale dello zainetto (48,08% per
+    le plus e minus al 12,5%, aliquota / 26% per un fondo misto) e l'avviso d'ordine per le minus."""
+    ridotta = s["aliquota"] < 0.26
+    computata = _percento(s["aliquota"] / 0.26, 2)
     if s["plus_real"] < 0:
         testo = f"minus €{-s['plus_real']:,.0f} a zainetto {s['broker']}"
-        if al_12_5:
-            testo += f" (vale €{s['zainetto']:,.0f} di zainetto: minus al 12,5% computata al 48,08%)"
+        if ridotta:
+            testo += (f" (vale €{s['zainetto']:,.0f} di zainetto: minus {_etichetta_aliquota(s['aliquota'])} "
+                      f"computata al {computata})")
         return testo + ", da eseguire prima delle vendite in plus"
     if s["comp"] > 0:
         testo = f"plus €{s['plus_real']:,.0f} compensata €{s['comp']:,.0f} dallo zainetto {s['broker']}"
-        if al_12_5:
-            testo += f" (consuma €{-s['zainetto']:,.0f} di zainetto: plus al 12,5% computata al 48,08%)"
+        if ridotta:
+            testo += (f" (consuma €{-s['zainetto']:,.0f} di zainetto: plus {_etichetta_aliquota(s['aliquota'])} "
+                      f"computata al {computata})")
         if s["plus_real"] - s["comp"] > 0.005:
             testo += f", il resto €{s['plus_real'] - s['comp']:,.0f} TASSATO"
         return testo
@@ -643,7 +673,8 @@ def stampa(plan):
             print("   nessuna vendita necessaria: tutte le classi sono in banda")
     for s in plan["vendite"]:
         nota = f"  → {effetto_fiscale(s)}" if s["plus_real"] else ""
-        aliq = "" if s["aliquota"] == 0.26 else " (12,5%)"
+        aliq = "" if s["aliquota"] == 0.26 else (" (12,5%)" if s["aliquota"] == 0.125
+                                                 else f" (aliquota mista {_percento(s['aliquota'])})")
         motivo = "  [prelievo]" if s["forzata"] else (f"  [€{s['prelievo']:,.0f} per il prelievo]"
                                                        if s["prelievo"] > 0.005 else "")
         print(f"   VENDI €{s['vendi']:,.0f} {s['classe']}/{s['tipo']}{aliq} @ {s['broker']}"
