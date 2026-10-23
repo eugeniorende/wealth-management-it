@@ -22,6 +22,8 @@ Questo documento nasce da una ricognizione del 23/10/2026 su develop e9d804c: ci
 - `README.md:27` «Errori noti»: le corrispondenze 2027 «da verificare» sono chiuse dalla PR #38 salvo due punti (DM 21/02/2013 e art. 306 c. 6, § 2.7).
 - `.github/workflows/freshness.yml:38` e `release.yml:27` girano su Python 3.12, fuori dalla matrice 3.11/3.14 di `tests.yml`.
 - `ROADMAP.md:189` branch protection: non attivabile su un repository privato senza GitHub Pro (l'API risponde 403): annotare «dopo la pubblicazione».
+- Quattro frasi superate nel README, nella stessa PR dei conteggi: `README.md:474` «Contiene solo manifest, comandi, skill e README» (lo zip ha anche LICENSE e NOTICE: `scripts/pacchetto.py:28`, `README.md:554`); `:545` dice che il test di igiene e il packaging verificano l'allineamento delle versioni, ma `t_marketplace` (`run_tests.py:83-91`) confronta solo `name` e `source` e `pacchetto.py:74-79` solo il tag con `plugin.json` (diventa vera con l'assert di F061); `:437` «procedura verificata … luglio 2026»; `:68` «smoke test».
+- `ROADMAP.md` non ha una «Linea di taglio e rilascio» per la 0.11, a differenza della 0.10.0 (`:128-132`), e la regola Gitflow di `:27` cita ancora `release/0.10.0`: aggiungere criteri (T9, T12 e pre-pubblicazione chiuse) e finestra (§ 3, passo 7).
 - Questo file va tenuto aggiornato a ogni PR (§ 1 e § 2).
 
 ### 2.2 T9 — interfaccia degli script e flusso dati (P1, XL)
@@ -64,6 +66,7 @@ Fatto: F051 (nessun nome dell'autore sotto `skills/` e `commands/`), recalc del 
 - **F058.** Invocazioni con la variabile di percorso (vedi F059) e, in `it-revisione/SKILL.md:74`, rimando a `scripts/ricalcola-excel.py` condizionale: non è nello zip di Cowork.
 - **F061 manifest e aggiornamenti.** `upstream` al top level di `plugin.json` (con `--strict` il validate dà rc 1); `version` duplicata nel marketplace senza assert; README senza `claude plugin update`, auto-update spento di default e `--scope`; `README.md:440` «aggiornamenti con un comando» in contrasto con `:453`. Da fare: `metadata.upstream`, assert in `t_marketplace`, README, poi `--strict` nel job validate (`tests.yml:74`).
 - **F066 indici.** 19 reference oltre 100 righe, più due esattamente a 100 (`mappa-nuovo-tuir.md`, `dividendi-esteri.md`), nessuna con indice. Da fare: «## Indice» con gli H2; eventuale test con soglia ≥ 100.
+- **Lingua e titolo dell'IPS.** `genera-ips.py:369-372` crea `Document()` senza `core_properties.title` né lingua, e nessun `w:lang` it-IT sugli stili (`qn` e `OxmlElement` sono già importati a `:37-38`): è un rilievo della critica dell'audit (`docs/audit-2026-10.md:1885-1889`) mai entrato in ROADMAP. Da fare: titolo, lingua e `w:lang` nel generatore, assert in `t_genera_ips` (`run_tests.py:2417`); si accorpa alla rilettura degli output.
 - **Icona.** `claude plugin validate` segnala `ICON_MISSING`: serve solo per il plugin directory. Decisione del proprietario, non bloccante.
 
 ### 2.6 Pre-pubblicazione, voci di giudizio
@@ -75,7 +78,7 @@ Fatto: F051 (nessun nome dell'autore sotto `skills/` e `commands/`), recalc del 
 ### 2.7 Verifiche alle fonti rimaste
 
 - Art. 11 c. 3-quater e 3-quinquies D.Lgs. 252/2005 e delibera COVIP del 25/6/2026: i vincoli in `previdenza-complementare.md:248-253` (alternatività, irrevocabilità, conversione in vitalizia, non cumulo con RITA, beneficiari, transitorio al 31/12/2026) non sono stati riletti su fonte primaria dalla sessione che ha scritto il testo (PR #37: Normattiva e COVIP irraggiungibili), ma stanno dentro il marcatore di `:281`. Da una sessione con rete: leggerli su Normattiva e COVIP; se non confermabili, circoscrivere il marcatore.
-- Certificates come redditi diversi compensabili: nota «Non verificata su fonte primaria» dentro un file obbligato al marcatore (`git grep -n "Non verificata"`). Verificare (art. 67 c. 1 lett. c-quater TUIR, dal 2027 art. 76; prassi AdE) o spostare la nota fuori dal marcatore.
+- Certificates come redditi diversi compensabili: `skills/it-revisione/assets/genera-ips.py:141-144`, blocco «Verificato: 2026-10» di `POLICY_FISCALITA`, chiude con «Non verificata su fonte primaria la compensabilità dei certificati», e il file è in `OBBLIGATI_FRESHNESS`. Verificare (art. 67 c. 1 lett. c-quater TUIR, dal 2027 art. 76; prassi AdE), allineare `it-tax-optimization/SKILL.md:33`, che li elenca sotto le lettere c-bis/c-ter, e togliere la riserva; altrimenti spostarla fuori dal marcatore.
 - DM 21/02/2013 (Tobin tax) e probabile refuso dell'art. 306 c. 6 D.Lgs. 117/2026: restano in «Da verificare» della mappa finché non escono correttivi o errata corrige. Nessuna modifica ai testi; rivedere con la legge di bilancio 2027.
 - Facoltativo: rimando a `ponte-pensione.py` in `mercati-e-correlazione.md:23` (esito-t8, nota 3).
 
@@ -93,7 +96,7 @@ Fatto: F051 (nessun nome dell'autore sotto `skills/` e `commands/`), recalc del 
 4. T12 (§ 2.4), in una o due PR.
 5. T14 (§ 2.5): description e YAML, CHANGELOG.md, command come alias, manifest e `--strict`, indici, aggiornamenti nel README.
 6. § 2.6 e § 2.7: rilettura degli output con verbale, verbale delle prove di installazione, verifiche alle fonti.
-7. **Rilascio 0.11.0**: versione in `plugin.json` e `marketplace.json`, changelog, ROADMAP spuntata con il nuovo «Stato al», README (conteggio dei test, tabella freshness rigenerata con `--tabella-freshness`), questo file aggiornato; `release/0.11.0` da develop → PR su main (merge commit) → tag `v0.11.0` → verifica di `release.yml` (suite completa con freshness, zip con LICENSE, NOTICE e CHANGELOG.md) → merge back su develop.
+7. **Rilascio 0.11.0**: versione in `plugin.json` e `marketplace.json`, changelog, ROADMAP spuntata con il nuovo «Stato al», README (conteggio dei test, tabella freshness rigenerata con `--tabella-freshness`), questo file aggiornato; `release/0.11.0` da develop → PR su main (merge commit) → tag `v0.11.0` → verifica di `release.yml` (suite completa con freshness, zip con LICENSE, NOTICE e CHANGELOG.md) → merge back su develop. Finestra: i marcatori più vecchi sono del 2026-06 e scadono a giugno 2027; `release.yml` esegue anche la freshness, quindi il tag va dato prima, oppure dopo una riverifica alle fonti.
 8. Al termine, lasciare in questo file ciò che resta al proprietario (§ 2.8 e le prove di installazione).
 
 ## 4. Regole di lavoro
