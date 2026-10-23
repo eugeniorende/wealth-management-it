@@ -37,10 +37,26 @@ jobs:
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
       # LibreOffice per i test che ricalcolano gli Excel (scripts/ricalcola-excel.py).
+      # I .deb restano in cache tra un run e l'altro: su alcuni runner il mirror li
+      # serve a ~70 KB/s (perché e come, in scripts/installa-libreoffice.sh). Oltre
+      # i 10 minuti lo step fallisce invece di restare appeso.
+      - name: Ripristina i .deb di LibreOffice
+        id: deb-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/apt-libreoffice
+          key: apt-libreoffice-${{ runner.os }}-${{ runner.arch }}-
+          restore-keys: apt-libreoffice-${{ runner.os }}-${{ runner.arch }}-
       - name: Installa LibreOffice Calc
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends libreoffice-calc
+        id: libreoffice
+        timeout-minutes: 10
+        run: bash scripts/installa-libreoffice.sh /tmp/apt-libreoffice
+      - name: Salva i .deb di LibreOffice
+        if: steps.libreoffice.outputs.chiave != steps.deb-cache.outputs.cache-matched-key
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/apt-libreoffice
+          key: ${{ steps.libreoffice.outputs.chiave }}
       - run: python tests/run_tests.py --skip freshness
         env:
           RICHIEDI_LIBREOFFICE: "1"   # in CI i test degli Excel non si saltano
