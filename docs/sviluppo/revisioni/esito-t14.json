@@ -1,0 +1,19 @@
+{
+ "branch": "feature/t14-authoring-packaging (T14) e feature/prepubblicazione-verifiche (§ 2.6-2.7), con le correzioni su fix/t14-revisione",
+ "data": "2026-10-24",
+ "applicati": [
+  "Art. 11 c. 6-bis D.Lgs. 252/2005 con l'equivalente 2027 (art. 258 c. 5 D.Lgs. 117/2026) in previdenza-complementare.md e nella mappa dei testi unici",
+  "Decisione 4 propagata alle reference: P1 «Usare lo spazio deducibile» come tetto fiscale e non importo consigliato in proiezione-tenore-vita.md, euristiche 1-5 di previdenza-complementare.md riscritte come scenari, tabella J1 di integrazione-fiscale-joint.md senza la colonna «Raccomandazione» e senza «A: fondo, sempre»",
+  "it-pianificazione: intro e Step 5 come «leve da valutare, quantificate come scenari», TFR come scenario; nuovo Pattern P6 e paragrafo «Uscita anticipata e RITA» (art. 11 c. 4/4-bis/4-ter; dal 2027 art. 258 c. 1); importa-previdenza, proiezione-inps, netto-pensione e ponte-pensione nei Riferimenti",
+  "Versioni di skill superate tolte dalle reference (es. «La skill v0.1 non modella le singole casse»)",
+  "it-revisione: tracker-secchielli.xlsx e genera-ips.py di nuovo nei Riferimenti; test che ogni asset di ogni skill compaia nei suoi Riferimenti",
+  "README: riquadro «Errori noti» allineato (T9, T12, T14 chiusi su develop; resta T13); il rilascio 0.11.0 lo riscrive per la versione",
+  "Ribilanciamento e IPS con --dati parziale: chiavi obbligatorie (posizioni, target, zainetto salvo --zainetto; chiavi dell'IPS), forme verificate, nessun riempimento silenzioso con i dati d'esempio; il CSV non si dichiara più dato reale quando i dati sono d'esempio",
+  "YAML stretto anche senza PyYAML: numeri e booleani non quotati (es. «version: 0.20», letta 0.2) ora falliscono",
+  "Vincoli COVIP: delibera del 25/6/2026 letta nella GU n. 155 del 7/7/2026 (atto 26A03313), vincoli di legge e di COVIP separati per fonte e riportati dentro il marcatore; corretto «non si versa più» (il TFR da un nuovo impiego prosegue come posizione separata); test che vincola la fonte in Gazzetta",
+  "Test di postura del § 2.6 (leve come scenari, P1, intestazione dell'importatore) e test sui certificates: compensazione sulle cinque lettere dell'art. 67 (art. 68 c. 4 e 5; dal 2027 art. 77 c. 6), eccezione dei certificati a capitale protetto (art. 44 c. 2 lett. c n. 2; dal 2027 art. 46 c. 2 lett. b n. 2) fuori dal marcatore",
+  "Esempi numerici delle leve corretti (niente «raddoppia il montante»; P1 con la tassazione in uscita)"
+ ],
+ "non_applicati": [],
+ "revisione": "docs/sviluppo/workflows/review-tema-roadmap.js, run wf_adb72b5e-c25 (60 agenti completati). 15 confermati, 4 contesi, 9 respinti; esiti in review-t14.json. Le correzioni erano già su fix/t14-revisione dai rilievi grezzi prima dei verdetti: confermati e contesi risultano tutti applicati, l'ultimo (riquadro del README) nel commit di questo esito"
+}
