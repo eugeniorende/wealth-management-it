@@ -94,7 +94,7 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-pianificazione-obiettivi/assets/decumulo-obiettivi.py` | 9: T12 rami avanzati; T9 formati; T9 interfaccia ×2; decumulo-obiettivi; obiettivi; serie storica ×2 … |
 | `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 11: T12 rami avanzati; T9 --json di glide path e Monte Carlo degli obiettivi; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; glidepath … |
 | `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 15: T9 --json di glide path e Monte Carlo degli obiettivi; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; glidepath e Monte Carlo; montecarlo-obiettivi ×4 … |
-| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 16: T12 Excel ×2; T9 lettore unico del pianificatore; allocatore-capitale; asset-location; glidepath; glidepath e Monte Carlo … |
+| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 17: T12 Excel ×2; T9 interfaccia; T9 lettore unico del pianificatore; allocatore-capitale; asset-location; glidepath … |
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-rebalance/assets/ribilanciamento-multibroker.py` | 19: T1; T7 ribilanciamento ×10; T9 formati ×2; T9 input esterno; T9 interfaccia ×2; T9 vocabolario … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |

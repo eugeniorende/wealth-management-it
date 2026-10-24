@@ -1,0 +1,27 @@
+{
+ "branch": "feature/t9a-cli-encoding-formati (PR #43)",
+ "data": "2026-10-24",
+ "revisione": "docs/sviluppo/workflows/review-tema-roadmap.js, run wf_fca6e428: quattro lenti (normativa 0 rilievi, propagazione 8, codice-test 9, documentazione 7). I verificatori della lente propagazione hanno confermato 6 rilievi e 1 è conteso; i verificatori di codice-test e documentazione sono caduti per il limite di sessione dell'account (29 agenti falliti): quei 16 rilievi li ha valutati l'integratore come verificatore scettico, riproducendoli sul branch.",
+ "applicati": [
+  "Propagazione 0 e codice-test 0 e documentazione 0 (asset-location con file inesistente → rc 0 sui default): errore «file non trovato» come i tre gemelli; t_cli_help prova il file mancante su tutti e quattro gli script degli obiettivi",
+  "Propagazione 1 e documentazione 2 (import-dati-broker.md: «codice 2» per gli errori sui file): riga riscritta con la convenzione 0/1/2",
+  "Propagazione 2 e codice-test 1 (importa-previdenza: XML o CSV mancante → traceback): OSError catturato in leggi_estratto_inps e leggi_storico_fondo con «ERRORE: file non trovato»; il controllo sui trattini lunghi vale anche sul primo argomento; test sui due casi",
+  "Propagazione 3 e 4 (docstring di ErroreInput nell'importatore e nel ribilanciamento, valida() «in attesa dell'interfaccia comune»): aggiornate; il ribilanciamento stampa «ERRORE: parametri: …»",
+  "Propagazione 5 (percorso_json senza chiamanti, docstring di applica_override legacy): funzione rimossa dalle due copie, indice e docstring aggiornati",
+  "Propagazione 6 (conteso) e documentazione 6 (SKILL di it-pianificazione senza --set per importa-previdenza, --set attribuito a due soli script): riga d'uso con [--set ALIQUOTA_COMPUTO=0.25], voce --set estesa ai cinque script con --help e la convenzione 0/1/2; docstring «Uso:» di importa-previdenza, proiezione-inps e montecarlo-pensione allineate (propagazione 7)",
+  "Codice-test 2 (scrivi_json su percorso non scrivibile → traceback): OSError → «ERRORE: impossibile scrivere»; test con proiezione-inps --json /non/esiste/x.json",
+  "Codice-test 4 (t_cli_help non distingue stderr da stdout): run_script_split e asserzioni «ERRORE:» su stderr, niente su stdout, per tutti i casi a rc 1",
+  "Codice-test 5 (t_cli_utf8 non protegge genera-ips e importa-estratto-broker): «€» presente e nessun «\\ufffd» nello stdout di ogni script",
+  "Codice-test 6 («12.6 punti» e «0.9500» col punto): numero() in montecarlo-obiettivi e nel messaggio del TARGET; la regex sui sorgenti vieta anche «{x:.1f}» senza %, esclusi .replace( e i letterali --set",
+  "Codice-test 7 (foglio senza obiettivi: rc 0 in tre script, rc 1 nell'allocatore): errore «nessun obiettivo nel foglio» in tutti e quattro; test con un pianificatore vuoto",
+  "Codice-test 8 (abbreviazioni argparse): allow_abbrev=False in cli() e nei tre parser scritti a mano; test «--se» → rc 2",
+  "Documentazione 1 (il contratto rc 1 + ERRORE: non valeva per vari percorsi): chiusi i casi file mancante, JSON non scrivibile, --set non numerico su costante numerica (RAL_ATTUALE=abc → ERRORE), messaggio del ribilanciamento; il file esistente ma non xlsx (BadZipFile) si chiude nel lettore unico di T9b (PR #44)",
+  "Documentazione 3 (HANDOFF § 2.1 con una voce già chiusa dalla stessa PR, § 2.2 «tutti e quattro i sottopunti aperti»): corrette",
+  "Documentazione 4 (tre conteggi degli script che crashavano): «11 su 13 su qualsiasi output, gli altri 2 su percorsi specifici» in ROADMAP e nel commento del test",
+  "Documentazione 5 (--help elenca coordinate del foglio e tabelle come costanti sovrascrivibili): esclusi i nomi …_ROW/…_START/…_N e i dict; con T9b le coordinate escono comunque dagli script"
+ ],
+ "non_applicati": [
+  "Codice-test 3 (pianificatore non xlsx → BadZipFile): rinviato alla PR #44, dove il lettore unico leggi_pianificatore è il posto giusto per la guardia"
+ ],
+ "mutanti": "I tre mutanti della PR (reconfigure tolto, format spec anglosassone, delimitatore «,») restano uccisi; in più: errore() su stdout invece di stderr → t_cli_help fallisce; reconfigure tolto solo in genera-ips → t_cli_utf8 fallisce per «\\ufffd»"
+}

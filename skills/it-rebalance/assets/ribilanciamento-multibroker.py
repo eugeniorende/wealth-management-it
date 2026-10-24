@@ -205,7 +205,7 @@ def carica_zainetto_importatore(path):
 
 
 class ErroreInput(Exception):
-    """Parametri in testa al file non validi: messaggio leggibile, uscita con codice 2."""
+    """Parametri non validi: messaggio «ERRORE: …» su stderr e uscita con codice 1 (il 2 è di argparse)."""
 
 
 def valida():
@@ -218,7 +218,7 @@ def valida():
     except (TypeError, ValueError):
         raise ErroreInput("TARGET: i pesi devono essere numeri (es. 0.6, non «60%»)")
     if abs(somma - 1) > 1e-6:
-        raise ErroreInput(f"TARGET somma a {somma:.4f}, non a 1")
+        raise ErroreInput(f"TARGET somma a {numero(somma, 4)}, non a 1")
     if not isinstance(ZAINETTO, dict):
         raise ErroreInput("ZAINETTO: oggetto broker → euro di minus al 26% (es. {\"Fineco\": 5000})")
     for n, p in enumerate(POSITIONS, start=1):
@@ -861,6 +861,7 @@ def _configura_stdout():
 def main(argv=None):
     _configura_stdout()
     ap = argparse.ArgumentParser(
+        allow_abbrev=False,
         description="Ribilanciamento tax-aware multi-broker: drift e bande 5/25, piano di vendite per broker e "
                     "tipo fiscale nell'ordine di esecuzione, prelievo in decumulo, ordini in CSV per broker. "
                     "I parametri (portafoglio, zainetto, target, versamenti, prelievo) sono le costanti in testa "
@@ -885,7 +886,7 @@ def main(argv=None):
             globals()["CARTELLA_OUTPUT"] = args.out
         plan = pianifica()
     except ErroreInput as e:
-        print(f"ERRORE nei parametri: {e}", file=sys.stderr)
+        print(f"ERRORE: parametri: {e}", file=sys.stderr)
         raise SystemExit(1)
     stampa(plan)
     if GENERA_CSV:
