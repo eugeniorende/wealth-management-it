@@ -1,6 +1,8 @@
 ---
 name: it-revisione
-description: Revisione periodica personale della propria situazione finanziaria complessiva — il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole "fare il punto", chiede una revisione annuale o di fine anno, dice "come sta andando il mio piano", "rivediamo il portafoglio / la mia situazione / i miei obiettivi", "controllo annuale", "check-up finanziario", "tiriamo le somme", oppure quando a fine anno fiscale (novembre-dicembre) vuole una verifica complessiva prima del 31/12. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento obiettivi), `it-tax-optimization` (minusvalenze e harvesting di fine anno) e `it-rebalance` (deriva dell'allocazione). Per un risparmiatore italiano che gestisce i propri soldi. NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato per le decisioni.
+description: "Revisione periodica personale della situazione finanziaria complessiva: il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole «fare il punto», chiede una revisione annuale o di fine anno, dice «come sta andando il mio piano», «rivediamo il portafoglio», «check-up finanziario», «tiriamo le somme», o a novembre-dicembre vuole una verifica complessiva prima del 31/12; anche per l'Investment Policy Statement (IPS) e il cruscotto patrimoniale. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento), `it-tax-optimization` (minusvalenze di fine anno) e `it-rebalance` (deriva dell'allocazione). NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato."
+metadata:
+  version: "0.7"
 ---
 
 # Revisione periodica personale
@@ -138,30 +140,3 @@ Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione
   - `it-pianificazione-obiettivi` — avanzamento, probabilità (Monte Carlo) e glide path degli obiettivi
   - `it-tax-optimization` — minusvalenze in scadenza, harvesting, il coordinamento di fine anno
   - `it-rebalance` — deriva dell'allocazione e ribilanciamento tax-aware (e `coordinamento-zainetto.md` per l'integrazione con la fiscalità)
-
-## Note per l'iterazione
-
-Questa è la versione 0.6 della skill (introdotta in v0.8 del plugin, estesa in v0.9.2).
-
-In quest'iterazione (v0.6):
-- **`tracker-secchielli.xlsx`** — il foglio operativo del monitoraggio goals-based: si definiscono i secchielli e l'anno del piano (Impostazioni), si incolla il calendario del glide path (Glide), si assegnano le posizioni a secchielli e classi con tendine (Posizioni), e il foglio Controllo mostra effettivo vs target per secchiello e aggregato con **semaforo automatico sulle bande 5/25** (formattazione condizionale OK/VICINO/RIBILANCIA). Il target % azioni "di oggi" si aggiorna da solo cambiando l'anno del piano (INDEX sul calendario Glide). Registro Versamenti con totali per secchiello e anno corrente. 145 formule, recalc 0 errori; dati precompilati d'esempio da sostituire. Completa il ciclo: pianifica (it-pianificazione-obiettivi) → esegui → monitora qui.
-
-In quest'iterazione (v0.5):
-- **`genera-ips.py`** — il generatore dell'Investment Policy Statement come documento Word (python-docx): copertina, 12 sezioni (profilo, obiettivi, allocazione, glide path, ribilanciamento, versamenti, strumenti, fiscalità, previdenza, guardrail, revisione), Appendice A con checklist a caselle e Appendice B broker opzionale. I dati del caso si compilano in un unico blocco `DATI`; i testi di policy (bande 5/25, trappola ETF, guardrail, checklist) sono default sovrascrivibili, quindi il documento esce completo anche da un dict minimo. **Onestà incorporata**: la nota di rischio è calcolata dalla quota azionaria aggregata (drawdown atteso in un orso ≈ metà della quota), e lo script valida allocazione=100% e capitali=totale, avvisando senza bloccare. Uso: `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json` dalla cartella di lavoro; senza `--dati` genera l'esempio e lo dice. Dipendenza: python-docx. Codifica il deliverable finale del flusso, prima costruito a mano.
-
-In quest'iterazione (v0.4):
-- **Excel dedicato all'IPS** (`assets/investment-policy-statement.xlsx`): lo scheletro dell'Investment Policy Statement come foglio compilabile, con le **bande di ribilanciamento calcolate da sé** dai target (regola 5/25 → soglie operative per classe), il controllo che i target sommino a 100%, e drawdown/vincoli fiscali precompilati. Quinto Excel del plugin. Validato (bande corrette, check 100% funzionante, 0 errori).
-
-In quest'iterazione (v0.3):
-- **Time-weighted return** nel cruscotto (foglio Rendimento TWR): il rendimento della strategia neutralizzato dai flussi, da confrontare con un benchmark, affiancato al money-weighted **esatto** (XIRR) sugli stessi dati. La differenza tra i due misura l'effetto del timing dei versamenti. Cruscotto a sei fogli.
-
-In quest'iterazione (v0.2):
-- **Template del report** (`assets/template-revisione.md`): scheletro markdown precompilato delle cinque sezioni, da riempire — rende il report completo e coerente di anno in anno.
-- **Foglio "Azioni"** nel cruscotto: tracker delle azioni emerse (azione, dominio, priorità, scadenza, stato) con la legenda di prioritizzazione; il ponte tra report ed esecuzione.
-- **Investment Policy Statement personale** (`references/investment-policy-statement.md`): la "costituzione" del portafoglio, con scheletro compilabile e il cuore comportamentale (le regole nei drawdown scritte prima del crollo). Formalizza in policy ciò che le altre skill producono come numeri; la revisione ne misura l'aderenza.
-
-Versione precedente (v0.1): la skill di sintesi/orchestrazione — workflow in cinque passi, logica di prioritizzazione (scadenza → impatto → manutenzione), azioni cross-dominio, report come deliverable, e il cruscotto patrimoniale.
-
-Roadmap:
-- ✅ Calcolo del **time-weighted return**: fatto in v0.3 (foglio Rendimento TWR, con MWR esatto via XIRR per il confronto)
-- ✅ Excel dedicato all'**IPS**: fatto in v0.4 (`assets/investment-policy-statement.xlsx`, con bande auto-calcolate)

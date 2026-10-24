@@ -8,10 +8,12 @@
   },
   "repository": "https://github.com/eugeniorende/wealth-management-it",
   "license": "Apache-2.0",
-  "upstream": {
-    "repo": "anthropics/financial-services",
-    "path": "plugins/vertical-plugins/wealth-management",
-    "rationale": "L'upstream è cablato sul fisco USA (wash sale, HIFO, Roth/401k). Le regole italiane sono strutturalmente diverse: questa versione le riscrive da zero invece di estenderle."
+  "metadata": {
+    "upstream": {
+      "repo": "anthropics/financial-services",
+      "path": "plugins/vertical-plugins/wealth-management",
+      "rationale": "L'upstream è cablato sul fisco USA (wash sale, HIFO, Roth/401k). Le regole italiane sono strutturalmente diverse: questa versione le riscrive da zero invece di estenderle."
+    }
   },
   "userConfig": {
     "cartella_lavoro": {

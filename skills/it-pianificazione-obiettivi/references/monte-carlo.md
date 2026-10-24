@@ -2,6 +2,20 @@
 
 Questa reference spiega il senso, il modello e soprattutto i **limiti** della simulazione Monte Carlo applicata agli obiettivi. Lo strumento è `assets/montecarlo-obiettivi.py`.
 
+## Indice
+
+- Perché il deterministico non basta
+- Il modello
+- Le volatilità per profilo
+- Come interpretare la probabilità di successo
+- Sequence-of-returns risk
+- Due modelli dei rendimenti: Normale e bootstrap storico
+- Le tre strade per colmare un gap (e perché il rischio è a doppio taglio)
+- I limiti del modello (importante)
+- Come eseguirlo
+- Heuristic per la skill
+- Due correzioni di onestà
+
 ## Perché il deterministico non basta
 
 Il pianificatore Excel calcola il versamento mensile usando il rendimento atteso **medio** del profilo. Questo centra la media della distribuzione dei risultati — ma la media non è il risultato "probabile". Per due ragioni:

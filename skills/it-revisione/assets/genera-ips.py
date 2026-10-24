@@ -234,6 +234,33 @@ def runs_markup(par, testo, size=None, color=None, italic=False):
     return par
 
 
+def proprieta_italiane(doc, titolo):
+    """Titolo e lingua del documento: senza, Word apre l'IPS con titolo vuoto e controllo
+    ortografico in inglese. La lingua va nelle proprietà del file e, come w:lang it-IT,
+    nei default dei run (docDefaults), così vale per ogni stile."""
+    doc.core_properties.title = titolo
+    doc.core_properties.language = "it-IT"
+    doc.core_properties.subject = "Investment Policy Statement"
+    defaults = doc.styles.element.find(qn("w:docDefaults"))
+    if defaults is None:
+        defaults = OxmlElement("w:docDefaults")
+        doc.styles.element.insert(0, defaults)
+    rpr_default = defaults.find(qn("w:rPrDefault"))
+    if rpr_default is None:
+        rpr_default = OxmlElement("w:rPrDefault")
+        defaults.insert(0, rpr_default)
+    rpr = rpr_default.find(qn("w:rPr"))
+    if rpr is None:
+        rpr = OxmlElement("w:rPr")
+        rpr_default.append(rpr)
+    lang = rpr.find(qn("w:lang"))
+    if lang is None:
+        lang = OxmlElement("w:lang")
+        rpr.append(lang)
+    lang.set(qn("w:val"), "it-IT")
+    lang.set(qn("w:eastAsia"), "it-IT")
+
+
 def bordo_sotto(par, colore=ACCENT, spessore=8):
     pPr = par._p.get_or_add_pPr()
     pBdr = OxmlElement("w:pBdr")
@@ -403,6 +430,7 @@ def genera(dati, path_out):
         print("⚠ nessuna classe azionaria riconosciuta nell'allocazione: la nota di rischio usa 0%")
 
     doc = Document()
+    proprieta_italiane(doc, f"Investment Policy Statement — {d['investitore']}")
     st = doc.styles["Normal"]
     st.font.name = "Arial"
     st.font.size = Pt(10)

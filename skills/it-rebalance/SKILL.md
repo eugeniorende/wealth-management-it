@@ -1,6 +1,8 @@
 ---
 name: it-rebalance
-description: Ribilanciamento di portafoglio tax-aware sotto la fiscalità italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di ribilanciamento, rebalancing, riequilibrio del portafoglio, allocazione target vs effettiva, drift dell'asset allocation, portafoglio sbilanciato, "le azioni sono cresciute troppo", riportare i pesi all'allocazione obiettivo, ribilanciare con/senza vendere, ribilanciamento tramite nuovi versamenti (cashflow), ribilanciamento di fine anno coordinato con le minusvalenze. Trigger anche quando l'utente ha un portafoglio multi-asset (azioni/obbligazioni/ETF) e chiede come ririportarlo ai pesi voluti minimizzando l'impatto fiscale. Coordina con `it-tax-optimization` perché in Italia ogni vendita per ribilanciare è un evento fiscale (realizzo plus/minus sul costo medio ponderato, interazione con lo zainetto). NON è consulenza di investimento: la skill è fiscale e operativa, non raccomanda QUALE asset allocation scegliere. NON copre fondi pensione (vincolati) né dipendenti pubblici.
+description: "Ribilanciamento di portafoglio tax-aware sotto la fiscalità italiana (regime amministrato). Usa questa skill quando l'utente parla di ribilanciamento, rebalancing, riequilibrio del portafoglio, allocazione target vs effettiva, drift dell'asset allocation, portafoglio sbilanciato («le azioni sono cresciute troppo»), riportare i pesi all'allocazione obiettivo con o senza vendere, ribilanciare con i nuovi versamenti o i dividendi, prelievo in decumulo, ribilanciamento di fine anno coordinato con le minusvalenze. Misura il drift con le bande 5/25 e applica la gerarchia delle leve (versamenti, flussi, vendite in minus, vendite tassate con gate), con il CSV degli ordini per broker. Coordina con `it-tax-optimization`: in Italia ogni vendita è un evento fiscale (plus/minus sul costo medio ponderato, zainetto). NON è consulenza di investimento: non raccomanda quale asset allocation scegliere, che è input dell'utente. NON copre i fondi pensione (vincolati)."
+metadata:
+  version: "0.7"
 ---
 
 # it-rebalance
@@ -314,30 +316,3 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 - `assets/ribilanciamento-multibroker.py` — strumento che esegue l'ottimizzazione multi-broker, le bande dinamiche, la regola di rientro e il prelievo in decumulo (`PRELIEVO`) su un portafoglio reale, e **genera gli ordini come CSV per broker** con instradamento della cassa (parametri editabili in testa; output: drift, piano di vendite ottimizzato per broker/tipo/aliquota nell'ordine di esecuzione, residui non corretti con motivo e costo, costo fiscale, zainetto residuo, allocazione risultante, e un CSV di ordini eseguibili per ciascun broker, solo se ci sono ordini)
 - **Vedi anche** `it-tax-optimization/SKILL.md` per le regole di compensazione minus/plus e `it-tax-optimization/references/multi-intermediario.md` per la frammentazione su più broker, e `it-pianificazione/references/integrazione-fiscale-joint.md` per l'interazione con l'IRPEF
 - **A monte** c'è `it-pianificazione-obiettivi`: definisce l'allocazione-target **aggregando i secchielli per obiettivo** (ciascuno pesato per il suo capitale) nell'asset allocation complessiva del portafoglio, più il **calendario di glide path** generato da `glidepath-obiettivi.py` (la quota azionaria target di ogni secchiello anno per anno). È quell'aggregato e quel calendario — non target scelti a mano — la fonte delle allocazioni che questa skill riceve in input, mantiene nel tempo, e de-riska progressivamente eseguendo gli spostamenti annuali (con attenzione agli eventi fiscali di ogni vendita).
-
-## Note per l'iterazione
-
-Questa è la versione 0.6 della skill (introdotta in v0.5 del plugin, estesa in v0.8.12 e nella 0.10.0).
-
-In quest'iterazione (v0.6, plugin 0.10.0):
-- **Piano corretto e regola unica**: versamenti e flussi entrano nel totale prima del drift e sono allocati tutti; le minus realizzate ricaricano lo zainetto del broker; aliquota per posizione (12,5% per i titoli di Stato, che consumano lo zainetto al 48,08%); quota a costo zero venduta anche quando il resto è rinviato, con il residuo stampato; regola di rientro mista (`OBIETTIVO_RIENTRO`, con i due costi); prelievo in decumulo (`PRELIEVO`), con il lordo calcolato una volta e una vendita per posizione; Leva 3 di tutte le classi prima della Leva 4, ordinata per imposta per euro venduto, e vendite in minus elencate per prime; sottopesate fuori banda riempite anche vendendo da classi in banda; modulazione per volatilità spenta di default; validazione minima dei parametri. Test con asserzioni sul caso di validazione e sugli scenari dell'audit e della revisione.
-
-In quest'iterazione (v0.5):
-- **Modulazione della banda per la volatilità della classe**: la banda 5/25 ora si scala con la volatilità del comparto, perché una soglia fissa rappresenta un segnale/rumore diverso tra classi (cinque punti su un azionario capitano per rumore, su un obbligazionario sono un movimento raro). Trattata con onestà la **tensione teorica** — la visione "più volatile → banda più larga" (efficienza di trading) contro il controllo ottimo alla Leland "più volatile → banda più stretta" (la deviazione è più rischiosa): non è una legge, è un trade-off. Implementazione deliberatamente modesta (fattore `(σ/σ_rif)^β` clampato in un intervallo stretto, spegnibile per tornare alla pura 5/25). Validato: azionario si allarga, classi stabili al clamp, retro-compatibilità con modulazione spenta. Vedi `references/bande-dinamiche.md`.
-
-In quest'iterazione (v0.4):
-- **Generatore di ordini CSV per broker**: lo script di ribilanciamento ora esporta gli ordini da eseguire, un CSV per broker, con instradamento della cassa (gli acquisti finanziati dalla liquidità presente su ciascun broker, così ogni file è eseguibile senza trasferimenti tra intermediari) e l'annotazione fiscale per riga. Chiude la voce v0.4 della roadmap. Validato su scenario mono e multi-broker (invariante: per ogni broker, acquisti ≤ cassa disponibile lì).
-
-In quest'iterazione (v0.3):
-- **Sequenza di liquidazione fiscale in decumulo** (`references/sequenza-liquidazione.md`): da dove prelevare per minimizzare l'imposta (liquidità → flussi già tassati → vendite tax-aware con la gerarchia delle leve → fondo pensione agevolato 9-15% in erogazione), riusando l'ottimizzazione multi-broker; e il prelievo annuo che diventa anche l'occasione per ribilanciare. Il calcolo del prelievo nello script è arrivato solo nella v0.6 (`PRELIEVO`). La sostenibilità del prelievo (quanto, non come) è in `it-pianificazione-obiettivi/references/decumulo.md`.
-
-In quest'iterazione (v0.2):
-- **Ottimizzazione globale dello zainetto multi-broker**: la compensazione non attraversa i broker, quindi la scelta di DOVE realizzare le plus (broker × tipo fiscale) determina il costo. Reference `ribilanciamento-multibroker.md` + script `assets/ribilanciamento-multibroker.py` (primo asset della skill, validato su tre scenari).
-- **Bande di tolleranza dinamiche** (regola 5/25 + allargamento cost-aware): si ribilancia a soglia, non a calendario; la banda si allarga quando correggere costa imposta netta. Reference `bande-dinamiche.md`, integrata nello script.
-
-Versioni precedenti (v0.1): regime amministrato, dossier titoli ordinario, allocazione target come input utente (no robo-advisory), proiezione deterministica del drift, gerarchia delle quattro leve, coordinamento di fine anno con lo zainetto.
-
-Roadmap:
-- ✅ Generatore di ordini esportabile (CSV per broker): fatto in v0.4, con instradamento della cassa per broker
-- ✅ Decumulo con prelievi tax-efficient: coperto in `references/sequenza-liquidazione.md` (sequenza di liquidazione fiscale), in coppia con la sostenibilità del prelievo in `it-pianificazione-obiettivi/references/decumulo.md`
-- ✅ Modulazione della banda per la volatilità della classe: fatta in v0.5 (fattore clampato sulla 5/25, con la tensione teorica documentata onestamente), oltre l'allargamento cost-aware

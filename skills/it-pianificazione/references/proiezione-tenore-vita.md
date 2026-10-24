@@ -1,5 +1,14 @@
 # Proiezione tenore di vita post-pensionamento
 
+## Indice
+
+- L'approccio gap analysis
+- Spesa target post-pensione
+- Reddito pensionistico totale
+- Scenari di proiezione
+- Pattern di copertura del gap
+- Heuristic per la skill
+
 ## L'approccio gap analysis
 
 La pianificazione pensionistica si riduce concettualmente a una domanda: **il reddito atteso dalla pensione coprirà il tenore di vita desiderato?**

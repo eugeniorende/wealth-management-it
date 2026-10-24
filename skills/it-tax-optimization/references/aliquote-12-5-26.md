@@ -1,5 +1,15 @@
 # Gestione dell'aliquota 12,5% e coefficiente di abbattimento
 
+## Indice
+
+- Quali strumenti rientrano nel 12,5%
+- Cosa NON è tassato al 12,5% (anche se "sembra")
+- L'edge case ETF/fondi sui titoli di Stato
+- La regola del coefficiente di abbattimento
+- Esempi numerici
+- Caveat operativo
+- Heuristic per la skill
+
 ## Quali strumenti rientrano nel 12,5%
 
 L'aliquota agevolata del 12,5% si applica ai proventi finanziari di:

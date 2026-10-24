@@ -2,6 +2,17 @@
 
 Cosa succede, ai fini fiscali, quando il dossier titoli passa agli eredi o viene donato: quale costo fiscale ricevono gli eredi e i donatari, che fine fa lo zainetto, quanto si paga di imposta di successione e donazione. In fondo c'è la domanda che conta per chi ha plusvalenze latenti elevate e un orizzonte breve: vendere in decumulo o lasciare in eredità. La reference riguarda la persona fisica residente con azioni, obbligazioni, titoli di Stato, fondi ed ETF. Per le cripto vedi `criptovalute-casi-speciali.md`, per le polizze vita `it-pianificazione-obiettivi/references/asset-location.md`. Non è consulenza: per i casi concreti servono un notaio o un commercialista.
 
+## Indice
+
+- Due imposte diverse
+- Il costo fiscale per gli eredi: il valore di successione
+- Fondi ed ETF: il testo della legge non prevede l'eccezione
+- La donazione: nessuna rivalutazione
+- Lo zainetto del defunto non passa agli eredi
+- L'imposta di successione e donazione
+- Vendo in decumulo o lascio in eredità?
+- Cosa verificare col notaio o il commercialista
+
 ## Due imposte diverse
 
 Il passaggio di un portafoglio tocca due imposte che non vanno confuse:

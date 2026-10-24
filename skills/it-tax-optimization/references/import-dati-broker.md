@@ -4,6 +4,14 @@ Questa skill lavora meglio sui dati reali del tuo portafoglio. Il modo per porta
 un collegamento "live" via API ai broker — quella strada è stata valutata e scartata, per ragioni
 che vale la pena ricordare perché spiegano il design di ciò che c'è qui.
 
+## Indice
+
+- Perché non un MCP "live" sui broker
+- Cosa fa l'importatore
+- Il parser è tollerante ai formati (deve esserlo)
+- Come esportare da ciascun broker
+- Limiti dichiarati (onestà del pilota)
+
 ## Perché non un MCP "live" sui broker
 
 Tre broker italiani diffusi — Directa, Fineco, Trade Republic — sono stati verificati uno per uno:

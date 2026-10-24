@@ -1,5 +1,18 @@
 # La trappola degli ETF UCITS armonizzati
 
+## Indice
+
+- Il problema in una frase
+- Riferimento normativo
+- Esempio numerico 1: la situazione ingenua
+- Esempio numerico 2: la strategia corretta (Pattern A)
+- Esempio numerico 3: creazione di zainetto da ETF UCITS (Pattern B con caveat)
+- Esempio numerico 4: switch tra ETF UCITS equivalenti (la "pseudo-TLH" che NON funziona)
+- Strumenti "amici" delle minus (reddito diverso)
+- Strumenti "nemici" delle minus (reddito di capitale)
+- Heuristic per la skill
+- Caso ibrido: l'ETF a distribuzione UCITS
+
 ## Il problema in una frase
 
 In Italia, **la perdita** sulla vendita di un ETF UCITS armonizzato è "reddito diverso" (compensabile con plus future); **il guadagno** sulla vendita dello stesso tipo di ETF è "reddito di capitale" (NON compensabile con minus pregresse).

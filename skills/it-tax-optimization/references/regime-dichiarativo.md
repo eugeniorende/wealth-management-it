@@ -2,6 +2,21 @@
 
 Tutto il resto della skill assume il regime **amministrato**, dove l'intermediario italiano fa da sostituto d'imposta: trattiene il 26% a ogni realizzo, gestisce lo zainetto, e tu non dichiari nulla. Ma chi usa un **broker estero** senza sostituto d'imposta italiano (Interactive Brokers, Degiro) finisce nel regime **dichiarativo**: deve fare tutto da sé in dichiarazione. Alcuni broker nati esteri hanno aperto una succursale italiana e offrono l'amministrato: lo stato di ciascuno è nella tabella qui sotto. Questa reference copre il dichiarativo a livello di principi e adempimenti: il motore di calcolo della skill (e l'importatore) resta sull'amministrato, e per la compilazione effettiva serve un commercialista. Non è consulenza.
 
+## Indice
+
+- I tre regimi a confronto
+- Quali broker sono in dichiarativo (stato a ottobre 2026)
+- Il dichiarativo in pratica: i quadri RT, RM e RW
+- Quali titoli si considerano venduti in dichiarativo: LIFO
+- Titoli in valuta: il cambio del giorno
+- Liquidità in valuta: la soglia di €51.645,69
+- Le minus vanno indicate nell'anno di realizzo
+- Il vero motivo per cui il dichiarativo conta nell'ottimizzazione: zainetto unificato
+- Quando conviene scegliere il dichiarativo
+- Cripto e quadro RW
+- Checklist degli adempimenti con un broker estero
+- In sintesi
+
 ## I tre regimi a confronto
 
 L'investitore italiano può trovarsi in uno di tre regimi:

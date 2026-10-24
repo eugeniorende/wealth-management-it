@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NOME = "wealth-management-it"
 
 # Cosa entra nello zip (relativo alla radice del repository).
-INCLUDI = [".claude-plugin", "commands", "skills", "README.md", "LICENSE", "NOTICE"]
+INCLUDI = [".claude-plugin", "commands", "skills", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE"]
 # Cosa resta fuori anche se dentro una cartella inclusa.
 ESCLUDI_DIR = {"__pycache__", ".git", "ordini"}
 ESCLUDI_FILE = {".DS_Store"}

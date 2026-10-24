@@ -8,6 +8,15 @@ Dal **1° gennaio 2027** si applicano i testi unici della riforma fiscale, che a
 
 **Come usarla.** Per il 2026, e per i periodi d'imposta fino al 2026, restano le norme previgenti. Nei testi del plugin si usa la **doppia citazione**: «art. 68 TUIR (dal 2027 art. 77 D.Lgs. 117/2026)». I numeri sono quelli degli articoli del testo unico allegato a ciascun decreto. Attenzione a **commi e lettere**: cambiano anche quando il numero dell'articolo resta uguale (art. 10 lett. e-bis → lett. h; art. 13 c. 3-bis → c. 4). I rinvii alle norme abrogate si intendono fatti alle disposizioni corrispondenti del testo unico (art. 376 c. 2 D.Lgs. 117/2026).
 
+## Indice
+
+- Imposte sui redditi — D.Lgs. 117/2026
+- Previdenza complementare — D.Lgs. 117/2026, artt. 257-262
+- Monitoraggio, versamenti, sanzioni
+- Tributi minori, successioni, IVAFE
+- Norme citate che restano in vigore
+- Da verificare
+
 ## Imposte sui redditi — D.Lgs. 117/2026
 
 | Fino al 31/12/2026 | Dal 1/1/2027 |

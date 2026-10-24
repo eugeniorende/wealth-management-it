@@ -12,6 +12,7 @@ regressione di un bug reale), non l'output cosmetico. La suite protegge i
 refactor: se passa, la meccanica di calcolo non è cambiata.
 """
 
+import glob
 import importlib.util
 import json
 import os
@@ -161,18 +162,15 @@ def t_pipefail():
 
 @test("igiene: il README dichiara un solo conteggio dei test, uguale ai decoratori @test del runner")
 def t_conteggio_test():
-    # Lo storico del changelog cita i conteggi di allora («Suite: 24 test»): si legge
-    # tutto il README tranne quella sezione, e ogni «N test» trovato deve essere il
-    # numero dei decoratori @test di questo file. Il conteggio vive in «## Test».
+    # Lo storico (CHANGELOG.md, dalla 0.11.0 fuori dal README) cita i conteggi di allora
+    # («Suite: 24 test»): ogni «N test» del README deve essere il numero dei decoratori
+    # @test di questo file. Il conteggio vive in «## Test».
     sorgente = open(os.path.abspath(__file__), encoding="utf-8").read()
     decoratori = len(re.findall(r"^@test\(", sorgente, re.M))
     registrati = sum(1 for v in globals().values() if getattr(v, "__test__", False))
     assert decoratori == registrati, f"decoratori {decoratori} ≠ test registrati {registrati}"
     readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
-    inizio = readme.index("### Changelog")
-    fine = readme.index("\n## ", inizio)
-    fuori_changelog = readme[:inizio] + readme[fine:]
-    conteggi = [int(n) for n in re.findall(r"\b(\d+) test\b", fuori_changelog)]
+    conteggi = [int(n) for n in re.findall(r"\b(\d+) test\b", readme)]
     assert conteggi, "il README deve dichiarare il numero dei test (sezione «Test»)"
     assert all(n == decoratori for n in conteggi), \
         f"il README dice {sorted(set(conteggi))} test, i decoratori @test sono {decoratori}"
@@ -2279,7 +2277,7 @@ def t_t7_aliquota_mista():
         raise AssertionError(f"input non valido accettato: {errato}")
 
 
-@test("T7 ribilanciamento: una sola regola di rientro e di banda in skill, reference e comando")
+@test("T7 ribilanciamento: una sola regola di rientro e di banda in skill e reference")
 def t_t7_testi():
     # REGRESSIONE F045/F046/F030: «a target» contro «in banda», prelievo promesso e non fatto,
     # «banda fissa ±5%» come regola di base.
@@ -2288,9 +2286,8 @@ def t_t7_testi():
              for rel in ("SKILL.md", "references/gerarchia-leve.md", "references/bande-dinamiche.md",
                          "references/sequenza-liquidazione.md", "references/ribilanciamento-multibroker.md",
                          "references/coordinamento-zainetto.md")}
-    testi["commands/ribilancia.md"] = open(os.path.join(ROOT, "commands", "ribilancia.md"), encoding="utf-8").read()
     regola = re.compile(r"a target[^\n]*costo (netto )?zero[^\n]*metà (della )?banda", re.I)
-    for rel in ("SKILL.md", "references/gerarchia-leve.md", "references/bande-dinamiche.md", "commands/ribilancia.md"):
+    for rel in ("SKILL.md", "references/gerarchia-leve.md", "references/bande-dinamiche.md"):
         assert regola.search(testi[rel]), f"{rel}: manca la regola di rientro mista"
     vietate = [r"raccomandare quella in banda", r"\"In banda\" batte", r"banda fissa\*\* \(±5% assoluto\)",
                r"prevista per v0\.5", r"Lo strumento fa esattamente così", r"PMC \(o lotti\)",
@@ -2309,7 +2306,7 @@ def t_t7_testi():
     assert "MODULA_VOLATILITA = False" in testi["references/bande-dinamiche.md"] or \
         "spenta di default" in testi["references/bande-dinamiche.md"], "bande-dinamiche: modulazione spenta di default"
     assert "aliquota" in testi["SKILL.md"].split("### Step 1")[1].split("### Step 2")[0], "Step 1 senza l'aliquota per posizione"
-    for rel in ("SKILL.md", "commands/ribilancia.md", "references/ribilanciamento-multibroker.md"):
+    for rel in ("SKILL.md", "references/ribilanciamento-multibroker.md"):
         assert "quota_titoli_stato" in testi[rel], f"{rel}: manca l'aliquota mista di ETF e fondi su titoli di Stato"
     aliquote = open(os.path.join(SKILLS, "it-tax-optimization", "references", "aliquote-12-5-26.md"), encoding="utf-8").read()
     for frase in ("67,27", "Non dal KID", "art. 1 c. 3", "valida per il semestre della vendita"):
@@ -2321,14 +2318,14 @@ def t_t7_testi():
     # revisione T7: Leva 4 per imposta per euro venduto, minus eseguite per prime, sottopesate,
     # tre valori di OBIETTIVO_RIENTRO, gate nel coordinamento di fine anno, unità dello zainetto
     for rel in ("SKILL.md", "references/ribilanciamento-multibroker.md", "references/sequenza-liquidazione.md",
-                "references/gerarchia-leve.md", "commands/ribilancia.md"):
+                "references/gerarchia-leve.md"):
         assert re.search(r"imposta per euro venduto", testi[rel]), f"{rel}: Leva 4 senza l'imposta per euro venduto"
     for rel in ("SKILL.md", "references/gerarchia-leve.md", "references/ribilanciamento-multibroker.md"):
         assert re.search(r"minus[^\n]*(prima delle plus|eseguit[ao] per prim|per prim[ae][^\n]*CSV)", testi[rel]), \
             f"{rel}: manca l'ordine di esecuzione (le minus prima delle plus)"
     assert "art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027" in testi["SKILL.md"]
-    for rel in ("SKILL.md", "references/bande-dinamiche.md", "references/ribilanciamento-multibroker.md", "commands/ribilancia.md"):
-        assert re.search(r"[Ss]ottopesat[ae] fuori banda", testi[rel]), f"{rel}: manca la regola delle sottopesate fuori banda"
+    for rel in ("SKILL.md", "references/bande-dinamiche.md", "references/ribilanciamento-multibroker.md"):
+        assert re.search(r"(?i)sottopesat[ae] fuori banda", testi[rel]), f"{rel}: manca la regola delle sottopesate fuori banda"
     for rel in ("SKILL.md", "references/bande-dinamiche.md"):
         assert all(x in testi[rel] for x in ("«misto»", "«target»", "«banda»", "MARGINE_RIENTRO")), f"{rel}: OBIETTIVO_RIENTRO"
     coord = testi["references/coordinamento-zainetto.md"]
@@ -2336,7 +2333,7 @@ def t_t7_testi():
     assert "banda larga" in fase4 and "metà banda" in fase4, "coordinamento-zainetto: Leva 4 senza gate"
     assert "0,4808" in coord.split("### Fase 3")[1].split("### Fase 4")[0], "coordinamento-zainetto: Fase 3 senza il 48,08%"
     assert re.search(r"\+7%[^\n]*sotto la banda larga[^\n]*rinvia", coord), "coordinamento-zainetto: esempio senza gate"
-    for rel in ("SKILL.md", "commands/ribilancia.md"):
+    for rel in ("SKILL.md",):
         assert "26%-equivalenti" in testi[rel], f"{rel}: zainetto senza unità"
     assert re.search(r"reddito_diverso` \([^)]*obbligazioni", testi["SKILL.md"]), "SKILL.md: tipo_fiscale senza obbligazioni"
 
@@ -2932,6 +2929,12 @@ def t_genera_ips():
     # la nota di rischio è CALCOLATA dalla quota azionaria (57% nell'esempio → ~28%)
     m = re.search(r"perdere circa il (\d+)%", testo)
     assert m and abs(int(m.group(1)) - 28) <= 1, "nota di rischio non calibrata sull'allocazione"
+    # T14: titolo e lingua del documento (prima: titolo vuoto e controllo ortografico in inglese)
+    from docx.oxml.ns import qn
+    assert doc.core_properties.title.startswith("Investment Policy Statement — "), doc.core_properties.title
+    assert doc.core_properties.language == "it-IT", doc.core_properties.language
+    lang = doc.styles.element.find(qn("w:docDefaults")).find(qn("w:rPrDefault")).find(qn("w:rPr")).find(qn("w:lang"))
+    assert lang is not None and lang.get(qn("w:val")) == "it-IT", "docDefaults senza w:lang it-IT"
 
 
 @test("genera-ips: quota azionaria sommata su tutte le classi, mese in italiano in copertina")
@@ -2965,9 +2968,9 @@ TAX = os.path.join(SKILLS, "it-tax-optimization")
 
 
 def _testi_regole():
-    """{percorso relativo: testo} di skill, comandi, README (senza il changelog storico) e
-    descrizione del plugin.json, con il grassetto Markdown tolto. Il changelog del README
-    racconta le versioni passate: gli errata li aggiunge chi rilascia, non questi controlli."""
+    """{percorso relativo: testo} di skill, comandi, README e descrizione del plugin.json,
+    con il grassetto Markdown tolto. CHANGELOG.md racconta le versioni passate e resta
+    fuori: gli errata li aggiunge chi rilascia, non questi controlli."""
     testi = {}
     for base in (SKILLS, os.path.join(ROOT, "commands")):
         for cartella, _, files in os.walk(base):
@@ -2975,8 +2978,7 @@ def _testi_regole():
                 if f.endswith((".md", ".py")):
                     p = os.path.join(cartella, f)
                     testi[os.path.relpath(p, ROOT).replace(os.sep, "/")] = open(p, encoding="utf-8").read()
-    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
-    testi["README.md"] = re.sub(r"\n### Changelog\n.*?(?=\n## )", "\n", readme, flags=re.S)
+    testi["README.md"] = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
     plugin = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
     testi[".claude-plugin/plugin.json"] = plugin["description"]
     return {k: v.replace("*", "") for k, v in testi.items()}
@@ -3428,12 +3430,11 @@ def t_t3_dichiarativo():
     assert re.search(r"quadro RT[^.\n]*(per anno|non per broker)", ingest), "Step 1: minus riportabili dal quadro RT"
     disclaimer = skill.split("### Disclaimer")[1].split("\n## ")[0]
     assert "dichiarativo" in disclaimer, "disclaimer limitato all'amministrato"
-    comando = open(os.path.join(ROOT, "commands", "minusvalenze.md"), encoding="utf-8").read()
-    assert re.search(r"regime[^.\n]*(ciascun|ogni) broker|(ciascun|ogni) broker[^.\n]*regime", comando), \
-        "/minusvalenze non chiede il regime di ogni broker"
-    assert re.search(r"minus riportabili dal quadro RT", comando) and "sezioni 4 e 5" in comando, \
-        "/minusvalenze: minus del quadro RT e sezioni 4 e 5 della skill"
-    assert re.search(r"[Nn]on (lanciare|usare) l'importatore[^.\n]*dichiarativo", comando), "/minusvalenze: importatore solo per l'amministrato"
+    # F057: /minusvalenze è un alias della skill; i punti che chiedeva stanno nello Step 1
+    assert re.search(r"(?i)regime[^.\n]*(ciascun|ogni) broker|(ciascun|ogni) broker[^.\n]*regime", ingest), \
+        "Step 1 non chiede il regime di ogni broker"
+    assert re.search(r"minus riportabili dal quadro RT", ingest), "Step 1: minus del quadro RT"
+    assert re.search(r"[Nn]on (lanciare|usare) l'importatore[^.\n]*dichiarativo", ingest), "Step 1: importatore solo per l'amministrato"
 
 
 @test("T3: cripto con leva ETN/ETC al 26% (con cautela) e reference marcate")
@@ -4193,7 +4194,7 @@ def t_revisione_spazio_deducibile():
     # Nota del § 4 dell'handoff (T10 dopo T4): la revisione di fine anno deve dire quanto resta
     # deducibile e quanto costa non comunicare i non dedotti.
     for rel in ("skills/it-revisione/SKILL.md", "skills/it-revisione/references/metodo-revisione.md",
-                "skills/it-revisione/assets/template-revisione.md", "commands/revisione.md"):
+                "skills/it-revisione/assets/template-revisione.md"):
         testo = " ".join(open(os.path.join(ROOT, rel), encoding="utf-8").read().split())
         assert "spazio deducibile residuo" in testo, f"{rel}: manca lo spazio deducibile residuo"
         assert "max(0, €5.300 − datore − dovuto − volontari già versati nell'anno)" in testo, \
@@ -4211,7 +4212,7 @@ def t_non_dedotti():
     for rel in ("skills/it-revisione/SKILL.md", "skills/it-revisione/references/metodo-revisione.md",
                 "skills/it-revisione/assets/template-revisione.md",
                 "skills/it-revisione/references/investment-policy-statement.md",
-                "skills/it-revisione/assets/genera-ips.py", "commands/revisione.md",
+                "skills/it-revisione/assets/genera-ips.py",
                 "skills/it-pianificazione-autonomi/references/fiscalita-forfettario.md"):
         assert "non dedott" in open(os.path.join(ROOT, rel), encoding="utf-8").read(), f"{rel}: manca la comunicazione"
     for nome, foglio, cella in (("cruscotto-patrimoniale.xlsx", "Azioni", "A2"),
@@ -4822,6 +4823,161 @@ def t_tabella_dati_normativi():
         assert f"| `{rel}` |" in r.stdout, f"{rel} assente dalla tabella"
 
 
+# ═══════════════════════ T14: authoring, documentazione e packaging ═══════════════════════
+
+def _frontmatter(path):
+    """(frontmatter, corpo) di un file Markdown: il frontmatter è tra i primi due «---»."""
+    testo = open(path, encoding="utf-8").read()
+    assert testo.startswith("---\n"), f"{path}: manca il frontmatter"
+    _, fm, corpo = testo.split("---\n", 2)
+    return fm, corpo
+
+
+def _yaml_stretto(fm, nome):
+    """Il sottoinsieme di YAML che usiamo, controllato senza dipendenze: chiave: valore, con i
+    valori che contengono «: » o « #» tra virgolette doppie (un parser stretto come PyYAML
+    altrimenti li rifiuta), e mappe indentate di due spazi. Restituisce {chiave: valore}."""
+    out, padre = {}, None
+    for riga in fm.splitlines():
+        if not riga.strip():
+            continue
+        m = re.fullmatch(r"( {2})?([a-z][\w-]*):(?: (.*))?", riga)
+        assert m, f"{nome}: riga non valida nel frontmatter «{riga[:60]}»"
+        rientro, chiave, valore = m.groups()
+        if valore is None:
+            assert not rientro, f"{nome}: mappa annidata oltre il primo livello ({chiave})"
+            padre = chiave
+            out[chiave] = {}
+            continue
+        if valore.startswith('"'):
+            assert re.fullmatch(r'"[^"\\]*"', valore), f"{nome}: {chiave} tra virgolette malformato"
+            valore = valore[1:-1]
+        else:
+            assert ": " not in valore and " #" not in valore and not re.match(r"[\[\]{}>|*&!%@`'\"]", valore), \
+                f"{nome}: il valore di {chiave} va tra virgolette doppie (YAML stretto)"
+            valore = {"true": True, "false": False}.get(valore, valore)
+        if rientro:
+            assert padre, f"{nome}: {chiave} indentato senza una mappa"
+            out[padre][chiave] = valore
+        else:
+            padre = None
+            out[chiave] = valore
+    try:  # se PyYAML c'è, conferma con il parser vero
+        import yaml
+        assert yaml.safe_load(fm) == out, f"{nome}: PyYAML legge il frontmatter in modo diverso"
+    except ImportError:
+        pass
+    return out
+
+
+@test("T14 skill: description entro 1.024 caratteri, YAML stretto, metadata.version uguale a README e CHANGELOG")
+def t_frontmatter_skill():
+    # F023: sei description oltre 1.024 caratteri e «: » non quotati, che un parser YAML stretto
+    # (quello dell'upload di skill fuori da Claude Code) rifiuta; nessuna versione per skill;
+    # 202 righe di «Note per l'iterazione» caricate nel contesto a ogni uso della skill.
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    tabella = dict(re.findall(r"\| `(it-[\w-]+)` \| ✅ v([\d.]+)", readme))
+    changelog = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read()
+    for skill in sorted(os.listdir(SKILLS)):
+        fm, corpo = _frontmatter(os.path.join(SKILLS, skill, "SKILL.md"))
+        d = _yaml_stretto(fm, skill)
+        assert set(d) <= {"name", "description", "metadata", "when_to_use", "license"}, f"{skill}: chiavi {sorted(d)}"
+        assert d["name"] == skill, f"{skill}: name {d['name']!r}"
+        assert 200 <= len(d["description"]) <= 1024, f"{skill}: description di {len(d['description'])} caratteri"
+        assert re.search(r"\bNON\b", d["description"]), f"{skill}: la description dichiara cosa non copre"
+        ver = d["metadata"].get("version", "")
+        assert re.fullmatch(r"\d+\.\d+", ver), f"{skill}: metadata.version {ver!r} (stringa «0.x»)"
+        assert tabella.get(skill) == ver, f"{skill}: README dice v{tabella.get(skill)}, il frontmatter {ver}"
+        sezione = changelog.split(f"\n### {skill}\n")[1]
+        assert re.match(r"\s*#### v" + re.escape(ver) + r"\b", sezione), f"{skill}: CHANGELOG senza la voce v{ver} in testa"
+        assert not re.search(r"^## Note per|^In quest'iterazione", corpo, re.M), f"{skill}: note d'iterazione nel SKILL.md"
+    # riscatto, ricongiunzione e totalizzazione non sono gestiti: fuori dai trigger, dichiarati esclusi
+    d = _yaml_stretto(_frontmatter(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"))[0], "it-pianificazione")
+    trigger, esclusioni = d["description"].split("NON copre")
+    assert not re.search(r"riscatto|ricongiunzione|totalizzazione", trigger), "it-pianificazione: trigger non gestiti"
+    assert all(x in esclusioni for x in ("riscatto", "ricongiunzione", "totalizzazione")), esclusioni
+
+
+@test("T14 comandi: alias sottili delle skill, uno per skill e come nel README")
+def t_comandi_alias():
+    # F057: i 6 comandi duplicavano a mano i workflow delle skill (già divergenti) ed entravano
+    # tra gli strumenti che Claude può invocare da solo.
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    uso = dict(re.findall(r"^/([\w-]+)\s+→ (it-[\w-]+)", readme, re.M))
+    cartella = os.path.join(ROOT, "commands")
+    visti = {}
+    for nome in sorted(os.listdir(cartella)):
+        fm, corpo = _frontmatter(os.path.join(cartella, nome))
+        d = _yaml_stretto(fm, f"commands/{nome}")
+        comando = nome[:-3]
+        assert d.get("disable-model-invocation") is True, \
+            f"/{comando}: disable-model-invocation: true (Claude carica la skill, non il comando)"
+        assert d.get("argument-hint", "").startswith("["), f"/{comando}: argument-hint"
+        assert len(d.get("description", "")) <= 250, f"/{comando}: description lunga"
+        skill = re.findall(r"`(it-[\w-]+)`", corpo)
+        assert skill and len(set(skill)) == 1, f"/{comando}: deve rimandare a una sola skill, trovate {set(skill)}"
+        assert os.path.isfile(os.path.join(SKILLS, skill[0], "SKILL.md")), f"/{comando}: skill {skill[0]} inesistente"
+        assert "$ARGUMENTS" in corpo, f"/{comando}: senza $ARGUMENTS"
+        assert len([r for r in corpo.splitlines() if r.strip()]) <= 4, f"/{comando}: non è un alias sottile"
+        assert uso.get(comando) == skill[0], f"README: /{comando} → {uso.get(comando)}, il comando → {skill[0]}"
+        visti[skill[0]] = comando
+    assert set(visti) == set(os.listdir(SKILLS)), f"skill senza comando: {set(os.listdir(SKILLS)) - set(visti)}"
+
+
+@test("T14 manifest: nessun campo sconosciuto in plugin.json, upstream in metadata, validate --strict in CI")
+def t_manifest_strict():
+    # F061: «upstream» al top level è un campo sconosciuto (warning, e rc 1 con --strict).
+    # Campi della documentazione ufficiale, plugins-reference, tabella «Fields» (letta il 24/10/2026).
+    noti = {"$schema", "name", "displayName", "version", "description", "author", "homepage", "repository",
+            "license", "keywords", "metadata", "icon", "documentationUrl", "supportUrl", "privacyPolicyUrl",
+            "termsOfServiceUrl", "defaultEnabled", "dependencies", "settings", "userConfig", "types", "channels",
+            "skills", "commands", "agents", "hooks", "mcpServers", "lspServers", "outputStyles", "workflows",
+            "experimental"}
+    pl = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
+    assert set(pl) <= noti, f"campi sconosciuti in plugin.json: {set(pl) - noti}"
+    assert pl["metadata"]["upstream"]["repo"] == "anthropics/financial-services", pl.get("metadata")
+    ci = open(os.path.join(ROOT, ".github", "workflows", "tests.yml"), encoding="utf-8").read()
+    assert re.search(r"run: claude plugin validate \. --strict\b", ci), "job validate senza --strict"
+    assert "CHANGELOG.md" in open(os.path.join(ROOT, "scripts", "pacchetto.py"), encoding="utf-8").read()
+
+
+@test("T14 README e CHANGELOG: aggiornamenti spiegati, voce del changelog per la versione del manifest")
+def t_changelog_aggiornamenti():
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    for atteso in ("claude plugin update wealth-management-it@wm-it", "--scope project", "Enable auto-update",
+                   "/reload-plugins", "[CHANGELOG.md](CHANGELOG.md)"):
+        assert atteso in readme, f"README: manca «{atteso}»"
+    assert "aggiornamenti con un comando" not in readme, "README: l'auto-update è spento di default per questo marketplace"
+    assert not re.search(r"^\*\*v0\.\d", readme, re.M), "README: lo storico delle versioni sta in CHANGELOG.md"
+    ver = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
+    changelog = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read()
+    versioni = re.findall(r"^## (v[\d.]+|Non rilasciato)", changelog, re.M)
+    assert f"v{ver}" in versioni, f"CHANGELOG.md senza la voce v{ver} del manifest"
+    assert versioni.index(f"v{ver}") <= 1 and versioni[0] in ("Non rilasciato", f"v{ver}"), \
+        f"CHANGELOG.md: la voce più recente deve essere «Non rilasciato» o v{ver}, trovate {versioni[:3]}"
+    assert "## Storia delle skill" in changelog
+
+
+@test("T14 reference: indice delle sezioni nelle reference di almeno 100 righe")
+def t_indici_reference():
+    # F066: 21 reference da 100 righe in su senza indice; Claude ne legge l'inizio per decidere dove andare.
+    for f in sorted(glob.glob(os.path.join(SKILLS, "*", "references", "*.md"))):
+        testo = open(f, encoding="utf-8").read()
+        if testo.count("\n") < 100:
+            continue
+        rel = os.path.relpath(f, SKILLS)
+        assert "\n## Indice\n" in testo, f"{rel}: manca «## Indice»"
+        h2, in_codice = [], False
+        for r in testo.split("\n"):
+            if r.startswith("```"):
+                in_codice = not in_codice
+            elif not in_codice and r.startswith("## ") and r != "## Indice":
+                h2.append(r[3:].strip())
+        voci = re.findall(r"^- (.+)$", testo.split("\n## Indice\n")[1].split("\n## ")[0], re.M)
+        assert voci == h2, f"{rel}: l'indice non corrisponde alle sezioni ({len(voci)} voci, {len(h2)} sezioni)"
+        assert testo.index("\n## Indice\n") < testo.index("\n## " + h2[0] + "\n"), f"{rel}: l'indice va prima delle sezioni"
+
+
 @test("pacchetto: lo zip per Cowork contiene solo il plugin, nome = versione del manifest")
 def t_pacchetto():
     import zipfile
@@ -4836,7 +4992,7 @@ def t_pacchetto():
         nomi = zipfile.ZipFile(zpath).namelist()
         radice = "wealth-management-it/"
         assert all(n.startswith(radice) for n in nomi), "tutto deve stare sotto wealth-management-it/"
-        for atteso in (radice + ".claude-plugin/plugin.json", radice + "README.md",
+        for atteso in (radice + ".claude-plugin/plugin.json", radice + "README.md", radice + "CHANGELOG.md",
                        radice + "LICENSE", radice + "NOTICE",  # Apache-2.0 §4: licenza e attribuzione
                        radice + "commands/pensione.md",
                        radice + "skills/it-tax-optimization/SKILL.md",

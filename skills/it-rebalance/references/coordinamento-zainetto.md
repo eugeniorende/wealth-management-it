@@ -2,6 +2,15 @@
 
 Questa reference definisce il **protocollo operativo** per usare insieme `it-rebalance` e `it-tax-optimization`, in particolare per il ribilanciamento di fine anno, dove le due skill si rinforzano a vicenda.
 
+## Indice
+
+- Perché coordinarle
+- Il problema dello zainetto in scadenza
+- Protocollo operativo (sequenza)
+- Esempio numerico coordinato
+- Caveat e regole
+- Quando NON coordinare
+
 ## Perché coordinarle
 
 Le due skill ottimizzano cose diverse ma sullo **stesso atto** (la vendita):
