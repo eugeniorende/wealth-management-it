@@ -533,6 +533,7 @@ def main(argv=None):
         except (AttributeError, ValueError):
             pass
     ap = argparse.ArgumentParser(
+        allow_abbrev=False,
         description="Genera l'Investment Policy Statement come documento Word dal blocco DATI in testa allo script. "
                     "Codici d'uscita: 0 riuscito, 1 errore nei dati o nella scrittura, 2 riga di comando errata.")
     ap.add_argument("output", nargs="?", default="IPS.docx",

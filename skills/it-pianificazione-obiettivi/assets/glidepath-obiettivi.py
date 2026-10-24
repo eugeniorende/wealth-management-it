@@ -37,7 +37,7 @@ modella la volatilità). Vedi glide-path.md per i limiti e l'interpretazione.
 import sys
 import os
 
-from motore_bootstrap import (cli, euro, frazioni_glide, leggi_pianificatore, numero, pmt_glide, quota_glide,
+from motore_bootstrap import (cli, errore, euro, frazioni_glide, leggi_pianificatore, numero, pmt_glide, quota_glide,
                               scarti_dal_foglio, scrivi_json)
 
 # ---- Parametri del glide path (editabili) ----
@@ -86,8 +86,7 @@ def main():
     path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
     inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     if not obiettivi:
-        print("Nessun obiettivo trovato nel foglio.")
-        sys.exit(0)
+        errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     rend_atterraggio = rendimento_a_quota(ATTERRAGGIO_AZ, profili)
     # i versamenti coincidono con la colonna I solo coi parametri del glide path del foglio

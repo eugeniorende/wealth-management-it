@@ -167,7 +167,7 @@ Prese il 20/10/2026.
   - [x] inventario dei campi che ogni script stampa: nessuna chiamata di rete; solo importa-previdenza stampa dati identificativi (intestatario e data di nascita);
   - [x] flag `--anonimo` in importa-previdenza (PR #27): omette intestatario e data di nascita, stampa solo l'età;
   - [x] sezione «Dove vanno i tuoi dati» nel README.
-- [x] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: prima 12 script su 14 andavano in crash con cp1252 (T9a).
+- [x] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: prima 11 script su 13 andavano in crash con cp1252 su qualsiasi output e gli altri 2 su percorsi specifici (T9a).
 - [x] **Formati italiani** (T9a):
   - [x] punto per le migliaia e virgola per i decimali in tutti gli script, via `numero()`, `euro()` e `pct()`;
   - [x] CSV degli ordini apribile in Excel italiano, con `;` come separatore, la virgola decimale e il BOM.
