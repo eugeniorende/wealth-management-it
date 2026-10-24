@@ -45,7 +45,7 @@ import os
 import numpy as np
 from openpyxl import load_workbook
 
-from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_storico, finestra_nel_foglio,
+from motore_bootstrap import (blocchi_bootstrap, carica_storico, cli, errore, euro, finestra_nel_foglio, numero,
                               frazioni_glide, indici_bootstrap, leggi_finestra_derisk, pmt_glide,
                               scarti_dal_foglio, verifica_intestazioni_obiettivi)
 
@@ -299,25 +299,15 @@ def simula_congiunta(obiettivi_def, n_sim=N_SIM):
     return maschere
 
 
-def euro(x):
-    return f"€{x:,.0f}".replace(",", ".")
-
-
 def main():
-    applica_override(globals())
+    args = cli("Monte Carlo degli obiettivi: probabilità di successo, percentili del capitale finale e versamento "
+               "per la confidenza-obiettivo, dal pianificatore compilato.", globals(), argomenti=(
+                   (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
     if SEED is not None:
         np.random.seed(SEED)
-
-    # percorso xlsx
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-    else:
-        here = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.join(here, "pianificatore-obiettivi.xlsx")
+    path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
     if not os.path.exists(path):
-        print(f"File non trovato: {path}")
-        print("Uso: python montecarlo-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]")
-        sys.exit(1)
+        errore(f"file non trovato: {path}")
 
     capacita, inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
@@ -340,9 +330,9 @@ def main():
     print("=" * 78)
     print("MONTE CARLO — PIANIFICATORE OBIETTIVI")
     print("=" * 78)
-    print(f"Simulazioni per obiettivo: {N_SIM:,}".replace(",", "."))
-    print(f"Capacità di risparmio: {euro(capacita)}/mese  |  Inflazione: {inflazione*100:.1f}%")
-    print(f"Confidenza-obiettivo per il versamento robusto: {CONFIDENZA_TARGET*100:.0f}%")
+    print(f"Simulazioni per obiettivo: {numero(N_SIM)}")
+    print(f"Capacità di risparmio: {euro(capacita)}/mese  |  Inflazione: {numero(inflazione*100, 1)}%")
+    print(f"Confidenza-obiettivo per il versamento robusto: {numero(CONFIDENZA_TARGET*100)}%")
     if MODELLO == "bootstrap":
         ric = "media ricentrata sul profilo" if RICENTRA_MEDIA else "media storica grezza"
         print(f"Modello rendimenti: BOOTSTRAP storico ({len(_AZ_HIST)} anni, blocchi da {BLOCCO_BOOTSTRAP}, {ric})")
@@ -350,7 +340,7 @@ def main():
         print(f"Modello rendimenti: Normale i.i.d.")
     if GLIDE:
         print(f"Glide path: i terminanti de-riskano da {finestra} anni prima della scadenza fino a "
-              f"{ATTERRAGGIO_AZ*100:.0f}% azionario (versamento e simulazione)")
+              f"{numero(ATTERRAGGIO_AZ*100)}% azionario (versamento e simulazione)")
         if scarti:
             print(f"⚠️  Glide path diverso da quello del foglio ({'; '.join(scarti)}): il versamento "
                   f"deterministico dei terminanti non è quello della colonna I.")
@@ -396,21 +386,21 @@ def main():
 
         print(f"\n▸ {g['nome']}  [{g['profilo']}, {anni} anni, priorità: {g['priorita']}]")
         print(f"    Target nominale (con inflazione):   {euro(target_nom)}")
-        print(f"    Rendimento {rend*100:.1f}% · volatilità {vol*100:.1f}%")
+        print(f"    Rendimento {numero(rend*100, 1)}% · volatilità {numero(vol*100, 1)}%")
         if glide is not None:
             rampa = int(np.sum(glide[0] < 1.0))
-            print(f"    Glide path: {peso_az*100:.0f}% azionario, ridotto ogni anno negli ultimi {rampa} anni "
-                  f"fino a {ATTERRAGGIO_AZ*100:.0f}% alla scadenza")
+            print(f"    Glide path: {numero(peso_az*100)}% azionario, ridotto ogni anno negli ultimi {rampa} anni "
+                  f"fino a {numero(ATTERRAGGIO_AZ*100)}% alla scadenza")
         if sovra_finanziato:
             print(f"    Versamento necessario:              €0/mese  (capitale esistente già sufficiente ALLA MEDIA)")
         else:
             print(f"    Versamento deterministico:          {euro(pmt_det)}/mese")
-        print(f"    → Probabilità di successo con questo versamento: {p_succ*100:.0f}%")
+        print(f"    → Probabilità di successo con questo versamento: {numero(p_succ*100)}%")
         print(f"    Capitale finale simulato:")
         print(f"        pessimistico (10°pct):          {euro(p10)}")
         print(f"        mediano      (50°pct):          {euro(p50)}")
         print(f"        ottimistico  (90°pct):          {euro(p90)}")
-        print(f"    Versamento per {CONFIDENZA_TARGET*100:.0f}% di confidenza:    {euro(pmt_conf)}/mese"
+        print(f"    Versamento per {numero(CONFIDENZA_TARGET*100)}% di confidenza:    {euro(pmt_conf)}/mese"
               f"  ({'+' if pmt_conf>=pmt_det else ''}{euro(pmt_conf - pmt_det)} vs sopra)")
 
         # ── Seconda strada: alzare il rischio invece del versamento (a versamento bloccato) ──
@@ -430,7 +420,7 @@ def main():
                 print(f"        INADATTA su orizzonte di {anni} anni: entro la finestra di de-risking")
                 print(f"        ({finestra} anni) la quota azionaria deve scendere verso la scadenza, non salire.")
             elif ontrack:
-                print(f"        CONTROPRODUCENTE: sei già in linea (prob {p_succ*100:.0f}%). Alzare il rischio")
+                print(f"        CONTROPRODUCENTE: sei già in linea (prob {numero(p_succ*100)}%). Alzare il rischio")
                 print(f"        aggiunge un downside che non ti serve — quando hai (quasi) vinto, non rilanci.")
             else:
                 ris, ib = leva_di_rischio(target_nom, g["gia"], pmt_det, anni, peso_az, profili, glide=glide)
@@ -438,7 +428,7 @@ def main():
                 if wb > peso_az + 1e-6 and pb > p_succ + 0.03:
                     peggiora = p10b < p10 - 1
                     partenza = " di partenza" if de_risk else ""
-                    print(f"        OPZIONE: portando la quota azionaria{partenza} a ~{wb*100:.0f}% "
+                    print(f"        OPZIONE: portando la quota azionaria{partenza} a ~{numero(wb*100)}% "
                           f"(≈ {nome_profilo_vicino(wb, profili)}),")
                     if de_risk:
                         # F017: accanto all'OPZIONE i due percorsi, a parità di versamento. Conta il
@@ -452,12 +442,12 @@ def main():
                                                   else ((p_alt0, p_altb), (p_succ, pb)))
                         print(f"        la probabilità sale SENZA versare di più:")
                         print(f"          sul percorso glide (de-risking da {finestra} anni dalla scadenza): "
-                              f"dal {pg0*100:.0f}% al {pgb*100:.0f}%")
+                              f"dal {numero(pg0*100)}% al {numero(pgb*100)}%")
                         print(f"          a quota fissa fino alla scadenza (senza de-risking):       "
-                              f"dal {pf0*100:.0f}% al {pfb*100:.0f}%")
+                              f"dal {numero(pf0*100)}% al {numero(pfb*100)}%")
                         print(f"        Conta la prima riga: il glide path è il piano che it-rebalance esegue.")
                     else:
-                        print(f"        la probabilità sale dal {p_succ*100:.0f}% al {pb*100:.0f}% SENZA versare di più.")
+                        print(f"        la probabilità sale dal {numero(p_succ*100)}% al {numero(pb*100)}% SENZA versare di più.")
                     print(f"        Ma il prezzo è sul caso brutto: il 10°pct va da {euro(p10)} a {euro(p10b)} "
                           f"({'PEGGIORA' if peggiora else 'tiene'}).")
                     print(f"        È un rilancio: più probabilità di centrare il target, worst case "
@@ -470,15 +460,15 @@ def main():
     print("RIEPILOGO")
     print("-" * 78)
     print(f"Totale versamenti deterministici (~50% confidenza ciascuno): {euro(totale_pmt_det)}/mese")
-    print(f"Totale versamenti per {CONFIDENZA_TARGET*100:.0f}% di confidenza ciascuno:        {euro(totale_pmt_conf)}/mese")
+    print(f"Totale versamenti per {numero(CONFIDENZA_TARGET*100)}% di confidenza ciascuno:        {euro(totale_pmt_conf)}/mese")
     print(f"Capacità di risparmio disponibile:                          {euro(capacita)}/mese")
     if totale_pmt_conf > capacita:
-        print(f"\n⚠️  Per avere {CONFIDENZA_TARGET*100:.0f}% di confidenza su TUTTI gli obiettivi servirebbero "
+        print(f"\n⚠️  Per avere {numero(CONFIDENZA_TARGET*100)}% di confidenza su TUTTI gli obiettivi servirebbero "
               f"{euro(totale_pmt_conf - capacita)}/mese in più della capacità.")
         print("    Leve: dare priorità (alta confidenza solo sugli essenziali), allungare gli orizzonti,")
         print("    ridurre i target discrezionali, o accettare confidenza più bassa sugli obiettivi non critici.")
     else:
-        print(f"\n✓  La capacità copre anche i versamenti per {CONFIDENZA_TARGET*100:.0f}% di confidenza su tutti.")
+        print(f"\n✓  La capacità copre anche i versamenti per {numero(CONFIDENZA_TARGET*100)}% di confidenza su tutti.")
 
     print("\n" + "-" * 78)
     print("Nota: il versamento deterministico centra la MEDIA del capitale finale → ~50% di probabilità.")
@@ -522,13 +512,13 @@ def main():
             print(f"Obiettivi considerati ({etichetta}): {', '.join(o['nome'] for o in usati)}")
             print("Un crollo li colpisce INSIEME: trattarli come indipendenti falsa le code congiunte.")
             print(f"\n  P(TUTTI falliscono nello STESSO scenario) — la coda che conta per la resilienza:")
-            print(f"      indipendenti (prodotto):           {all_fail_ind*100:5.1f}%   ← ipotesi ingenua")
-            print(f"      mercato condiviso (congiunta):     {all_fail_cor*100:5.1f}%   ← realistico")
+            print(f"      indipendenti (prodotto):           {numero(all_fail_ind*100, 1):>5}%   ← ipotesi ingenua")
+            print(f"      mercato condiviso (congiunta):     {numero(all_fail_cor*100, 1):>5}%   ← realistico")
             direzione = "SOTTOSTIMA" if all_fail_cor > all_fail_ind else "sovrastima"
             print(f"      → l'indipendenza {direzione} di {abs(all_fail_cor-all_fail_ind)*100:.1f} punti il rischio che salti tutto insieme.")
             print(f"\n  P(TUTTI riescono insieme):")
-            print(f"      indipendenti (prodotto):           {all_succ_ind*100:5.1f}%")
-            print(f"      mercato condiviso (congiunta):     {all_succ_cor*100:5.1f}%")
+            print(f"      indipendenti (prodotto):           {numero(all_succ_ind*100, 1):>5}%")
+            print(f"      mercato condiviso (congiunta):     {numero(all_succ_cor*100, 1):>5}%")
             print("\n  Le probabilità SINGOLE non cambiano; ma non ci si diversifica TRA obiettivi che")
             print("  condividono il mercato (l'effetto cresce se condividono esposizione azionaria).")
             print("  Per questo il fondo emergenza e gli essenziali vanno coperti per primi.")

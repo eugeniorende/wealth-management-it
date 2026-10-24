@@ -32,8 +32,8 @@ Dipendenze: numpy. Uso: python montecarlo-pensione.py
 
 import numpy as np
 
-from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_inflazione, carica_storico, deflaziona,
-                              pctl, percorso_json, scrivi_json)
+from motore_bootstrap import (blocchi_bootstrap, carica_inflazione, carica_storico, cli, deflaziona, numero, pct,
+                              pctl, scrivi_json)
 
 # ─────────────── INPS — pilastro pubblico (ÀNCORA deterministica) ───────────────
 PENSIONE_INPS_ANNUA = 21000.0      # pensione pubblica annua LORDA al pensionamento, dal foglio Excel
@@ -91,8 +91,9 @@ def simula_fp(az_hist, ob_hist):
 
 
 def main():
-    applica_override(globals())
-    json_out = percorso_json()
+    args = cli("Monte Carlo del tasso di sostituzione: pensione INPS come àncora deterministica, fondo pensione "
+               "simulato per block bootstrap sulla serie storica.", globals(), json=True)
+    json_out = args.json
     if SEED is not None:
         np.random.seed(SEED)
     az, ob = carica_storico(FILE_STORICO)
@@ -107,32 +108,32 @@ def main():
     ts_fp_med = pctl(fp_rendita, 50) / RAL_FINALE
 
     print(f"\n{'='*70}")
-    print(f"MONTE CARLO PENSIONE — {N_SIM:,} percorsi, {ANNI} anni, bootstrap a blocchi di {BLOCCO}")
+    print(f"MONTE CARLO PENSIONE — {numero(N_SIM)} percorsi, {ANNI} anni, bootstrap a blocchi di {BLOCCO}")
     print(f"{'='*70}")
-    print(f"Comparto fondo pensione: {FP_PESO_AZIONARIO*100:.0f}% azionario, "
-          + (f"rendimento reale atteso {FP_RENDIMENTO_ATTESO_REALE*100:.1f}% (media storica ricentrata)"
+    print(f"Comparto fondo pensione: {numero(FP_PESO_AZIONARIO*100)}% azionario, "
+          + (f"rendimento reale atteso {numero(FP_RENDIMENTO_ATTESO_REALE*100, 1)}% (media storica ricentrata)"
              if RICENTRA_MEDIA else "rendimenti reali storici USA (serie deflazionata, media non ricentrata)"))
 
     print(f"\n— PILASTRO COMPLEMENTARE (fondo pensione) — la parte a rischio di mercato —")
-    print(f"   Montante al pensionamento:   P10 € {pctl(pot,10):>10,.0f}   "
-          f"mediana € {pctl(pot,50):>10,.0f}   P90 € {pctl(pot,90):>10,.0f}")
-    print(f"   Rendita annua (coeff {COEFF_RENDITA_FP*100:.1f}%): P10 € {pctl(fp_rendita,10):>10,.0f}   "
-          f"mediana € {pctl(fp_rendita,50):>10,.0f}   P90 € {pctl(fp_rendita,90):>10,.0f}")
+    print(f"   Montante al pensionamento:   P10 € {numero(pctl(pot,10)):>10}   "
+          f"mediana € {numero(pctl(pot,50)):>10}   P90 € {numero(pctl(pot,90)):>10}")
+    print(f"   Rendita annua (coeff {numero(COEFF_RENDITA_FP*100, 1)}%): P10 € {numero(pctl(fp_rendita,10)):>10}   "
+          f"mediana € {numero(pctl(fp_rendita,50)):>10}   P90 € {numero(pctl(fp_rendita,90)):>10}")
 
     print(f"\n— PILASTRO PUBBLICO (INPS) — l'àncora, non simulata —")
-    print(f"   Pensione annua lorda:        € {PENSIONE_INPS_ANNUA:>10,.0f}   (fissa: rivalutata al PIL, non ai mercati)")
+    print(f"   Pensione annua lorda:        € {numero(PENSIONE_INPS_ANNUA):>10}   (fissa: rivalutata al PIL, non ai mercati)")
 
-    print(f"\n— TOTALE: tasso di sostituzione lordo (pensione / RAL {RAL_FINALE:,.0f}) —")
-    print(f"   P10  {pctl(tasso,10)*100:>5.1f}%      mediana  {pctl(tasso,50)*100:>5.1f}%      "
-          f"P90  {pctl(tasso,90)*100:>5.1f}%")
+    print(f"\n— TOTALE: tasso di sostituzione lordo (pensione / RAL {numero(RAL_FINALE)}) —")
+    print(f"   P10  {numero(pctl(tasso,10)*100, 1):>5}%      mediana  {numero(pctl(tasso,50)*100, 1):>5}%      "
+          f"P90  {numero(pctl(tasso,90)*100, 1):>5}%")
     p_target = float(np.mean(tasso >= TASSO_SOSTITUZIONE_TARGET))
-    print(f"   Probabilità di raggiungere il {TASSO_SOSTITUZIONE_TARGET*100:.0f}%: {p_target*100:.1f}%")
+    print(f"   Probabilità di raggiungere il {numero(TASSO_SOSTITUZIONE_TARGET*100)}%: {numero(p_target*100, 1)}%")
 
     print(f"\n— LA LETTURA ONESTA —")
-    print(f"   Il pubblico àncora il tasso di sostituzione a {ts_inps*100:.1f}% (fisso).")
-    print(f"   Il fondo pensione ci aggiunge una banda di mercato: dal +{pctl(fp_rendita,10)/RAL_FINALE*100:.1f}% (P10) "
-          f"al +{pctl(fp_rendita,90)/RAL_FINALE*100:.1f}% (P90).")
-    print(f"   Quindi il totale oscilla tra {pctl(tasso,10)*100:.1f}% e {pctl(tasso,90)*100:.1f}%, e tutta")
+    print(f"   Il pubblico àncora il tasso di sostituzione a {numero(ts_inps*100, 1)}% (fisso).")
+    print(f"   Il fondo pensione ci aggiunge una banda di mercato: dal +{numero(pctl(fp_rendita,10)/RAL_FINALE*100, 1)}% (P10) "
+          f"al +{numero(pctl(fp_rendita,90)/RAL_FINALE*100, 1)}% (P90).")
+    print(f"   Quindi il totale oscilla tra {numero(pctl(tasso,10)*100, 1)}% e {numero(pctl(tasso,90)*100, 1)}%, e tutta")
     print(f"   l'incertezza viene dal complementare: è lì che la scelta del comparto conta.")
     print(f"\n   Caveat: restano fuori dal Monte Carlo (perché non sono rischio di mercato) la discesa")
     print(f"   del coefficiente di trasformazione e la rivalutazione PIL dell'INPS — vanno trattate")
@@ -145,7 +146,7 @@ def main():
         det += FP_VERSAMENTO_ANNUO * ANNI * (1 + r) ** (ANNI - 1)
     else:
         det += FP_VERSAMENTO_ANNUO * (((1+r)**ANNI - (1+g)**ANNI) / (r - g))
-    print(f"[check] montante FP deterministico ≈ € {det:,.0f}; mediana simulata € {pctl(pot,50):,.0f} "
+    print(f"[check] montante FP deterministico ≈ € {numero(det)}; mediana simulata € {numero(pctl(pot,50))} "
           f"(la mediana sta sotto per il volatility drag, atteso)")
 
     if json_out:

@@ -38,7 +38,7 @@ import sys
 import os
 from openpyxl import load_workbook
 
-from motore_bootstrap import (applica_override, finestra_nel_foglio, frazioni_glide, leggi_finestra_derisk,
+from motore_bootstrap import (cli, errore, euro, finestra_nel_foglio, frazioni_glide, leggi_finestra_derisk, numero,
                               pmt_glide, quota_glide, scarti_dal_foglio, verifica_intestazioni_obiettivi)
 
 # ---- Parametri del glide path (editabili) ----
@@ -113,19 +113,16 @@ def equity_glide(anni_residui, eq_start, finestra, atterraggio):
 
 
 def pct(x):
-    return f"{x*100:.0f}%"
+    return f"{numero(x*100)}%"
 
 
 def main():
-    applica_override(globals())
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-    else:
-        here = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.join(here, "pianificatore-obiettivi.xlsx")
+    args = cli("Calendario di de-risking anno per anno (glide path) per ogni obiettivo del pianificatore e per "
+               "l'aggregato di portafoglio.", globals(), argomenti=(
+                   (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
+    path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
     if not os.path.exists(path):
-        print(f"File non trovato: {path}")
-        sys.exit(1)
+        errore(f"file non trovato: {path}")
 
     inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     if not obiettivi:
@@ -175,7 +172,7 @@ def main():
     print("GLIDE PATH — CALENDARIO DI DE-RISKING")
     print("=" * 78)
     print(f"Finestra de-risking: {finestra} anni  |  Atterraggio: {pct(ATTERRAGGIO_AZ)} azionario alla scadenza")
-    print(f"Inflazione: {inflazione*100:.1f}%")
+    print(f"Inflazione: {numero(inflazione*100, 1)}%")
     print("-" * 78)
 
     # intestazione tabella per-obiettivo
@@ -218,7 +215,7 @@ def main():
     else:
         print("VERSAMENTI usati nella proiezione (come la colonna I del foglio, de-risking compreso):")
     for g in obiettivi:
-        quanto = "— (nessun target)" if g["target_oggi"] is None else f"€{g['pmt']:,.0f}/mese".replace(",", ".")
+        quanto = "— (nessun target)" if g["target_oggi"] is None else f"{euro(g['pmt'])}/mese"
         print(f"  {g['nome']}: {quanto}")
 
     # transizioni chiave dell'aggregato

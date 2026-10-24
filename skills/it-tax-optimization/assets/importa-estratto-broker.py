@@ -681,9 +681,15 @@ def stampa(posizioni, zainetto, a, anno_rif, avvisi):
 
 
 def main(argv=None):
+    for flusso in (sys.stdout, sys.stderr):   # UTF-8 anche su Windows (cp1252)
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(
         description="Plus/minus latenti da un estratto CSV del broker, incrociate con lo zainetto "
-                    "(regime amministrato). Strumento educativo, non è consulenza fiscale.")
+                    "(regime amministrato). Strumento educativo, non è consulenza fiscale. Codici d'uscita: 0 riuscito, "
+                    "1 file o dati non leggibili, 2 riga di comando errata.")
     ap.add_argument("estratto", help="CSV delle posizioni esportato dal broker")
     ap.add_argument("zainetto", nargs="?", help="CSV dello zainetto (anno, importo, aliquota[, broker])")
     ap.add_argument("--anno", type=int, default=datetime.date.today().year,
@@ -701,8 +707,8 @@ def main(argv=None):
         if not posizioni:
             raise ErroreInput(f"{args.estratto}: nessuna posizione valutabile (vedi gli avvisi: {avvisi[:2]})")
     except ErroreInput as e:
-        print(f"errore: {e}", file=sys.stderr)
-        sys.exit(2)
+        print(f"ERRORE: {e}", file=sys.stderr)
+        sys.exit(1)
     a = analizza(posizioni, zainetto)
     out = {"anno_riferimento": args.anno, "broker": args.broker, "posizioni": posizioni,
            "zainetto": zainetto, "analisi": a, "avvisi": avvisi}
@@ -715,8 +721,8 @@ def main(argv=None):
             with open(args.json, "w", encoding="utf-8") as f:
                 json.dump(out, f, ensure_ascii=False, indent=2)
         except OSError as e:
-            print(f"errore: impossibile scrivere {args.json}: {e}", file=sys.stderr)
-            sys.exit(2)
+            print(f"ERRORE: impossibile scrivere {args.json}: {e}", file=sys.stderr)
+            sys.exit(1)
         print(f"JSON completo scritto in {args.json}")
 
 
