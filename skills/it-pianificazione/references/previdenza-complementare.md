@@ -249,17 +249,22 @@ Più opzioni = rendita base più bassa.
 ### Nuove forme di erogazione (dal 1/7 e dal 31/10/2026)
 
 La L. 199/2025 ha aggiunto il comma 3-bis all'art. 11 D.Lgs. 252/2005: la parte che non si prende in capitale, invece della rendita vitalizia, può andare in:
-- **rendita a durata definita** (dal 1/7/2026), con rate calcolate sulla speranza di vita residua;
+- **rendita a durata definita** (dal 1/7/2026), per un numero di anni pari alla vita attesa residua (anni interi della speranza di vita ISTAT all'età dell'opzione, c. 3-ter), con rata annua uguale al montante alla data della rata diviso gli anni residui;
 - **prelievi liberamente determinabili** (dal 1/7/2026), di volta in volta entro la somma delle rate maturate e non ancora riscosse di una rendita teorica a durata definita (c. 3-quater): non un accesso libero al montante;
 - **erogazione frazionata** in almeno 5 anni (dal 31/10/2026).
 
 Fiscalità: rendita a durata definita e prelievi come il capitale (15% ridotto di 0,30 punti per anno oltre il 15° di partecipazione, fino al 9%); erogazione frazionata al 20%, ridotto di 0,25 punti per anno oltre il 15°, fino al 15% (art. 11 c. 6-ter; dal 2027 art. 258 c. 6). Dal 1/1/2027 le stesse regole sono nell'art. 258 del nuovo testo unico (D.Lgs. 117/2026). La COVIP ha adeguato le istruzioni con la delibera del 25/6/2026: condizioni e tempi di avvio vanno letti nel regolamento del proprio fondo.
 
-Vincoli (art. 11 c. 3-quater e 3-quinquies; delibera COVIP 25/6/2026):
-- le tre forme sono alternative alla vitalizia e non si combinano tra loro né con la vitalizia; a ciascuna si può affiancare il capitale fino al 50%;
+Vincoli di legge (art. 11 c. 3, 3-bis, 3-quater e 3-quinquies D.Lgs. 252/2005):
+- le tre forme valgono solo nei fondi a contribuzione definita e si prendono «in luogo della rendita vitalizia»; resta il limite del 50% per la parte in capitale (c. 3);
+- i prelievi stanno entro la somma delle rate maturate e non riscosse della rendita a durata definita (c. 3-quater);
+- le prestazioni le eroga direttamente il fondo, che tiene in gestione il montante residuo (c. 3-quinquies);
+- in caso di decesso il montante residuo è riscattato dai beneficiari indicati al momento dell'opzione (c. 3-quinquies), con la tassazione del capitale (c. 6-bis).
+
+Vincoli delle istruzioni COVIP (delibera del 25/6/2026), come li riportano fondi e sindacati: **non riletti sul testo della delibera**, perché il sito della COVIP non era raggiungibile il 24/10/2026. Prima di decidere vanno controllati nel regolamento e nel documento sulle prestazioni del proprio fondo:
+- le tre forme non si combinano tra loro né con la vitalizia;
 - una volta avviata l'erogazione la scelta è irrevocabile: resta solo la conversione del residuo in rendita vitalizia, anche presso un altro fondo; prima del primo pagamento la richiesta si può revocare;
-- il montante resta investito nel fondo (si può solo cambiare comparto), non si versa più e le nuove forme non sono cumulabili con una RITA in corso;
-- in caso di decesso il montante residuo va ai beneficiari indicati (c. 3-quinquies);
+- durante l'erogazione non si versa più (si può cambiare comparto) e le nuove forme non sono cumulabili con una RITA in corso;
 - periodo transitorio fino al 31/12/2026: i fondi raccolgono le richieste ma possono liquidarle dopo l'adeguamento.
 
 **Come confrontare le scelte** (scenari, non una raccomandazione):
@@ -288,5 +293,5 @@ Pesano il patrimonio fuori dal fondo, il timore di vivere più a lungo dell'atte
 7. **Mai consigliare il fondo come "investimento" alternativo a un PAC**: il fondo è specificamente uno strumento previdenziale con vincoli di accesso (no liquidità ordinaria fino al pensionamento). Va integrato con risparmio non vincolato per esigenze di liquidità di medio termine.
 
 ---
-*Tetto di deducibilità €5.300 (L. 199/2025 c. 201), capitale al 50% e caso del 100% (art. 11 c. 3, DL 62/2026 art. 16-ter), base imponibile e aliquote in uscita (art. 11 c. 6 e 6-ter; dal 2027 art. 258 c. 4 e 6 D.Lgs. 117/2026), nuove forme di erogazione e loro vincoli (c. 3-bis, 3-quater e 3-quinquies), tassazione dei rendimenti (art. 17, L. 190/2014 c. 622; dal 2027 art. 257 c. 1 e 10 D.Lgs. 117/2026), TFR in azienda (art. 2120 c.c., D.Lgs. 47/2000 art. 11 c. 3, dal 2027 art. 36 c. 1 D.Lgs. 33/2025; art. 19 TUIR; dal 2027 art. 21 D.Lgs. 117/2026); commi 201-204 L. 199/2025 e delibera COVIP 25/6/2026 — Verificato: 2026-10.*
+*Tetto di deducibilità €5.300 (L. 199/2025 c. 201), capitale al 50% e caso del 100% (art. 11 c. 3, DL 62/2026 art. 16-ter), base imponibile e aliquote in uscita (art. 11 c. 6 e 6-ter; dal 2027 art. 258 c. 4 e 6 D.Lgs. 117/2026), nuove forme di erogazione e loro vincoli di legge (c. 3-bis, 3-ter, 3-quater, 3-quinquies, 6-bis e 6-ter, riletti su Normattiva il 24/10/2026, con le decorrenze del c. 202 L. 199/2025 come modificato dal DL 62/2026), tassazione dei rendimenti (art. 17, L. 190/2014 c. 622; dal 2027 art. 257 c. 1 e 10 D.Lgs. 117/2026), TFR in azienda (art. 2120 c.c., D.Lgs. 47/2000 art. 11 c. 3, dal 2027 art. 36 c. 1 D.Lgs. 33/2025; art. 19 TUIR; dal 2027 art. 21 D.Lgs. 117/2026); commi 201-204 L. 199/2025 — Verificato: 2026-10. I vincoli tratti dalla delibera COVIP del 25/6/2026 restano fuori da questo marcatore: il testo non era raggiungibile il 24/10/2026.*
 *Plafond condiviso con il contributo del datore, comunicazione dei non dedotti (art. 8 c. 4 D.Lgs. 252/2005), trasferimento con il contributo datoriale dal 31/10/2026 e adesione automatica dal 1/7/2026 — Verificato: 2026-10.*

@@ -32,7 +32,7 @@ Questo è il vincolo strutturale del sistema italiano e la fonte degli errori pi
 
 | Categoria fiscale | Tipo provento | Compensabile con minus pregresse? |
 |---|---|---|
-| **Reddito diverso** (art. 67 TUIR, lett. c-bis, c-ter; dal 2027 art. 76 c. 1 lett. e, f) | Plusvalenze da: azioni, certificates, ETC/ETN, obbligazioni (solo la differenza di prezzo, al netto di cedole, ratei e scarto di emissione), warrant, opzioni quotate | **SÌ** (tra redditi diversi "tradizionali") |
+| **Reddito diverso** (art. 67 TUIR, lett. c-bis, c-ter, c-quater, c-quinquies; dal 2027 art. 76 c. 1 lett. e, f, g, h) | Plusvalenze da: azioni, obbligazioni (solo la differenza di prezzo, al netto di cedole, ratei e scarto di emissione), warrant; redditi da certificates, ETC/ETN, opzioni e altri derivati (di norma lett. c-quater, dal 2027 art. 76 c. 1 lett. g) | **SÌ**: le quattro lettere si compensano tra loro (art. 68 c. 5 TUIR; dal 2027 art. 77 c. 6) |
 | **Reddito di capitale** (art. 44 TUIR; dal 2027 art. 46) | Dividendi azionari, cedole obbligazionarie, scarto di emissione (BOT, CTZ, zero coupon), plusvalenze di ETF e fondi (UCITS armonizzati e non armonizzati), proventi distribuiti da fondi, interessi su conti deposito | **NO** |
 | **Reddito diverso "cripto"** (art. 67 TUIR, lett. **c-sexies**; dal 2027 art. 76 c. 1 lett. i) | Plus/minus su cripto-attività (Bitcoin, Ethereum, altcoin, NFT, stablecoin) | **SÌ ma SOLO con altre cripto** (compartimento separato) |
 

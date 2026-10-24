@@ -1104,6 +1104,14 @@ def t_testi_fondo():
     nuove = pc[pc.index("### Nuove forme di erogazione"):pc.index("## Heuristic per la skill")]
     for atteso in ("rate maturate", "irrevocabil", "RITA", "31/12/2026", "3-quinquies"):
         assert atteso in nuove, f"nuove forme di erogazione: manca il vincolo «{atteso}»"
+    # § 2.7: i vincoli di legge riletti su Normattiva (24/10/2026); quelli della delibera COVIP,
+    # non raggiungibile, sono dichiarati tali e restano fuori dal marcatore
+    legge, covip = nuove.split("Vincoli delle istruzioni COVIP")
+    assert "in luogo della rendita vitalizia" in legge and "rate maturate e non riscosse" in legge, "vincoli di legge"
+    assert "irrevocabil" not in legge and "RITA" not in legge, "vincoli COVIP presentati come vincoli di legge"
+    assert "non riletti sul testo della delibera" in covip and "regolamento" in covip, "vincoli COVIP senza la riserva"
+    marcatore = next(r for r in pc.splitlines() if "201-204" in r and "Verificato: 2026-10" in r)
+    assert not re.search(r"delibera COVIP[^.]*— Verificato", marcatore), "la delibera COVIP dentro il marcatore"
     assert "mix 50/50" not in pc, "regola pratica capitale/rendita come default consulenziale"
     # esempio RAL 60k: gli ultimi ~850 € della deduzione cadono nello scaglione al 33%
     netto = _modulo_previdenza("netto-pensione.py")
