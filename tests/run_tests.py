@@ -1641,6 +1641,174 @@ def _cassa_per_broker(m, piano):
     return ordini, entrate
 
 
+@test("T9 input esterno: ribilanciamento con --dati, --zainetto dell'importatore, --out, sinonimi del vocabolario")
+def t_dati_ribilanciamento():
+    # F033: portafoglio, zainetto e target erano cablati; F026: tipo_fiscale/categoria_fiscale e
+    # reddito_diverso/diverso non erano accettati dallo script (tipo fuori vocabolario → piano degradato in silenzio).
+    import csv
+    script = asset("it-rebalance", "ribilanciamento-multibroker.py")
+    m = carica_modulo(script)
+    tmp = tempfile.mkdtemp()
+    try:
+        piano = os.path.join(tmp, "piano.json")
+        # lo stesso caso di default, scritto col vocabolario del plugin (categoria_fiscale, plus_minus, classe)
+        pos = [{"broker": "Fineco", "classe": "azionario", "categoria_fiscale": "reddito_capitale", "controvalore": 40000, "plus_minus": 10000},
+               {"broker": "Fineco", "classe": "azionario", "categoria_fiscale": "reddito_diverso", "controvalore": 10000, "plus_minus": 4000},
+               {"broker": "Fineco", "classe": "obbligazionario", "tipo_fiscale": "capitale", "valore": 15000, "plus": -500},
+               {"broker": "Directa", "classe": "azionario", "tipo": "reddito_capitale", "valore": 18000, "plus": 3000},
+               {"broker": "Directa", "classe": "obbligazionario", "tipo": "diverso", "valore": 9000, "plus": 0},
+               {"broker": "Directa", "classe": "monetario", "tipo": "capitale", "valore": 8000, "plus": 0}]
+        json.dump({"posizioni": pos, "zainetto": {"Fineco": 5000, "Directa": 0},
+                   "target": {"azionario": 0.6, "obbligazionario": 0.3, "monetario": 0.1}}, open(piano, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", piano, "--out", os.path.join(tmp, "csv"), cwd=tmp)
+        assert rc == 0 and "Dati di esempio" not in out, out[-400:]
+        assert "VENDI €8.000 azionario/diverso @ Fineco" in out and "COSTO FISCALE TOTALE: €0" in out, out[-900:]
+        assert os.path.exists(os.path.join(tmp, "csv", "ordini_Fineco.csv")) and not os.path.exists(os.path.join(tmp, "ordini")), os.listdir(tmp)
+        with open(os.path.join(tmp, "csv", "ordini_Fineco.csv"), encoding="utf-8-sig", newline="") as f:
+            righe = list(csv.DictReader(f, delimiter=";"))
+        assert righe[0]["categoria_fiscale"] == "diverso" and "tipo_fiscale" not in righe[0], righe[0]
+        # senza --dati: dati di esempio dichiarati
+        rc, out = run_script(script, cwd=tmp)
+        assert rc == 0 and "Dati di esempio" in out, out[:300]
+        # chiave ignota, posizione fuori perimetro, tipo sconosciuto, target sbagliato → rc 1 con il motivo
+        for dati, atteso in (({"posizioni": pos, "zainetto": {}, "target": {"azionario": 1.0}, "prelievi": 1}, "non riconosciute"),
+                             ({"posizioni": [dict(pos[0], categoria_fiscale="da_classificare")], "zainetto": {}, "target": {"azionario": 1.0}}, "classifica prima"),
+                             ({"posizioni": [dict(pos[0], categoria_fiscale="reddito_capitale_irpef")], "zainetto": {}, "target": {"azionario": 1.0}}, "IRPEF"),
+                             ({"posizioni": [dict(pos[0], categoria_fiscale="boh")], "zainetto": {}, "target": {"azionario": 1.0}}, "reddito_diverso o reddito_capitale"),
+                             ({"posizioni": pos, "zainetto": {}, "target": {"azionario": "60%"}}, "numeri")):
+            json.dump(dati, open(piano, "w", encoding="utf-8"))
+            rc, out = run_script(script, "--dati", piano, cwd=tmp)
+            assert rc == 1 and "ERRORE" in out and atteso in out and "Traceback" not in out, (atteso, rc, out[-300:])
+        # --zainetto dal JSON dell'importatore: zainetto_26_equivalente per broker
+        rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"),
+                             os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"),
+                             "--anno", "2026", "--json", os.path.join(tmp, "imp.json"))
+        assert rc == 0, out[-300:]
+        imp = json.load(open(os.path.join(tmp, "imp.json"), encoding="utf-8"))
+        atteso = {b: v["zainetto_26_equivalente"] for b, v in imp["analisi"]["per_broker"].items()}
+        json.dump({"posizioni": [dict(p, broker=list(atteso)[0]) for p in pos], "zainetto": {"X": 1},
+                   "target": {"azionario": 0.6, "obbligazionario": 0.3, "monetario": 0.1}}, open(piano, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", piano, "--zainetto", os.path.join(tmp, "imp.json"), "--out", os.path.join(tmp, "z"), cwd=tmp)
+        assert rc == 0, out[-400:]
+        m2 = carica_modulo(script)
+        m2.carica_dati(piano)
+        assert m2.carica_zainetto_importatore(os.path.join(tmp, "imp.json")) == atteso and m2.ZAINETTO == atteso
+        rc, out = run_script(script, "--dati", piano, "--zainetto", piano, cwd=tmp)
+        assert rc == 1 and "non è il JSON di importa-estratto-broker" in out, out[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    # i sinonimi normalizzati producono lo stesso piano dei dati canonici
+    canon = [m.normalizza_posizione(p) for p in pos]
+    assert canon[0] == {"broker": "Fineco", "asset_class": "azionario", "tipo": "capitale", "valore": 40000, "plus": 10000}, canon[0]
+    assert [p["tipo"] for p in canon] == ["capitale", "diverso", "capitale", "capitale", "diverso", "capitale"]
+    m.POSITIONS = pos
+    piano_sin = m.pianifica()
+    m.POSITIONS = carica_modulo(script).POSITIONS
+    piano_can = m.pianifica()
+    assert [(v["broker"], v["classe"], round(v["vendi"])) for v in piano_sin["vendite"]] == \
+        [(v["broker"], v["classe"], round(v["vendi"])) for v in piano_can["vendite"]] == [("Fineco", "azionario", 8000)]
+
+
+@test("T9 input esterno: genera-ips con --dati dalla cartella di lavoro, esempio dichiarato senza, JSON errato → rc 1")
+def t_dati_ips():
+    try:
+        from docx import Document
+    except ImportError:
+        raise AssertionError("python-docx non installato: pip install python-docx")
+    script = asset("it-revisione", "genera-ips.py")
+    tmp = tempfile.mkdtemp()
+    try:
+        dati = os.path.join(tmp, "ips.json")
+        json.dump({"investitore": "Giulia Test", "capitale": 50000, "sottotitolo": "Prova",
+                   "profilo": [["Età", "40 anni"]],
+                   "obiettivi": [["Fondo emergenza", "permanente", "Preservazione (0%)", "€10.000", 10000],
+                                 ["Casa", "8 anni · terminante", "Moderato (40%)", "€40.000", 40000]],
+                   "allocazione": [["Azioni", 16000, 32.0], ["Obbligazioni", 24000, 48.0], ["Liquidità", 10000, 20.0]],
+                   "glide_path": [["Partenza", "oggi", "32%", "allocazione iniziale"]],
+                   "versamenti": ["€200/mese sulla casa"], "strumenti": [["Azioni", "ETF globale"]],
+                   "previdenza": ["Aggiornare la proiezione ogni anno."]}, open(dati, "w", encoding="utf-8"), ensure_ascii=False)
+        out_docx = os.path.join(tmp, "ips.docx")
+        rc, out = run_script(script, out_docx, "--dati", dati, cwd=tmp)
+        assert rc == 0 and "Dati di esempio" not in out and "Giulia Test" in out, out[-400:]
+        testo = "\n".join(p.text for p in Document(out_docx).paragraphs)
+        assert "Giulia Test" in testo and "Mario Rossi" not in testo and "€50.000" in testo, testo[:600]
+        m = re.search(r"perdere circa il (\d+)%", testo)
+        assert m and int(m.group(1)) == 16, "nota di rischio dalla quota azionaria del JSON (32% → 16%)"
+        rc, out = run_script(script, os.path.join(tmp, "demo.docx"), cwd=tmp)
+        assert rc == 0 and "Dati di esempio" in out and "Mario Rossi" in out, out[-300:]
+        assert not os.path.exists(os.path.join(tmp, "--dati")), "«--dati» non è un nome di file di output"
+        json.dump({"capitale": 1}, open(dati, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", dati, cwd=tmp)
+        assert rc == 1 and "investitore" in out and "Traceback" not in out, (rc, out[-300:])
+        json.dump({"investitore": "X", "capitali": 1}, open(dati, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", dati, cwd=tmp)
+        assert rc == 1 and "non riconosciute" in out and "capitali" in out, (rc, out[-300:])
+        open(dati, "w", encoding="utf-8").write("{non json")
+        rc, out = run_script(script, "--dati", dati, cwd=tmp)
+        assert rc == 1 and "JSON valido" in out, (rc, out[-300:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T9 «Dove lavorare»: ogni SKILL.md ha la sezione con ${CLAUDE_SKILL_DIR}, nessuna invocazione a nome nudo, command con ${CLAUDE_PLUGIN_ROOT}")
+def t_dove_lavorare():
+    # F059/F058: la cartella di lavoro era solo prosa nel README e gli script erano invocati a nome nudo,
+    # cioè solo con cwd = assets/. Variabili verificate sulla documentazione ufficiale di Claude Code
+    # (code.claude.com/docs/en/skills, «Available string substitutions»; plugins-reference, «Environment variables»).
+    # gli script del repository (scripts/…) si lanciano dal checkout e non sono nello zip: restano fuori dalla regola
+    nudo = re.compile(r"python3? (?!\")(?!scripts/)[\w./-]*[\w-]+\.py\b")
+    for skill in sorted(os.listdir(SKILLS)):
+        testo = open(os.path.join(SKILLS, skill, "SKILL.md"), encoding="utf-8").read()
+        assert "## Dove lavorare" in testo, f"{skill}: manca la sezione «Dove lavorare»"
+        sez = testo.split("## Dove lavorare")[1].split("\n## ")[0]
+        assert "${CLAUDE_SKILL_DIR}" in sez and "cartella di lavoro" in sez and "${user_config.cartella_lavoro}" in sez, skill
+        assert "mai dentro il plugin" in sez or "mai in `assets/`" in sez, skill
+        if os.path.isdir(os.path.join(SKILLS, skill, "assets")) and any(f.endswith(".xlsx") for f in os.listdir(os.path.join(SKILLS, skill, "assets"))):
+            assert "copiano" in sez, f"{skill}: i modelli Excel vanno copiati nella cartella di lavoro"
+        m = nudo.search(testo)
+        assert not m, f"{skill}/SKILL.md: invocazione a nome nudo «{m.group(0)}»: usare python \"${{CLAUDE_SKILL_DIR}}/assets/…\""
+        assert "${CLAUDE_PLUGIN_ROOT}/skills/" + skill in sez, f"{skill}: il percorso per i command"
+    for nome in sorted(os.listdir(os.path.join(ROOT, "commands"))):
+        testo = open(os.path.join(ROOT, "commands", nome), encoding="utf-8").read()
+        m = nudo.search(testo)
+        assert not m, f"commands/{nome}: invocazione a nome nudo «{m.group(0)}»"
+        if ".py" in testo:
+            assert "${CLAUDE_PLUGIN_ROOT}/skills/" in testo, f"commands/{nome}: gli script si invocano con ${{CLAUDE_PLUGIN_ROOT}}"
+    manifest = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
+    cfg = manifest["userConfig"]["cartella_lavoro"]
+    assert cfg["type"] == "directory" and cfg.get("default") and set(cfg) <= {"type", "title", "description", "default", "required"}, cfg
+    # il rimando al ricalcolo da riga di comando dice che scripts/ non è nello zip di Cowork
+    rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    assert re.search(r"ricalcola-excel\.py[^\n]*", rev) and "non lo zip per Cowork" in rev, "it-revisione: ricalcolo condizionale"
+
+
+@test("T9 vocabolario: categoria fiscale con gli stessi nomi e valori in README, skill, importatore e ribilanciamento")
+def t_lessico():
+    # F026: lo stesso campo si chiamava categoria_fiscale / tipo_fiscale / tipo con valori reddito_diverso / diverso.
+    imp = carica_modulo(asset("it-tax-optimization", "importa-estratto-broker.py"))
+    valori = set(imp.CATEGORIE)
+    assert valori == {"reddito_diverso", "reddito_capitale", "reddito_capitale_irpef", "da_classificare"}, valori
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    gloss = readme.split("## Glossario")[1].split("\n## ")[0]
+    for v in valori:
+        assert f"`{v}`" in gloss, f"glossario del README senza «{v}»"
+    for termine in ("Zainetto fiscale", "Categoria fiscale", "PMC", "Secchiello", "Glide path", "Profilo", "Asset class", "Tasso di sostituzione"):
+        assert f"**{termine}**" in gloss, f"glossario senza «{termine}»"
+    assert gloss.count("\n| **") >= 8, "glossario con meno di 8 termini"
+    assert "broker,isin,descrizione" in readme and "broker,anno_realizzo" in readme, "README «Input richiesto»: schema senza broker"
+    tax = open(os.path.join(SKILLS, "it-tax-optimization", "SKILL.md"), encoding="utf-8").read()
+    reb = open(os.path.join(SKILLS, "it-rebalance", "SKILL.md"), encoding="utf-8").read()
+    for v in valori:
+        assert f"`{v}`" in tax, f"it-tax-optimization/SKILL.md senza «{v}»"
+    assert "`categoria_fiscale`" in reb and not re.search(r"^- `tipo_fiscale`", reb, re.M), "it-rebalance: il campo si chiama categoria_fiscale"
+    assert "`categoria_fiscale`" in tax and "`broker`" in tax
+    m = carica_modulo(asset("it-rebalance", "ribilanciamento-multibroker.py"))
+    assert "categoria_fiscale" in m.CAMPI_CSV and "tipo_fiscale" not in m.CAMPI_CSV
+    for sinonimo, canonico in (("reddito_diverso", "diverso"), ("reddito_capitale", "capitale"), ("Reddito di capitale", "capitale")):
+        assert m.normalizza_posizione({"tipo_fiscale": sinonimo})["tipo"] == canonico
+    assert set(m.SINONIMI_CHIAVI) >= {"categoria_fiscale", "tipo_fiscale", "classe", "plus_minus", "controvalore"}
+
+
 @test("T7 ribilanciamento: caso di validazione con asserzioni (vendita €8.000 a imposta zero, CSV, cassa per broker)")
 def t_t7_default():
     # REGRESSIONE F047: lo smoke test controllava solo rc == 0, e il caso ATTESO era scaduto
@@ -2890,8 +3058,8 @@ def t_t1_non_armonizzati():
     assert re.search(r"non armonizzat[^\n]*→\s*`reddito_capitale`[^\n]*`reddito_capitale_irpef`", skill), \
         "SKILL.md: la deduzione della categoria non manda i non armonizzati a reddito_capitale/_irpef"
     reb = open(os.path.join(SKILLS, "it-rebalance", "SKILL.md"), encoding="utf-8").read()
-    assert re.search(r"`tipo_fiscale`[^\n]*`reddito_capitale`\s*\([^)\n]*non armonizzat", reb), \
-        "it-rebalance: la riga tipo_fiscale non mette i non armonizzati sotto reddito_capitale"
+    assert re.search(r"`categoria_fiscale`[^\n]*`reddito_capitale`\s*\([^)\n]*non armonizzat", reb), \
+        "it-rebalance: la riga categoria_fiscale non mette i non armonizzati sotto reddito_capitale"
     trovate = 0
     for r in reb.splitlines():
         if "reddito diverso" in r and "**può**" in r:

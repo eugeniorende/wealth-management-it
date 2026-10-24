@@ -357,6 +357,34 @@ MESI = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
         "agosto", "settembre", "ottobre", "novembre", "dicembre")  # strftime("%B") dipende dal locale
 
 
+CHIAVI_DATI = set(DATI) | {"ribilanciamento", "guardrail", "revisione", "fiscalita", "checklist"}
+
+
+def carica_dati(path):
+    """I dati del caso dal JSON di --dati: un oggetto con le chiavi del blocco DATI (le liste prendono il
+    posto delle tuple). Le chiavi assenti restano ai default di policy; una chiave ignota è un errore."""
+    import json
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = json.load(f)
+    except OSError as e:
+        print(f"ERRORE: --dati: impossibile leggere {path}: {e.strerror}", file=sys.stderr)
+        raise SystemExit(1)
+    except ValueError as e:
+        print(f"ERRORE: --dati: {path} non è un JSON valido ({e})", file=sys.stderr)
+        raise SystemExit(1)
+    if not isinstance(dati, dict) or "investitore" not in dati:
+        print(f"ERRORE: --dati: {path} deve essere un oggetto JSON con almeno «investitore» (schema in SKILL.md)",
+              file=sys.stderr)
+        raise SystemExit(1)
+    ignote = sorted(set(dati) - CHIAVI_DATI)
+    if ignote:
+        print(f"ERRORE: --dati: chiavi non riconosciute {ignote}; attese: {', '.join(sorted(CHIAVI_DATI))}",
+              file=sys.stderr)
+        raise SystemExit(1)
+    return dati
+
+
 def genera(dati, path_out):
     d = dict(DATI)
     d.update(dati or {})
@@ -509,9 +537,18 @@ def main(argv=None):
                     "Codici d'uscita: 0 riuscito, 1 errore nei dati o nella scrittura, 2 riga di comando errata.")
     ap.add_argument("output", nargs="?", default="IPS.docx",
                     help="file .docx da scrivere (default: IPS.docx nella cartella corrente)")
+    ap.add_argument("--dati", metavar="FILE",
+                    help="JSON con i dati del tuo caso, le stesse chiavi del blocco DATI (schema in SKILL.md); "
+                         "senza, l'IPS d'esempio")
     args = ap.parse_args(argv)
+    dati = None
+    if args.dati:
+        dati = carica_dati(args.dati)
+    else:
+        print(f"⚠️  Dati di esempio: l'IPS è quello di «{DATI['investitore']}». Passa --dati ips.json con i tuoi "
+              f"dati (schema in SKILL.md).")
     try:
-        genera(None, args.output)
+        genera(dati, args.output)
     except OSError as e:
         print(f"ERRORE: impossibile scrivere {args.output}: {e}", file=sys.stderr)
         raise SystemExit(1)

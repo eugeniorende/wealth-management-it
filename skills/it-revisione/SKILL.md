@@ -19,6 +19,16 @@ Postura: **personale ed educativa**. Non è consulenza. La revisione mette ordin
 
 NON è il posto per una singola analisi verticale: se l'utente chiede solo "quanto prenderò di pensione" o solo "come ribilancio", usa la skill specifica. Questa entra quando serve la **visione d'insieme**.
 
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/cruscotto-patrimoniale.xlsx`, `${CLAUDE_SKILL_DIR}/assets/tracker-secchielli.xlsx`, `${CLAUDE_SKILL_DIR}/assets/investment-policy-statement.xlsx`;
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-revisione`). Dipendenze degli script: Python 3.11 o successivo con numpy, openpyxl e python-docx (`pip install numpy openpyxl python-docx`).
+
 ## Il workflow della revisione
 
 La revisione segue un'agenda in cinque passi. Ai passi 1-2 fotografa; al passo 3 **richiama le altre skill** (non ne duplica la logica); ai passi 4-5 sintetizza e produce il report. Lo strumento `assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa.
@@ -71,7 +81,23 @@ Report in markdown, cinque sezioni che ricalcano il workflow. C'è un **template
 - **Azioni**: il tracker delle azioni emerse dalla revisione (azione, dominio, priorità, scadenza, stato), con la legenda della logica di prioritizzazione. È il ponte tra il report e l'esecuzione.
 - **Rendimento TWR**: il **time-weighted return** della strategia (rendimenti dei sotto-periodi tra un flusso e l'altro, incatenati), affiancato al **money-weighted esatto** (XIRR) sugli stessi dati. La differenza tra i due è l'effetto del timing dei versamenti; il TWR è il numero da confrontare con un benchmark. Si compila una riga per data di rilevazione (valore + flusso netto), dall'alto e senza righe vuote, fino a 120 righe: il riepilogo legge da solo l'ultima.
 
-Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo; dal repository del plugin, `python scripts/ricalcola-excel.py <file>` lo ricalcola in locale italiano e segnala le celle in errore. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
+Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo e cercare celle in errore (`#RIF!`, `#VALORE!`). Solo chi ha il repository del plugin (non lo zip per Cowork, che non contiene `scripts/`) può anche ricalcolarlo da riga di comando con `python scripts/ricalcola-excel.py <file>`, in locale italiano e con l'elenco delle celle in errore. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
+
+### I dati dell'IPS: `--dati ips.json`
+
+`genera-ips.py` prende i dati del caso da un JSON nella cartella di lavoro (`--dati ips.json`), mai dal blocco `DATI` dentro lo script, che resta l'esempio; senza `--dati` lo script genera l'esempio e avvisa. Il JSON è un oggetto con le stesse chiavi del blocco `DATI` (le liste al posto delle tuple); le chiavi assenti usano i default di policy, una chiave ignota è un errore. Chiavi principali:
+
+| Chiave | Forma | Da dove |
+|---|---|---|
+| `investitore`, `data`, `capitale`, `sottotitolo` | testo, testo (vuoto = mese corrente), numero, testo | l'utente |
+| `profilo` | lista di `[etichetta, valore]` | l'utente (età, reddito, tolleranza, capacità di risparmio) |
+| `obiettivi` | lista di `[nome, "orizzonte · tipo", "Profilo (% azioni)", target, capitale assegnato]` | pianificatore e `allocatore-capitale.py --json` (`obiettivi[].allocato`) |
+| `obiettivi_nota`, `allocazione_nota` | testo | facoltative |
+| `allocazione` | lista di `[classe, importo, quota %]` | `allocatore-capitale.py --json` (`aggregato`) |
+| `glide_path` | lista di `[fase, anni, "da → a %", cosa succede]` | `glidepath-obiettivi.py --json` (`portafoglio`) |
+| `versamenti`, `strumenti`, `previdenza` | liste di testi, o di `[classe, testo]` per gli strumenti | l'utente; la proiezione pensione per `previdenza` |
+| `ribilanciamento`, `guardrail`, `revisione`, `fiscalita`, `checklist` | liste di testi | facoltative: senza, i default di policy del plugin |
+| `broker` | `null` oppure `{"nome": …, "sezioni": [[titolo, testo], …]}` | facoltativa, Appendice B |
 
 ### Contratto di input: da dove viene ogni numero
 
@@ -121,7 +147,7 @@ In quest'iterazione (v0.6):
 - **`tracker-secchielli.xlsx`** — il foglio operativo del monitoraggio goals-based: si definiscono i secchielli e l'anno del piano (Impostazioni), si incolla il calendario del glide path (Glide), si assegnano le posizioni a secchielli e classi con tendine (Posizioni), e il foglio Controllo mostra effettivo vs target per secchiello e aggregato con **semaforo automatico sulle bande 5/25** (formattazione condizionale OK/VICINO/RIBILANCIA). Il target % azioni "di oggi" si aggiorna da solo cambiando l'anno del piano (INDEX sul calendario Glide). Registro Versamenti con totali per secchiello e anno corrente. 145 formule, recalc 0 errori; dati precompilati d'esempio da sostituire. Completa il ciclo: pianifica (it-pianificazione-obiettivi) → esegui → monitora qui.
 
 In quest'iterazione (v0.5):
-- **`genera-ips.py`** — il generatore dell'Investment Policy Statement come documento Word (python-docx): copertina, 12 sezioni (profilo, obiettivi, allocazione, glide path, ribilanciamento, versamenti, strumenti, fiscalità, previdenza, guardrail, revisione), Appendice A con checklist a caselle e Appendice B broker opzionale. I dati del caso si compilano in un unico blocco `DATI`; i testi di policy (bande 5/25, trappola ETF, guardrail, checklist) sono default sovrascrivibili, quindi il documento esce completo anche da un dict minimo. **Onestà incorporata**: la nota di rischio è calcolata dalla quota azionaria aggregata (drawdown atteso in un orso ≈ metà della quota), e lo script valida allocazione=100% e capitali=totale, avvisando senza bloccare. Uso: `python genera-ips.py [output.docx]`. Dipendenza: python-docx. Codifica il deliverable finale del flusso, prima costruito a mano.
+- **`genera-ips.py`** — il generatore dell'Investment Policy Statement come documento Word (python-docx): copertina, 12 sezioni (profilo, obiettivi, allocazione, glide path, ribilanciamento, versamenti, strumenti, fiscalità, previdenza, guardrail, revisione), Appendice A con checklist a caselle e Appendice B broker opzionale. I dati del caso si compilano in un unico blocco `DATI`; i testi di policy (bande 5/25, trappola ETF, guardrail, checklist) sono default sovrascrivibili, quindi il documento esce completo anche da un dict minimo. **Onestà incorporata**: la nota di rischio è calcolata dalla quota azionaria aggregata (drawdown atteso in un orso ≈ metà della quota), e lo script valida allocazione=100% e capitali=totale, avvisando senza bloccare. Uso: `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json` dalla cartella di lavoro; senza `--dati` genera l'esempio e lo dice. Dipendenza: python-docx. Codifica il deliverable finale del flusso, prima costruito a mano.
 
 In quest'iterazione (v0.4):
 - **Excel dedicato all'IPS** (`assets/investment-policy-statement.xlsx`): lo scheletro dell'Investment Policy Statement come foglio compilabile, con le **bande di ribilanciamento calcolate da sé** dai target (regola 5/25 → soglie operative per classe), il controllo che i target sommino a 100%, e drawdown/vincoli fiscali precompilati. Quinto Excel del plugin. Validato (bande corrette, check 100% funzionante, 0 errori).

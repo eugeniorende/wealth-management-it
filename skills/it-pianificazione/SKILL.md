@@ -102,6 +102,16 @@ L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si
 - Detrazione pensionati (art. 13 c. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026; R = reddito complessivo): €1.955 fino a €8.500 (no tax area); 700 + 1.255 × (28.000 − R) / 19.500 fino a €28.000; 700 × (50.000 − R) / 22.000 fino a €50.000; zero oltre; +€50 tra €25.000 e €29.000 (c. 3-bis; dal 2027 art. 13 c. 4 D.Lgs. 117/2026). È la formula di `assets/netto-pensione.py`
 - Addizionali regionali e comunali (variabili: 0,7-3,33% regionale, 0-0,9% comunale)
 
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/proiezione-pensione.xlsx`;
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/importa-previdenza.py" estratto.xml fondo.csv --anonimo --json dati.json`, `python "${CLAUDE_SKILL_DIR}/assets/proiezione-inps.py" --from dati.json --json inps.json`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-pianificazione`). Dipendenze degli script: Python 3.11 o successivo con numpy, openpyxl e python-docx (`pip install numpy openpyxl python-docx`).
+
 ## Workflow operativo
 
 ### Step 1: Ingestion
@@ -109,20 +119,21 @@ L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si
 **Percorso automatico (preferito)**: se l'utente ha i file reali, usare `assets/importa-previdenza.py`:
 
 ```bash
-python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--json dati.json]
+python "${CLAUDE_SKILL_DIR}/assets/importa-previdenza.py" estratto_inps.xml [storico_fondo.csv] [--anonimo] [--json dati.json]
 ```
 
 Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): proporlo quando l'output finisce in chat o in un documento da condividere. Con `--json` i parametri pronti finiscono in un file che gli script a valle leggono con `--from`, senza ricopiarli:
 
 ```bash
-python importa-previdenza.py estratto.xml fondo.csv --anonimo --json dati.json
-python proiezione-inps.py      --from dati.json --json inps.json
-python montecarlo-pensione.py  --from dati.json --from inps.json --json mc.json
-python netto-pensione.py       --from mc.json --json netto.json
-python ponte-pensione.py       --from inps.json --from mc.json --set ETA_USCITA=62 --json ponte.json
+A="${CLAUDE_SKILL_DIR}/assets"      # dalla cartella di lavoro
+python "$A/importa-previdenza.py" estratto.xml fondo.csv --anonimo --json dati.json
+python "$A/proiezione-inps.py"     --from dati.json --json inps.json
+python "$A/montecarlo-pensione.py" --from dati.json --from inps.json --json mc.json
+python "$A/netto-pensione.py"      --from mc.json --json netto.json
+python "$A/ponte-pensione.py"      --from inps.json --from mc.json --set ETA_USCITA=62 --json ponte.json
 ```
 
-Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin.
+Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette.
 
 Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico movimenti del fondo pensione** (CSV), e produce: anzianità e retribuzioni per anno, la ricostruzione del montante contributivo (contributi × aliquota, capitalizzati coi tassi ufficiali ISTAT — tabella verificata nello script, ±qualche % rispetto al dato esatto de "La mia pensione futura"), montante del fondo per comparto con stima euristica del mix azionario, versamenti per anno/fonte, e il blocco di parametri pronti per `proiezione-inps.py` e `montecarlo-pensione.py`. I dati reali battono sempre quelli dichiarati a memoria.
 
@@ -397,7 +408,7 @@ In quest'iterazione (v0.9):
 - **`netto-pensione.py`** — dal tasso di sostituzione LORDO a quello NETTO/NETTO: IRPEF 2026 a tre scaglioni (23/33/43, secondo scaglione ridotto dalla L.199/2025 — verificato), detrazioni pensione e lavoro dipendente (art. 13 TUIR, dal 2027 art. 13 D.Lgs. 117/2026), contributi IVS 9,19%, addizionali parametriche, e imposta sostitutiva sulla rendita complementare 15%→9% con l'anzianità di partecipazione (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026). Accetta più scenari di rendita (P10/P50/P90 dal Monte Carlo) e confronta pensione netta / ultimo stipendio netto. Il lordo sottostima sistematicamente la copertura: sul caso reale validato, la mediana passa dal 74,6% lordo al 97,5% netto. Supporta `--set`.
 
 In quest'iterazione (v0.8):
-- **Override `--set NOME=VALORE`** (via `motore_bootstrap.applica_override`): le costanti in testa a `montecarlo-pensione.py` e `proiezione-inps.py` si sovrascrivono da riga di comando senza modificare i file — es. `python proiezione-inps.py --set PIL_REALE=0.0 --set COEFF_ESPLICITO=0.048`. I nomi inesistenti vengono respinti (protezione dai refusi), gli override applicati sono stampati (run documentato e ripetibile).
+- **Override `--set NOME=VALORE`** (via `motore_bootstrap.applica_override`): le costanti in testa a `montecarlo-pensione.py` e `proiezione-inps.py` si sovrascrivono da riga di comando senza modificare i file — es. `python "${CLAUDE_SKILL_DIR}/assets/proiezione-inps.py" --set PIL_REALE=0.0 --set COEFF_ESPLICITO=0.048`. I nomi inesistenti vengono respinti (protezione dai refusi), gli override applicati sono stampati (run documentato e ripetibile).
 
 In quest'iterazione (v0.7):
 - **Motore bootstrap condiviso** (`motore_bootstrap.py`): `carica_storico`, campionamento a blocchi circolari (`indici_bootstrap`/`blocchi_bootstrap`) e percentili vivono in un modulo unico, copia sincronizzata con `it-pianificazione-obiettivi` (l'identità è verificata dalla test suite). `montecarlo-pensione.py` lo importa; refactor validato bit-per-bit: con lo stesso seed produce output identico alla versione precedente.

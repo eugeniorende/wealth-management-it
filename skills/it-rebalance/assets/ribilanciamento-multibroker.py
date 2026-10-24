@@ -122,19 +122,119 @@ BROKER_VERSAMENTI = "Fineco"   # broker su cui atterrano versamenti/flussi in en
 # ──────────────────────────────────────────────────────────────────────────
 
 
+# Vocabolario: i nomi e i valori canonici sono quelli del plugin (README, «Glossario»); lo script
+# accetta i sinonimi e li normalizza, così il JSON dell'importatore o un CSV ricopiato non vanno
+# riscritti a mano. Internamente il tipo fiscale è «diverso» o «capitale».
+SINONIMI_CHIAVI = {"classe": "asset_class", "asset class": "asset_class", "asset_class": "asset_class",
+                   "categoria_fiscale": "tipo", "tipo_fiscale": "tipo", "categoria": "tipo", "tipo": "tipo",
+                   "plus_minus": "plus", "plusvalenza": "plus", "plus": "plus",
+                   "controvalore": "valore", "valore": "valore", "intermediario": "broker", "broker": "broker"}
+SINONIMI_TIPO = {"diverso": "diverso", "reddito_diverso": "diverso", "redditi_diversi": "diverso",
+                 "capitale": "capitale", "reddito_capitale": "capitale", "reddito_di_capitale": "capitale",
+                 "redditi_di_capitale": "capitale"}
+TIPI_FUORI_PERIMETRO = {"reddito_capitale_irpef": "la plus va a IRPEF progressiva: fuori dal perimetro del "
+                                                  "ribilanciamento, trattala a parte",
+                        "da_classificare": "classifica prima la posizione (vedi it-tax-optimization)"}
+
+
+def normalizza_posizione(p):
+    """La posizione con le chiavi e i valori canonici dello script: accetta i sinonimi del vocabolario
+    del plugin (categoria_fiscale o tipo_fiscale → tipo; reddito_diverso → diverso; classe → asset_class;
+    plus_minus → plus; controvalore → valore). Le chiavi ignote restano com'erano."""
+    q = {}
+    for k, v in p.items():
+        chiave = str(k).strip().lower().replace(" ", "_")
+        q[SINONIMI_CHIAVI.get(chiave, str(k).strip())] = v
+    if isinstance(q.get("tipo"), str):
+        t = q["tipo"].strip().lower().replace(" ", "_")
+        q["tipo"] = SINONIMI_TIPO.get(t, t)
+    for k in ("asset_class", "broker"):
+        if isinstance(q.get(k), str):
+            q[k] = q[k].strip()
+    return q
+
+
+# Chiavi del JSON di --dati (minuscole) → costanti dello script.
+CHIAVI_DATI = {"posizioni": "POSITIONS", "zainetto": "ZAINETTO", "target": "TARGET",
+               "nuovi_versamenti": "NUOVI_VERSAMENTI", "flussi_attesi": "FLUSSI_ATTESI", "prelievo": "PRELIEVO",
+               "aliquota_default": "ALIQUOTA", "obiettivo_rientro": "OBIETTIVO_RIENTRO",
+               "margine_rientro": "MARGINE_RIENTRO", "modula_volatilita": "MODULA_VOLATILITA",
+               "genera_csv": "GENERA_CSV", "cartella_output": "CARTELLA_OUTPUT",
+               "broker_versamenti": "BROKER_VERSAMENTI"}
+
+
+def carica_dati(path):
+    """Portafoglio, zainetto, target e opzioni dal JSON di --dati (schema in SKILL.md): sostituiscono le
+    costanti in testa allo script. Chiavi ignote → errore, così un refuso non passa in silenzio."""
+    import json
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = json.load(f)
+    except OSError as e:
+        raise ErroreInput(f"--dati: impossibile leggere {path} ({e.strerror})")
+    except ValueError as e:
+        raise ErroreInput(f"--dati: {path} non è un JSON valido ({e})")
+    if not isinstance(dati, dict):
+        raise ErroreInput(f"--dati: {path} deve contenere un oggetto JSON con posizioni, zainetto e target")
+    ignote = [k for k in dati if str(k).lower() not in CHIAVI_DATI]
+    if ignote:
+        raise ErroreInput(f"--dati: chiavi non riconosciute {ignote}; attese: {', '.join(CHIAVI_DATI)}")
+    for k, v in dati.items():
+        globals()[CHIAVI_DATI[str(k).lower()]] = v
+    if not isinstance(POSITIONS, list) or not isinstance(ZAINETTO, dict) or not isinstance(TARGET, dict):
+        raise ErroreInput("--dati: «posizioni» è una lista, «zainetto» e «target» sono oggetti broker → euro e classe → peso")
+    return dati
+
+
+def carica_zainetto_importatore(path):
+    """Lo zainetto per broker dal JSON di importa-estratto-broker.py --json: analisi.per_broker[b].
+    zainetto_26_equivalente, cioè le minus valide in euro al 26% (quelle al 12,5% già al 48,08%)."""
+    import json
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = json.load(f)
+        per_broker = dati["analisi"]["per_broker"]
+        zainetto = {b: float(v["zainetto_26_equivalente"]) for b, v in per_broker.items()}
+    except OSError as e:
+        raise ErroreInput(f"--zainetto: impossibile leggere {path} ({e.strerror})")
+    except (ValueError, KeyError, TypeError):
+        raise ErroreInput(f"--zainetto: {path} non è il JSON di importa-estratto-broker.py --json "
+                          f"(manca analisi.per_broker[].zainetto_26_equivalente)")
+    globals()["ZAINETTO"] = zainetto
+    return zainetto
+
+
 class ErroreInput(Exception):
     """Parametri in testa al file non validi: messaggio leggibile, uscita con codice 2."""
 
 
 def valida():
-    """Validazione minima dell'input (in attesa dell'interfaccia comune degli script)."""
-    if abs(sum(TARGET.values()) - 1) > 1e-6:
-        raise ErroreInput(f"TARGET somma a {sum(TARGET.values()):.4f}, non a 1")
+    """Validazione dell'input, dopo la normalizzazione dei sinonimi del vocabolario."""
+    globals()["POSITIONS"] = [normalizza_posizione(p) for p in POSITIONS]
+    if not isinstance(TARGET, dict) or not TARGET:
+        raise ErroreInput("TARGET vuoto: indicare le classi con il peso target (somma 1)")
+    try:
+        somma = sum(float(v) for v in TARGET.values())
+    except (TypeError, ValueError):
+        raise ErroreInput("TARGET: i pesi devono essere numeri (es. 0.6, non «60%»)")
+    if abs(somma - 1) > 1e-6:
+        raise ErroreInput(f"TARGET somma a {somma:.4f}, non a 1")
+    if not isinstance(ZAINETTO, dict):
+        raise ErroreInput("ZAINETTO: oggetto broker → euro di minus al 26% (es. {\"Fineco\": 5000})")
     for n, p in enumerate(POSITIONS, start=1):
+        for campo in ("broker", "asset_class", "tipo", "valore", "plus"):
+            if campo not in p:
+                raise ErroreInput(f"posizione {n}: manca «{campo}» (chiavi: broker, asset_class, tipo, valore, plus)")
         if p.get("asset_class") not in TARGET:
             raise ErroreInput(f"posizione {n}: classe «{p.get('asset_class')}» assente da TARGET")
+        if p.get("tipo") in TIPI_FUORI_PERIMETRO:
+            raise ErroreInput(f"posizione {n}: {p['tipo']}: {TIPI_FUORI_PERIMETRO[p['tipo']]}")
         if p.get("tipo") not in ("diverso", "capitale"):
-            raise ErroreInput(f"posizione {n}: tipo «{p.get('tipo')}» (attesi «diverso» o «capitale»)")
+            raise ErroreInput(f"posizione {n}: tipo «{p.get('tipo')}» (attesi «diverso» o «capitale», "
+                              f"anche come reddito_diverso o reddito_capitale)")
+        for campo in ("valore", "plus"):
+            if isinstance(p[campo], bool) or not isinstance(p[campo], (int, float)):
+                raise ErroreInput(f"posizione {n}: {campo} {p[campo]!r} non numerico")
         for campo in ("aliquota", "quota_titoli_stato"):
             if campo in p and (isinstance(p[campo], bool) or not isinstance(p[campo], (int, float))):
                 raise ErroreInput(f"posizione {n}: {campo} {p[campo]!r} non numerica (es. 0.125, non «12,5%»)")
@@ -520,7 +620,7 @@ def _ripartisci(valori, importo):
     return {cl: max(0.0, v - TARGET[cl] * hi) for cl, v in valori.items()}
 
 
-CAMPI_CSV = ["broker", "operazione", "classe", "tipo_fiscale", "strumento_ISIN",
+CAMPI_CSV = ["broker", "operazione", "classe", "categoria_fiscale", "strumento_ISIN",
              "importo_eur", "plus_minus_eur", "imposta_eur", "compensazione_zainetto_eur", "nota"]
 # Ultima riga di ogni CSV: chi apre il file vede il disclaimer, e l'intestazione resta la prima riga.
 NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non costituisce consulenza "
@@ -597,7 +697,7 @@ def genera_ordini(plan):
             motivo = f"riduce sovrappeso {s['classe']}"
         nota = f"{motivo}; {effetto_fiscale(s)}" if s["plus_real"] else motivo
         ordini.append({"broker": s["broker"], "operazione": "VENDITA", "classe": s["classe"],
-                       "tipo_fiscale": s["tipo"], "importo_eur": round(s["vendi"], 2),
+                       "categoria_fiscale": s["tipo"], "importo_eur": round(s["vendi"], 2),
                        "plus_minus_eur": round(s["plus_real"], 2), "imposta_eur": round(s["tassa"], 2),
                        "compensazione_zainetto_eur": round(s["comp"], 2), "nota": nota})
 
@@ -617,7 +717,7 @@ def genera_ordini(plan):
             if quota <= 1e-6:
                 continue
             ordini.append({"broker": broker, "operazione": operazione, "classe": classe,
-                           "tipo_fiscale": "", "importo_eur": round(quota, 2), "plus_minus_eur": "",
+                           "categoria_fiscale": "", "importo_eur": round(quota, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "", "nota": nota})
             cassa[broker] -= quota
             rimanente -= quota
@@ -628,7 +728,7 @@ def genera_ordini(plan):
         rimanente = preleva(plan["prelievo"], "PRELIEVO", "", "bonifico del prelievo netto sul conto corrente")
         if rimanente > 0.005:   # difesa: pianifica() rifiuta i prelievi non finanziabili
             ordini.append({"broker": "(da finanziare)", "operazione": "PRELIEVO", "classe": "",
-                           "tipo_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
+                           "categoria_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "",
                            "nota": "prelievo non coperto dalla cassa netta dei broker"})
     # ACQUISTI — instradati sui broker che hanno cassa
@@ -638,7 +738,7 @@ def genera_ordini(plan):
         rimanente = preleva(amt, "ACQUISTO", cl, f"riempie sottopeso {cl}")
         if rimanente > 1e-6:   # cassa insufficiente ovunque: serve un versamento/trasferimento
             ordini.append({"broker": "(da finanziare)", "operazione": "ACQUISTO", "classe": cl,
-                           "tipo_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
+                           "categoria_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "",
                            "nota": f"riempie sottopeso {cl} — cassa insufficiente, richiede versamento o trasferimento"})
     return ordini
@@ -765,8 +865,24 @@ def main(argv=None):
                     "tipo fiscale nell'ordine di esecuzione, prelievo in decumulo, ordini in CSV per broker. "
                     "I parametri (portafoglio, zainetto, target, versamenti, prelievo) sono le costanti in testa "
                     "allo script. Codici d'uscita: 0 riuscito, 1 parametri incoerenti, 2 riga di comando errata.")
-    ap.parse_args(argv)
+    ap.add_argument("--dati", metavar="FILE",
+                    help="JSON con posizioni, zainetto, target e opzioni (schema in SKILL.md); senza, i dati di "
+                         "esempio in testa allo script")
+    ap.add_argument("--zainetto", metavar="FILE",
+                    help="JSON di importa-estratto-broker.py --json: lo zainetto per broker in euro 26%%-equivalenti "
+                         "(analisi.per_broker), al posto di quello del JSON di --dati o dello script")
+    ap.add_argument("--out", metavar="DIR", help="cartella dei CSV degli ordini (default: ./ordini nella cartella corrente)")
+    args = ap.parse_args(argv)
     try:
+        if args.dati:
+            carica_dati(args.dati)
+        else:
+            print("⚠️  Dati di esempio: portafoglio, zainetto e target sono quelli in testa allo script. "
+                  "Passa --dati piano.json con i tuoi (schema in SKILL.md).")
+        if args.zainetto:
+            carica_zainetto_importatore(args.zainetto)
+        if args.out:
+            globals()["CARTELLA_OUTPUT"] = args.out
         plan = pianifica()
     except ErroreInput as e:
         print(f"ERRORE nei parametri: {e}", file=sys.stderr)
@@ -796,7 +912,7 @@ def esporta_ordini(plan):
     print(f"   {'broker':<14}{'op.':<9}{'classe':<16}{'tipo':<10}{'importo':>10}  nota")
     for o in ordini:
         imp = f"€{numero(o['importo_eur'])}"
-        print(f"   {o['broker']:<14}{o['operazione']:<9}{o['classe']:<16}{str(o['tipo_fiscale']):<10}{imp:>10}  {o['nota']}")
+        print(f"   {o['broker']:<14}{o['operazione']:<9}{o['classe']:<16}{str(o['categoria_fiscale']):<10}{imp:>10}  {o['nota']}")
     print(f"\n   I broker italiani non importano ordini da CSV: questi file sono una checklist di")
     print(f"   esecuzione e una traccia. Compila la colonna strumento_ISIN con lo strumento scelto.")
     print()
