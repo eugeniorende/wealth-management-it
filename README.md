@@ -24,7 +24,7 @@ Un overlay/extension avrebbe creato conflitti dove Claude pesca dalla skill sbag
 
 ## Stato del progetto (v0.11.0)
 
-> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. La 0.10.0 ha chiuso l'ondata 0 e i temi T1-T8, T10, T11 e parte di T13; la 0.11.0 chiude T9 (interfaccia comune degli script, catena `--json` → `--from`, input da file), T12 (test che vincolano i numeri) e T14 (documentazione e packaging), con la rilettura degli output e le verifiche di pre-pubblicazione. Restano aperti il riscatto della laurea e i casi del freelance (T13, da decidere) e due punti «da verificare» della mappa dei testi unici, i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6 del D.Lgs. 117/2026, finché non escono correttivi. Il piano è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
+> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. La 0.10.0 ha chiuso l'ondata 0 e i temi T1-T8, T10, T11 e parte di T13; la 0.11.0 chiude T9 (interfaccia comune degli script, catena `--json` → `--from`, input da file), T12 (test che vincolano i numeri) e T14 (documentazione e packaging), con la rilettura degli output e le verifiche di pre-pubblicazione. Su `develop`, dopo la 0.11.0, è chiuso anche T13 (riscatto della laurea e casi frequenti del freelance). Restano due punti «da verificare» della mappa dei testi unici, i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6 del D.Lgs. 117/2026, finché non escono correttivi. Il piano è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
 
 Sei skill operative: `it-pianificazione-obiettivi` (pianificazione goals-based — il pezzo a monte), `it-tax-optimization` (ottimizzazione minus/plus, titoli e cripto), `it-pianificazione` (pensione dipendenti), `it-pianificazione-autonomi` (pensione autonomi/forfettari), `it-rebalance` (ribilanciamento tax-aware), e `it-revisione` (revisione periodica di sintesi — il livello che tiene insieme tutto).
 
@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 134 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 139 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -80,14 +80,15 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 <!-- generata con: python tests/run_tests.py --tabella-test -->
 | Strumento | Test che lo esercitano |
 |---|---|
-| `it-pianificazione/assets/importa-previdenza.py` | 13: T12 fixture realistiche; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale; importa-previdenza ×5 … |
+| `it-pianificazione/assets/importa-previdenza.py` | 14: T12 fixture realistiche; T13 riscatto della laurea; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale … |
 | `it-pianificazione/assets/montecarlo-pensione.py` | 10: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; montecarlo-pensione … |
 | `it-pianificazione/assets/motore_bootstrap.py` | 12: T12 rami avanzati; T14 skill; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap … |
 | `it-pianificazione/assets/netto-pensione.py` | 19: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
 | `it-pianificazione/assets/ponte-pensione.py` | 12: T12 --json previdenziali; T14 postura e fonti; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale … |
-| `it-pianificazione/assets/proiezione-inps.py` | 15: T12 rami avanzati; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill; freshness fiscale … |
+| `it-pianificazione/assets/proiezione-inps.py` | 16: T12 rami avanzati; T13 riscatto della laurea; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
 | `it-pianificazione/assets/proiezione-pensione.xlsx` | 11: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
 | `it-pianificazione/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
+| `it-pianificazione/assets/riscatto-laurea.py` | 9: T13 riscatto della laurea ×3; T14 skill; T9 formati; T9 interfaccia ×2; freshness fiscale; runner |
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 6: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
 | `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 9: T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; allocatore-capitale; glidepath e Monte Carlo … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
@@ -164,8 +165,8 @@ Ogni skill ha una versione propria, nel campo `metadata.version` del frontmatter
 | # | Skill upstream | Skill fork | Stato |
 |---|---|---|---|
 | 1 | `tax-loss-harvesting` | `it-tax-optimization` | ✅ v0.11 (minus/plus, multi-broker, dichiarativo RT/RW/IVAFE, Tobin tax 2026, cripto: base + avanzata + casi speciali) + importatore estratti broker |
-| 2 | `financial-plan` | `it-pianificazione` | ✅ v0.12 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione) |
-| 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.4 (pensione autonomi/forfettari, casse professionali, Excel) |
+| 2 | `financial-plan` | `it-pianificazione` | ✅ v0.13 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione, riscatto della laurea) |
+| 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.5 (pensione autonomi/forfettari, casse professionali, Excel, rivalsa e acconti del secondo anno) |
 | 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.20 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo) |
 | 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.7 (tax-aware con versamenti, aliquota per posizione e rientro misto, multi-broker, bande 5/25, prelievo in decumulo, sequenza di liquidazione, ordini CSV) |
 | 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.7 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR) |

@@ -1,0 +1,26 @@
+{
+ "branch": "feature/t13-estensioni (T13: riscatto della laurea F055, casi del freelance F063; PR #54)",
+ "data": "2026-10-24",
+ "applicati": [
+  "F24 della Gestione Separata: causali INPS PXX (26,07%) e P10 (24%) al posto del codice 1299, in SKILL.md e nella reference (istruzioni Redditi PF 2026, Fascicolo 2, quadro RR); test che il 1299 non torni",
+  "c. 5-ter: gli anni riscattati valgono per il diritto (c. 5-ter) e per la misura perché l'onere entra nel montante (c. 5)",
+  "Riscatto di chi non ha mai lavorato: doppia citazione 2027 (art. 10 c. 1 lett. u e art. 14 c. 1 lett. i D.Lgs. 117/2026, che abroga l'ultimo periodo del c. 5-bis), letta su Normattiva; riga nella mappa dei testi unici e nella regex dei test T11",
+  "Aliquota sulla pensione in più al 38% (marginale di netto-pensione.py sulla pensione dei default): anni per rientrare da 15,8 a 19,1; reference «circa 19 anni»",
+  "CHANGELOG: Roadmap di it-pianificazione (riscatto fatto, ricongiunzione e totalizzazione fuori perimetro) e di it-pianificazione-autonomi (il simulatore non è più «v0.5»)",
+  "Posizione mista: l'avviso copre anche l'ordinario (riserva matematica, art. 2 c. 4 D.Lgs. 184/1997)",
+  "SESSO per il requisito dell'anticipata (uomini 43 anni e 1 mese, donne 42 e 1 mese dal 2028), nell'output, nel P7 e nella reference",
+  "Errore se un --set di ETA_ATTUALE o ETA_PENSIONAMENTO contraddice gli anni e il coefficiente del JSON di proiezione-inps.py, con il comando per rifare la proiezione",
+  "Coefficiente calcolato come proiezione-inps.py (tabella e riduzione lette dal suo modulo) quando non arriva da --from; test della catena con uscita a 64 anni",
+  "Test della posizione mista lungo la catena importatore → riscatto → proiezione e della deduzione dell'anno",
+  "ANNI_PRIMA_DEL_1996: avviso sugli anni di corso fuori dal contributivo, onere e pensione solo sugli anni dal 1996, anzianità su tutti",
+  "Pattern P7 con i dati da chiedere e la catena del riscatto nello Step 1",
+  "HANDOFF: il conteggio dei test rinvia al README, esito in questo file",
+  "Conteso, applicato: anzianità dell'importatore al massimo 52 settimane per anno (i periodi coincidenti contano una volta per il diritto)",
+  "Conteso, applicato: t_check_ruleset verifica la riga esatta in AND, senza «||»",
+  "Conteso, applicato: il JSON del riscatto porta l'età di uscita, che proiezione-inps.py --from ora legge; gli altri --set di scenario vanno ripetuti (scritto nella reference e nella skill)",
+  "Conteso, applicato: etichetta della deduzione con l'unica soluzione e avviso quando la deduzione dell'anno esce dallo scaglione"
+ ],
+ "non_applicati": [],
+ "mutanti": "Primo giro: 12/12 sul riscatto, 11/11 sul freelance. Dopo le correzioni: 11/11 sulle nuove protezioni (età incoerenti, coefficiente, 52 settimane, età nel JSON, flag della posizione mista, SESSO, anni prima del 1996, avviso dello scaglione, riserva matematica, aliquota in pensione, job «test» in AND), e i 12 del primo giro di nuovo uccisi",
+ "revisione": "docs/sviluppo/workflows/review-tema-roadmap.js, run wf_5c9f68ac-faf (64 agenti completati). 13 confermati, 4 contesi, 13 respinti; esiti in review-t13b.json"
+}

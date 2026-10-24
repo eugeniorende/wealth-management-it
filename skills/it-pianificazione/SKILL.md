@@ -1,8 +1,8 @@
 ---
 name: it-pianificazione
-description: "Pianificazione pensionistica integrata per lavoratori dipendenti italiani: previdenza obbligatoria (INPS contributivo), complementare (fondi pensione, PIP, TFR) e proiezione del tenore di vita dopo la pensione. Usa questa skill quando l'utente parla di pensione futura, quando e quanto prenderò di pensione, conferimento del TFR, scelta del fondo pensione (negoziale, aperto, PIP), deduzione €5.300, anzianità contributiva, coefficiente di trasformazione, tasso di sostituzione, gap pensionistico, anticipata vs vecchiaia, anticipazioni del fondo, capitale vs rendita, RITA, uscita anticipata con capitale-ponte, o chiede «ce la farò a mantenere lo stile di vita?». Legge l'estratto conto INPS e lo storico del fondo con gli script della skill. Per autonomi, partite IVA e forfettari usa `it-pianificazione-autonomi`. NON copre dipendenti pubblici, riscatto della laurea, ricongiunzione e totalizzazione (rinvia a INPS o a un consulente). NON sostituisce un consulente previdenziale abilitato."
+description: "Pianificazione pensionistica integrata per lavoratori dipendenti italiani: previdenza obbligatoria (INPS contributivo), complementare (fondi pensione, PIP, TFR) e proiezione del tenore di vita dopo la pensione. Usa questa skill quando l'utente parla di pensione futura, quando e quanto prenderò di pensione, conferimento del TFR, scelta del fondo pensione (negoziale, aperto, PIP), deduzione €5.300, anzianità contributiva, coefficiente di trasformazione, tasso di sostituzione, gap pensionistico, anticipata vs vecchiaia, riscatto della laurea, anticipazioni del fondo, capitale vs rendita, RITA, uscita anticipata con capitale-ponte, o chiede «ce la farò a mantenere lo stile di vita?». Legge l'estratto conto INPS e lo storico del fondo con gli script della skill. Per autonomi, partite IVA e forfettari usa `it-pianificazione-autonomi`. NON copre dipendenti pubblici, ricongiunzione e totalizzazione (rinvia a INPS o a un consulente). NON sostituisce un consulente previdenziale abilitato."
 metadata:
-  version: "0.12"
+  version: "0.13"
 ---
 
 # it-pianificazione
@@ -17,11 +17,13 @@ Skill per la pianificazione pensionistica integrata di un lavoratore dipendente 
 3. **Confronto TFR azienda vs fondo**: blocco «Confronto TFR» nel foglio Complementare dell'Excel (rivalutazione tassata al 17% e tassazione separata contro 15→9% sulle sole quote), con il vantaggio netto in euro di oggi
 4. **Gap analysis tenore di vita**: confronto tra pensione totale attesa e spesa proiettata
 5. **Leve da valutare**: pattern di copertura del gap, quantificati come scenari: la scelta resta all'utente
+6. **Riscatto della laurea**: onere agevolato e ordinario, costo netto dopo la deduzione, rate, pensione in più e anticipo sull'anticipata ordinaria (`assets/riscatto-laurea.py`)
 
 **Cosa NON fa:**
 - ❌ Non copre lavoratori autonomi, P.IVA forfettari, casse professionali → usa la skill gemella `it-pianificazione-autonomi` (regime previdenziale e fiscale diverso: Gestione Separata 26,07%, no TFR, e per i forfettari il fondo pensione NON è deducibile)
 - ❌ Non copre dipendenti pubblici (TFS vs TFR, regimi specifici)
-- ❌ Non gestisce ricongiunzione, totalizzazione, riscatto laurea (questi richiederebbero accesso a dati INPS reali)
+- ❌ Non gestisce ricongiunzione e totalizzazione: dipendono dalla storia contributiva su più gestioni, quindi rinvia a INPS o a un patronato
+- ⚠️ Il riscatto della laurea si stima, ma il dato esatto dell'onere lo dà INPS (simulazione sul portale), e per gli anni prima del 1996 l'ordinario segue la riserva matematica, che lo script non calcola
 - ⚠️ Il foglio Excel è deterministico (scenari multipli a parametri editabili); il Monte Carlo c'è ma in uno script a parte (`montecarlo-pensione.py`), e simula il fondo pensione, non il pilastro pubblico (che è rivalutato al PIL, non al mercato)
 - ❌ Non sostituisce il consulente previdenziale abilitato o il commercialista
 
@@ -135,9 +137,12 @@ python "$A/netto-pensione.py"      --from mc.json --json netto.json
 # per l'uscita anticipata: un secondo Monte Carlo fino all'età di uscita (ANNI = 62 − età di oggi)
 python "$A/montecarlo-pensione.py" --from dati.json --from inps.json --set ANNI=25 --json mc-uscita.json
 python "$A/ponte-pensione.py"      --from inps.json --from mc-uscita.json --set ETA_USCITA=62 --json ponte.json
+# riscatto della laurea (Pattern P7): costo e anticipo, poi la proiezione con il montante riscattato
+python "$A/riscatto-laurea.py"     --from dati.json --from inps.json --set ANNI_RISCATTO=5 --json riscatto.json
+python "$A/proiezione-inps.py"     --from riscatto.json --json inps-riscatto.json
 ```
 
-Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Il ponte vuole il montante del fondo **all'uscita**, non alla vecchiaia: se riceve il `mc.json` della vecchiaia si ferma e indica il valore di `ANNI` con cui rigenerarlo.
+Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Il ponte vuole il montante del fondo **all'uscita**, non alla vecchiaia: se riceve il `mc.json` della vecchiaia si ferma e indica il valore di `ANNI` con cui rigenerarlo. Lo stesso fa il riscatto se un `--set` di età contraddice il JSON della proiezione; il JSON del riscatto porta l'età di uscita, mentre gli altri `--set` di scenario della prima proiezione vanno ripetuti nella seconda.
 
 Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico movimenti del fondo pensione** (CSV), e produce: anzianità e retribuzioni per anno, la ricostruzione del montante contributivo (contributi × aliquota, capitalizzati coi tassi ufficiali ISTAT — tabella verificata nello script, ±qualche % rispetto al dato esatto de "La mia pensione futura"), montante del fondo per comparto con stima euristica del mix azionario, versamenti per anno/fonte, e il blocco di parametri pronti per `proiezione-inps.py` e `montecarlo-pensione.py`. I dati reali battono sempre quelli dichiarati a memoria.
 
@@ -305,6 +310,7 @@ Per ciascun pattern di copertura, quantificare l'impatto come scenario, con cost
 - **Pattern P4 — Conferire TFR**: se ancora in azienda, simulare il delta cumulato sulle quote future di TFR (il maturato resta in azienda), come scenario: la scelta è irrevocabile
 - **Pattern P5 — Risparmio non previdenziale**: copertura del residuo gap via PAC ETF (rinviare a competenze separate)
 - **Pattern P6 — Uscita anticipata con capitale-ponte** («posso smettere a X anni?»): `ponte-pensione.py` simula il capitale che copre gli anni dall'uscita alla vecchiaia, in euro di oggi, con la probabilità di farcela e il capitale necessario per confidenza; vedi «Uscita anticipata e RITA» qui sotto
+- **Pattern P7 — Riscattare la laurea**: `riscatto-laurea.py` mette a confronto agevolato e ordinario (costo lordo e netto, rata, pensione in più, anni di pensione per rientrare) e mostra di quanto si anticipa la pensione anticipata ordinaria; con `--json` passa il montante con il riscatto a `proiezione-inps.py --from` (comandi nello Step 1). Prima di lanciarlo chiedere: gli anni del corso legale ancora riscattabili, cioè non fuori corso né già coperti da contributi (`ANNI_RISCATTO`; il default di 5 anni non va usato al posto del dato); quanti cadono prima del 1996 (`ANNI_PRIMA_DEL_1996`: per quelli l'onere lo calcola solo INPS); il sesso (`SESSO='F'` per le donne, il requisito dell'anticipata è un anno più basso); rate o unica soluzione (`RATE_MENSILI`); l'anzianità di oggi se manca l'estratto (`ANZIANITA_ATTUALE`). È uno scenario: conta soprattutto per chi punta all'anticipata o rischia di non arrivare a 20 anni di contributi. Dettagli e fonti in `references/previdenza-obbligatoria.md`, «Riscatto della laurea»
 
 Per ogni pattern: pro, contro, vincoli (es. €5.300 cap, rischio comparto), orizzonte temporale.
 
@@ -391,7 +397,7 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 
 ## Riferimenti
 
-- `references/previdenza-obbligatoria.md` — sistema contributivo INPS, tabella coefficienti, requisiti accesso pensione, tassazione assegno
+- `references/previdenza-obbligatoria.md` — sistema contributivo INPS, tabella coefficienti, requisiti accesso pensione, riscatto della laurea, tassazione assegno
 - `references/previdenza-complementare.md` — forme (negoziale/aperto/PIP), conferimento TFR, deduzione €5.300, comparti, tassazione fondi
 - `references/proiezione-tenore-vita.md` — metodologia gap analysis, parametri scenari, strategie di copertura
 - `references/montecarlo-pensione.md` — la dimensione **stocastica** della proiezione: perché i due pilastri hanno rischi opposti (il pubblico INPS è rivalutato al PIL, non al mercato → àncora deterministica; il fondo pensione è esposto al mercato → Monte Carlo), e la lettura onesta che ne segue (tutta la dispersione del tasso di sostituzione viene dal complementare)
@@ -400,6 +406,7 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 - `assets/importa-previdenza.py` — legge l'estratto conto INPS (XML) e lo storico del fondo pensione (CSV): anzianità, retribuzioni, montante ricostruito, mix del fondo; `--anonimo` per non stampare i dati personali, `--json` per la catena dello Step 1
 - `assets/proiezione-inps.py` — proiezione parametrica della pensione INPS in euro di oggi, con il coefficiente proiettato all'età di pensionamento e la sensibilità a PIL reale e coefficienti; avvisa se la posizione è mista (retribuzioni prima del 1996)
 - `assets/netto-pensione.py` — dal lordo al netto: IRPEF da pensionato, detrazioni e addizionali sulla pensione INPS, tassazione agevolata della rendita del fondo; il tasso di sostituzione **netto** è quello che misura il tenore di vita
+- `assets/riscatto-laurea.py` — riscatto della laurea, agevolato e ordinario a confronto: onere, costo netto dopo la deduzione, rata, pensione lorda in più, anni per rientrare e anticipo sull'anticipata ordinaria; legge con `--from` il JSON di `importa-previdenza.py` e di `proiezione-inps.py`, e con `--json` passa il montante con il riscatto a `proiezione-inps.py --from` (Pattern P7)
 - `assets/ponte-pensione.py` — «posso smettere a X anni?»: Monte Carlo del capitale-ponte dall'uscita alla vecchiaia, RITA integrata, costi permanenti dell'uscita (vedi «Uscita anticipata e RITA»)
 - `assets/montecarlo-pensione.py` — il **Monte Carlo** del tasso di sostituzione: àncora l'INPS al valore deterministico del foglio e simula solo il fondo pensione via block bootstrap sulla serie storica USA nominale in dollari (Damodaran), di cui di default usa solo la forma: la media è ricentrata sul rendimento reale del comparto; con `RICENTRA_MEDIA = False` la serie si deflaziona anno per anno (stesso motore di obiettivi). Restituisce i percentili del tasso di sostituzione, la probabilità di una soglia obiettivo, e la decomposizione àncora-pubblica / banda-di-mercato-complementare. Richiede numpy; usa `rendimenti-storici.csv`
 - `assets/rendimenti-storici.csv` — serie annuale azionario/obbligazionario (Damodaran/NYU Stern, 1928–2025) per il bootstrap; sostituibile con una propria serie

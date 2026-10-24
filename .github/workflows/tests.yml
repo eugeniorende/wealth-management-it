@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  suite:
     runs-on: ubuntu-latest
     # Il minimo dichiarato nel README e la versione più recente: t_compila compila
     # tutti gli script con l'interprete del job, quindi una sintassi solo-3.12 emerge qui.
@@ -79,10 +79,23 @@ jobs:
       - run: pip install -r tests/requirements.txt
       - run: python tests/run_tests.py --skip freshness
 
+  # Il ruleset di main e develop chiede un check che si chiama «test»: i job della matrice si
+  # chiamano «suite (3.11)» e «suite (3.14)», quindi questo job li riassume. È verde solo se lo
+  # sono tutti, Windows compreso: con !cancelled() un job a monte fallito lo fa fallire invece di
+  # saltarlo (un check saltato varrebbe come superato), e un run annullato non dà un falso rosso.
+  test:
+    if: ${{ !cancelled() }}
+    needs: [suite, test-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "suite: ${{ needs.suite.result }} · test-windows: ${{ needs.test-windows.result }}"
+          [ "${{ needs.suite.result }}" = success ] && [ "${{ needs.test-windows.result }}" = success ]
+
   # Il manifest del plugin passa `claude plugin validate --strict`: anche i warning
   # (campi sconosciuti, nomi non kebab-case) bloccano. Evita di scoprire un plugin.json
   # rotto solo all'installazione. Il solo avviso ammesso è ICON_MISSING del controllo
-  # per il plugin directory, che non cambia l'esito (l'icona la decide il proprietario).
+  # per il plugin directory, che non cambia l'esito (l'icona non si aggiunge, per decisione del proprietario).
   validate:
     runs-on: ubuntu-latest
     steps:

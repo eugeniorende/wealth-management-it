@@ -4,6 +4,14 @@ Le versioni del plugin `wealth-management-it`, dalla più recente. Le modifiche 
 
 Ogni skill ha anche una versione propria (`metadata.version` nel frontmatter di `SKILL.md`): la sua storia è in fondo, in «Storia delle skill».
 
+## Non rilasciato
+
+Su `develop` dopo il tag `v0.11.0`.
+
+- **CI per il ruleset** (PR #54): il ruleset di `main` e `develop` chiede i check `test` e `validate`, ma i job della matrice si chiamano «test (3.11)» e «test (3.14)», quindi un check «test» non arrivava mai e ogni PR restava bloccata. La matrice ora è il job `suite`, e un job `test` la riassume con quello Windows: verde solo se lo sono entrambi.
+- **Casi frequenti del freelance** (T13, F063): in it-pianificazione-autonomi la rivalsa INPS del 4% come compenso (art. 1 c. 212 L. 662/1996), saldo e acconti di contributi e imposta sostitutiva con l'esempio primo anno contro secondo (€0 contro €17.760,92 su €40.000 di compensi al 5%), deduzione dei contributi per cassa ed eccedenza nei righi LM49 e RP21, Pattern A6 sulla cassa del secondo anno; il rinvio del 2026 al 20 luglio datato e con l'abrogazione del D.L. 89/2026; i contributi si versano con le causali INPS PXX o P10, non con il codice 1299 citato prima. Fonti: L. 662/1996, L. 190/2014 c. 64, art. 58 DL 124/2019 e Ris. AdE 93/E/2019, istruzioni Redditi PF 2026, Circ. INPS 8/2026, con le corrispondenze dal 2027 (art. 235 D.Lgs. 117/2026, art. 72 D.Lgs. 33/2025).
+- **Riscatto della laurea** (T13, F055): nuovo `riscatto-laurea.py` in it-pianificazione. Mette a confronto agevolato (€18.808 × 33% = €6.206,64 l'anno per le domande del 2026) e ordinario (33% della retribuzione), con costo netto dopo la deduzione, rata fino a 120 mesi, pensione lorda in più, anni di pensione per rientrare e anticipo sull'anticipata ordinaria. Legge con `--from` il JSON di `importa-previdenza.py`, che ora scrive anche l'anzianità contributiva, e di `proiezione-inps.py`; con `--json` passa il montante con il riscatto a `proiezione-inps.py --from`. Sezione «Riscatto della laurea» in `previdenza-obbligatoria.md` sulle fonti primarie (art. 2 D.Lgs. 184/1997, art. 20 c. 6 DL 4/2019, Circ. INPS 14/2026, scheda INPS); il riscatto torna tra i trigger della skill, ricongiunzione e totalizzazione restano escluse. Dalla revisione avversariale: coefficiente calcolato come `proiezione-inps.py` all'età di uscita (errore se un `--set` di età contraddice il suo JSON), `SESSO` per il requisito dell'anticipata, `ANNI_PRIMA_DEL_1996` per gli anni di corso fuori dal contributivo, avviso sull'unica soluzione che esce dallo scaglione, aliquota sulla pensione in più al 38% come `netto-pensione.py`, anzianità dell'importatore al massimo 52 settimane per anno, età di uscita nella catena verso `proiezione-inps.py`, doppia citazione 2027 per il riscatto di chi non ha mai lavorato.
+
 ## v0.11.0 (24/10/2026)
 
 Script con un'interfaccia comune e una catena di dati senza travasi a mano, test che vincolano i numeri, packaging e verifiche di pre-pubblicazione. Le voci sono in ordine di PR.
@@ -464,6 +472,9 @@ Da estendere in iterazioni successive:
 
 ### it-pianificazione
 
+#### v0.13 (non rilasciata)
+- Riscatto della laurea: `riscatto-laurea.py` (agevolato e ordinario, costo netto, rate, pensione in più, anticipo sull'anticipata ordinaria, sesso e anni di corso prima del 1996), sezione nella reference INPS e Pattern P7 con i dati da chiedere; anzianità contributiva nel JSON di `importa-previdenza.py`, al massimo 52 settimane per anno.
+
 #### v0.12 (plugin 0.11.0)
 - Catena `--from`/`--json` tra importa-previdenza, proiezione-inps, montecarlo-pensione, netto-pensione e ponte-pensione; `--help` e `--set` su tutti gli script; storico del fondo con BOM e unità nelle intestazioni; riscatto della laurea, ricongiunzione e totalizzazione tolti dai trigger e dichiarati fuori perimetro nella description.
 - Leve come scenari, non raccomandazioni: lo spazio deducibile è un tetto fiscale, non un importo consigliato; nuovo Pattern P6 e paragrafo «Uscita anticipata e RITA»; il ponte controlla che l'età del montante coincida con l'età d'uscita; proiezione-inps avvisa sulle posizioni miste; vincoli della delibera COVIP del 25/6/2026 letti in Gazzetta Ufficiale.
@@ -514,9 +525,13 @@ Roadmap:
 - Dipendenti pubblici (TFS, regimi specifici)
 - ✅ Monte Carlo per scenari di rendimento → fatto in v0.4 (`montecarlo-pensione.py`, due pilastri: complementare stocastico, pubblico àncora)
 - Integrazione completa con it-tax-optimization (ottimizzazione joint IRPEF + finanziaria)
-- Ricongiunzione, totalizzazione, riscatto laurea (richiedono dati INPS reali)
+- ✅ Riscatto della laurea → fatto in v0.13 (`riscatto-laurea.py`, sezione in `references/previdenza-obbligatoria.md`, Pattern P7)
+- Ricongiunzione e totalizzazione: fuori perimetro (dipendono dalla storia contributiva su più gestioni); la skill rinvia a INPS o a un patronato
 
 ### it-pianificazione-autonomi
+
+#### v0.5 (non rilasciata)
+- Casi frequenti del freelance: rivalsa del 4% come compenso, saldo e acconti con l'esempio primo anno contro secondo, deduzione per cassa ed eccedenza LM49 → RP21, Pattern A6.
 
 #### v0.4 (plugin 0.11.0)
 - Description più corta e quotata; sezione «Dove lavorare» con la copia dell'Excel nella cartella di lavoro.
@@ -533,7 +548,7 @@ Fino alla 0.10.0 del plugin la skill era alla versione 0.3 (introdotta in v0.6 d
 Roadmap:
 - Artigiani e commercianti (contributi fissi sul minimale, riduzioni del 35% e del 50%): fuori perimetro per decisione del 20/10/2026; la skill li rinvia a INPS o al commercialista
 - Minimale della Gestione Separata (€18.808 nel 2026) e mesi accreditati sotto il minimale: non cambiano il montante, ma l'anzianità per i requisiti; il foglio non li modella ancora
-- v0.5: simulatore numerico del confronto forfettario vs ordinario ai fini previdenziali (oltre alla fotografia annua già nel foglio Excel)
+- Possibile: simulatore numerico del confronto forfettario vs ordinario ai fini previdenziali (oltre alla fotografia annua già nel foglio Excel)
 - Possibile: dettaglio per singola cassa con i coefficienti di trasformazione e le regole di rivalutazione specifiche (ENPAM Quota A/B, casse 103/1996)
 
 ### it-rebalance
