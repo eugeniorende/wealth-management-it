@@ -29,7 +29,7 @@ I dati personali e i file compilati vivono nella **cartella di lavoro** dell'ute
 - gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
 
-`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-revisione`). Dipendenze degli script: Python 3.11 o successivo con numpy, openpyxl e python-docx (`pip install numpy openpyxl python-docx`).
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-revisione`). Dipendenze dello script: Python 3.11 o successivo con python-docx (`pip install python-docx`).
 
 ## Il workflow della revisione
 
@@ -87,17 +87,18 @@ Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato 
 
 ### I dati dell'IPS: `--dati ips.json`
 
-`genera-ips.py` prende i dati del caso da un JSON nella cartella di lavoro (`--dati ips.json`), mai dal blocco `DATI` dentro lo script, che resta l'esempio; senza `--dati` lo script genera l'esempio e avvisa. Il JSON è un oggetto con le stesse chiavi del blocco `DATI` (le liste al posto delle tuple); le chiavi assenti usano i default di policy, una chiave ignota è un errore. Chiavi principali:
+`genera-ips.py` prende i dati del caso da un JSON nella cartella di lavoro (`--dati ips.json`), mai dal blocco `DATI` dentro lo script, che resta l'esempio; senza `--dati` lo script genera l'esempio e avvisa. Il JSON è un oggetto con le stesse chiavi del blocco `DATI` (le liste al posto delle tuple). Le chiavi del caso sono **obbligatorie** e vengono tutte dal JSON, mai dall'esempio: se ne manca una, o ha la forma sbagliata (un importo scritto come testo, una riga con un elemento in meno), lo script si ferma con `ERRORE:` e il nome della chiave. Sono facoltative solo le note, il broker e i testi di policy, che senza il JSON usano i default del plugin; una chiave ignota è un errore. Le chiavi:
 
 | Chiave | Forma | Da dove |
 |---|---|---|
-| `investitore`, `data`, `capitale`, `sottotitolo` | testo, testo (vuoto = mese corrente), numero, testo | l'utente |
-| `profilo` | lista di `[etichetta, valore]` | l'utente (età, reddito, tolleranza, capacità di risparmio) |
-| `obiettivi` | lista di `[nome, "orizzonte · tipo", "Profilo (% azioni)", target, capitale assegnato]` | pianificatore e `allocatore-capitale.py --json` (`obiettivi[].allocato`) |
+| `investitore`, `capitale` (obbligatorie) | testo, numero | l'utente |
+| `data`, `sottotitolo` | testo (vuoto = mese corrente), testo | facoltative |
+| `profilo` (obbligatoria) | lista di `[etichetta, valore]` | l'utente (età, reddito, tolleranza, capacità di risparmio) |
+| `obiettivi` (obbligatoria) | lista di `[nome, "orizzonte · tipo", "Profilo (% azioni)", target, capitale assegnato]` | pianificatore e `allocatore-capitale.py --json` (`obiettivi[].allocato`) |
 | `obiettivi_nota`, `allocazione_nota` | testo | facoltative |
-| `allocazione` | lista di `[classe, importo, quota %]` | `allocatore-capitale.py --json` (`aggregato`) |
-| `glide_path` | lista di `[fase, anni, "da → a %", cosa succede]` | `glidepath-obiettivi.py --json` (`portafoglio`) |
-| `versamenti`, `strumenti`, `previdenza` | liste di testi, o di `[classe, testo]` per gli strumenti | l'utente; la proiezione pensione per `previdenza` |
+| `allocazione` (obbligatoria) | lista di `[classe, importo, quota %]` | `allocatore-capitale.py --json` (`aggregato`) |
+| `glide_path` (obbligatoria) | lista di `[fase, anni, "da → a %", cosa succede]` | `glidepath-obiettivi.py --json` (`portafoglio`) |
+| `versamenti`, `strumenti`, `previdenza` (obbligatorie) | liste di testi, o di `[classe, testo]` per gli strumenti | l'utente; la proiezione pensione per `previdenza` |
 | `ribilanciamento`, `guardrail`, `revisione`, `fiscalita`, `checklist` | liste di testi | facoltative: senza, i default di policy del plugin |
 | `broker` | `null` oppure `{"nome": …, "sezioni": [[titolo, testo], …]}` | facoltativa, Appendice B |
 
@@ -110,11 +111,11 @@ Ogni cella di input del cruscotto ha una fonte precisa. Dove la fonte è uno scr
 | Patrimonio | estratti di broker, fondo e banca (nessuno script) | saldi a oggi per contenitore; debiti residui | `Patrimonio!B6:B13`; `B17:B18` |
 | Allocazione attuale | `importa-estratto-broker.py --json` (it-tax-optimization), più fondo e liquidità | `posizioni[].valore`, sommati per classe (lo script dà la categoria fiscale, la classe la assegni tu) | `Allocazione!B5:B9` |
 | Allocazione target | `allocatore-capitale.py --json` (it-pianificazione-obiettivi) | `aggregato.azioni`, `.obbligazioni`, `.liquidita` diviso `aggregato.totale` | `Allocazione!D5:D7` (`D8:D9` a mano) |
-| Glide path | `glidepath-obiettivi.py --json` (it-pianificazione-obiettivi) | `portafoglio[anno]`, la quota azionaria aggregata dell'anno del piano | `Allocazione!D5`, se il target segue il calendario |
+| Glide path | `glidepath-obiettivi.py --json` (it-pianificazione-obiettivi) | `portafoglio[anno]`, la quota azionaria aggregata dell'anno del piano | `Allocazione!D5`, se il target segue il calendario; `D6:D7` si riproporzionano sulle quote dell'allocatore perché il totale `D10` resti 100% |
 | Andamento | estratti (nessuno script) | saldo iniziale e finale, versamenti netti; inflazione del periodo | `Andamento!B4:B6`; `B14` |
 | Obiettivi | `montecarlo-obiettivi.py --json` (it-pianificazione-obiettivi) | `obiettivi[].probabilita_successo`; `obiettivi[].gia` e `obiettivi[].target_oggi` (o le colonne F e B del pianificatore); `obiettivi[].priorita` | `Sintesi!E6:E9`; `B6:B9` e `C6:C9`; `G6:G9` |
-| Pensione, dipendenti | `proiezione-inps.py --json` → `montecarlo-pensione.py --from --json` → `netto-pensione.py --from --json` (it-pianificazione) | `tasso_sostituzione_lordo_vs_ral_finale` dalla proiezione, oppure `scenari[].tasso_sostituzione_netto` del netto (è il netto che misura il tenore di vita: dirlo nel report) | `Sintesi!B12`; l'obiettivo `B13` a mano |
-| Pensione, autonomi | `proiezione-pensione-autonomi.xlsx`, foglio Riepilogo (nessuno script) | tasso di sostituzione | `Sintesi!B12` |
+| Pensione, dipendenti | `proiezione-inps.py --json` → `montecarlo-pensione.py --from --json` → `netto-pensione.py --from --json` (it-pianificazione) | `tasso_sostituzione_lordo.mediana` del Monte Carlo: INPS più fondo, lordo sulla RAL finale. L'obiettivo è il `target` dello stesso JSON, sulla stessa base lorda (per un obiettivo diverso si rilancia con `--set TASSO_SOSTITUZIONE_TARGET=…`). Il netto (`scenari[nome="mediana"].tasso_sostituzione_netto`, e `P10` per la lettura prudente) va nel report come misura del tenore di vita, mai in B12 contro un obiettivo lordo; `tasso_sostituzione_lordo_vs_ral_finale` della proiezione è la sola quota pubblica e non va in B12 | `Sintesi!B12`; `B13` |
+| Pensione, autonomi | `proiezione-pensione-autonomi.xlsx`, foglio Riepilogo (nessuno script) | `Riepilogo!B13`, «Tasso di sostituzione — totale» (non la B12, che è la sola obbligatoria), lordo; l'obiettivo sulla stessa base | `Sintesi!B12`; `B13` |
 | Fiscalità | `importa-estratto-broker.py --json` | `analisi.per_broker[broker].zainetto_in_scadenza` e `.plus_realizzabili_a_costo_zero` | foglio `Azioni`, righe di scadenza al 31/12 (nessuna cella numerica) |
 
 Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione; `--help` di ogni script elenca anche le chiavi che legge con `--from`.

@@ -112,7 +112,7 @@ I dati personali e i file compilati vivono nella **cartella di lavoro** dell'ute
 - gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/importa-previdenza.py" estratto.xml fondo.csv --anonimo --json dati.json`, `python "${CLAUDE_SKILL_DIR}/assets/proiezione-inps.py" --from dati.json --json inps.json`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
 
-`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-pianificazione`). Dipendenze degli script: Python 3.11 o successivo con numpy, openpyxl e python-docx (`pip install numpy openpyxl python-docx`).
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-pianificazione`). Dipendenze degli script: Python 3.11 o successivo con numpy (`pip install numpy`).
 
 ## Workflow operativo
 
@@ -132,10 +132,12 @@ python "$A/importa-previdenza.py" estratto.xml fondo.csv --anonimo --json dati.j
 python "$A/proiezione-inps.py"     --from dati.json --json inps.json
 python "$A/montecarlo-pensione.py" --from dati.json --from inps.json --json mc.json
 python "$A/netto-pensione.py"      --from mc.json --json netto.json
-python "$A/ponte-pensione.py"      --from inps.json --from mc.json --set ETA_USCITA=62 --json ponte.json
+# per l'uscita anticipata: un secondo Monte Carlo fino all'età di uscita (ANNI = 62 − età di oggi)
+python "$A/montecarlo-pensione.py" --from dati.json --from inps.json --set ANNI=25 --json mc-uscita.json
+python "$A/ponte-pensione.py"      --from inps.json --from mc-uscita.json --set ETA_USCITA=62 --json ponte.json
 ```
 
-Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette.
+Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Il ponte vuole il montante del fondo **all'uscita**, non alla vecchiaia: se riceve il `mc.json` della vecchiaia si ferma e indica il valore di `ANNI` con cui rigenerarlo.
 
 Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico movimenti del fondo pensione** (CSV), e produce: anzianità e retribuzioni per anno, la ricostruzione del montante contributivo (contributi × aliquota, capitalizzati coi tassi ufficiali ISTAT — tabella verificata nello script, ±qualche % rispetto al dato esatto de "La mia pensione futura"), montante del fondo per comparto con stima euristica del mix azionario, versamenti per anno/fonte, e il blocco di parametri pronti per `proiezione-inps.py` e `montecarlo-pensione.py`. I dati reali battono sempre quelli dichiarati a memoria.
 

@@ -1455,7 +1455,7 @@ def t_lettore_pianificatore():
     rc, out = run_script(script["montecarlo-obiettivi.py"], xlsx)
     assert "Rendimento 5,5% · volatilità 13,0%" in out, out[-600:]
     shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
-    # (b) target vuoto: il glide path lo tiene (max); Monte Carlo e allocatore lo escludono dicendolo
+    # (b) target vuoto: il glide path e l'asset location lo tengono; Monte Carlo e allocatore lo escludono dicendolo
     xlsx = _excel_test([("Con target", 50000, 10, "Moderato", 10000, "importante", "terminante"),
                         ("Senza target", None, 15, "Crescita", 20000, "desiderabile", "terminante")])
     assert motore.leggi_pianificatore(xlsx)["obiettivi"][1]["target_oggi"] is None
@@ -1465,6 +1465,17 @@ def t_lettore_pianificatore():
         rc, out = run_script(script[nome], xlsx)
         assert rc == 0 and "Senza target: senza importo target" in out and "escluso" in out, f"{nome}: {out[-400:]}"
         assert "Con target" in out
+    # revisione T9: all'asset location il target non serve (contano capitale, orizzonte e profilo),
+    # quindi l'obiettivo «il più possibile» a lungo termine entra nel confronto PIR/dossier
+    rc, out = run_script(script["asset-location-optimizer.py"], xlsx)
+    assert rc == 0 and "▸ Senza target" in out and "scenario di esempio" not in out, out[-500:]
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # revisione T9: due obiettivi con lo stesso nome mescolavano i calendari del glide path (chiave = nome)
+    xlsx = _excel_test([("Anticipo casa", 40000, 6, "Moderato", 0, "importante", "terminante"),
+                        (" anticipo CASA", 20000, 3, "Conservativo", 0, "importante", "terminante")])
+    for nome, path in script.items():
+        rc, out = run_script(path, xlsx)
+        assert rc == 1 and "ERRORE:" in out and "ripetuto" in out and "Obiettivi!A6" in out and "Obiettivi!A5" in out, f"{nome}: {out[-300:]}"
     shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
     # (c) orizzonte 1,5 anni: errore esplicito, non «1 anni»; (f) profilo ignoto: errore con la tabella
     for caso, atteso in ((("Casa", 40000, 1.5, "Moderato", 0, "importante", "terminante"), "anni interi"),
@@ -1495,10 +1506,17 @@ def t_lettore_pianificatore():
         rc, out = run_script(path, finto)
         assert rc == 1 and "ERRORE:" in out and "non è un pianificatore xlsx leggibile" in out and "Traceback" not in out, f"{nome}: {out[-300:]}"
     shutil.rmtree(os.path.dirname(finto), ignore_errors=True)
-    xlsx = _pianificatore_modificato(lambda wb: wb["Obiettivi"].__setitem__("B6", "quarantamila"))
-    rc, out = run_script(script["glidepath-obiettivi.py"], xlsx)
-    assert rc == 1 and "Obiettivi!B6" in out and "testo" in out, out[-300:]
-    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # revisione T9: anche il testo che sembra un numero è un errore. Prima «1.5» diventava 15 anni,
+    # «0.02» un'inflazione del 200% e «40.000» passava: ogni punto era preso per le migliaia.
+    for cella, testo in (("Obiettivi!B6", "quarantamila"), ("Obiettivi!B6", "40.000"), ("Obiettivi!C6", "1.5"),
+                         ("Parametri!B6", "0.02"), ("Parametri!B11", "0.025")):
+        foglio, rif = cella.split("!")
+        xlsx = _pianificatore_modificato(lambda wb: wb[foglio].__setitem__(rif, testo))
+        for nome, path in script.items():
+            rc, out = run_script(path, xlsx)
+            assert rc == 1 and "ERRORE:" in out and cella in out and "testo" in out and "Traceback" not in out, \
+                f"{nome}, {cella} = {testo!r}: rc {rc}, {out[-300:]}"
+        shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
     # (h) riga col nome ma senza orizzonte: scartata con il motivo; riga senza nome: scartata
     def incompleta(wb):
         o = wb["Obiettivi"]
@@ -1738,6 +1756,40 @@ def t_dati_ribilanciamento():
         assert m2.carica_zainetto_importatore(os.path.join(tmp, "imp.json")) == atteso and m2.ZAINETTO == atteso
         rc, out = run_script(script, "--dati", piano, "--zainetto", piano, cwd=tmp)
         assert rc == 1 and "non è il JSON di importa-estratto-broker" in out, out[-300:]
+        # revisione T9: dal JSON dell'importatore al piano copiando le posizioni così come sono (più la
+        # classe). L'importatore scrive l'aliquota in percento (12.5): prima il BTP veniva respinto, o
+        # tassato al 26% togliendo il campo; ora vale il 12,5% e consuma lo zainetto al 48,08%.
+        open(os.path.join(tmp, "e.csv"), "w", encoding="utf-8").write(
+            "broker,isin,descrizione,quantita,pmc,prezzo_corrente\n"
+            "Fineco,IT0005436693,BTP 0.6% 2031,10000,0.80,0.95\n"
+            "Fineco,IE00B4L5Y983,ISHARES CORE MSCI WORLD UCITS ETF,100,50,50\n")
+        open(os.path.join(tmp, "z.csv"), "w", encoding="utf-8").write("broker,anno,importo,aliquota\nFineco,2024,1000,26\n")
+        rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"), os.path.join(tmp, "e.csv"),
+                             os.path.join(tmp, "z.csv"), "--anno", "2026", "--json", os.path.join(tmp, "imp2.json"))
+        assert rc == 0, out[-300:]
+        imp2 = json.load(open(os.path.join(tmp, "imp2.json"), encoding="utf-8"))
+        assert sorted(p["aliquota"] for p in imp2["posizioni"]) == [12.5, 26.0], imp2["posizioni"]
+        classi = {"IT0005436693": "obbligazionario", "IE00B4L5Y983": "azionario"}
+        json.dump({"posizioni": [dict(p, classe=classi[p["isin"]]) for p in imp2["posizioni"]], "zainetto": {},
+                   "target": {"azionario": 0.6, "obbligazionario": 0.4}}, open(piano, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", piano, "--zainetto", os.path.join(tmp, "imp2.json"), "--out", os.path.join(tmp, "z2"), cwd=tmp)
+        assert rc == 0 and "in percento" in out, out[-600:]
+        vendita = next(r for r in out.splitlines() if "VENDI" in r and "obbligazionario" in r)
+        assert "imposta €0" in vendita and "48,08%" in out, out[-900:]
+        # zainetto con il nome del broker scritto diversamente: allineato con un avviso, non perso;
+        # zainetto di un broker senza posizioni: avviso «non usato» (con il suggerimento di --broker)
+        json.dump({"posizioni": pos, "zainetto": {"FINECO": 5000, "(broker non indicato)": 700, "Directa": 0},
+                   "target": {"azionario": 0.6, "obbligazionario": 0.3, "monetario": 0.1}}, open(piano, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", piano, "--out", os.path.join(tmp, "z3"), cwd=tmp)
+        assert rc == 0 and "«FINECO» → «Fineco»" in out and "compensata €3.200 dallo zainetto Fineco" in out, out[-900:]
+        assert "(broker non indicato)" in out and "non usato" in out and "--broker" in out, out[-900:]
+        # numeri scritti come testo nel JSON: ERRORE con rc 1, mai un Traceback
+        for chiave, valore in (("target", {"azionario": "0.6", "obbligazionario": 0.3, "monetario": 0.1}),
+                               ("nuovi_versamenti", "1000"), ("zainetto", {"Fineco": "5.000"})):
+            json.dump({"posizioni": pos, "zainetto": {"Fineco": 5000}, "target": {"azionario": 0.6, "obbligazionario": 0.3,
+                       "monetario": 0.1}, chiave: valore}, open(piano, "w", encoding="utf-8"))
+            rc, out = run_script(script, "--dati", piano, cwd=tmp)
+            assert rc == 1 and "ERRORE" in out and "Traceback" not in out, (chiave, rc, out[-300:])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     # i sinonimi normalizzati producono lo stesso piano dei dati canonici
@@ -1777,6 +1829,18 @@ def t_dati_ips():
         assert "Giulia Test" in testo and "Mario Rossi" not in testo and "€50.000" in testo, testo[:600]
         m = re.search(r"perdere circa il (\d+)%", testo)
         assert m and int(m.group(1)) == 16, "nota di rischio dalla quota azionaria del JSON (32% → 16%)"
+        # revisione T9: con --dati nulla viene dall'esempio di Mario Rossi (prima: note, profilo e
+        # glide path dell'esempio riempivano in silenzio le chiavi mancanti)
+        for estraneo in ("fondo emergenza è tenuto", "35 anni", "€32.000", "lungo termine\u201d) guida"):
+            assert estraneo not in testo, f"IPS con --dati contiene un pezzo dell'esempio: «{estraneo}»"
+        completo = json.load(open(dati, encoding="utf-8"))
+        for parziale, attesi in (({"investitore": "X", "capitale": 50000}, ("chiavi mancanti", "profilo", "glide_path")),
+                                 (dict(completo, capitale="50000"), ("capitale",)),
+                                 (dict(completo, allocazione=[["Azioni", "16000", 32.0]]), ("allocazione",))):
+            json.dump(parziale, open(dati, "w", encoding="utf-8"))
+            rc, out = run_script(script, os.path.join(tmp, "x.docx"), "--dati", dati, cwd=tmp)
+            assert rc == 1 and "ERRORE:" in out and all(a in out for a in attesi) and "Traceback" not in out, (parziale, rc, out[-400:])
+        json.dump(completo, open(dati, "w", encoding="utf-8"))
         rc, out = run_script(script, os.path.join(tmp, "demo.docx"), cwd=tmp)
         assert rc == 0 and "Dati di esempio" in out and "Mario Rossi" in out, out[-300:]
         assert not os.path.exists(os.path.join(tmp, "--dati")), "«--dati» non è un nome di file di output"
@@ -1820,6 +1884,29 @@ def t_dove_lavorare():
     manifest = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
     cfg = manifest["userConfig"]["cartella_lavoro"]
     assert cfg["type"] == "directory" and cfg.get("default") and set(cfg) <= {"type", "title", "description", "default", "required"}, cfg
+    # contestato in revisione T9: la riga delle dipendenze era la stessa in ogni skill. Ora elenca i
+    # pacchetti esterni importati in testa agli script della skill (e del motore, se lo importano).
+    pacchetti = {"numpy": "numpy", "openpyxl": "openpyxl", "docx": "python-docx"}
+    for skill in sorted(os.listdir(SKILLS)):
+        assets_dir = os.path.join(SKILLS, skill, "assets")
+        sez = open(os.path.join(SKILLS, skill, "SKILL.md"), encoding="utf-8").read().split("## Dove lavorare")[1].split("\n## ")[0]
+        script = [f for f in os.listdir(assets_dir) if f.endswith(".py")] if os.path.isdir(assets_dir) else []
+        if not script:
+            assert "non ha script" in sez and "pip install" not in sez, f"{skill}: senza script, niente dipendenze"
+            continue
+        usati = set()
+        for f in script:
+            testo_f = open(os.path.join(assets_dir, f), encoding="utf-8").read()
+            for m in re.finditer(r"^(?:import|from) (\w+)", testo_f, re.M):
+                if m.group(1) in pacchetti:
+                    usati.add(pacchetti[m.group(1)])
+            if f != "motore_bootstrap.py" and "leggi_pianificatore" in testo_f:
+                usati.add("openpyxl")   # il lettore del motore importa openpyxl quando serve
+        riga_dip = re.search(r"Dipendenz[ae][^\n]*?(?:\)|standard)\.", sez).group(0)
+        for nome in pacchetti.values():
+            assert (nome in riga_dip) == (nome in usati), f"{skill}: dipendenze dichiarate «{riga_dip}», usate {sorted(usati)}"
+        if not usati:
+            assert "solo libreria standard" in riga_dip, f"{skill}: {riga_dip}"
     # il rimando al ricalcolo da riga di comando dice che scripts/ non è nello zip di Cowork
     rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
     assert re.search(r"ricalcola-excel\.py[^\n]*", rev) and "non lo zip per Cowork" in rev, "it-revisione: ricalcolo condizionale"
@@ -1850,6 +1937,13 @@ def t_lessico():
     for sinonimo, canonico in (("reddito_diverso", "diverso"), ("reddito_capitale", "capitale"), ("Reddito di capitale", "capitale")):
         assert m.normalizza_posizione({"tipo_fiscale": sinonimo})["tipo"] == canonico
     assert set(m.SINONIMI_CHIAVI) >= {"categoria_fiscale", "tipo_fiscale", "classe", "plus_minus", "controvalore"}
+    # revisione T9: i sinonimi del PMC nel glossario sono quelli del prezzo unitario dell'importatore,
+    # mai quelli del costo totale della posizione (prima `costo`, che l'importatore legge come totale)
+    riga_pmc = next(r for r in gloss.splitlines() if r.startswith("| **PMC**"))
+    sinonimi_pmc = [s.strip("`«» ") for s in riga_pmc.rstrip(" |").split("|")[-1].split(",")]
+    for s in sinonimi_pmc:
+        assert s.lower() in imp.SINONIMI["prezzo_carico"] and s.lower() not in imp.SINONIMI["valore_carico"], \
+            f"glossario: «{s}» non è un sinonimo del prezzo medio di carico nell'importatore"
 
 
 @test("T7 ribilanciamento: caso di validazione con asserzioni (vendita €8.000 a imposta zero, CSV, cassa per broker)")
@@ -2302,7 +2396,8 @@ def t_t7_testi():
     for rel, testo in testi.items():
         for v in vietate:
             assert not re.search(v, testo), f"{rel}: «{v}»"
-    assert "PRELIEVO" in testi["references/sequenza-liquidazione.md"] and "PRELIEVO" in testi["SKILL.md"]
+    # il prelievo in decumulo si passa con la chiave «prelievo» del JSON di --dati (revisione T9)
+    assert "chiave `prelievo`" in testi["references/sequenza-liquidazione.md"] and "chiave `prelievo`" in testi["SKILL.md"]
     assert "MODULA_VOLATILITA = False" in testi["references/bande-dinamiche.md"] or \
         "spenta di default" in testi["references/bande-dinamiche.md"], "bande-dinamiche: modulazione spenta di default"
     assert "aliquota" in testi["SKILL.md"].split("### Step 1")[1].split("### Step 2")[0], "Step 1 senza l'aliquota per posizione"
@@ -2951,9 +3046,10 @@ def t_ips_quota():
                   ("Obbligazionario", 31_300, 31.3), ("Liquidità", 12_000, 12.0)], 57),
                 ([("ETF azionario globale", 60_000, 60.0), ("Obbligazioni", 40_000, 40.0)], 60)):
             out = os.path.join(tmp, "ips.docx")
-            mod.genera({"allocazione": allocazione, "capitale": 100_000,
-                        "obiettivi": [o[:4] + (100_000 * o[4] / mod.DATI["capitale"],) + o[5:]
-                                      for o in mod.DATI["obiettivi"]]}, out)
+            # i dati dell'esempio con l'allocazione del caso (genera() con un dict usa solo quel dict)
+            mod.genera(dict(mod.DATI, allocazione=allocazione, capitale=100_000,
+                            obiettivi=[o[:4] + (100_000 * o[4] / mod.DATI["capitale"],) + o[5:]
+                                       for o in mod.DATI["obiettivi"]]), out)
             testo = "\n".join(p.text for p in Document(out).paragraphs)
             m = re.search(r"allocazione al (\d+)% azionario", testo)
             assert m and int(m.group(1)) == attesa, f"quota azionaria {m.group(1) if m else '—'}%, attesa {attesa}%"
@@ -4378,22 +4474,107 @@ def t_catena_previdenziale():
         atteso, _, _ = mod.netto_pensionato(inps["pensione_inps_lorda_annua"], mod.ADDIZIONALE_REGIONALE, mod.ADDIZIONALE_COMUNALE)
         assert abs(netto["netto_pensione_inps"] - atteso) < 0.01, (netto["netto_pensione_inps"], atteso)
         assert [s["rendita_lorda"] for s in netto["scenari"]] == [mc["rendita_fp"]["p10"], mc["rendita_fp"]["mediana"], mc["rendita_fp"]["p90"]]
+        # revisione T9: mc.json è il montante alla vecchiaia (69), non all'uscita (62). Il ponte lo
+        # rifiuta e dice come rigenerarlo; con il Monte Carlo fino all'uscita la catena regge.
         rc, out = run_script(P("ponte-pensione.py"), "--from", j("inps.json"), "--from", j("mc.json"),
-                             "--set", "N_SIM=2000", "--json", j("ponte.json"))
-        assert rc == 0 and "[from] mc.json: MONTANTE_FP_ALL_USCITA=" in out, out[-400:]
+                             "--set", "ETA_USCITA=62", "--set", "N_SIM=2000")
+        eta_oggi = inps["eta_pensionamento"] - inps["anni_al_pensionamento"]
+        assert rc == 1 and "ERRORE:" in out and f"--set ANNI={int(62 - eta_oggi)}" in out and "Traceback" not in out, (rc, out[-500:])
+        rc, out = run_script(P("montecarlo-pensione.py"), "--from", j("dati.json"), "--from", j("inps.json"),
+                             "--set", f"ANNI={int(62 - eta_oggi)}", "--set", "N_SIM=2000", "--json", j("mc-uscita.json"))
+        assert rc == 0, out[-300:]
+        mc_uscita = leggi("mc-uscita.json")
+        rc, out = run_script(P("ponte-pensione.py"), "--from", j("inps.json"), "--from", j("mc-uscita.json"),
+                             "--set", "ETA_USCITA=62", "--set", "N_SIM=2000", "--json", j("ponte.json"))
+        assert rc == 0 and "[from] mc-uscita.json: MONTANTE_FP_ALL_USCITA=" in out, out[-400:]
         ponte = leggi("ponte.json")
-        assert ponte["montante_fp_all_uscita"] == mc["montante_fp"]["mediana"] and ponte["eta_pensione_vecchiaia"] == 69, ponte
-        assert abs(ponte["rita"]["rata_lorda"] - mc["montante_fp"]["mediana"] / 5) < 0.01, ponte["rita"]
+        assert ponte["montante_fp_all_uscita"] == mc_uscita["montante_fp"]["mediana"] < mc["montante_fp"]["mediana"], ponte
+        assert ponte["eta_pensione_vecchiaia"] == 69, ponte
+        assert abs(ponte["rita"]["rata_lorda"] - mc_uscita["montante_fp"]["mediana"] / 5) < 0.01, ponte["rita"]
+        # il montante forzato a mano con --set non passa dal controllo
+        rc, out = run_script(P("ponte-pensione.py"), "--from", j("inps.json"), "--from", j("mc.json"),
+                             "--set", "ETA_USCITA=62", "--set", "MONTANTE_FP_ALL_USCITA=100000", "--set", "N_SIM=500")
+        assert rc == 0, out[-300:]
         # precedenza: --set prevale su --from; un JSON di un altro script → rc 1; file mancante → rc 1
         rc, out = run_script(P("montecarlo-pensione.py"), "--from", j("inps.json"), "--set", "PENSIONE_INPS_ANNUA=1.0",
                              "--set", "N_SIM=500", "--json", j("mc2.json"))
         assert rc == 0 and leggi("mc2.json")["pensione_inps_lorda"] == 1.0, out[-300:]
         rc, out = run_script(P("proiezione-inps.py"), "--from", j("mc.json"))
         assert rc == 1 and "nessuna delle chiavi attese" in out and "Traceback" not in out, (rc, out[-300:])
+        # contestato in revisione T9: la posizione mista (retribuzioni prima del 1996) si perdeva nella
+        # catena; ora la proiezione la legge dal JSON dell'importatore e lo dice prima del numero
+        _json.dump(dict(dati, contributi_solo_dal_1996=True), open(j("mista.json"), "w", encoding="utf-8"))
+        rc, out = run_script(P("proiezione-inps.py"), "--from", j("mista.json"))
+        assert rc == 0 and "posizione mista" in out and "La mia pensione futura" in out, out[-400:]
+        assert out.index("posizione mista") < out.index("PENSIONE LORDA ANNUA"), "avviso dopo il numero"
+        rc, out = run_script(P("proiezione-inps.py"), "--from", j("dati.json"))
+        assert "posizione mista" not in out, out[-300:]
         rc, out = run_script(P("proiezione-inps.py"), "--from", j("manca.json"))
         assert rc == 1 and "non trovato" in out, (rc, out[-300:])
         rc, out = run_script(P("netto-pensione.py"), "--help")
         assert "chiavi lette da --from" in out and "rendita_fp → RENDITE_FP" in out, out[-500:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T9 contratto di input della revisione: ogni chiave della tabella esiste nel JSON del suo script")
+def t_contratto_revisione():
+    # F031 e revisione T9: la tabella dice quale campo va in quale cella; una chiave rinominata in uno
+    # script la romperebbe in silenzio. B12 e B13 della pensione stanno sulla stessa base (lorda).
+    import json as _json
+    skill = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    tabella = skill.split("### Contratto di input")[1].split("\n## ")[0]
+    tmp = tempfile.mkdtemp()
+    pian = asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx")
+    lanci = {
+        "mc.json": (asset("it-pianificazione", "montecarlo-pensione.py"), ["--set", "N_SIM=500"]),
+        "netto.json": (asset("it-pianificazione", "netto-pensione.py"), []),
+        "mco.json": (asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
+        "alloc.json": (asset("it-pianificazione-obiettivi", "allocatore-capitale.py"), [pian]),
+        "glide.json": (asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py"), [pian]),
+        "imp.json": (asset("it-tax-optimization", "importa-estratto-broker.py"),
+                     [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
+    }
+    try:
+        js = {}
+        for nome, (script, argomenti) in lanci.items():
+            rc, out = run_script(script, *argomenti, "--json", os.path.join(tmp, nome), cwd=tmp)
+            assert rc == 0, f"{os.path.basename(script)}: {out[-300:]}"
+            js[nome] = _json.load(open(os.path.join(tmp, nome), encoding="utf-8"))
+        def valori(dato, percorso):
+            """I valori al percorso «a.b», «a[].b» o «a[nome=x].b» (tutti gli elementi della lista o quello col nome)."""
+            correnti = [dato]
+            for pezzo in percorso.split("."):
+                m = re.fullmatch(r"(\w+)(?:\[(?:(\w+)=\"?([^\]\"]*)\"?)?\])?", pezzo)
+                chiave, filtro_k, filtro_v = m.groups()
+                prossimi = []
+                for c in correnti:
+                    assert isinstance(c, dict) and chiave in c, f"manca «{chiave}» in {percorso}"
+                    v = c[chiave]
+                    if "[" in pezzo:
+                        elementi = list(v.values()) if isinstance(v, dict) else v
+                        if filtro_k:
+                            elementi = [e for e in elementi if str(e.get(filtro_k)) == filtro_v]
+                        assert elementi, f"{percorso}: nessun elemento"
+                        prossimi.extend(elementi)
+                    else:
+                        prossimi.append(v)
+                correnti = prossimi
+            return correnti
+        attese = (("mc.json", "tasso_sostituzione_lordo.mediana"), ("mc.json", "target"),
+                  ("netto.json", 'scenari[nome="mediana"].tasso_sostituzione_netto'),
+                  ("mco.json", "obiettivi[].probabilita_successo"), ("mco.json", "obiettivi[].gia"),
+                  ("mco.json", "obiettivi[].target_oggi"), ("mco.json", "obiettivi[].priorita"),
+                  ("alloc.json", "aggregato.azioni"), ("alloc.json", "aggregato.totale"), ("glide.json", "portafoglio"),
+                  ("imp.json", "posizioni[].valore"), ("imp.json", "analisi.per_broker[].zainetto_in_scadenza"),
+                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"))
+        for nome, percorso in attese:
+            assert percorso.replace("[]", "[") .split("[")[0].split(".")[-1] in tabella or percorso in tabella, \
+                f"la tabella del contratto non nomina «{percorso}»"
+            assert valori(js[nome], percorso), percorso
+        riga = next(r for r in tabella.splitlines() if r.startswith("| Pensione, dipendenti"))
+        assert "`tasso_sostituzione_lordo.mediana`" in riga and "`target`" in riga and "mai in B12" in riga, riga
+        assert js["mc.json"]["target"] == 0.70 and 0 < js["mc.json"]["tasso_sostituzione_lordo"]["mediana"] < 2
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -4605,8 +4786,11 @@ def t_excel_valori_sentinella():
     per_priorita = {p: sum((o[f"I{k}"].value or 0) for k in range(5, 15) if o[f"G{k}"].value == p)
                     for p in ("essenziale", "importante", "desiderabile")}
     assert abs(r["B12"].value - per_priorita["essenziale"]) < 0.01 and abs(r["B14"].value - per_priorita["desiderabile"]) < 0.01
+    # revisione T12: anche il totale «importante», e le tre priorità che ricompongono i versamenti
+    assert abs(r["B13"].value - per_priorita["importante"]) < 0.01, (r["B13"].value, per_priorita)
+    assert abs(r["B12"].value + r["B13"].value + r["B14"].value - r["B5"].value) < 0.01
     assert abs(r["B18"].value - sum(o[f"F{k}"].value or 0 for k in range(5, 15))) < 0.01 and r["B18"].value == 5000
-    # cruscotto: Patrimonio netto = attività − passività, quote sul netto che sommano a 1
+    # cruscotto, modello consegnato: senza debiti il netto coincide con le attività e le quote sommano a 1
     orig = asset("it-revisione", "cruscotto-patrimoniale.xlsx")
     pat = load_workbook(ricalcolati[orig], data_only=True)["Patrimonio"]
     attivita = sum(pat[f"B{k}"].value or 0 for k in range(6, 14))
@@ -4614,6 +4798,23 @@ def t_excel_valori_sentinella():
     assert pat["B14"].value == attivita == 64000 and pat["B19"].value == passivita and pat["B21"].value == attivita - passivita
     assert abs(sum(pat[f"C{k}"].value for k in range(6, 14)) - 1) < 1e-9, "le quote sul netto devono sommare a 1"
     assert abs(pat["C6"].value - 40000 / 64000) < 1e-9
+    # revisione T12: con passività a zero il modello non distingue netto e attività. La variante con
+    # un mutuo (B17), un altro debito (B18) e una voce in B12 vincola netto = attività − passività,
+    # quote sul netto (sommano a più di 1) e il totale delle attività esteso a B6:B13.
+    tmp = tempfile.mkdtemp()
+    try:
+        wb = load_workbook(orig)
+        wb["Patrimonio"]["B17"], wb["Patrimonio"]["B18"], wb["Patrimonio"]["B12"] = 20000, 5000, 1000
+        variante = os.path.join(tmp, "debiti.xlsx")
+        wb.save(variante)
+        (ricalcolata,) = ricalcolatore().ricalcola([variante], os.path.join(tmp, "out"))
+        v = load_workbook(ricalcolata, data_only=True)["Patrimonio"]
+        assert (v["B14"].value, v["B19"].value, v["B21"].value) == (65000, 25000, 40000), \
+            (v["B14"].value, v["B19"].value, v["B21"].value)
+        assert abs(v["C6"].value - 1) < 1e-9 and abs(v["C12"].value - 1000 / 40000) < 1e-9, (v["C6"].value, v["C12"].value)
+        assert abs(sum(v[f"C{k}"].value for k in range(6, 14)) - 65000 / 40000) < 1e-9, "quote non calcolate sul netto"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     # tracker: le cache consegnate coincidono col ricalcolo, salvo le celle volatili (TODAY)
     import math
     orig = asset("it-revisione", "tracker-secchielli.xlsx")
@@ -4633,7 +4834,11 @@ def t_excel_valori_sentinella():
     assert confrontate >= 139 and not diverse, (confrontate, diverse[:3])
 
 
-# Valori chiusi sui default (seed 42): cambiano solo se cambia la meccanica, e allora va detto nel changelog.
+# Valori chiusi sui default (seed 42). Cambiano se cambia la meccanica, ma anche se cambiano i parametri
+# normativi di netto-pensione.py (scaglioni, detrazioni, addizionali, contributi) o la serie
+# rendimenti-storici.csv con la CPI (montecarlo-pensione e ponte-pensione: vale anche per
+# PROB_PONTE_DEFAULT e il capitale necessario). Si aggiornano insieme al dato, seguendo il «Calendario»
+# del README, e la modifica va detta nel changelog.
 MC_PENSIONE_MEDIANA_DEFAULT = 169_205
 NETTO_TASSO_NETTO_MEDIANA_DEFAULT = 0.9693
 
@@ -4685,7 +4890,7 @@ def t_rami_avanzati():
         g_cur = json.load(open(_json_di(gp, "--set", "CURVATURA=0.5", "--json", os.path.join(tmp, "c.json")), encoding="utf-8"))
         lungo_l = next(o for o in g_lin["obiettivi"] if o["nome"].startswith("Lungo"))["quota_azionaria"]
         lungo_c = next(o for o in g_cur["obiettivi"] if o["nome"].startswith("Lungo"))["quota_azionaria"]
-        # a 3,5 anni dalla scadenza (metà della finestra di 7): lineare 0,65 × 0,5, curva 0,65 × sqrt(0,5)
+        # a 3 anni dalla scadenza (indice 17 su orizzonte 20, finestra di 7): lineare 0,65 × 3/7 ≈ 0,279, curva 0,65 × sqrt(3/7) ≈ 0,426
         assert abs(lungo_l[17] - 0.65 * 3 / 7) < 1e-3 and lungo_c[17] > lungo_l[17] and abs(lungo_c[17] - 0.65 * (3 / 7) ** 0.5) < 1e-3
         assert g_cur["curvatura"] == 0.5 and any("curvatura" in sc for sc in g_cur["scarti_dal_foglio"])
     finally:

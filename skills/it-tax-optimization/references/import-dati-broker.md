@@ -126,8 +126,9 @@ tre cifre indica sempre le migliaia, in entrambi i formati: `1.500` e `1,500` va
 perché un importo in euro con tre decimali non è plausibile. Prezzi e quantità seguono il formato del file.
 Le righe senza costo o valore leggibili sono scartate con un avviso, mai in silenzio. Riconosce per esempio `ISIN`/`Codice ISIN`, `Descrizione`/`Strumento`/`Titolo`, `Quantità`/`Pezzi`,
 `Prezzo medio di carico`/`PMC`/`Prezzo di carico`, `Controvalore`/`Valore di mercato`. Se il tuo
-export usa nomi che non riconosce, li aggiungi ai dizionari `SINONIMI` in testa allo script — è una
-riga. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il formato atteso: sugli
+export usa nomi che non riconosce, rinomina le colonne nella copia del CSV che sta nella cartella di
+lavoro (mai lo script nel plugin, che si sovrascrive a ogni aggiornamento) e segnala i nomi, così
+entrano tra i sinonimi. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il formato atteso: sugli
 esempi le uniche plus sono di un ETF, quindi l'importatore risponde «€ 0 a imposta zero».
 Lo zainetto accetta le colonne anno di **realizzo** (non di scadenza), importo residuo, aliquota e,
 se serve, broker. Le varianti della certificazione sono gestite con un avviso:

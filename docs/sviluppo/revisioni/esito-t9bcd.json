@@ -1,0 +1,21 @@
+{
+ "branch": "feature/t9b-lettore-pianificatore, feature/t9c-from-json-catena, feature/t9d-input-esterno-dove-lavorare (PR #44, #45, #46), rivisti insieme su t9d contro develop",
+ "data": "2026-10-24",
+ "revisione": "docs/sviluppo/workflows/review-tema-roadmap.js, run wf_bcde4967-ef6 (ripreso dopo il limite di sessione: tutti i 72 agenti completati). 20 confermati, 3 contesi, 11 respinti; esiti in review-t9bcd.json",
+ "applicati": [
+  "Lettore del pianificatore: ogni cella numerica scritta come testo è un ERRORE con la cella («1.5» diventava 15 anni, «0.02» un 200%, «40.000» passava); nomi di obiettivo ripetuti → ERRORE con le due righe (il glide path ne mescolava i calendari); asset-location tiene gli obiettivi senza target",
+  "genera-ips --dati: chiavi del caso obbligatorie con forma controllata (ERRORE rc 1, mai Traceback), base neutra al posto dell'esempio di Mario Rossi, docstring, commento DATI e --help con --dati, SKILL con le chiavi obbligatorie (rilievi codice-test, propagazione e documentazione sullo stesso difetto)",
+  "Ribilanciamento: posizioni del JSON dell'importatore copiate così come sono, aliquota in percento convertita con un avviso (titoli di Stato al 12,5% e zainetto al 48,08%), chiavi dello zainetto allineate ai broker o segnalate come non usate, numeri come testo respinti; SKILL e reference con --dati invece delle costanti; categoria fiscale con reddito_capitale_irpef per i non armonizzati fuori UE/SEE (art. 10-ter L. 77/1983)",
+  "ponte-pensione: il montante del fondo letto da --from deve essere all'età di uscita, altrimenti ERRORE con il valore di ANNI per rigenerare il Monte Carlo; catena della SKILL con mc-uscita.json; test con il caso negativo",
+  "Contratto di input della revisione: B12 e B13 della pensione sulla stessa base lorda (mediana e target del Monte Carlo, il netto nel report), Riepilogo!B13 per gli autonomi, D6:D7 riproporzionati col glide path; t_contratto_revisione verifica ogni chiave della tabella sul JSON vero",
+  "Glossario: `costo` non è un sinonimo del PMC (l'importatore lo legge come costo totale), chi accetta quali nomi della categoria fiscale; t_lessico lega i sinonimi del PMC all'importatore",
+  "Testi che dicevano di modificare o incollare negli script: importa-previdenza (stdout e docstring), README, asset-location, decumulo, monte-carlo, importatore (rinominare le colonne nella copia del CSV)",
+  "Contesi, applicati perché costano poco: riga delle dipendenze uguale agli import di ogni skill (test in t_dove_lavorare); proiezione-inps legge contributi_solo_dal_1996 e avvisa della posizione mista"
+ ],
+ "non_applicati": [
+  "Conteso X2 (mappatura senza l'aliquota): superato dalla correzione del ribilanciamento, che accetta l'aliquota in percento e la SKILL la nomina",
+  "SKILL di it-revisione, nota della v0.5 («i dati si compilano nel blocco DATI»): è storia della skill e con il T14 passa in CHANGELOG.md",
+  "Nota del cruscotto Sintesi!C12 («da proiezione-pensione.xlsx»): non sbagliata, la base è fissata nella SKILL; modifica dell'Excel non necessaria"
+ ],
+ "mutanti": "Ogni test nuovo è stato visto fallire sul codice di prima. Mutanti in più, tutti uccisi: zainetto non allineato, zainetto e target come testo accettati, dipendenze dichiarate sbagliate, contratto con la sola quota INPS in B12, chiave target rinominata nel JSON del Monte Carlo, glossario con `costo` come PMC."
+}
