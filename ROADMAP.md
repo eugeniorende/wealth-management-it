@@ -1,13 +1,13 @@
 # Roadmap
 
-Stato al 24/10/2026: 0.11.0 rilasciata il 24/10/2026 (T9, T12, T14 e le voci di pre-pubblicazione non riservate al proprietario), dopo la 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11 e parte di T13). Restano T13 (da decidere) e le voci del proprietario: visibilità, branch protection, icona, prove di installazione da un account esterno e in Cowork. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 24/10/2026: 0.11.0 rilasciata il 24/10/2026 (T9, T12, T14 e le voci di pre-pubblicazione non riservate al proprietario), dopo la 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11 e parte di T13). Su `develop`, dopo il tag, T13 con la PR #54 (riscatto della laurea e casi frequenti del freelance). Il repository è pubblico dal 24/10/2026, con un ruleset su `main` e `develop`; l'icona del plugin non si aggiunge. Restano al proprietario le prove di installazione da un account senza accesso e in Cowork. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
 Prese il 20/10/2026.
 
 1. **0.10.0 correttiva entro il 31/12/2026**, con il fix della CI, i quick win, tutti i temi P0 (T1–T8) e T11.
-2. **Repository privato ora, pubblico più avanti.** Licenza, privacy, Windows e packaging si chiudono nella milestone «Pre-pubblicazione», prima di cambiare la visibilità.
+2. **Repository privato ora, pubblico più avanti.** Licenza, privacy, Windows e packaging si chiudono nella milestone «Pre-pubblicazione», prima di cambiare la visibilità. Il proprietario l'ha reso pubblico il 24/10/2026, dopo la 0.11.0.
 3. **Regime dichiarativo: solo principi.** Il motore resta sull'amministrato e la reference del dichiarativo diventa corretta e completa (T3). Non si costruisce un importatore per IBKR o Degiro.
 4. **Uscite operative con gate stretti e disclaimer.** La OPZIONE sulla leva di rischio, il «versa fino a €5.300» e il CSV degli ordini restano, ma solo quando le condizioni sono rispettate. Il disclaimer va anche nei commands e nel CSV.
 5. **Proposte dell'audit adottate:**
@@ -177,22 +177,22 @@ Prese il 20/10/2026.
   - [x] description entro i 1.024 caratteri, quotate per un parser YAML stretto, con `metadata.version` per skill e i trigger non gestiti di it-pianificazione (riscatto, ricongiunzione, totalizzazione) dichiarati fuori perimetro;
   - [x] CHANGELOG.md, con la storia delle skill tolta dai SKILL.md;
   - [x] commands come alias delle skill (`disable-model-invocation`, `argument-hint`, `$ARGUMENTS`);
-  - [x] plugin.json senza warning: `upstream` in `metadata`, `claude plugin validate --strict` nella CI (resta solo ICON_MISSING del controllo per il plugin directory, che non cambia l'esito: l'icona la decide il proprietario);
+  - [x] plugin.json senza warning: `upstream` in `metadata`, `claude plugin validate --strict` nella CI (resta solo ICON_MISSING del controllo per il plugin directory, che non cambia l'esito: il proprietario ha deciso il 24/10/2026 di non aggiungere l'icona);
   - [x] indici nelle reference da 100 righe in su, istruzioni di aggiornamento nel README (`claude plugin update`, auto-update, `--scope`), titolo e lingua italiana nell'IPS in Word.
-- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatte il 21 e il 24/10/2026 le prove in profili Claude Code vuoti: marketplace locale, marketplace da GitHub (con le credenziali della sessione), `--config` e `/plugin configure` della cartella di lavoro, script lanciati dalla copia in cache, zip estratto e validato con `--strict` (verbale in `docs/sviluppo/verbale-installazione-2026-10-24.md`). **Restano al proprietario**: GitHub da un account senza accesso, possibile solo dopo la pubblicazione (decisione 2), e l'upload in Cowork, che richiede la sua interfaccia; i passi sono nel verbale.
+- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatte il 21 e il 24/10/2026 le prove in profili Claude Code vuoti: marketplace locale, marketplace da GitHub (con le credenziali della sessione), `--config` e `/plugin configure` della cartella di lavoro, script lanciati dalla copia in cache, zip estratto e validato con `--strict` (verbale in `docs/sviluppo/verbale-installazione-2026-10-24.md`). **Restano al proprietario**: GitHub da un account senza accesso, possibile dal 24/10/2026 con il repository pubblico, e l'upload in Cowork, che richiede la sua interfaccia; i passi sono nel verbale.
 - [x] Supply chain della CI: action fissate per SHA con test di igiene, claude-code a versione fissa (PR #15). Dependabot su pip non serve: le dipendenze hanno solo versioni minime.
 - [x] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4): OPZIONE e tetto dei €5.300 con il loro gate, CSV degli ordini con la categoria del vocabolario e i dati d'esempio dichiarati, IPS d'esempio dichiarato in copertina, leve previdenziali come scenari nelle skill (verbale in `docs/sviluppo/verbale-rilettura-output-2026-10-24.md`).
 - [x] README coerente con un repository pubblico: marketplace e Releases, aggiornamenti (`claude plugin update`, auto-update, `--scope`), opzione della cartella di lavoro, CHANGELOG.md.
 
 ## Dopo — da decidere
 
-- [ ] **T13 Estensioni** (P1, L): F021, F054, F055, F063.
+- [x] **T13 Estensioni** (P1, L): F021, F054, F055, F063 (PR #32 e #54).
   - [x] Reference sui dividendi esteri e su successione e donazione (F021, F054), anticipate nella 0.10.0 con l'indice, i rimandi da it-rebalance e it-pianificazione-obiettivi e i test sui numeri (PR #32).
-  - [ ] Sezione sul riscatto della laurea (F055); la correzione della description di it-pianificazione si può anticipare con T14.
-  - [ ] Casi frequenti del freelance (F063).
+  - [x] Riscatto della laurea (F055, PR #54): sezione in `previdenza-obbligatoria.md` e, oltre la proposta dell'audit («solo sezione e `--set`»), lo script `riscatto-laurea.py` nella catena `--json` → `--from`, deciso dal proprietario il 24/10/2026 («implementare le ultime funzioni rimaste»).
+  - [x] Casi frequenti del freelance (F063, PR #54): rivalsa del 4%, saldo e acconti con l'esempio primo anno contro secondo, eccedenza LM49 → RP21, Pattern A6.
 
-  Per le due voci aperte la proposta dell'audit, non ancora decisa, è: riscatto solo come sezione e con `--set`. Il confronto TFR contro fondo (F037) e il prelievo in decumulo (F046) sono già in T4 e T7.
+  Il confronto TFR contro fondo (F037) e il prelievo in decumulo (F046) sono già in T4 e T7.
 
 ## Fuori dal codice
 
-- [ ] Branch protection su `main` e `develop` con i check `test` e `validate`, da impostare su GitHub **dopo la pubblicazione**: su un repository privato senza GitHub Pro non è attivabile (l'API risponde 403, verificato il 23/10/2026). Decisione del proprietario.
+- [x] Branch protection su `main` e `develop`: dal 24/10/2026, con il repository pubblico, il proprietario ha attivato un ruleset su entrambi i branch (niente cancellazione né force push, check obbligatori `test` e `validate`).
