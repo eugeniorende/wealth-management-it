@@ -388,6 +388,8 @@ def main():
           "   # ultima annualità completa dall'estratto: verifica con la RAL da contratto")
     if "nascita" in anag:
         print(f"  ETA_ATTUALE      = {eta_stampata((oggi - anag['nascita']).days / 365.25, anonimo)}")
+    print("per riscatto-laurea.py:")
+    print(f"  ANZIANITA_ATTUALE = {round(tot_sett / 52, 2)}   # settimane utili / 52")
     if fp_montante is not None:
         print("per montecarlo-pensione.py:")
         print(f"  FP_POT_ATTUALE      = {fp_montante:_.0f}")
@@ -398,7 +400,7 @@ def main():
 
     if args.json:   # mai nomi né date: solo i parametri (l'età come nei parametri pronti)
         dati = {"montante_attuale": round(montante, 2), "ral_attuale": round(ral_rif, 2),
-                "contributi_solo_dal_1996": bool(prima)}
+                "anzianita_contributiva": round(tot_sett / 52, 2), "contributi_solo_dal_1996": bool(prima)}
         if "nascita" in anag:
             dati["eta_attuale"] = eta_stampata((oggi - anag["nascita"]).days / 365.25, anonimo)
         if fp_montante is not None:

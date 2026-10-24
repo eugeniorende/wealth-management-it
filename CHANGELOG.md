@@ -4,6 +4,12 @@ Le versioni del plugin `wealth-management-it`, dalla più recente. Le modifiche 
 
 Ogni skill ha anche una versione propria (`metadata.version` nel frontmatter di `SKILL.md`): la sua storia è in fondo, in «Storia delle skill».
 
+## Non rilasciato
+
+Su `develop` dopo il tag `v0.11.0`.
+
+- **Riscatto della laurea** (T13, F055): nuovo `riscatto-laurea.py` in it-pianificazione. Mette a confronto agevolato (€18.808 × 33% = €6.206,64 l'anno per le domande del 2026) e ordinario (33% della retribuzione), con costo netto dopo la deduzione, rata fino a 120 mesi, pensione lorda in più, anni di pensione per rientrare e anticipo sull'anticipata ordinaria. Legge con `--from` il JSON di `importa-previdenza.py`, che ora scrive anche l'anzianità contributiva, e di `proiezione-inps.py`; con `--json` passa il montante con il riscatto a `proiezione-inps.py --from`. Sezione «Riscatto della laurea» in `previdenza-obbligatoria.md` sulle fonti primarie (art. 2 D.Lgs. 184/1997, art. 20 c. 6 DL 4/2019, Circ. INPS 14/2026, scheda INPS); il riscatto torna tra i trigger della skill, ricongiunzione e totalizzazione restano escluse.
+
 ## v0.11.0 (24/10/2026)
 
 Script con un'interfaccia comune e una catena di dati senza travasi a mano, test che vincolano i numeri, packaging e verifiche di pre-pubblicazione. Le voci sono in ordine di PR.
@@ -463,6 +469,9 @@ Da estendere in iterazioni successive:
 - Lista aggiornata delle principali azioni italiane > €500M cap (per auto-rilevare quando la Tobin tax si applica)
 
 ### it-pianificazione
+
+#### v0.13 (non rilasciata)
+- Riscatto della laurea: `riscatto-laurea.py` (agevolato e ordinario, costo netto, rate, pensione in più, anticipo sull'anticipata ordinaria), sezione nella reference INPS e Pattern P7; anzianità contributiva nel JSON di `importa-previdenza.py`.
 
 #### v0.12 (plugin 0.11.0)
 - Catena `--from`/`--json` tra importa-previdenza, proiezione-inps, montecarlo-pensione, netto-pensione e ponte-pensione; `--help` e `--set` su tutti gli script; storico del fondo con BOM e unità nelle intestazioni; riscatto della laurea, ricongiunzione e totalizzazione tolti dai trigger e dichiarati fuori perimetro nella description.

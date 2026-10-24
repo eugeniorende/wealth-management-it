@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 134 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 137 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -80,14 +80,15 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 <!-- generata con: python tests/run_tests.py --tabella-test -->
 | Strumento | Test che lo esercitano |
 |---|---|
-| `it-pianificazione/assets/importa-previdenza.py` | 13: T12 fixture realistiche; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale; importa-previdenza ×5 … |
+| `it-pianificazione/assets/importa-previdenza.py` | 14: T12 fixture realistiche; T13 riscatto della laurea; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale … |
 | `it-pianificazione/assets/montecarlo-pensione.py` | 10: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; montecarlo-pensione … |
 | `it-pianificazione/assets/motore_bootstrap.py` | 12: T12 rami avanzati; T14 skill; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap … |
 | `it-pianificazione/assets/netto-pensione.py` | 19: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
 | `it-pianificazione/assets/ponte-pensione.py` | 12: T12 --json previdenziali; T14 postura e fonti; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale … |
-| `it-pianificazione/assets/proiezione-inps.py` | 15: T12 rami avanzati; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill; freshness fiscale … |
+| `it-pianificazione/assets/proiezione-inps.py` | 16: T12 rami avanzati; T13 riscatto della laurea; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
 | `it-pianificazione/assets/proiezione-pensione.xlsx` | 11: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
 | `it-pianificazione/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
+| `it-pianificazione/assets/riscatto-laurea.py` | 9: T13 riscatto della laurea ×3; T14 skill; T9 formati; T9 interfaccia ×2; freshness fiscale; runner |
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 6: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
 | `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 9: T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; allocatore-capitale; glidepath e Monte Carlo … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
@@ -164,7 +165,7 @@ Ogni skill ha una versione propria, nel campo `metadata.version` del frontmatter
 | # | Skill upstream | Skill fork | Stato |
 |---|---|---|---|
 | 1 | `tax-loss-harvesting` | `it-tax-optimization` | ✅ v0.11 (minus/plus, multi-broker, dichiarativo RT/RW/IVAFE, Tobin tax 2026, cripto: base + avanzata + casi speciali) + importatore estratti broker |
-| 2 | `financial-plan` | `it-pianificazione` | ✅ v0.12 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione) |
+| 2 | `financial-plan` | `it-pianificazione` | ✅ v0.13 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione, riscatto della laurea) |
 | 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.4 (pensione autonomi/forfettari, casse professionali, Excel) |
 | 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.20 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo) |
 | 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.7 (tax-aware con versamenti, aliquota per posizione e rientro misto, multi-broker, bande 5/25, prelievo in decumulo, sequenza di liquidazione, ordini CSV) |

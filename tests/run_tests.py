@@ -314,6 +314,7 @@ SCRIPT_CLI = [
     ("it-pianificazione", "netto-pensione.py"),
     ("it-pianificazione", "ponte-pensione.py"),
     ("it-pianificazione", "importa-previdenza.py"),
+    ("it-pianificazione", "riscatto-laurea.py"),
     ("it-pianificazione-obiettivi", "allocatore-capitale.py"),
     ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
     ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
@@ -350,7 +351,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 13 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 14 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -3883,6 +3884,109 @@ def t_t13_propagazione():
     assert not errori, "\n  ".join(errori[:10])
 
 
+# ══════════════════════ T13: riscatto della laurea (F055) ══════════════════════
+
+@test("T13 riscatto della laurea: onere agevolato e ordinario, netto, rata, pensione in più e anticipo, valori chiusi")
+def t_riscatto_laurea():
+    # F055: la description prometteva il riscatto e la skill rimandava al patronato senza l'ordine di grandezza.
+    # Agevolato: €18.808 × 33% = €6.206,64 l'anno (art. 2 c. 5-quater D.Lgs. 184/1997; Circ. INPS 14/2026)
+    P = asset("it-pianificazione", "riscatto-laurea.py")
+    tmp = tempfile.mkdtemp()
+    try:
+        j = os.path.join(tmp, "r.json")
+        rc, out = run_script(P, "--json", j)
+        assert rc == 0, out[-400:]
+        r = json.load(open(j, encoding="utf-8"))
+        assert r["onere_agevolato"] == 31033.2 and r["onere_ordinario"] == 59400.0, r      # 5 × 6.206,64; 5 × 36.000 × 33%
+        assert r["rata_mensile"] == 258.61 and r["costo_netto"] == 20792.24, r              # 120 rate; deduzione al 33%
+        assert r["delta_montante_al_pensionamento"] == 36403.28, r                          # × 1,005^32
+        assert r["delta_pensione_lorda_annua"] == 1751.36 and r["anni_per_rientrare"] == 15.8, r   # × 4,811%; netto/(× 0,75)
+        assert r["eta_anticipata_senza_riscatto"] == 68.33 and r["eta_anticipata_con_riscatto"] == 63.33, r
+        assert r["montante_attuale"] == 85000 + 31033.2 and r["modalita"] == "agevolato", r
+        for atteso in ("€ 6.206,64 (€ 18.808 × 33%)", "€ 31.033", "€ 59.400", "€ 258,61", "€ 20.792", "€ 1.751",
+                       "senza riscatto: a 68,3 anni", "con il riscatto: a 63,3 anni", "rendono allo stesso modo"):
+            assert atteso in out, f"riscatto: manca «{atteso}»"
+        # le due modalità rendono uguale per euro versato: stessi anni per rientrare
+        assert re.search(r"rientrare\s+15,8\s+15,8", out), out
+        # ordinario sotto il minimale: costa meno, e lo script lo dice
+        rc, out = run_script(P, "--set", "RAL_ATTUALE=15_000")
+        assert rc == 0 and "sotto il minimale" in out, out[-300:]
+        # unica soluzione: rata = onere, deduzione dell'anno = onere
+        rc, out = run_script(P, "--set", "RATE_MENSILI=1", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["rata_mensile"] == r["onere_riscatto"] == 31033.2 and "unica soluzione" in out, out[-300:]
+        # modalità ordinaria nella catena: il montante porta l'onere ordinario
+        rc, out = run_script(P, "--set", "MODALITA='ordinario'", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["onere_riscatto"] == 59400.0 and r["montante_attuale"] == 85000 + 59400.0, r
+        # posizione mista: l'agevolato solo per gli anni dal 1996, con l'avviso sull'opzione
+        rc, out = run_script(P, "--set", "CONTRIBUTI_SOLO_DAL_1996=True")
+        assert rc == 0 and "posizione mista" in out and "art. 1 c. 23 L. 335/1995" in out, out[:500]
+        # chi senza riscatto arriverebbe alla vecchiaia sotto i 20 anni di contributi
+        rc, out = run_script(P, "--set", "ANZIANITA_ATTUALE=0", "--set", "ETA_ATTUALE=52", "--set", "ETA_PENSIONAMENTO=67")
+        assert rc == 0 and "sotto i 20 della vecchiaia" in out, out[-500:]
+        # errori nei dati: rc 1 con ERRORE su stderr
+        for espr, atteso in (("ANNI_RISCATTO=0", "ANNI_RISCATTO"), ("RATE_MENSILI=121", "RATE_MENSILI"),
+                             ("MODALITA='gratis'", "MODALITA"), ("ALIQUOTA_MARGINALE_IRPEF=33", "frazione"),
+                             ("ETA_PENSIONAMENTO=30", "ETA_PENSIONAMENTO")):
+            rc, so, se = run_script_split(P, "--set", espr)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and atteso in se and "Traceback" not in se, (espr, rc, se[-200:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T13 riscatto della laurea: catena importa-previdenza → riscatto → proiezione-inps, stessi numeri")
+def t_riscatto_catena():
+    P = lambda n: asset("it-pianificazione", n)
+    tmp = tempfile.mkdtemp()
+    try:
+        imp, inps, ris = (os.path.join(tmp, f) for f in ("imp.json", "inps.json", "ris.json"))
+        rc, out = run_script(P("importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-test.xml"), "--json", imp)
+        assert rc == 0 and "ANZIANITA_ATTUALE = 2.0" in out, out[-400:]
+        assert json.load(open(imp, encoding="utf-8"))["anzianita_contributiva"] == 2.0     # 104 settimane / 52
+        rc, out = run_script(P("proiezione-inps.py"), "--from", imp, "--json", inps)
+        assert rc == 0, out[-300:]
+        base = json.load(open(inps, encoding="utf-8"))
+        rc, out = run_script(P("riscatto-laurea.py"), "--from", imp, "--from", inps, "--json", ris)
+        assert rc == 0 and "ANZIANITA_ATTUALE=2.0" in out and "COEFF_TRASFORMAZIONE=" in out, out[:600]
+        r = json.load(open(ris, encoding="utf-8"))
+        m0 = json.load(open(imp, encoding="utf-8"))["montante_attuale"]
+        assert r["montante_attuale"] == round(m0 + r["onere_riscatto"], 2) and r["anzianita_con_riscatto"] == 7.0, r
+        # l'anticipata arriva comunque dopo l'uscita ipotizzata: il riscatto non anticipa
+        assert "il riscatto non anticipa" in out, out[-900:]
+        rc, out = run_script(P("proiezione-inps.py"), "--from", ris, "--json", inps)
+        assert rc == 0, out[-300:]
+        con = json.load(open(inps, encoding="utf-8"))
+        # la proiezione completa con il riscatto e la pensione in più dello script coincidono (arrotondamenti)
+        delta = con["pensione_inps_lorda_annua"] - base["pensione_inps_lorda_annua"]
+        assert abs(delta - r["delta_pensione_lorda_annua"]) < 2, (delta, r["delta_pensione_lorda_annua"])
+        # il coefficiente di default dello script è quello di proiezione-inps.py sui suoi default
+        rc, out = run_script(P("proiezione-inps.py"), "--json", inps)
+        coeff = json.load(open(inps, encoding="utf-8"))["coefficiente_trasformazione"]
+        sorgente = open(P("riscatto-laurea.py"), encoding="utf-8").read()
+        assert re.search(r"^COEFF_TRASFORMAZIONE = " + re.escape(str(coeff)) + r"\b", sorgente, re.M), coeff
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T13 riscatto della laurea: reference e skill con lo stesso onere, fonti nel marcatore, description")
+def t_riscatto_testi():
+    ref = open(os.path.join(SKILLS, "it-pianificazione", "references", "previdenza-obbligatoria.md"), encoding="utf-8").read()
+    sezione = ref.split("\n## Riscatto della laurea\n")[1].split("\n## ")[0]
+    for atteso in ("€18.808 × 33% = **€6.206,64**", "120 rate mensili senza interessi", "art. 10 c. 1 lett. e TUIR",
+                   "dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026", "c. 5-quater", "art. 20 c. 6 DL 4/2019",
+                   "riserva matematica", "art. 1 c. 23 L. 335/1995", "€31.033", "€20.792", "€258,61", "€1.751",
+                   "Circ. INPS 14/2026", "Verificato: 2026-10"):
+        assert atteso in sezione, f"previdenza-obbligatoria.md, Riscatto della laurea: manca «{atteso}»"
+    # lo stesso minimale nella reference, nello script e nella Gestione Separata degli autonomi
+    sorgente = open(asset("it-pianificazione", "riscatto-laurea.py"), encoding="utf-8").read()
+    assert re.search(r"^MINIMALE_ARTIGIANI_COMMERCIANTI = 18_808\.0\b", sorgente, re.M)
+    gs = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "references", "previdenza-gestione-separata.md"), encoding="utf-8").read()
+    assert "€18.808" in gs, "minimale 2026 diverso tra le reference"
+    skill = open(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"), encoding="utf-8").read()
+    assert "Pattern P7 — Riscattare la laurea" in skill and "assets/riscatto-laurea.py" in skill
+    assert "Non gestisce ricongiunzione, totalizzazione, riscatto laurea" not in skill
+
 # ══════════════════════ T11: testi unici dal 2027 ══════════════════════
 
 # Norme abrogate o rinumerate dal 1/1/2027 (mappa in it-tax-optimization/references/mappa-nuovo-tuir.md).
@@ -4410,6 +4514,7 @@ OBBLIGATI_FRESHNESS = (
     "it-pianificazione/assets/proiezione-inps.py",
     "it-pianificazione/assets/ponte-pensione.py",
     "it-pianificazione/assets/importa-previdenza.py",
+    "it-pianificazione/assets/riscatto-laurea.py",
     "it-pianificazione-autonomi/references/casse-professionali.md",
     "it-pianificazione-autonomi/references/previdenza-gestione-separata.md",
     "it-pianificazione-autonomi/references/fiscalita-forfettario.md",
@@ -5147,11 +5252,13 @@ def t_frontmatter_skill():
             for f in sorted(os.listdir(cartella_assets)):
                 if f.endswith((".py", ".xlsx")) and f != "motore_bootstrap.py":
                     assert f"assets/{f}" in riferimenti, f"{skill}: assets/{f} non è nei Riferimenti"
-    # riscatto, ricongiunzione e totalizzazione non sono gestiti: fuori dai trigger, dichiarati esclusi
+    # ricongiunzione e totalizzazione non sono gestite: fuori dai trigger, dichiarate escluse; il riscatto della
+    # laurea dalla T13 sì (riscatto-laurea.py), quindi è un trigger e non più un'esclusione
     d = _yaml_stretto(_frontmatter(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"))[0], "it-pianificazione")
     trigger, esclusioni = d["description"].split("NON copre")
-    assert not re.search(r"riscatto|ricongiunzione|totalizzazione", trigger), "it-pianificazione: trigger non gestiti"
-    assert all(x in esclusioni for x in ("riscatto", "ricongiunzione", "totalizzazione")), esclusioni
+    assert not re.search(r"ricongiunzione|totalizzazione", trigger), "it-pianificazione: trigger non gestiti"
+    assert all(x in esclusioni for x in ("ricongiunzione", "totalizzazione")), esclusioni
+    assert "riscatto della laurea" in trigger and "riscatto" not in esclusioni, (trigger[-300:], esclusioni)
 
 
 @test("T14 comandi: alias sottili delle skill, uno per skill e come nel README")
