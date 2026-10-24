@@ -38,7 +38,7 @@ import sys
 import os
 
 from motore_bootstrap import (cli, euro, frazioni_glide, leggi_pianificatore, numero, pmt_glide, quota_glide,
-                              scarti_dal_foglio)
+                              scarti_dal_foglio, scrivi_json)
 
 # ---- Parametri del glide path (editabili) ----
 FINESTRA_DERISK = None   # anni prima della scadenza in cui inizia il de-risking;
@@ -81,7 +81,7 @@ def pct(x):
 
 def main():
     args = cli("Calendario di de-risking anno per anno (glide path) per ogni obiettivo del pianificatore e per "
-               "l'aggregato di portafoglio.", globals(), argomenti=(
+               "l'aggregato di portafoglio.", globals(), json=True, argomenti=(
                    (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
     path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
     inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
@@ -143,6 +143,8 @@ def main():
     print(intest)
     print("-" * len(intest))
 
+    calendario = {g["nome"]: [] for g in obiettivi}   # quota azionaria per anno (None = concluso)
+    aggregato = []
     for t in range(orizzonte_max + 1):
         celle = []
         num = 0.0   # capitale azionario aggregato
@@ -151,6 +153,7 @@ def main():
             attivo = (t <= g["orizzonte"]) or g["permanente"]
             if not attivo:
                 celle.append(f"{'concl.':>16}")
+                calendario[g["nome"]].append(None)
                 continue
             if g["permanente"]:
                 # nessun glide: una riserva permanente tiene la quota del profilo (non ha scadenza di spesa)
@@ -161,10 +164,12 @@ def main():
                 eqt = equity_glide(ar, g["eq_start"], g["finestra"], ATTERRAGGIO_AZ)
                 etich = pct(eqt)
             celle.append(f"{etich:>16}")
+            calendario[g["nome"]].append(round(eqt, 4))
             capt = g["cap"][t]
             num += capt * eqt
             den += capt
         agg = (num / den) if den > 0 else 0.0
+        aggregato.append(round(agg, 4))
         riga = f"{t:>4}  " + "  ".join(celle) + f"   |  {pct(agg):>10}"
         print(riga)
 
@@ -194,6 +199,19 @@ def main():
     print("\nNON è consulenza di investimento. Proiezione al rendimento atteso di ogni anno lungo")
     print("il glide path (non modella la volatilità). Le % azionario per profilo e i parametri")
     print("del glide path sono editabili (la finestra anche nel foglio, Parametri!B7). Vedi glide-path.md.")
+
+    if args.json:
+        scrivi_json(args.json, {
+            "finestra": finestra, "atterraggio": ATTERRAGGIO_AZ, "curvatura": CURVATURA,
+            "inflazione": inflazione, "scarti_dal_foglio": scarti,
+            "anni": list(range(orizzonte_max + 1)),
+            "portafoglio": aggregato,          # quota azionaria aggregata per anno
+            "obiettivi": [{"nome": g["nome"], "profilo": g["profilo"], "orizzonte": g["orizzonte"],
+                           "permanente": g["permanente"], "target_oggi": g["target_oggi"],
+                           "gia": g["gia"], "versamento_mensile": round(g["pmt"], 2),
+                           "quota_azionaria": calendario[g["nome"]],
+                           "capitale_proiettato": [round(c, 2) for c in g["cap"]]} for g in obiettivi],
+        })
 
 
 if __name__ == "__main__":

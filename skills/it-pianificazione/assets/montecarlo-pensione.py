@@ -92,7 +92,11 @@ def simula_fp(az_hist, ob_hist):
 
 def main():
     args = cli("Monte Carlo del tasso di sostituzione: pensione INPS come àncora deterministica, fondo pensione "
-               "simulato per block bootstrap sulla serie storica.", globals(), json=True)
+               "simulato per block bootstrap sulla serie storica.", globals(), json=True,
+               da_json={"pensione_inps_lorda_annua": "PENSIONE_INPS_ANNUA", "ral_finale": "RAL_FINALE",
+                        "anni_al_pensionamento": "ANNI",                        # da proiezione-inps.py
+                        "fp_montante_attuale": "FP_POT_ATTUALE",
+                        "fp_versamento_annuo": "FP_VERSAMENTO_ANNUO"})          # da importa-previdenza.py
     json_out = args.json
     if SEED is not None:
         np.random.seed(SEED)
@@ -154,6 +158,8 @@ def main():
             "montante_fp": {"p10": round(pctl(pot, 10)), "mediana": round(pctl(pot, 50)), "p90": round(pctl(pot, 90))},
             "rendita_fp": {"p10": round(pctl(fp_rendita, 10)), "mediana": round(pctl(fp_rendita, 50)), "p90": round(pctl(fp_rendita, 90))},
             "pensione_inps_lorda": PENSIONE_INPS_ANNUA,
+            "ral_finale": RAL_FINALE,
+            "anni": ANNI,
             "tasso_sostituzione_lordo": {"p10": round(pctl(tasso, 10), 4), "mediana": round(pctl(tasso, 50), 4), "p90": round(pctl(tasso, 90), 4)},
             "prob_target": round(p_target, 4),
             "target": TASSO_SOSTITUZIONE_TARGET,

@@ -140,16 +140,16 @@ Prese il 20/10/2026.
   - [x] Matrice Python 3.11 e 3.14, con versioni minime delle dipendenze (PR #17).
   - [x] Versione fissata di claude-code nel job validate (PR #15).
 - [ ] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059.
-  - Helper `cli()` comune: `--help`, `--set`, `--json`, `--from` (`--help`, codici 0/1/2, UTF-8 e formati italiani in (a); `--from` in (c)).
-  - Lettore unico del pianificatore.
-  - `--dati` per genera-ips e per il ribilanciamento.
-  - Catena `--json` → `--from` tra gli script.
+  - [x] Helper `cli()` comune: `--help`, `--set`, `--json`, `--from` (PR #43 e T9c).
+  - [x] Lettore unico del pianificatore (PR #44).
+  - [ ] `--dati` per genera-ips e per il ribilanciamento.
+  - [x] Catena `--json` → `--from` tra gli script (T9c): importa-previdenza → proiezione INPS → Monte Carlo → netto e ponte, con `--json` anche su glide path e Monte Carlo degli obiettivi.
 - [x] **T10 Revisione annuale** (P1, M): F049, F050, F060, F064 (PR #12, #18). Anticipato: non dipendeva davvero da T4 e T7.
   - [x] TWR con 120 righe e ultima riga dinamica, Leggimi con i limiti.
   - [x] Costi dell'anno (trasparenza, non da sottrarre di nuovo).
   - [x] Semaforo per priorità (85/75/60%).
   - [x] In più, da F030: soglia 5/25 per classe nel cruscotto e nella riga aggregata del tracker.
-  - [ ] Contratto di input della revisione (F031): resta a T9.
+  - [x] Contratto di input della revisione (F031): tabella dominio → script `--json` → campo → cella in `it-revisione/SKILL.md` (T9c).
 
 ### Linea di taglio e rilascio della 0.11.0
 

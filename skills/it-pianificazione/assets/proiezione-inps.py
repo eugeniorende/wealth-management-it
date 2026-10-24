@@ -91,7 +91,9 @@ def proietta(montante0, ral0, g_ral, pil, anni, coeff):
 
 def main():
     args = cli("Proiezione parametrica della pensione INPS in euro di oggi (metodo contributivo), con la "
-               "sensibilità a PIL reale e coefficienti di trasformazione.", globals(), json=True)
+               "sensibilità a PIL reale e coefficienti di trasformazione.", globals(), json=True,
+               da_json={"montante_attuale": "MONTANTE_ATTUALE", "ral_attuale": "RAL_ATTUALE",
+                        "eta_attuale": "ETA_ATTUALE"})   # il JSON di importa-previdenza.py
     json_out = args.json
     anni = ETA_PENSIONAMENTO - ETA_ATTUALE
     if anni <= 0:
@@ -159,6 +161,7 @@ def main():
             "coefficiente_trasformazione": round(coeff, 5),
             "tasso_sostituzione_lordo_vs_ral_finale": round(pensione / ral_fin, 4),
             "anni_al_pensionamento": n,
+            "eta_pensionamento": ETA_PENSIONAMENTO,
         })
 
 

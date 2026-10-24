@@ -17,8 +17,10 @@ Contenuto:
   - indici_bootstrap(n_hist, n_sim, anni, blocco): campionamento a blocchi circolari
   - blocchi_bootstrap(port, n_sim, anni, blocco): rendimenti di portafoglio campionati
   - pctl(a, p): percentile come float
-  - cli(descrizione, spazio, argomenti, json): riga di comando comune (--help, argomenti dichiarati,
-    --set, --json, codici d'uscita 0/1/2), UTF-8 su stdout; errore(msg, codice) per uscire pulito
+  - cli(descrizione, spazio, argomenti, json, da_json): riga di comando comune (--help, argomenti
+    dichiarati, --set, --json, --from, codici d'uscita 0/1/2), UTF-8 su stdout; errore(msg, codice)
+  - carica_da_json(spazio, path, mappa): le costanti dal JSON scritto a monte da un altro script
+    (la catena --json → --from; --set prevale su --from, che prevale sui default)
   - numero / euro / pct: numeri in formato italiano (punto per le migliaia, virgola per i decimali)
   - applica_override(spazio): override '--set NOME=VALORE' delle costanti da riga di comando
   - percorso_json / scrivi_json: flag '--json <file>' per l'output machine-readable (pipeline)
@@ -84,7 +86,46 @@ def costanti_sovrascrivibili(spazio):
             if k.isupper() and not k.startswith("_") and not callable(v) and not hasattr(v, "__file__")]
 
 
-def cli(descrizione, spazio=None, argomenti=(), json=False, argv=None, epilogo=None):
+_MANCA = object()
+
+
+def carica_da_json(spazio, path, mappa):
+    """Costanti dal JSON scritto a monte da un altro script con --json (il flag --from).
+
+    `mappa`: {chiave del JSON (anche annidata, «montante_fp.mediana»): COSTANTE, oppure (COSTANTE, trasforma)}.
+    Le chiavi assenti dal file si saltano, perché il JSON di uno script a monte non le ha tutte; se nessuna
+    chiave attesa è nel file è un errore (rc 1): quasi certamente è il JSON di un altro script. Le costanti
+    applicate vengono stampate, come gli override; --set, applicato dopo, prevale.
+    """
+    import json as _json
+    if not os.path.exists(path):
+        errore(f"--from: file non trovato: {path}")
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = _json.load(f)
+    except ValueError as e:
+        errore(f"--from: {path} non è un JSON valido ({e})")
+    applicati = []
+    for chiave, destinazione in mappa.items():
+        valore = dati
+        for parte in chiave.split("."):
+            valore = valore.get(parte, _MANCA) if isinstance(valore, dict) else _MANCA
+            if valore is _MANCA:
+                break
+        if valore is _MANCA:
+            continue
+        nome, trasforma = destinazione if isinstance(destinazione, tuple) else (destinazione, None)
+        if nome not in spazio:
+            raise KeyError(f"carica_da_json: {nome} non è una costante dello script")
+        spazio[nome] = trasforma(valore) if trasforma else valore
+        applicati.append(f"{nome}={spazio[nome]!r}")
+    if not applicati:
+        errore(f"--from: in {path} nessuna delle chiavi attese ({', '.join(mappa)}): è il JSON di un altro script?")
+    print(f"[from] {os.path.basename(path)}: " + ", ".join(applicati))
+    return applicati
+
+
+def cli(descrizione, spazio=None, argomenti=(), json=False, da_json=None, argv=None, epilogo=None):
     """Riga di comando comune degli script del plugin.
 
     - `--help` con descrizione, argomenti e, se `spazio` è dato, l'elenco delle costanti sovrascrivibili
@@ -93,6 +134,8 @@ def cli(descrizione, spazio=None, argomenti=(), json=False, argv=None, epilogo=N
     - `spazio` (di norma globals()): abilita `--set NOME=VALORE`, ripetibile, applicato con applica_override
       (refuso → rc 1); gli override applicati vengono stampati
     - `json=True`: aggiunge `--json FILE`; il percorso è in `.json` (None se assente)
+    - `da_json`: la mappa di carica_da_json; abilita `--from FILE`, ripetibile, letto prima di --set
+      (precedenza: --set > --from > default)
     - argomento o flag non riconosciuto → usage su stderr e rc 2 (argparse)
     Ritorna il Namespace di argparse, con `.parser` per segnalare errori d'uso (`args.parser.error(...)`).
     Chiama configura_stdout(), quindi va invocata prima di qualsiasi stampa.
@@ -101,10 +144,16 @@ def cli(descrizione, spazio=None, argomenti=(), json=False, argv=None, epilogo=N
     if spazio is not None and epilogo is None:
         epilogo = ("costanti sovrascrivibili con --set NOME=VALORE (valori Python: 0.02, 10_000, None, "
                    "'bootstrap'):\n  " + ", ".join(costanti_sovrascrivibili(spazio)))
+        if da_json:
+            epilogo += "\n\nchiavi lette da --from FILE (JSON scritto con --json da un altro script):\n  " + \
+                ", ".join(f"{k} → {v[0] if isinstance(v, tuple) else v}" for k, v in da_json.items())
     ap = argparse.ArgumentParser(description=descrizione, epilog=epilogo,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     for nomi, opzioni in argomenti:
         ap.add_argument(*nomi, **opzioni)
+    if da_json:
+        ap.add_argument("--from", dest="da", action="append", default=[], metavar="FILE",
+                        help="legge le costanti dal JSON di un altro script (ripetibile; --set prevale)")
     if spazio is not None:
         ap.add_argument("--set", action="append", default=[], metavar="NOME=VALORE",
                         help="sovrascrive una costante in testa allo script (ripetibile, vedi in fondo)")
@@ -112,6 +161,9 @@ def cli(descrizione, spazio=None, argomenti=(), json=False, argv=None, epilogo=N
         ap.add_argument("--json", metavar="FILE", help="scrive i risultati chiave anche in un file JSON")
     args = ap.parse_args(argv)
     args.parser = ap
+    if da_json:
+        for percorso in args.da:
+            carica_da_json(spazio, percorso, da_json)
     if spazio is not None:
         finti_argv = [ap.prog]
         for espr in args.set:
