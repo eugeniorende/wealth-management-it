@@ -175,9 +175,11 @@ CHIAVI_DATI = {"posizioni": "POSITIONS", "zainetto": "ZAINETTO", "target": "TARG
                "broker_versamenti": "BROKER_VERSAMENTI"}
 
 
-def carica_dati(path):
+def carica_dati(path, zainetto_esterno=False):
     """Portafoglio, zainetto, target e opzioni dal JSON di --dati (schema in SKILL.md): sostituiscono le
-    costanti in testa allo script. Chiavi ignote → errore, così un refuso non passa in silenzio."""
+    costanti in testa allo script. Chiavi ignote → errore, così un refuso non passa in silenzio.
+    «posizioni» e «target» sono obbligatorie, e «zainetto» anche, salvo che arrivi da --zainetto:
+    altrimenti resterebbero quelli d'esempio, mescolati ai dati reali."""
     import json
     try:
         with open(path, encoding="utf-8") as f:
@@ -191,6 +193,12 @@ def carica_dati(path):
     ignote = [k for k in dati if str(k).lower() not in CHIAVI_DATI]
     if ignote:
         raise ErroreInput(f"--dati: chiavi non riconosciute {ignote}; attese: {', '.join(CHIAVI_DATI)}")
+    presenti = {str(k).lower() for k in dati}
+    obbligatorie = ["posizioni", "target"] + ([] if zainetto_esterno else ["zainetto"])
+    mancanti = [k for k in obbligatorie if k not in presenti]
+    if mancanti:
+        raise ErroreInput(f"--dati: manca «{mancanti[0]}»" + (" (usa {} se non hai minus, oppure --zainetto con il JSON "
+                          "dell'importatore)" if mancanti[0] == "zainetto" else "") + "; senza, lo script userebbe l'esempio")
     for k, v in dati.items():
         globals()[CHIAVI_DATI[str(k).lower()]] = v
     if not isinstance(POSITIONS, list) or not isinstance(ZAINETTO, dict) or not isinstance(TARGET, dict):
@@ -932,7 +940,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     try:
         if args.dati:
-            carica_dati(args.dati)
+            carica_dati(args.dati, zainetto_esterno=bool(args.zainetto))
         else:
             print("⚠️  Dati di esempio: portafoglio, zainetto e target sono quelli in testa allo script. "
                   "Passa --dati piano.json con i tuoi (schema in SKILL.md).")

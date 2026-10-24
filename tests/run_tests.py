@@ -1806,6 +1806,16 @@ def t_dati_ribilanciamento():
         rc, out = run_script(script, "--dati", piano, "--out", os.path.join(tmp, "z3"), cwd=tmp)
         assert rc == 0 and "«FINECO» → «Fineco»" in out and "compensata €3.200 dallo zainetto Fineco" in out, out[-900:]
         assert "(broker non indicato)" in out and "non usato" in out and "--broker" in out, out[-900:]
+        # revisione T14: un --dati senza zainetto o senza target usava in silenzio quelli d'esempio
+        # (e il CSV si dichiarava dato reale); lo zainetto può arrivare anche da --zainetto
+        base = {"posizioni": pos, "zainetto": {"Fineco": 5000}, "target": {"azionario": 0.6, "obbligazionario": 0.3, "monetario": 0.1}}
+        for manca in ("zainetto", "target", "posizioni"):
+            json.dump({k: v for k, v in base.items() if k != manca}, open(piano, "w", encoding="utf-8"))
+            rc, out = run_script(script, "--dati", piano, cwd=tmp)
+            assert rc == 1 and "ERRORE" in out and f"«{manca}»" in out and "Traceback" not in out, (manca, rc, out[-300:])
+        json.dump({k: v for k, v in base.items() if k != "zainetto"}, open(piano, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", piano, "--zainetto", os.path.join(tmp, "imp.json"), "--out", os.path.join(tmp, "z4"), cwd=tmp)
+        assert rc == 0, out[-300:]
         # numeri scritti come testo nel JSON: ERRORE con rc 1, mai un Traceback
         for chiave, valore in (("target", {"azionario": "0.6", "obbligazionario": 0.3, "monetario": 0.1}),
                                ("nuovi_versamenti", "1000"), ("zainetto", {"Fineco": "5.000"})):
@@ -1901,13 +1911,14 @@ def t_dove_lavorare():
             assert "copiano" in sez, f"{skill}: i modelli Excel vanno copiati nella cartella di lavoro"
         m = nudo.search(testo)
         assert not m, f"{skill}/SKILL.md: invocazione a nome nudo «{m.group(0)}»: usare python \"${{CLAUDE_SKILL_DIR}}/assets/…\""
-        assert "${CLAUDE_PLUGIN_ROOT}/skills/" + skill in sez, f"{skill}: il percorso per i command"
+        # T14: i comandi sono alias della skill, quindi niente percorso «per i command» (revisione T14)
+        assert "nei command vale" not in sez, f"{skill}: i comandi non lanciano script"
+        assert not re.search(r"python3? scripts/", testo), f"{skill}: scripts/ si lancia con ${{CLAUDE_PLUGIN_ROOT}}"
     for nome in sorted(os.listdir(os.path.join(ROOT, "commands"))):
         testo = open(os.path.join(ROOT, "commands", nome), encoding="utf-8").read()
         m = nudo.search(testo)
         assert not m, f"commands/{nome}: invocazione a nome nudo «{m.group(0)}»"
-        if ".py" in testo:
-            assert "${CLAUDE_PLUGIN_ROOT}/skills/" in testo, f"commands/{nome}: gli script si invocano con ${{CLAUDE_PLUGIN_ROOT}}"
+        assert ".py" not in testo, f"commands/{nome}: un alias non lancia script, lo fa la skill"
     manifest = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
     cfg = manifest["userConfig"]["cartella_lavoro"]
     assert cfg["type"] == "directory" and cfg.get("default") and set(cfg) <= {"type", "title", "description", "default", "required"}, cfg
