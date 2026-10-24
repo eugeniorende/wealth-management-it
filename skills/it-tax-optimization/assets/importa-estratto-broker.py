@@ -12,7 +12,8 @@ costituisce consulenza fiscale o finanziaria.
 
 Formati: i broker (Directa, Fineco, Trade Republic...) esportano layout DIVERSI. Il parser
 riconosce i nomi-colonna tipici con sinonimi e matching tollerante (maiuscole, accenti, spazi
-ignorati); se il tuo export usa nomi diversi, aggiungili ai dizionari SINONIMI qui sotto. Il
+ignorati); se il tuo export usa nomi diversi, rinomina le colonne nella copia del CSV (mai questo
+file, che si sovrascrive a ogni aggiornamento) e segnala i nomi da aggiungere a SINONIMI. Il
 formato dei numeri si decide per file: se compare una virgola decimale («12,40») il file è
 all'italiana e «1.000» vale mille.
 
@@ -376,7 +377,8 @@ def parse_estratto(path, broker_default=None, avvisi=None):
     m = _mappa_colonne(intest, SINONIMI)
     if "isin" not in m and "descrizione" not in m:
         raise ErroreInput(f"{path}: estratto non riconosciuto, manca sia ISIN sia Descrizione. "
-                          "Controlla il file o aggiungi i nomi-colonna ai dizionari SINONIMI.")
+                          "Controlla il file, o rinomina le colonne nella tua copia del CSV con i nomi riconosciuti "
+                          "(vedi references/import-dati-broker.md).")
     locale, incertezza = rileva_locale((r[m[c]] for r in righe for c in COLONNE_NUMERICHE
                                         if c in m and m[c] < len(r)), delim)
     ambigui = [] if incertezza else None

@@ -42,8 +42,9 @@ successive; ogni posizione ha la sua aliquota (26%, o 12,5% per titoli di Stato 
 equiparati, che compensano lo zainetto al 48,08%; per ETF e fondi su titoli di Stato
 un'aliquota mista, dalla quota di titoli di Stato e white list del fondo).
 
-Tutti i parametri sono editabili qui sotto. I valori di default sono un caso reale di
-validazione (vedi il commento ATTESO in fondo). plus = plusvalenza/minusvalenza latente
+I valori qui sotto sono l'esempio di validazione (vedi il commento ATTESO in fondo): i dati
+reali arrivano da --dati piano.json, le cui chiavi sostituiscono le costanti omonime, e lo
+zainetto anche da --zainetto (il JSON dell'importatore). plus = plusvalenza/minusvalenza latente
 in euro (negativo = minus). Realizzi parziali pro-rata: in amministrato è il calcolo esatto,
 perché la plus si determina sul costo medio ponderato
 (art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027); il LIFO vale solo in dichiarativo,
@@ -123,8 +124,10 @@ BROKER_VERSAMENTI = "Fineco"   # broker su cui atterrano versamenti/flussi in en
 
 
 # Vocabolario: i nomi e i valori canonici sono quelli del plugin (README, «Glossario»); lo script
-# accetta i sinonimi e li normalizza, così il JSON dell'importatore o un CSV ricopiato non vanno
-# riscritti a mano. Internamente il tipo fiscale è «diverso» o «capitale».
+# accetta i sinonimi dei nomi delle chiavi e li normalizza, così le posizioni del JSON
+# dell'importatore si copiano così come sono, aggiungendo solo la classe. Internamente il tipo
+# fiscale è «diverso» o «capitale»; l'aliquota è una frazione (0.26, 0.125), e quella in percento
+# dell'importatore (26, 12.5) si converte dicendolo.
 SINONIMI_CHIAVI = {"classe": "asset_class", "asset class": "asset_class", "asset_class": "asset_class",
                    "categoria_fiscale": "tipo", "tipo_fiscale": "tipo", "categoria": "tipo", "tipo": "tipo",
                    "plus_minus": "plus", "plusvalenza": "plus", "plus": "plus",
@@ -152,6 +155,15 @@ def normalizza_posizione(p):
         if isinstance(q.get(k), str):
             q[k] = q[k].strip()
     return q
+
+
+def _aliquota_da_percento(p, n):
+    """L'aliquota in percento dell'importatore (26, 12.5) diventa la frazione dello script, con un avviso:
+    le frazioni valide stanno tra 0,125 e 0,26, i percento tra 12,5 e 26, quindi non si confondono."""
+    a = p.get("aliquota")
+    if isinstance(a, (int, float)) and not isinstance(a, bool) and 1 < a <= 100:
+        p["aliquota"] = a / 100
+        print(f"ℹ posizione {n}: aliquota {numero(a, 1)} letta in percento → {numero(a / 100, 3)}")
 
 
 # Chiavi del JSON di --dati (minuscole) → costanti dello script.
@@ -209,23 +221,58 @@ class ErroreInput(Exception):
     """Parametri non validi: messaggio «ERRORE: …» su stderr e uscita con codice 1 (il 2 è di argparse)."""
 
 
+def _numero_vero(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def allinea_zainetto(posizioni, zainetto):
+    """Le chiavi dello zainetto con i nomi dei broker delle posizioni: «FINECO» o « fineco » diventano
+    «Fineco» (sommando se due chiavi coincidono), con un avviso; uno zainetto di un broker senza
+    posizioni resta inutilizzato, e lo si dice invece di perderlo in silenzio."""
+    canonici = {}
+    for p in posizioni:
+        canonici.setdefault(str(p["broker"]).strip().casefold(), p["broker"])
+    allineato = {}
+    for chiave, importo in zainetto.items():
+        nome = canonici.get(str(chiave).strip().casefold(), chiave)
+        if nome != chiave:
+            print(f"ℹ zainetto «{chiave}» → «{nome}», il nome del broker nelle posizioni")
+        allineato[nome] = allineato.get(nome, 0.0) + importo
+    for nome, importo in allineato.items():
+        if importo > 0 and nome not in canonici.values():
+            suggerimento = (" (l'estratto non aveva la colonna broker: rilancia l'importatore con --broker NOME)"
+                            if nome == "(broker non indicato)" else "")
+            print(f"⚠ zainetto «{nome}» di €{numero(importo)} non usato: nessuna posizione con quel broker "
+                  f"(broker delle posizioni: {', '.join(sorted(set(canonici.values())))}){suggerimento}")
+    return allineato
+
+
 def valida():
-    """Validazione dell'input, dopo la normalizzazione dei sinonimi del vocabolario."""
+    """Validazione dell'input, dopo la normalizzazione dei sinonimi del vocabolario: tipi (numeri veri,
+    mai testo), aliquote, classi e broker; lo zainetto allineato ai broker delle posizioni."""
     globals()["POSITIONS"] = [normalizza_posizione(p) for p in POSITIONS]
     if not isinstance(TARGET, dict) or not TARGET:
         raise ErroreInput("TARGET vuoto: indicare le classi con il peso target (somma 1)")
-    try:
-        somma = sum(float(v) for v in TARGET.values())
-    except (TypeError, ValueError):
-        raise ErroreInput("TARGET: i pesi devono essere numeri (es. 0.6, non «60%»)")
+    if not all(_numero_vero(v) for v in TARGET.values()):
+        raise ErroreInput("TARGET: i pesi devono essere numeri (es. 0.6, non «60%» o «0.6» tra virgolette)")
+    somma = sum(TARGET.values())
     if abs(somma - 1) > 1e-6:
         raise ErroreInput(f"TARGET somma a {numero(somma, 4)}, non a 1")
     if not isinstance(ZAINETTO, dict):
         raise ErroreInput("ZAINETTO: oggetto broker → euro di minus al 26% (es. {\"Fineco\": 5000})")
+    for chiave, importo in ZAINETTO.items():
+        if not _numero_vero(importo) or importo < 0:
+            raise ErroreInput(f"ZAINETTO «{chiave}»: {importo!r} non è un importo in euro (es. 5000, non «5.000»)")
+    for nome in ("NUOVI_VERSAMENTI", "FLUSSI_ATTESI", "PRELIEVO", "MARGINE_RIENTRO", "ALIQUOTA"):
+        if not _numero_vero(globals()[nome]):
+            raise ErroreInput(f"{nome.lower()}: {globals()[nome]!r} non è un numero (scriverlo senza virgolette)")
     for n, p in enumerate(POSITIONS, start=1):
         for campo in ("broker", "asset_class", "tipo", "valore", "plus"):
             if campo not in p:
                 raise ErroreInput(f"posizione {n}: manca «{campo}» (chiavi: broker, asset_class, tipo, valore, plus)")
+        if not isinstance(p.get("broker"), str) or not p["broker"]:
+            raise ErroreInput(f"posizione {n}: broker vuoto o mancante (lo zainetto è per broker)")
+        _aliquota_da_percento(p, n)
         if p.get("asset_class") not in TARGET:
             raise ErroreInput(f"posizione {n}: classe «{p.get('asset_class')}» assente da TARGET")
         if p.get("tipo") in TIPI_FUORI_PERIMETRO:
@@ -258,6 +305,7 @@ def valida():
         raise ErroreInput(f"OBIETTIVO_RIENTRO «{OBIETTIVO_RIENTRO}» (attesi misto, target, banda)")
     if min(PRELIEVO, NUOVI_VERSAMENTI, FLUSSI_ATTESI) < 0:
         raise ErroreInput("PRELIEVO, NUOVI_VERSAMENTI e FLUSSI_ATTESI vanno indicati come importi positivi")
+    globals()["ZAINETTO"] = allinea_zainetto(POSITIONS, ZAINETTO)
 
 
 def aggrega(positions):
@@ -870,8 +918,10 @@ def main(argv=None):
         allow_abbrev=False,
         description="Ribilanciamento tax-aware multi-broker: drift e bande 5/25, piano di vendite per broker e "
                     "tipo fiscale nell'ordine di esecuzione, prelievo in decumulo, ordini in CSV per broker. "
-                    "I parametri (portafoglio, zainetto, target, versamenti, prelievo) sono le costanti in testa "
-                    "allo script. Codici d'uscita: 0 riuscito, 1 parametri incoerenti, 2 riga di comando errata.")
+                    "Portafoglio, zainetto, target, versamenti e prelievo arrivano dal JSON di --dati (schema in "
+                    "SKILL.md), lo zainetto anche da --zainetto; senza --dati lo script gira sull'esempio di "
+                    "validazione in testa al file. "
+                    "Codici d'uscita: 0 riuscito, 1 parametri incoerenti, 2 riga di comando errata.")
     ap.add_argument("--dati", metavar="FILE",
                     help="JSON con posizioni, zainetto, target e opzioni (schema in SKILL.md); senza, i dati di "
                          "esempio in testa allo script")
