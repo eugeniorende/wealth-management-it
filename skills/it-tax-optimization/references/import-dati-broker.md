@@ -62,7 +62,7 @@ python importa-estratto-broker.py estratto.csv [zainetto.csv] [--anno 2026] [--b
 ```
 
 `--json -` stampa solo il JSON su stdout. Gli errori sui file (mancanti, vuoti, colonne non
-riconosciute, aliquote ignote) escono con un messaggio leggibile e codice 2. Solo libreria standard.
+riconosciute, aliquote ignote, JSON non scrivibile) escono con un messaggio che inizia per `ERRORE:` su stderr e codice 1; una riga di comando errata (flag ignoto, estratto non indicato) stampa l'usage ed esce con codice 2, come per tutti gli script del plugin (README, «Convenzioni degli script»). Solo libreria standard.
 
 ### Come classifica senza la colonna «tipo fiscale»
 

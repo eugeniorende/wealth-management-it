@@ -27,7 +27,7 @@ Termini: esprimi TUTTI i valori in modo coerente — consigliato in EURO DI OGGI
 rendimento reale del comparto, pensione INPS e RAL in moneta di oggi. Il bootstrap trapianta la
 volatilità storica (nominale) sul livello scelto; è un'approssimazione consapevole, come in obiettivi.
 
-Dipendenze: numpy. Uso: python montecarlo-pensione.py
+Dipendenze: numpy. Uso: python montecarlo-pensione.py [--set NOME=VALORE ...] [--json FILE] (--help elenca le costanti)
 """
 
 import numpy as np

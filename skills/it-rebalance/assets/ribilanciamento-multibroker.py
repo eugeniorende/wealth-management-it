@@ -123,13 +123,13 @@ BROKER_VERSAMENTI = "Fineco"   # broker su cui atterrano versamenti/flussi in en
 
 
 class ErroreInput(Exception):
-    """Parametri in testa al file non validi: messaggio leggibile, uscita con codice 2."""
+    """Parametri non validi: messaggio «ERRORE: …» su stderr e uscita con codice 1 (il 2 è di argparse)."""
 
 
 def valida():
-    """Validazione minima dell'input (in attesa dell'interfaccia comune degli script)."""
+    """Validazione dell'input: le costanti in testa allo script (l'input da file arriva con T9d)."""
     if abs(sum(TARGET.values()) - 1) > 1e-6:
-        raise ErroreInput(f"TARGET somma a {sum(TARGET.values()):.4f}, non a 1")
+        raise ErroreInput(f"TARGET somma a {numero(sum(TARGET.values()), 4)}, non a 1")
     for n, p in enumerate(POSITIONS, start=1):
         if p.get("asset_class") not in TARGET:
             raise ErroreInput(f"posizione {n}: classe «{p.get('asset_class')}» assente da TARGET")
@@ -761,6 +761,7 @@ def _configura_stdout():
 def main(argv=None):
     _configura_stdout()
     ap = argparse.ArgumentParser(
+        allow_abbrev=False,
         description="Ribilanciamento tax-aware multi-broker: drift e bande 5/25, piano di vendite per broker e "
                     "tipo fiscale nell'ordine di esecuzione, prelievo in decumulo, ordini in CSV per broker. "
                     "I parametri (portafoglio, zainetto, target, versamenti, prelievo) sono le costanti in testa "
@@ -769,7 +770,7 @@ def main(argv=None):
     try:
         plan = pianifica()
     except ErroreInput as e:
-        print(f"ERRORE nei parametri: {e}", file=sys.stderr)
+        print(f"ERRORE: parametri: {e}", file=sys.stderr)
         raise SystemExit(1)
     stampa(plan)
     if GENERA_CSV:

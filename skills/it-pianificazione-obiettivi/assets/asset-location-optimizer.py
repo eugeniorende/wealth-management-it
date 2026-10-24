@@ -163,10 +163,11 @@ def main():
                "PIR contro dossier) sugli obiettivi del pianificatore.", globals(), argomenti=(
                    (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
     path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
-
-    inflazione, profili, obiettivi = (0.02, {}, [])
-    if os.path.exists(path):
-        inflazione, profili, obiettivi = leggi_excel(path)
+    if not os.path.exists(path):
+        errore(f"file non trovato: {path}")
+    inflazione, profili, obiettivi = leggi_excel(path)
+    if not obiettivi:
+        errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
     # rendimento di riferimento per lo scenario pensione: profilo Crescita se presente, portato
     # al LORDO (i profili sono netti di costi e imposte, qui si tolgono contenitore per contenitore)
     netto_crescita = profili.get("Crescita", 0.055)

@@ -56,6 +56,14 @@ def run_script(path, *args, cwd=None, env=None):
     return r.returncode, r.stdout + r.stderr
 
 
+def run_script_split(path, *args, cwd=None, env=None):
+    """Come run_script, ma con stdout e stderr separati: (returncode, stdout, stderr)."""
+    r = subprocess.run([sys.executable, path, *args],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
+                       cwd=cwd or os.path.dirname(path), env=env)
+    return r.returncode, r.stdout, r.stderr
+
+
 def euro(testo, etichetta):
     """Estrae il primo importo in formato italiano ('€ 1.234' o '€ 1.234,56') che segue l'etichetta."""
     m = re.search(re.escape(etichetta) + r"[^€\n]*€\s*([\d.,]+)", testo)
@@ -355,26 +363,45 @@ def t_cli_help():
             assert "--set NOME=VALORE" in out and "costanti sovrascrivibili" in out, f"{nome}: --help senza l'elenco delle costanti"
         rc, out = run_script(path, "--argomento-ignoto", *ARGOMENTI_DEFAULT.get(nome, ()))
         assert rc == 2 and "usage:" in out and "Traceback" not in out, f"{nome} con un flag ignoto: rc {rc}, {out[-300:]}"
-    # codice 1 per i dati: file mancante, costante --set sconosciuta, file di output non scrivibile
-    rc, out = run_script(asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py"), "/non/esiste.xlsx")
-    assert rc == 1 and out.startswith("ERRORE:") and "Traceback" not in out, (rc, out[-300:])
-    rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--set", "NON_ESISTE=1")
-    assert rc == 1 and "ERRORE:" in out and "sconosciuta" in out, (rc, out[-300:])
-    rc, out = run_script(asset("it-revisione", "genera-ips.py"), os.path.join(tempfile.gettempdir(), "cartella-inesistente", "x.docx"))
-    assert rc == 1 and "ERRORE:" in out and "Traceback" not in out, (rc, out[-300:])
-    rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"), "/non/esiste.csv")
-    assert rc == 1 and "ERRORE:" in out, (rc, out[-300:])
+    # codice 1 per i dati, con «ERRORE:» su stderr e niente su stdout: file mancante (ogni script che legge un
+    # file), costante --set sconosciuta o non numerica, file di output non scrivibile, foglio senza obiettivi
+    def errore_pulito(path, *args, atteso="ERRORE:"):
+        rc, so, se = run_script_split(path, *args)
+        assert rc == 1, f"{os.path.basename(path)} {args}: rc {rc}, {so[-200:]} {se[-200:]}"
+        assert se.lstrip().startswith("ERRORE:") and "ERRORE:" not in so and "Traceback" not in se, \
+            f"{os.path.basename(path)} {args}: stdout «{so[-150:]}» stderr «{se[-300:]}»"
+        assert atteso in se, f"{os.path.basename(path)} {args}: manca «{atteso}» in «{se[-300:]}»"
+    OB = "it-pianificazione-obiettivi"
+    for nome in ("glidepath-obiettivi.py", "montecarlo-obiettivi.py", "allocatore-capitale.py", "asset-location-optimizer.py"):
+        errore_pulito(asset(OB, nome), "/non/esiste.xlsx", atteso="non trovato")
+    vuoto = _excel_test([])
+    for nome in ("glidepath-obiettivi.py", "montecarlo-obiettivi.py", "allocatore-capitale.py", "asset-location-optimizer.py"):
+        errore_pulito(asset(OB, nome), vuoto, atteso="nessun obiettivo")
+    shutil.rmtree(os.path.dirname(vuoto), ignore_errors=True)
+    errore_pulito(asset("it-pianificazione", "importa-previdenza.py"), "/non/esiste.xml", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione", "importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-test.xml"), "/non/esiste.csv", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione", "netto-pensione.py"), "--set", "NON_ESISTE=1", atteso="sconosciuta")
+    errore_pulito(asset("it-pianificazione", "proiezione-inps.py"), "--set", "RAL_ATTUALE=abc", atteso="non è un numero")
+    errore_pulito(asset("it-pianificazione", "proiezione-inps.py"), "--json", "/non/esiste/x.json", atteso="impossibile scrivere")
+    errore_pulito(asset("it-revisione", "genera-ips.py"), os.path.join(tempfile.gettempdir(), "cartella-inesistente", "x.docx"), atteso="impossibile scrivere")
+    errore_pulito(asset("it-tax-optimization", "importa-estratto-broker.py"), "/non/esiste.csv", atteso="non trovato")
+    # niente abbreviazioni dei flag: «--se» non è «--set»
+    rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--se", "RAL_FINALE_LORDA=1")
+    assert rc == 2 and "usage:" in out, (rc, out[-200:])
 
 
 @test("T9 interfaccia: tutti gli script girano da una cartella esterna con una console cp1252 (Windows)")
 def t_cli_utf8():
-    # Prima della 0.11 undici script su tredici andavano in UnicodeEncodeError su «€», «→» e «≈»
+    # Prima della 0.11 undici script su tredici andavano in UnicodeEncodeError su «€», «→» e «≈» su qualsiasi
+    # output, gli altri due (genera-ips, importa-estratto-broker) su percorsi specifici
     # con stdout in cp1252: ogni script forza l'UTF-8 (sys.stdout.reconfigure) prima di stampare.
     for nome, (rc, out) in _tutti_gli_script_cp1252().items():
         assert rc == 0, f"{nome} da una cartella esterna con cp1252: rc {rc}, {out[-400:]}"
         assert "UnicodeEncodeError" not in out and "Traceback" not in out, f"{nome}: {out[-400:]}"
         assert "serie storica non trovata" not in out, f"{nome}: serie storica non trovata"
-    assert "€" in _tutti_gli_script_cp1252()["proiezione-inps.py"][1], "lo stdout deve restare UTF-8, non «?»"
+        # lo stdout resta UTF-8: ogni script stampa almeno un «€», e senza reconfigure il simbolo
+        # uscirebbe in cp1252 (qui decodificato come «\ufffd») anche dove non va in crash
+        assert "€" in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
     # nessuna open() senza encoding negli script e nel runner: su Windows leggerebbero in cp1252
     cartelle = [os.path.join(SKILLS, s, "assets") for s in sorted(os.listdir(SKILLS))] + \
                [os.path.join(ROOT, "scripts"), os.path.join(ROOT, "tests")]
@@ -394,10 +421,11 @@ def t_cli_utf8():
 @test("T9 formati: importi e percentuali in formato italiano in tutti gli script (punto migliaia, virgola decimali)")
 def t_formati_italiani():
     # Nei sorgenti nessun format spec anglosassone («{x:,.0f}», «{x:.1%}»): si passa da numero()/pct()
-    anglo = re.compile(r":[<>^]?\+?\d*,\.?\d*[fd]?\}|:[<>^]?\+?\d*\.\d%\}")
+    # («{x:.1f}» con decimali è anglosassone anche senza «%»: «12.6 punti»; «.0f» non ha decimali e resta)
+    anglo = re.compile(r":[<>^]?\+?\d*,\.?\d*[fd]?\}|:[<>^]?\+?\d*\.\d%\}|:[<>^]?\+?\d*\.[1-9]\d*f\}")
     for skill, nome in SCRIPT_CLI + [("it-pianificazione", "motore_bootstrap.py")]:
         for n, riga in enumerate(open(asset(skill, nome), encoding="utf-8"), 1):
-            if anglo.search(riga) and ".replace(" not in riga:
+            if anglo.search(riga) and ".replace(" not in riga and "--set" not in riga:
                 raise AssertionError(f"{nome}:{n}: format spec anglosassone: {riga.strip()[:100]}")
     # Negli output nessun «€ 1,234» né «7.0%»; valori chiusi sui default
     for nome, (rc, out) in _tutti_gli_script_cp1252().items():
