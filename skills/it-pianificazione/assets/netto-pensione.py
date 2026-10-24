@@ -37,8 +37,10 @@ Regole fiscali incorporate (Verificato: 2026-07; periodo d'imposta 2026):
     4,8% del reddito di lavoro (c. 4-5); tra 20.000 e 32.000 un'ulteriore
     detrazione di 1.000 €, che scende a zero tra 32.000 e 40.000 (c. 6)
     (Verificato: 2026-10: Normattiva L. 207/2024, Circ. AdE 4/E/2025, Circ. INPS 6/2026).
-    Il c. 6 vale fino al 2026: dal 1/1/2027 lo abroga il D.Lgs. 117/2026, che
-    riporta l'ulteriore detrazione nell'art. 13 del nuovo TUIR (comma da verificare)
+    Il c. 6 vale fino al 2026: dal 1/1/2027 lo abroga il D.Lgs. 117/2026
+    (art. 376 c. 1 lett. pppppp e art. 377), che riporta la stessa ulteriore
+    detrazione nell'art. 13 c. 10 del nuovo TUIR (testo in GU n. 152 del
+    3/7/2026, S.O. n. 26)
   - addizionali regionale e comunale: parametriche (variano per territorio)
 
 ONESTÀ METODOLOGICA
@@ -51,12 +53,12 @@ ONESTÀ METODOLOGICA
 - Semplificazioni dichiarate: nessun altro reddito IRPEF, nessuna detrazione
   per carichi di famiglia od oneri, niente trattamento integrativo.
 - Rendita del fondo: la parte della rata che viene dai rendimenti maturati
-  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 D.Lgs. 117/2026, lettera da verificare) è tassata a parte
+  durante l'erogazione (art. 44 c. 1 lett. g-quinquies TUIR; dal 2027 art. 46 c. 1 lett. n D.Lgs. 117/2026) è tassata a parte
   dall'erogatore al 26% (12,5% sui titoli di Stato) e non è modellata.
 Questo strumento è educativo e non costituisce consulenza fiscale.
 """
 
-from motore_bootstrap import applica_override, percorso_json, scrivi_json
+from motore_bootstrap import cli, numero, pct, scrivi_json
 
 # ============================== PARAMETRI ==============================
 
@@ -173,8 +175,15 @@ def netto_lavoratore(ral, aliq_contr, add_reg, add_com):
 
 
 def main():
-    applica_override(globals())
-    json_out = percorso_json()
+    args = cli("Tasso di sostituzione netto: pensione netta (IRPEF, detrazioni, rendita del fondo) su ultimo "
+               "stipendio netto, per più scenari di rendita.", globals(), json=True,
+               da_json={"pensione_inps_lorda_annua": "PENSIONE_INPS_LORDA",   # da proiezione-inps.py
+                        "pensione_inps_lorda": "PENSIONE_INPS_LORDA",         # da montecarlo-pensione.py
+                        "ral_finale": "RAL_FINALE_LORDA",
+                        "rendita_fp": ("RENDITE_FP", lambda d: [("P10", float(d["p10"])),
+                                                                ("mediana", float(d["mediana"])),
+                                                                ("P90", float(d["p90"]))])})
+    json_out = args.json
 
     print("=" * 74)
     print("TASSO DI SOSTITUZIONE NETTO — pensione netta / ultimo stipendio netto")
@@ -183,31 +192,31 @@ def main():
     # lato lavoro
     netto_lav, contr, irpef_lav, add_lav = netto_lavoratore(
         RAL_FINALE_LORDA, ALIQ_CONTRIBUTI_DIP, ADDIZIONALE_REGIONALE, ADDIZIONALE_COMUNALE)
-    print(f"\nULTIMO STIPENDIO   lordo € {RAL_FINALE_LORDA:>10,.0f}")
-    print(f"  − contributi IVS ({ALIQ_CONTRIBUTI_DIP:.2%})   € {contr:>9,.0f}")
-    print(f"  − IRPEF (netto detrazione lavoro) € {irpef_lav:>9,.0f}")
-    print(f"  − addizionali ({(ADDIZIONALE_REGIONALE+ADDIZIONALE_COMUNALE):.2%})"
-          f"        € {add_lav:>9,.0f}")
+    print(f"\nULTIMO STIPENDIO   lordo € {numero(RAL_FINALE_LORDA):>10}")
+    print(f"  − contributi IVS ({pct(ALIQ_CONTRIBUTI_DIP, 2)})   € {numero(contr):>9}")
+    print(f"  − IRPEF (netto detrazione lavoro) € {numero(irpef_lav):>9}")
+    print(f"  − addizionali ({pct((ADDIZIONALE_REGIONALE+ADDIZIONALE_COMUNALE), 2)})"
+          f"        € {numero(add_lav):>9}")
     esente = cuneo_l207(RAL_FINALE_LORDA - contr)[0]
     if esente:
-        print(f"  + somma esente L. 207/2024     € {esente:>9,.0f}")
-    print(f"  = NETTO            € {netto_lav:>10,.0f}   (aliquota effettiva "
-          f"{1-netto_lav/RAL_FINALE_LORDA:.1%})")
+        print(f"  + somma esente L. 207/2024     € {numero(esente):>9}")
+    print(f"  = NETTO            € {numero(netto_lav):>10}   (aliquota effettiva "
+          f"{pct(1-netto_lav/RAL_FINALE_LORDA)})")
 
     # lato pensione INPS
     netto_inps, irpef_p, add_p = netto_pensionato(
         PENSIONE_INPS_LORDA, ADDIZIONALE_REGIONALE, ADDIZIONALE_COMUNALE)
-    print(f"\nPENSIONE INPS      lorda € {PENSIONE_INPS_LORDA:>10,.0f}")
-    print(f"  − IRPEF (netto detrazione pensione) € {irpef_p:>9,.0f}")
-    print(f"  − addizionali      € {add_p:>9,.0f}")
-    print(f"  = NETTA            € {netto_inps:>10,.0f}   (aliquota effettiva "
-          f"{1-netto_inps/PENSIONE_INPS_LORDA:.1%})")
+    print(f"\nPENSIONE INPS      lorda € {numero(PENSIONE_INPS_LORDA):>10}")
+    print(f"  − IRPEF (netto detrazione pensione) € {numero(irpef_p):>9}")
+    print(f"  − addizionali      € {numero(add_p):>9}")
+    print(f"  = NETTA            € {numero(netto_inps):>10}   (aliquota effettiva "
+          f"{pct(1-netto_inps/PENSIONE_INPS_LORDA)})")
 
     # rendita complementare
     aliq_fp = aliquota_rendita_fp(ANNI_ISCRIZIONE_FP)
-    print(f"\nRENDITA FONDO PENSIONE — imposta sostitutiva {aliq_fp:.1%} "
+    print(f"\nRENDITA FONDO PENSIONE — imposta sostitutiva {pct(aliq_fp)} "
           f"({ANNI_ISCRIZIONE_FP} anni di partecipazione; fuori IRPEF) "
-          f"sul {QUOTA_IMPONIBILE_FP:.0%} della rendita")
+          f"sul {pct(QUOTA_IMPONIBILE_FP, 0)} della rendita")
     if QUOTA_IMPONIBILE_FP >= 1:
         print("  stima prudente: tassa anche i rendimenti già tassati; imposta QUOTA_IMPONIBILE_FP "
               "con la quota di TFR e contributi dedotti")
@@ -220,14 +229,14 @@ def main():
         tot = netto_inps + netta
         t_netto = tot / netto_lav
         t_lordo = (PENSIONE_INPS_LORDA + lorda) / ral_lorda_tot
-        print(f"{nome:<10}{lorda:>14,.0f}{netta:>14,.0f}{tot:>16,.0f}"
-              f"{t_netto:>12.1%}{t_lordo:>9.1%}")
+        print(f"{nome:<10}{numero(lorda):>14}{numero(netta):>14}{numero(tot):>16}"
+              f"{pct(t_netto):>12}{pct(t_lordo):>9}")
 
     print("\nLettura: il tasso NETTO è il numero che descrive il tenore di vita —")
     print("confronta ciò che entra davvero in tasca nei due momenti della vita.")
     print("Il divario col lordo viene da tre asimmetrie: in pensione non si versano")
-    print(f"contributi ({ALIQ_CONTRIBUTI_DIP:.2%}), la rendita complementare paga "
-          f"{aliq_fp:.0%} secco fuori IRPEF,")
+    print(f"contributi ({pct(ALIQ_CONTRIBUTI_DIP, 2)}), la rendita complementare paga "
+          f"{pct(aliq_fp, 0)} secco fuori IRPEF,")
     print("e l'IRPEF su un reddito più basso sconta scaglioni e detrazioni migliori.")
     print("\nAvvertenze: regole fiscali di OGGI proiettate al futuro (cambiano quasi")
     print("ogni anno); addizionali medie indicative; nessun altro reddito o detrazione.")

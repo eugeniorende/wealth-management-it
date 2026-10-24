@@ -1,76 +1,89 @@
-# Passaggio della sessione di sviluppo — 21/10/2026
+# Passaggio della sessione di sviluppo — 24/10/2026
 
-Documento per riprendere lo sviluppo della 0.10.0 in un'altra sessione (Claude Code in cloud o su un'altra macchina). Tutto ciò che serve è nel repository: questo file, `ROADMAP.md`, `docs/audit-2026-10.md` e i dati in `docs/sviluppo/`.
+Documento per riprendere lo sviluppo in un'altra sessione (Claude Code in cloud o su un'altra macchina). Sostituisce la versione del 21/10/2026, che descriveva lo stato prima della 0.10.0. Tutto ciò che serve è nel repository: questo file, `ROADMAP.md`, `docs/audit-2026-10.md` e i dati in `docs/sviluppo/`.
 
 ## 1. Dove siamo
 
-`develop` (0f8ba21) contiene l'ondata 0 completa e, in anticipo, T10, la prima parte di T11, licenza, supply chain e matrice Python della CI (PR #5, #7-#19). I temi della 0.10.0 sono implementati su branch pubblicati, non ancora mergiati:
+- **0.11.0 rilasciata il 24/10/2026**: tag `v0.11.0`, release con lo zip, merge back su develop. Dentro, dopo la 0.10.0 del 22/10/2026: PR #37-#40 (verifiche alle fonti, LibreOffice in CI, aliquota mista), PR #42 (stato dopo la 0.10.0), T9 in quattro PR (#43-#46: interfaccia comune degli script, lettore unico del pianificatore, catena `--json` → `--from`, input da file, «Dove lavorare», vocabolario), T12 (#47: test che vincolano i numeri), T14 (#48: description, CHANGELOG.md, comandi alias, manifest `--strict`, indici) e la pre-pubblicazione (#49: rilettura degli output, prove di installazione, verifiche alle fonti). Ogni tema ha la sua revisione avversariale, con gli esiti in `docs/sviluppo/revisioni/` (esito-t9a, esito-t9bcd, esito-t12, esito-t14).
+- Suite: 134 test (`@test` in `tests/run_tests.py`; il conteggio nel README è vincolato da un test di igiene). Freshness: nessun marcatore scade prima del 2027-06.
+- Il repository è **privato** e resta tale: la visibilità la decide il proprietario (decisione 2 di `ROADMAP.md`).
+- **Branch remoti da cancellare dal proprietario**: `claude/kind-meitner-crztg2`, `claude/vigilant-cannon-1otexq`, `feature/verifiche-fonti`, `feature/handoff-0.11`, `feature/stato-dopo-0.10.0`, `feature/t9a-cli-encoding-formati`, `feature/t9b-lettore-pianificatore`, `feature/t9c-from-json-catena`, `feature/t9d-input-esterno-dove-lavorare`, `feature/t12-test-vincolanti`, `feature/t14-authoring-packaging`, `feature/prepubblicazione-verifiche`, `release/0.11.0`. Dalla sessione cloud la cancellazione è negata: il proxy GitHub risponde 403 sia a `git push origin --delete` sia a `DELETE /git/refs` (`delete_branch_on_merge` è spento sul repository e non si può accendere da qui). In alternativa: Settings → General → «Automatically delete head branches».
 
-| Tema | Branch | Base | Stato |
-|---|---|---|---|
-| T1 asimmetria e zainetto | `feature/t1-asimmetria-zainetto` | develop | **pronto**: correzioni della revisione applicate (1cf2a7a), suite 49/49. **PR #20** aperta: far ripassare la CI e mergiare |
-| T2 importatore broker | `feature/t2-importatore-broker` | T1 (merge fe6b03b) | correzioni **da applicare**: `revisioni/review-t2.json` |
-| T3 broker esteri e dichiarativo | `feature/t3-broker-esteri` | T2 (75e0795) | correzioni da applicare: `revisioni/review-t3.json`; prima incorporare T2 aggiornato |
-| T13 dividendi esteri, successioni | `feature/t13-reference` | develop | correzioni + integrazione da fare: `revisioni/review-t13.json` e § 3 |
-| T8 obiettivi | `feature/t8-obiettivi` | develop (merge 05fbf60) | **pronto**: correzioni applicate (9064ada), suite 55/55; note in `revisioni/esito-t8.json` |
-| T5 pensione pubblica | `feature/t5-pensione-pubblica` | develop 0f8ba21 | correzioni da applicare: `revisioni/review-t5.json` |
-| T4 fondo pensione | `feature/t4-fondo-pensione` | T5 | correzioni da applicare: `revisioni/review-t4.json` |
-| T6 autonomi | `feature/t6-autonomi` | T4 | correzioni da applicare: `revisioni/review-t6.json` |
+## 2. Cosa resta: le voci verificate
 
-Restano da fare: **T7** (ribilanciamento), la **seconda parte di T11** (mappa dei testi unici 2027 e doppie citazioni, materiale pronto in `t11/`), i lavori trasversali di 0.11 e pre-pubblicazione, la release.
+### 2.1 Incoerenze documentali, da chiudere per prime
 
-**I file `revisioni/review-*.json`** sono gli esiti delle revisioni avversariali (4 lenti, 2 verificatori per rilievo). Gruppi: `confermati` (due voti: applicare salvo prova contraria), `contesi` (un voto: valutare), `non_verificati` (verifica caduta per limiti tecnici: valutare con scetticismo, applicare solo se dimostrabili). Il campo `correzione` è una proposta, da verificare sul testo del branch.
+Chiusa dalla PR #42 (24/10/2026): `--anonimo` e «Privacy» spuntati; «Stato al 24/10/2026» e sezione «Non rilasciato» del changelog con le PR #37-#40; un solo conteggio dei test nel README vincolato da `t_conteggio_test` (storico del changelog escluso); «Errori noti» aggiornato; `freshness.yml` e `release.yml` su Python 3.11 con `t_python_workflow` che li tiene nella matrice; branch protection rinviata a dopo la pubblicazione; frasi superate del README corrette (zip con LICENSE e NOTICE, prova di installazione del 21/10/2026, niente «smoke test»); `t_marketplace` confronta anche `version` (l'assert di F061); «Linea di taglio e rilascio della 0.11.0» e regola Gitflow generica in ROADMAP.
 
-## 2. Ordine di lavoro consigliato
+### 2.2 T9 — interfaccia degli script e flusso dati (P1, XL)
 
-1. **PR #20 (T1)**: push già fatto con le correzioni; CI verde → merge (merge commit) → elimina il branch.
-2. **T2**: `git merge develop`, applica `review-t2.json` (tra i confermati: aliquota 12,5% solo ai titoli di Stato italiani mentre spetta anche a white list ed enti sovranazionali; ETC WisdomTree con ISIN JE classificati come OICR a IRPEF) → PR → CI → merge.
-3. **T3**: `git merge feature/t2-importatore-broker` (o develop dopo il merge di T2), applica `review-t3.json` → PR → merge.
-4. **T13**: `git merge develop`, applica `review-t13.json` e l'integrazione del § 3 → PR → merge.
-5. **T8**: `git merge develop` → PR → merge.
-6. **T5 → T4 → T6**: applica le tre revisioni in ordine (ogni branch incorpora il precedente) → tre PR in ordine → merge.
-7. **Dopo T8 e T5-T6**: le note fuori perimetro del § 4 (deflazione della serie in `ponte-pensione.py`, diciture «serie storica reale», `--anonimo` in importa-previdenza, ecc.).
-8. **T7 ribilanciamento** (dopo T1): F004, F019, F030 (restano `bande-dinamiche.md` e lo script: cruscotto e tracker sono già a 5/25), F044, F045 (regola di rientro mista), F046 (prelievo in decumulo), F047. Vedi `docs/audit-2026-10.md`, § T7.
-9. **T11 seconda parte**: `t11/mappa-nuovo-tuir.md` → `skills/it-tax-optimization/references/mappa-nuovo-tuir.md` (con rimando dalla SKILL e voce in `OBBLIGATI_FRESHNESS`), poi `t11/doppie-citazioni.md`.
-10. **Rilascio 0.10.0**: changelog v0.10.0 (voci per T1-T8, T13 e correzioni), ROADMAP spuntata, README («Errori noti», conteggio dei test, tabella `--tabella-freshness` rigenerata), poi `release/0.10.0` da develop → PR su main (merge commit) → tag `v0.10.0` → verifica di `release.yml` (suite completa con freshness, zip con LICENSE e NOTICE) → merge back su develop.
-11. **0.11 e pre-pubblicazione** (ROADMAP): T9 helper CLI comune (`--help`, `--set`, `--json`, `--from`), Windows ed encoding (UTF-8 su stdout e `open()`, `windows-latest` in CI), formati italiani (migliaia col punto, CSV ordini con `;`), T12 test strutturali sugli xlsx e `--json` a valori chiusi, T14 (description ≤ 1.024 caratteri, CHANGELOG.md, campo `upstream` di plugin.json, commands come alias, recalc della sandbox in autonomi SKILL).
+Il primo sottopunto di `ROADMAP.md:143-146` (helper) è fatto nella PR #43 salvo `--from`; restano gli altri tre. Fatto in anticipo: F005 (CSV ancorato a `__file__`), rendimento zero in ponte (parte di F056), `--set` con refuso respinto (`motore_bootstrap.py:154-156`), `valida()` del ribilanciamento (T7), argparse solo in `importa-estratto-broker.py`.
 
-## 3. Integrazione di T13 (da fare sul branch T13)
+- **F056 helper CLI.** Fatto nella PR #43 (T9a): `cli()`, `errore()`, `configura_stdout()`, `numero()`/`euro()`/`pct()` in `motore_bootstrap.py` (copie identiche, `t_sincronia`); adottati nei 13 script (i tre delle skill senza motore usano argparse e lo stesso `reconfigure`); test `t_cli_help` (`--help` → rc 0, flag ignoto → rc 2, dati mancanti → rc 1), `t_cli_utf8` (cwd esterna e console cp1252), convenzione 0/1/2 nel README («Convenzioni degli script»). Resta `--from` (F027, PR (c)).
+- **F028 lettore unico del pianificatore.** Fatto nella PR #44 (T9b): `leggi_pianificatore(path)` in motore_bootstrap, usato dai quattro script; foglio mancante, importo come testo, profilo ignoto e orizzonte non intero → `ERRORE:` con rc 1; profilo con casefold; target vuoto → None (il glide path lo tiene, Monte Carlo e allocatore lo escludono dicendolo); righe incomplete scartate col motivo; `coperto` e stato «✓ già coperto» nell'allocatore; avviso sul modello dentro il plugin; test `t_lettore_pianificatore` (otto workbook limite, tre mutanti). Attenzione ai `__pycache__` quando si provano mutanti della stessa lunghezza nello stesso secondo: il bytecode resta quello vecchio (usare `python -B` o cancellare le cache).
+- **F027 `--from`.** Fatto nella PR #45 (T9c): `carica_da_json` e `--from FILE` (ripetibile, letto prima di `--set`) in `cli()`; catena importa-previdenza `--json` → proiezione-inps → montecarlo-pensione → netto-pensione e ponte-pensione, con le mappe chiavi → costanti in testa a ogni `main()` e in `--help`; `--json` su glidepath e montecarlo-obiettivi; `t_catena_previdenziale` (stessi numeri lungo la catena, precedenza, JSON estraneo → rc 1) e `t_json_obiettivi`; SKILL di it-pianificazione (Step 1 e nota della pipeline) riscritte: la promessa ora è vera.
+- **F033 input esterno.** Fatto nella PR #46 (T9d): `genera-ips.py --dati ips.json` (chiavi del blocco DATI, schema nella SKILL di it-revisione, avviso «dati di esempio» senza), `ribilanciamento-multibroker.py --dati piano.json --zainetto importatore.json --out DIR` (schema nella SKILL di it-rebalance; lo zainetto dal JSON dell'importatore via `analisi.per_broker[].zainetto_26_equivalente`); test `t_dati_ips` e `t_dati_ribilanciamento`.
+- **F026 vocabolario.** Fatto nella PR #46: `categoria_fiscale` con i quattro valori dell'importatore è il nome canonico (README «Input richiesto» con `broker` nei due CSV, SKILL di it-rebalance, colonna del CSV degli ordini); il ribilanciamento accetta e normalizza i sinonimi (`tipo_fiscale`, `tipo`, `classe`, `plus_minus`, `controvalore`, forme brevi) e rifiuta `reddito_capitale_irpef` e `da_classificare` con il motivo; «Glossario» di dieci termini nel README; test `t_lessico`.
+- **F059 «Dove lavorare» e F058.** Fatto nella PR #46: sezione in ogni SKILL.md con `${CLAUDE_SKILL_DIR}` (sostituito nel corpo della skill: documentazione ufficiale, pagina skills, «Available string substitutions», letta il 24/10/2026) e `${CLAUDE_PLUGIN_ROOT}` nei command (plugins-reference, «Environment variables»: le variabili non arrivano ai processi del tool Bash, vanno scritte nel markdown), `${user_config.cartella_lavoro}` con `userConfig` di tipo directory e default in `plugin.json` (resta da verificare dal proprietario come Cowork tratti `userConfig`: la documentazione non lo dice); invocazioni a nome nudo sostituite; ricalcolo da riga di comando condizionale in it-revisione; test `t_dove_lavorare`.
+- **F031 contratto di input di it-revisione.** Fatto nella PR #45: tabella «Contratto di input» (dominio → script `--json` → campo → cella del cruscotto) in `skills/it-revisione/SKILL.md`; `template-revisione.md` rimanda agli script; `ROADMAP.md` spuntata.
 
-- `skills/it-tax-optimization/SKILL.md`, elenco delle reference:
-  - `references/dividendi-esteri.md` — dividendi esteri e doppia imposizione: ritenute alla fonte di sette Paesi con il prelievo totale, il 26% sul netto frontiera in amministrato, W-8BEN e rimborsi esteri, il credito per le imposte estere (negato dall'Agenzia, aperture della Cassazione), ETF ad accumulazione o a distribuzione e azioni dirette;
-  - `references/successione-donazione.md` — costo per gli eredi pari al valore di successione e per i donatari pari al costo del donante, fondi ed ETF come caso a parte, zainetto che si estingue col decesso, aliquote e franchigie dopo il D.Lgs. 139/2024, il confronto «vendo in decumulo o lascio in eredità».
-  - Riga dei «Casi limite (successioni…)»: aggiungere «principi in `references/successione-donazione.md`».
-- `skills/it-rebalance/references/sequenza-liquidazione.md`, fine del punto 2: «Per i dividendi esteri il netto incassato sconta anche la ritenuta dello Stato estero, e il 26% italiano si applica sul netto frontiera. L'eventuale eccedenza rispetto alla convenzione si recupera solo con le pratiche estere (W-8BEN, rimborsi): vedi `it-tax-optimization/references/dividendi-esteri.md`.» Nuovo paragrafo «Finalità successoria»: «Per azioni e obbligazioni detenute direttamente gli eredi ricevono come costo il valore di successione: la plusvalenza latente si azzera. Se una parte del dossier è destinata agli eredi, le posizioni dirette con la plusvalenza latente più alta sono le ultime da vendere. Per fondi ed ETF il testo vigente tratta l'intestazione agli eredi come una cessione: da verificare.»
-- Bucket «Eredità» di it-pianificazione-obiettivi (dopo il merge di T8): «La fiscalità dietro il profilo: per azioni e obbligazioni detenute direttamente gli eredi prendono come costo il valore di successione, e l'imposta di successione è nulla entro €1.000.000 per coniuge e figli. Per fondi ed ETF l'azzeramento della plusvalenza non è garantito. Vedi `it-tax-optimization/references/successione-donazione.md`.»
-- `tests/run_tests.py`: le due reference in `OBBLIGATI_FRESHNESS` (più `multi-intermediario.md` e `import-dati-broker.md`, se marcati) e un test che vincoli i numeri (prelievo = r + 26%×(1−r); esempi 629/518/590; successione 78.000 e 249.600) e l'indice nella SKILL, validato per mutazione.
-- Attenzione al contenuto: per fondi ed ETF l'intestazione agli eredi è trattata come cessione nel testo vigente (artt. 26-quinquies c. 6 DPR 600/73 e 10-ter c. 3 L. 77/83): l'azzeramento della plusvalenza vale con certezza solo per i titoli detenuti direttamente. La ritenuta francese per le persone fisiche è 12,8% (non 25% come nell'audit).
+### 2.3 Windows, encoding e formati italiani (pre-pubblicazione, insieme all'helper di T9)
 
-## 4. Note fuori perimetro raccolte dagli agenti
+Chiusa dalla PR #43 (T9a): UTF-8 forzato su stdout e stderr in ogni script, negli `scripts/` e nel runner; `open()` sempre con encoding (test `t_cli_utf8` lo controlla su assets, scripts e tests); `relpath` con `/`; job `test-windows` su `windows-latest` (Python 3.11, senza LibreOffice); `trova_soffice()` con i percorsi di Windows; `numero()`, `euro()` e `pct()` al posto di circa 110 format spec anglosassoni, con `t_formati_italiani` che vieta `{x:,.0f}` e `{x:.1%}` nei sorgenti e `€ 1,234` o `7.0%` negli output; CSV degli ordini con `;`, virgola decimale e BOM (`t_csv_italiano`); i «parametri pronti» di importa-previdenza restano letterali Python (`36_000`). Le voci «Windows ed encoding» e «Formati italiani» di ROADMAP sono spuntate.
 
-- **ponte-pensione.py** (dopo T8): deflazionare la serie storica come il decumulo (`carica_inflazione` e `deflaziona` del motore, parametri `INFLAZIONE=None` e `INFLAZIONE_RIPIEGO=0.02`); sui default la probabilità di coprire il ponte scende da circa 44% a circa 21%. Dirlo nel changelog (output con seed cambiati). Test a valore chiuso.
-- **montecarlo-pensione.py:20-22, it-pianificazione/SKILL.md (serie storica), references/montecarlo-pensione.md**: «serie storica reale» → «serie storica USA nominale in dollari (Damodaran), ne usa solo la forma: media ricentrata».
-- **Due copie di `motore_bootstrap.py`**: quella di T8 è la versione di riferimento; se un altro tema tocca la copia in it-pianificazione, riallinearla.
-- **sequenza-liquidazione.md (it-rebalance)**: allineare alle nuove forme di erogazione del fondo (rendita a durata definita, prelievi, frazionata) e alla ritenuta 15→9% sulla sola parte imponibile.
-- **it-pianificazione-obiettivi/SKILL.md e asset-location-optimizer.py**: «€5.300 al 33%» presuppone l'assenza del contributo del datore: nota sul plafond condiviso.
-- **it-revisione (T10)**: aggiungere lo spazio deducibile residuo (plafond − datore − dovuto) e la perdita del 9-15% se i non dedotti non sono comunicati.
-- **importa-previdenza.py**: flag `--anonimo` (oggi stampa intestatario e data di nascita).
-- **commands/ribilancia.md**: «PMC (o lotti)» → i lotti servono solo a ricostruire il PMC (come it-rebalance/SKILL.md).
-- **criptovalute-casi-speciali.md**: «art. 6 c. 6 D.Lgs. 461/1997» senza successore (dal 2027 art. 306 c. 7 D.Lgs. 117/2026).
-- **README**: conteggio dei test superato; «Errori noti» elenca come aperti F001, F007, F011, F012 (chiusi dai temi); tabella freshness da rigenerare; voci di changelog per i temi.
-- **Circ. AdE 30/E/2023**: il PDF sul sito AdE dà 404; copia integrale su dirittobancario.it.
+### 2.4 T12 — test e CI che vincolano i numeri (P1, L)
 
-## 5. Regole di lavoro (invariate)
+Chiusa dalla PR #47 (T12): struttura uniforme e valori sentinella dei 6 xlsx dopo il ricalcolo, `--json` degli script previdenziali con valori chiusi sui default, `t_allocatore` sul JSON, rami avanzati (curvatura, buffer, `coeff_vigente` interpolato, sensibilità monotona), fixture con BOM, unità ed `xmlns`, tabella strumenti ↔ test nel README generata da `--tabella-test`, verbali esito-t2, esito-t3, esito-t13 ed esito-t12 con i 4 mutanti di F032 rieseguiti e uccisi.
 
-- **Gitflow**: `feature/*` → PR su `develop`, merge commit (`gh pr merge N --merge`), poi eliminazione del branch; `release/X.Y.Z` → `main` con tag e merge back. Messaggi di commit in italiano, ultima riga `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`; descrizione delle PR che chiude con `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- **Decisioni del proprietario**: § «Decisioni» di `ROADMAP.md` (0.10.0 con P0 e T11; repository privato fino alla pre-pubblicazione; dichiarativo solo come principi; uscite operative con gate stretti e disclaimer; F012 come correzione).
+### 2.5 T14 — authoring, documentazione e packaging (P2, M)
+
+Chiusa dalla PR #48 (T14), salvo l'icona (§ 2.8): description entro 1.024 caratteri e quotate, `metadata.version` per skill, «Note per l'iterazione» e storico del README in `CHANGELOG.md` (anche nello zip), comandi come alias (`disable-model-invocation`, `argument-hint`, `$ARGUMENTS`), `upstream` in `metadata` e `claude plugin validate . --strict` nella CI, indici nelle 21 reference da 100 righe in su, README con `claude plugin update`, auto-update e `--scope`, IPS con titolo e lingua it-IT. F058 era già chiuso dalla PR #46. Costo di contesto sempre caricato: da circa 4.350 a circa 3.050 token (`claude plugin details`, verbale delle prove di installazione).
+
+### 2.6 Pre-pubblicazione, voci di giudizio
+
+Chiusa dalla PR #49, salvo le due prove che richiedono il proprietario:
+
+- **Rilettura degli output operativi**: verbale in `docs/sviluppo/verbale-rilettura-output-2026-10-24.md`. OPZIONE e tetto dei €5.300 conformi al gate; corretti il CSV degli ordini (categoria del vocabolario, dati d'esempio dichiarati nella NOTA, percorso di `--out`), l'IPS d'esempio (avviso in copertina), l'intestazione dell'importatore e la postura delle leve previdenziali (scenari, non raccomandazioni), che stava solo nei comandi diventati alias.
+- **README coerente con un repository pubblico**: aggiornamenti, `--scope`, opzione della cartella di lavoro e CHANGELOG nelle PR #48 e #49.
+- **Prove di installazione**: verbale in `docs/sviluppo/verbale-installazione-2026-10-24.md` (via locale, via GitHub con le credenziali della sessione, `--config` e `/plugin configure`, script dalla copia in cache, zip estratto e validato con `--strict`). **Restano al proprietario**, con i passi nel verbale: l'installazione da un account senza accesso, possibile solo dopo la pubblicazione, e l'upload dello zip in Cowork.
+
+### 2.7 Verifiche alle fonti rimaste
+
+Fatte nella PR #49:
+
+- **Art. 11 D.Lgs. 252/2005**: commi 3, 3-bis, 3-ter, 3-quater, 3-quinquies, 4, 4-bis, 4-ter, 6-bis e 6-ter riletti su Normattiva il 24/10/2026, con le decorrenze del c. 202 L. 199/2025 come modificato dal DL 62/2026 (1/7/2026; 31/10/2026 per la frazionata) e le corrispondenze 2027 dell'art. 258 D.Lgs. 117/2026 (c. 5 per il 6-bis). **Delibera COVIP del 25/6/2026**: il sito COVIP risponde 403, ma il testo è in GU Serie Generale n. 155 del 7/7/2026 (atto 26A03313), letta il 24/10/2026 su gazzettaufficiale.it (la revisione di T14 l'ha segnalato). Confermati non combinabilità, irrevocabilità salvo conversione in vitalizia, revoca prima del primo importo, niente RITA né anticipazioni con lo switch di comparto ammesso, non cumulo con una RITA in corso, transitorio non oltre il 31/12/2026; corretto «non si versa più»: si versa ancora il TFR di un nuovo rapporto di lavoro, come posizione distinta (par. 4). I vincoli sono dentro il marcatore, separati da quelli di legge; un test lo vincola.
+- **Certificates**: l'art. 68 c. 5 TUIR (Normattiva, 24/10/2026) somma tra loro i redditi delle lettere c, c-bis, c-ter, c-quater e c-quinquies dell'art. 67, escluse le plus di partecipazioni in Stati a fiscalità privilegiata del c. 4. I certificates stanno di norma nella lett. c-quater, ma è un'interpretazione: non c'è una risoluzione AdE specifica (la 72/E/2010 riguarda gli ETC), e un certificato a capitale protetto al 100% può essere un titolo similare alle obbligazioni con proventi di capitale (art. 44 c. 2 lett. c n. 2 TUIR, dal 2027 art. 46 c. 2 lett. b n. 2, letti su Normattiva). In `it-tax-optimization` e in `genera-ips.py` la norma sta nel marcatore, l'interpretazione fuori.
+- DM 21/02/2013 (Tobin tax) e probabile refuso dell'art. 306 c. 6 D.Lgs. 117/2026: invariati, in «Da verificare» della mappa fino ai correttivi; rivedere con la legge di bilancio 2027.
+- Rimando a `ponte-pensione.py` in `mercati-e-correlazione.md` (esito-t8, nota 3): fatto.
+
+### 2.8 Da decidere dal proprietario: non toccare senza decisione
+
+- Visibilità del repository (decisione 2) e branch protection (richiede repository pubblico o GitHub Pro).
+- T13: riscatto della laurea (F055) e casi del freelance (F063), `ROADMAP.md` § «Dopo». La pulizia della description di it-pianificazione (F023) è fatta: riscatto, ricongiunzione e totalizzazione sono fuori dai trigger e dichiarati fuori perimetro.
+- Icona del plugin.
+
+## 3. Prossimi passi
+
+I passi 1-7 dell'ordine di lavoro precedente (PR del documento, stato dopo la 0.10.0, T9, T12, T14, § 2.6-2.7, rilascio 0.11.0) sono fatti. Restano:
+
+1. **Al proprietario**: le decisioni del § 2.8 (visibilità, branch protection, T13, icona); la cancellazione dei branch remoti del § 1, oppure Settings → General → «Automatically delete head branches»; le due prove di installazione del § 2.6 (account senza accesso dopo la pubblicazione, upload dello zip in Cowork), con i passi nel verbale delle prove di installazione.
+2. **Con la legge di bilancio 2027 e i correttivi del D.Lgs. 117/2026**: rivedere i due punti «Da verificare» della mappa dei testi unici (rinvii del DM 21/02/2013, art. 306 c. 6) e le soglie annuali (massimale contributivo, coefficienti, tassi di rivalutazione), seguendo il calendario dei parametri nel README.
+3. **Dal 1/1/2027** entrano in vigore i testi unici: le doppie citazioni di `mappa-nuovo-tuir.md` restano valide, ma la citazione principale va girata sul testo nuovo quando le prassi dell'AdE lo seguono.
+4. **Entro giugno 2027**: riverifica alle fonti dei marcatori del 2026-06, prima che la freshness mensile apra la issue e prima di un nuovo tag (`release.yml` esegue anche la freshness).
+5. **T13**, se il proprietario lo decide: riscatto della laurea (F055) e casi del freelance (F063), `ROADMAP.md` § «Dopo», con una revisione avversariale prima del merge.
+
+## 4. Regole di lavoro
+
+- **Gitflow**: `feature/*` → PR su `develop`, merge commit (`gh pr merge N --merge`), poi eliminazione del branch; `release/X.Y.Z` → `main` con tag e merge back. Messaggi di commit in italiano; la riga `Co-Authored-By` e la chiusura delle PR sono quelle indicate dall'ambiente della sessione.
+- **Decisioni del proprietario**: § «Decisioni» di `ROADMAP.md` (repository privato fino alla pre-pubblicazione; dichiarativo solo come principi; uscite operative con gate stretti e disclaimer; F012 come correzione) e il § 2.8 di questo file. Non rendere pubblico il repository.
 - **TDD**: prima il test che fallisce per la ragione giusta, poi il fix; test che vincolano i numeri; validazione per mutazione dove possibile.
-- **Fonti primarie** (Normattiva, Gazzetta Ufficiale, AdE, INPS, COVIP, MEF) per ogni dato normativo; marcatori `Verificato: AAAA-MM` circoscritti a ciò che è confermato; doppia citazione per le norme che cambiano dal 2027.
-- **Propagazione**: ogni correzione in tutte le copie (`git grep` su skills/, commands/, README, plugin.json).
+- **Fonti primarie** (Normattiva, Gazzetta Ufficiale, AdE, INPS, COVIP, MEF) per ogni dato normativo; marcatori `Verificato: AAAA-MM` circoscritti a ciò che è confermato; doppia citazione per le norme che cambiano dal 2027 (`mappa-nuovo-tuir.md`).
+- **Propagazione**: ogni correzione in tutte le copie (`git grep` su `skills/`, `commands/`, README, manifest).
 - **Excel**: mai salvare con openpyxl i file con convalide o strutture delicate; modificare l'XML nello zip e poi `python scripts/ricalcola-excel.py FILE --in-place` (ricalcolo in locale it-IT). Confrontare la struttura prima e dopo.
-- **Revisione avversariale prima di ogni merge di tema**: `docs/sviluppo/workflows/review-tema-roadmap.js` (Workflow tool, args `{repo, scratch, python, branch, base, tema, finding}`); il modello di workflow per applicare le correzioni è `correzioni-temi-roadmap.js`.
+- **Revisione avversariale prima di ogni merge di tema**: `docs/sviluppo/workflows/review-tema-roadmap.js` (Workflow tool, args `{repo, scratch, python, branch, base, tema, finding}`); il modello per applicare le correzioni è `correzioni-temi-roadmap.js`. Esito in `docs/sviluppo/revisioni/esito-<tema>.json`.
+- **CI verde prima del merge**: `tests` (3.11 e 3.14, LibreOffice obbligatorio), `validate` (con `--strict`), `test-windows` e `freshness`.
 
-## 6. Ambiente
+## 5. Ambiente
 
 ```bash
 pip install -r tests/requirements.txt          # numpy, openpyxl, python-docx
@@ -80,4 +93,11 @@ python tests/run_tests.py --only freshness      # solo freshness
 python tests/run_tests.py --tabella-freshness   # tabella per il README
 ```
 
-In CI: `RICHIEDI_LIBREOFFICE=1` rende obbligatori i test Excel; matrice Python 3.11 e 3.14.
+In CI: `RICHIEDI_LIBREOFFICE=1` rende obbligatori i test Excel; matrice Python 3.11 e 3.14; `scripts/installa-libreoffice.sh` installa LibreOffice dai `.deb` in cache (PR #39). Il validatore locale: `claude plugin validate .`.
+
+## 6. Storico e materiale
+
+- Passaggio del 21/10/2026: stato prima della 0.10.0, temi su branch separati, note fuori perimetro (§ 4 di allora): tutto chiuso tranne il conteggio dei test del README (§ 2.1).
+- `docs/sviluppo/revisioni/`: `review-<tema>.json` (esiti delle revisioni avversariali: `confermati`, `contesi`, `non_verificati`) ed `esito-<tema>.json` (cosa è stato applicato), uno per tema; esito-t2, esito-t3 ed esito-t13 ricostruiti con la PR #47. Per la 0.11.0: esito-t9a, esito-t9bcd, esito-t12 ed esito-t14 (quest'ultimo copre anche la PR #49).
+- `docs/sviluppo/t11/`: `mappa-nuovo-tuir.md` e `doppie-citazioni.md` sono bozze storiche, già integrate nella reference; i verbali `verifica-2026-10-22-*.md` sono la fonte delle corrispondenze 2027.
+- Circ. AdE 30/E/2023: il PDF sul sito AdE dà 404; copia integrale su dirittobancario.it.

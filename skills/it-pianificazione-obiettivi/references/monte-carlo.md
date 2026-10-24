@@ -2,6 +2,20 @@
 
 Questa reference spiega il senso, il modello e soprattutto i **limiti** della simulazione Monte Carlo applicata agli obiettivi. Lo strumento è `assets/montecarlo-obiettivi.py`.
 
+## Indice
+
+- Perché il deterministico non basta
+- Il modello
+- Le volatilità per profilo
+- Come interpretare la probabilità di successo
+- Sequence-of-returns risk
+- Due modelli dei rendimenti: Normale e bootstrap storico
+- Le tre strade per colmare un gap (e perché il rischio è a doppio taglio)
+- I limiti del modello (importante)
+- Come eseguirlo
+- Heuristic per la skill
+- Due correzioni di onestà
+
 ## Perché il deterministico non basta
 
 Il pianificatore Excel calcola il versamento mensile usando il rendimento atteso **medio** del profilo. Questo centra la media della distribuzione dei risultati — ma la media non è il risultato "probabile". Per due ragioni:
@@ -124,7 +138,7 @@ pip install numpy openpyxl
 python montecarlo-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]
 ```
 
-Lo script legge gli obiettivi e i parametri dal foglio Excel (singola fonte di verità: si compila l'Excel, si lancia lo script). Senza argomenti, cerca `pianificatore-obiettivi.xlsx` nella stessa cartella. I parametri della simulazione (numero di percorsi, confidenza-obiettivo, seed, glide path) sono in cima allo script, editabili o sovrascrivibili con `--set` (es. `--set MODELLO=bootstrap`, `--set GLIDE=False`).
+Lo script legge gli obiettivi e i parametri dal foglio Excel (singola fonte di verità: si compila l'Excel, si lancia lo script). Senza argomenti, cerca `pianificatore-obiettivi.xlsx` nella stessa cartella. I parametri della simulazione (numero di percorsi, confidenza-obiettivo, seed, glide path) sono in cima allo script e si cambiano con `--set`, senza toccare il file (es. `--set MODELLO=bootstrap`, `--set GLIDE=False`).
 
 ## Heuristic per la skill
 

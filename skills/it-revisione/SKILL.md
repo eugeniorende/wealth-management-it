@@ -1,6 +1,8 @@
 ---
 name: it-revisione
-description: Revisione periodica personale della propria situazione finanziaria complessiva — il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole "fare il punto", chiede una revisione annuale o di fine anno, dice "come sta andando il mio piano", "rivediamo il portafoglio / la mia situazione / i miei obiettivi", "controllo annuale", "check-up finanziario", "tiriamo le somme", oppure quando a fine anno fiscale (novembre-dicembre) vuole una verifica complessiva prima del 31/12. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento obiettivi), `it-tax-optimization` (minusvalenze e harvesting di fine anno) e `it-rebalance` (deriva dell'allocazione). Per un risparmiatore italiano che gestisce i propri soldi. NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato per le decisioni.
+description: "Revisione periodica personale della situazione finanziaria complessiva: il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole «fare il punto», chiede una revisione annuale o di fine anno, dice «come sta andando il mio piano», «rivediamo il portafoglio», «check-up finanziario», «tiriamo le somme», o a novembre-dicembre vuole una verifica complessiva prima del 31/12; anche per l'Investment Policy Statement (IPS) e il cruscotto patrimoniale. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento), `it-tax-optimization` (minusvalenze di fine anno) e `it-rebalance` (deriva dell'allocazione). NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato."
+metadata:
+  version: "0.7"
 ---
 
 # Revisione periodica personale
@@ -19,6 +21,16 @@ Postura: **personale ed educativa**. Non è consulenza. La revisione mette ordin
 
 NON è il posto per una singola analisi verticale: se l'utente chiede solo "quanto prenderò di pensione" o solo "come ribilancio", usa la skill specifica. Questa entra quando serve la **visione d'insieme**.
 
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/cruscotto-patrimoniale.xlsx`, `${CLAUDE_SKILL_DIR}/assets/tracker-secchielli.xlsx`, `${CLAUDE_SKILL_DIR}/assets/investment-policy-statement.xlsx`;
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze dello script: Python 3.11 o successivo con python-docx (`pip install python-docx`).
+
 ## Il workflow della revisione
 
 La revisione segue un'agenda in cinque passi. Ai passi 1-2 fotografa; al passo 3 **richiama le altre skill** (non ne duplica la logica); ai passi 4-5 sintetizza e produce il report. Lo strumento `assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa.
@@ -31,7 +43,7 @@ Versamenti effettuati vs pianificati; andamento del periodo **separando il rendi
 
 ### 3. Avanzamento per dominio (richiamando le altre skill)
 - **Pensione** → `it-pianificazione` (dipendenti) o `it-pianificazione-autonomi` (P.IVA): il tasso di sostituzione proiettato è ancora in linea con l'obiettivo? C'è un **gap previdenziale**? Va aumentato il versamento al fondo pensione (verificando la deducibilità nel proprio regime)? Per il dipendente, qual è lo **spazio deducibile residuo** dell'anno: max(0, €5.300 − datore − dovuto − volontari già versati nell'anno), con il contributo del datore e quello minimo del lavoratore (il TFR non conta)? È il tetto fiscale dei volontari da versare ancora entro il 31/12, non un importo consigliato (foglio Complementare dell'Excel di `it-pianificazione`); per il forfettario la deduzione arriva solo fino agli altri redditi IRPEF (`it-pianificazione-autonomi`). Ciò che supera il plafond, o che il forfettario non deduce, va comunicato al fondo come non dedotto entro il 31/12 dell'anno dopo: senza comunicazione in uscita è tassato di nuovo, con una perdita del 9-15% su quella parte (23% se la posizione esce con un'anticipazione non sanitaria o un riscatto per altre cause).
-- **Obiettivi** → `it-pianificazione-obiettivi`: ogni obiettivo è **on track**? La **probabilità di successo** (Monte Carlo) è ancora adeguata? Il **glide path** richiede de-risking quest'anno? Va aggiustato il versamento mensile?
+- **Obiettivi** → `it-pianificazione-obiettivi`: ogni obiettivo è **on track**? La **probabilità di successo** (Monte Carlo) è ancora adeguata? Il **glide path** richiede de-risking quest'anno? Va aggiustato il versamento mensile? La deriva per obiettivo si legge nel `tracker-secchielli.xlsx`, se l'utente lo tiene.
 - **Fiscalità** → `it-tax-optimization`: ci sono **minusvalenze in scadenza** (finestra 4 anni) da usare entro il 31/12? Plusvalenze da compensare? Opportunità di **harvesting**? (A fine anno questo passo ha priorità per via delle scadenze.)
 - **Allocazione** → `it-rebalance`: quanto è il **drift** rispetto al target? Va ribilanciato? Si può ribilanciare sfruttando le **minus in scadenza** per compensare le plus da vendita (coordinamento fiscale)?
 
@@ -71,7 +83,42 @@ Report in markdown, cinque sezioni che ricalcano il workflow. C'è un **template
 - **Azioni**: il tracker delle azioni emerse dalla revisione (azione, dominio, priorità, scadenza, stato), con la legenda della logica di prioritizzazione. È il ponte tra il report e l'esecuzione.
 - **Rendimento TWR**: il **time-weighted return** della strategia (rendimenti dei sotto-periodi tra un flusso e l'altro, incatenati), affiancato al **money-weighted esatto** (XIRR) sugli stessi dati. La differenza tra i due è l'effetto del timing dei versamenti; il TWR è il numero da confrontare con un benchmark. Si compila una riga per data di rilevazione (valore + flusso netto), dall'alto e senza righe vuote, fino a 120 righe: il riepilogo legge da solo l'ultima.
 
-Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo; dal repository del plugin, `python scripts/ricalcola-excel.py <file>` lo ricalcola in locale italiano e segnala le celle in errore. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
+Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo e cercare celle in errore (`#RIF!`, `#VALORE!`). Chi ha installato il plugin da marketplace o dal repository (non lo zip per Cowork, che non contiene `scripts/`) può anche ricalcolarlo da riga di comando con `python "${CLAUDE_PLUGIN_ROOT}/scripts/ricalcola-excel.py" <file>`, in locale italiano e con l'elenco delle celle in errore; serve LibreOffice. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
+
+### I dati dell'IPS: `--dati ips.json`
+
+`genera-ips.py` prende i dati del caso da un JSON nella cartella di lavoro (`--dati ips.json`), mai dal blocco `DATI` dentro lo script, che resta l'esempio; senza `--dati` lo script genera l'esempio e avvisa. Il JSON è un oggetto con le stesse chiavi del blocco `DATI` (le liste al posto delle tuple). Le chiavi del caso sono **obbligatorie** e vengono tutte dal JSON, mai dall'esempio: se ne manca una, o ha la forma sbagliata (un importo scritto come testo, una riga con un elemento in meno), lo script si ferma con `ERRORE:` e il nome della chiave. Sono facoltative solo le note, il broker e i testi di policy, che senza il JSON usano i default del plugin; una chiave ignota è un errore. Le chiavi:
+
+| Chiave | Forma | Da dove |
+|---|---|---|
+| `investitore`, `capitale` (obbligatorie) | testo, numero | l'utente |
+| `data`, `sottotitolo` | testo (vuoto = mese corrente), testo | facoltative |
+| `profilo` (obbligatoria) | lista di `[etichetta, valore]` | l'utente (età, reddito, tolleranza, capacità di risparmio) |
+| `obiettivi` (obbligatoria) | lista di `[nome, "orizzonte · tipo", "Profilo (% azioni)", target, capitale assegnato]` | pianificatore e `allocatore-capitale.py --json` (`obiettivi[].allocato`) |
+| `obiettivi_nota`, `allocazione_nota` | testo | facoltative |
+| `allocazione` (obbligatoria) | lista di `[classe, importo, quota %]` | `allocatore-capitale.py --json` (`aggregato`) |
+| `glide_path` (obbligatoria) | lista di `[fase, anni, "da → a %", cosa succede]` | `glidepath-obiettivi.py --json` (`portafoglio`) |
+| `versamenti`, `strumenti`, `previdenza` (obbligatorie) | liste di testi, o di `[classe, testo]` per gli strumenti | l'utente; la proiezione pensione per `previdenza` |
+| `ribilanciamento`, `guardrail`, `revisione`, `fiscalita`, `checklist` | liste di testi | facoltative: senza, i default di policy del plugin |
+| `broker` | `null` oppure `{"nome": …, "sezioni": [[titolo, testo], …]}` | facoltativa, Appendice B |
+
+### Contratto di input: da dove viene ogni numero
+
+Ogni cella di input del cruscotto ha una fonte precisa. Dove la fonte è uno script, lanciarlo con `--json FILE` dalla cartella di lavoro e leggere dal file i campi indicati; il resto viene dagli estratti. Le celle sono quelle del foglio consegnato.
+
+| Dominio | Fonte (skill) | Campo del JSON o dell'estratto | Cella del cruscotto |
+|---|---|---|---|
+| Patrimonio | estratti di broker, fondo e banca (nessuno script) | saldi a oggi per contenitore; debiti residui | `Patrimonio!B6:B13`; `B17:B18` |
+| Allocazione attuale | `importa-estratto-broker.py --json` (it-tax-optimization), più fondo e liquidità | `posizioni[].valore`, sommati per classe (lo script dà la categoria fiscale, la classe la assegni tu) | `Allocazione!B5:B9` |
+| Allocazione target | `allocatore-capitale.py --json` (it-pianificazione-obiettivi) | `aggregato.azioni`, `.obbligazioni`, `.liquidita` diviso `aggregato.totale` | `Allocazione!D5:D7` (`D8:D9` a mano) |
+| Glide path | `glidepath-obiettivi.py --json` (it-pianificazione-obiettivi) | `portafoglio[anno]`, la quota azionaria aggregata dell'anno del piano | `Allocazione!D5`, se il target segue il calendario; `D6:D7` si riproporzionano sulle quote dell'allocatore perché il totale `D10` resti 100% |
+| Andamento | estratti (nessuno script) | saldo iniziale e finale, versamenti netti; inflazione del periodo | `Andamento!B4:B6`; `B14` |
+| Obiettivi | `montecarlo-obiettivi.py --json` (it-pianificazione-obiettivi) | `obiettivi[].probabilita_successo`; `obiettivi[].gia` e `obiettivi[].target_oggi` (o le colonne F e B del pianificatore); `obiettivi[].priorita` | `Sintesi!E6:E9`; `B6:B9` e `C6:C9`; `G6:G9` |
+| Pensione, dipendenti | `proiezione-inps.py --json` → `montecarlo-pensione.py --from --json` → `netto-pensione.py --from --json` (it-pianificazione) | `tasso_sostituzione_lordo.mediana` del Monte Carlo: INPS più fondo, lordo sulla RAL finale. L'obiettivo è il `target` dello stesso JSON, sulla stessa base lorda (per un obiettivo diverso si rilancia con `--set TASSO_SOSTITUZIONE_TARGET=…`). Il netto (`scenari[nome="mediana"].tasso_sostituzione_netto`, e `P10` per la lettura prudente) va nel report come misura del tenore di vita, mai in B12 contro un obiettivo lordo; `tasso_sostituzione_lordo_vs_ral_finale` della proiezione è la sola quota pubblica e non va in B12 | `Sintesi!B12`; `B13` |
+| Pensione, autonomi | `proiezione-pensione-autonomi.xlsx`, foglio Riepilogo (nessuno script) | `Riepilogo!B13`, «Tasso di sostituzione — totale» (non la B12, che è la sola obbligatoria), lordo; l'obiettivo sulla stessa base | `Sintesi!B12`; `B13` |
+| Fiscalità | `importa-estratto-broker.py --json` | `analisi.per_broker[broker].zainetto_in_scadenza` e `.plus_realizzabili_a_costo_zero` | foglio `Azioni`, righe di scadenza al 31/12 (nessuna cella numerica) |
+
+Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione; `--help` di ogni script elenca anche le chiavi che legge con `--from`.
 
 ## Anti-pattern (NON FARE MAI)
 
@@ -88,36 +135,11 @@ Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato 
 - `references/investment-policy-statement.md` — l'**IPS personale**: la "costituzione" del portafoglio (obiettivi, profilo di rischio, allocazione target, bande di ribilanciamento, **regole nei drawdown**, politica di versamento e prelievo, vincoli fiscali, cadenza), con scheletro compilabile. È il riferimento da cui la revisione misura gli scostamenti
 - `assets/investment-policy-statement.xlsx` — l'IPS come **foglio compilabile**: le nove sezioni con celle da riempire, le **bande di ribilanciamento calcolate da sé** dai target con la regola 5/25, il controllo che i target sommino a 100%, e drawdown/vincoli fiscali precompilati con default
 - `assets/cruscotto-patrimoniale.xlsx` — il cruscotto quantitativo (Patrimonio, Allocazione, Andamento, Sintesi, Azioni, Rendimento TWR)
+- `assets/tracker-secchielli.xlsx` — il monitoraggio goals-based: secchielli e anno del piano (Impostazioni), calendario del glide path incollato da `glidepath-obiettivi.py` (Glide), posizioni assegnate a secchiello e classe con tendine (Posizioni), effettivo contro target per secchiello e aggregato con semaforo sulle bande 5/25 (Controllo), registro dei versamenti; si compila nella cartella di lavoro e si rilegge al passo 3
+- `assets/genera-ips.py` — l'IPS in Word: copertina, 12 sezioni, appendici con la checklist e il broker; la nota di rischio viene dalla quota azionaria; i dati del caso arrivano da `--dati ips.json` (vedi «I dati dell'IPS»), senza il documento è l'esempio e lo dice in copertina
 - `assets/template-revisione.md` — il **template del report** di revisione, scheletro markdown precompilato da riempire (le cinque sezioni + disclaimer)
 - **Orchestra** (non duplica) le altre skill del plugin:
   - `it-pianificazione` / `it-pianificazione-autonomi` — il gap previdenziale e il fondo pensione
   - `it-pianificazione-obiettivi` — avanzamento, probabilità (Monte Carlo) e glide path degli obiettivi
   - `it-tax-optimization` — minusvalenze in scadenza, harvesting, il coordinamento di fine anno
   - `it-rebalance` — deriva dell'allocazione e ribilanciamento tax-aware (e `coordinamento-zainetto.md` per l'integrazione con la fiscalità)
-
-## Note per l'iterazione
-
-Questa è la versione 0.6 della skill (introdotta in v0.8 del plugin, estesa in v0.9.2).
-
-In quest'iterazione (v0.6):
-- **`tracker-secchielli.xlsx`** — il foglio operativo del monitoraggio goals-based: si definiscono i secchielli e l'anno del piano (Impostazioni), si incolla il calendario del glide path (Glide), si assegnano le posizioni a secchielli e classi con tendine (Posizioni), e il foglio Controllo mostra effettivo vs target per secchiello e aggregato con **semaforo automatico sulle bande 5/25** (formattazione condizionale OK/VICINO/RIBILANCIA). Il target % azioni "di oggi" si aggiorna da solo cambiando l'anno del piano (INDEX sul calendario Glide). Registro Versamenti con totali per secchiello e anno corrente. 145 formule, recalc 0 errori; dati precompilati d'esempio da sostituire. Completa il ciclo: pianifica (it-pianificazione-obiettivi) → esegui → monitora qui.
-
-In quest'iterazione (v0.5):
-- **`genera-ips.py`** — il generatore dell'Investment Policy Statement come documento Word (python-docx): copertina, 12 sezioni (profilo, obiettivi, allocazione, glide path, ribilanciamento, versamenti, strumenti, fiscalità, previdenza, guardrail, revisione), Appendice A con checklist a caselle e Appendice B broker opzionale. I dati del caso si compilano in un unico blocco `DATI`; i testi di policy (bande 5/25, trappola ETF, guardrail, checklist) sono default sovrascrivibili, quindi il documento esce completo anche da un dict minimo. **Onestà incorporata**: la nota di rischio è calcolata dalla quota azionaria aggregata (drawdown atteso in un orso ≈ metà della quota), e lo script valida allocazione=100% e capitali=totale, avvisando senza bloccare. Uso: `python genera-ips.py [output.docx]`. Dipendenza: python-docx. Codifica il deliverable finale del flusso, prima costruito a mano.
-
-In quest'iterazione (v0.4):
-- **Excel dedicato all'IPS** (`assets/investment-policy-statement.xlsx`): lo scheletro dell'Investment Policy Statement come foglio compilabile, con le **bande di ribilanciamento calcolate da sé** dai target (regola 5/25 → soglie operative per classe), il controllo che i target sommino a 100%, e drawdown/vincoli fiscali precompilati. Quinto Excel del plugin. Validato (bande corrette, check 100% funzionante, 0 errori).
-
-In quest'iterazione (v0.3):
-- **Time-weighted return** nel cruscotto (foglio Rendimento TWR): il rendimento della strategia neutralizzato dai flussi, da confrontare con un benchmark, affiancato al money-weighted **esatto** (XIRR) sugli stessi dati. La differenza tra i due misura l'effetto del timing dei versamenti. Cruscotto a sei fogli.
-
-In quest'iterazione (v0.2):
-- **Template del report** (`assets/template-revisione.md`): scheletro markdown precompilato delle cinque sezioni, da riempire — rende il report completo e coerente di anno in anno.
-- **Foglio "Azioni"** nel cruscotto: tracker delle azioni emerse (azione, dominio, priorità, scadenza, stato) con la legenda di prioritizzazione; il ponte tra report ed esecuzione.
-- **Investment Policy Statement personale** (`references/investment-policy-statement.md`): la "costituzione" del portafoglio, con scheletro compilabile e il cuore comportamentale (le regole nei drawdown scritte prima del crollo). Formalizza in policy ciò che le altre skill producono come numeri; la revisione ne misura l'aderenza.
-
-Versione precedente (v0.1): la skill di sintesi/orchestrazione — workflow in cinque passi, logica di prioritizzazione (scadenza → impatto → manutenzione), azioni cross-dominio, report come deliverable, e il cruscotto patrimoniale.
-
-Roadmap:
-- ✅ Calcolo del **time-weighted return**: fatto in v0.3 (foglio Rendimento TWR, con MWR esatto via XIRR per il confronto)
-- ✅ Excel dedicato all'**IPS**: fatto in v0.4 (`assets/investment-policy-statement.xlsx`, con bande auto-calcolate)

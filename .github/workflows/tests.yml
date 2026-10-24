@@ -37,16 +37,52 @@ jobs:
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
       # LibreOffice per i test che ricalcolano gli Excel (scripts/ricalcola-excel.py).
+      # I .deb restano in cache tra un run e l'altro: su alcuni runner il mirror li
+      # serve a ~70 KB/s (perché e come, in scripts/installa-libreoffice.sh). Oltre
+      # i 10 minuti lo step fallisce invece di restare appeso.
+      - name: Ripristina i .deb di LibreOffice
+        id: deb-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/apt-libreoffice
+          key: apt-libreoffice-${{ runner.os }}-${{ runner.arch }}-
+          restore-keys: apt-libreoffice-${{ runner.os }}-${{ runner.arch }}-
       - name: Installa LibreOffice Calc
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends libreoffice-calc
+        id: libreoffice
+        timeout-minutes: 10
+        run: bash scripts/installa-libreoffice.sh /tmp/apt-libreoffice
+      - name: Salva i .deb di LibreOffice
+        if: steps.libreoffice.outputs.chiave != steps.deb-cache.outputs.cache-matched-key
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/apt-libreoffice
+          key: ${{ steps.libreoffice.outputs.chiave }}
       - run: python tests/run_tests.py --skip freshness
         env:
           RICHIEDI_LIBREOFFICE: "1"   # in CI i test degli Excel non si saltano
 
-  # Il manifest del plugin passa `claude plugin validate` (errori bloccano,
-  # i warning no). Evita di scoprire un plugin.json rotto solo all'installazione.
+  # Windows: script e suite devono girare anche con una console cp1252 e i percorsi con
+  # la barra rovesciata. Una sola versione di Python (il minimo dichiarato) e niente
+  # LibreOffice: i test che ricalcolano gli Excel risultano saltati, li copre il job ubuntu.
+  test-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+      - run: pip install -r tests/requirements.txt
+      - run: python tests/run_tests.py --skip freshness
+
+  # Il manifest del plugin passa `claude plugin validate --strict`: anche i warning
+  # (campi sconosciuti, nomi non kebab-case) bloccano. Evita di scoprire un plugin.json
+  # rotto solo all'installazione. Il solo avviso ammesso è ICON_MISSING del controllo
+  # per il plugin directory, che non cambia l'esito (l'icona la decide il proprietario).
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -55,4 +91,4 @@ jobs:
         with:
           node-version: 22
       - run: npm install -g @anthropic-ai/claude-code@2.1.305   # versione fissata: aggiornarla a mano
-      - run: claude plugin validate .
+      - run: claude plugin validate . --strict

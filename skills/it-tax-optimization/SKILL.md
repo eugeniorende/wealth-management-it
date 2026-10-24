@@ -1,6 +1,8 @@
 ---
 name: it-tax-optimization
-description: Ottimizzazione fiscale di minusvalenze e plusvalenze sotto la normativa italiana (regime amministrato). Usa questa skill ogni volta che l'utente parla di minusvalenze, plusvalenze, ottimizzazione fiscale italiana, compensazione minus/plus, zainetto fiscale, scadenza minus a 4 anni, harvesting fiscale su broker italiani (Directa, Fineco, Banca Sella, ecc.) ed esteri (Interactive Brokers e Degiro in regime dichiarativo, nei principi, con quadri RT/RW e IVAFE; Trade Republic e Scalable possono essere in amministrato), tassazione ETF UCITS armonizzati, regime amministrato come sostituto d'imposta, articolo 67 vs articolo 44 TUIR, Tobin tax / imposta sulle transazioni finanziarie (ITF) su azioni italiane, imposta di bollo sul dossier titoli, dividendi esteri e W-8BEN, successione e donazione del dossier. Usa questa skill anche per la tassazione delle criptovalute / cripto-attività (Bitcoin, Ethereum, altcoin, NFT, stablecoin): aliquota 33% dal 2026 e 26% per gli e-money token in euro MiCA, compartimento separato delle minusvalenze cripto, eventi tassabili e permuta cripto-cripto, metodo del costo di carico, monitoraggio fiscale quadro RW/W, imposta sul valore delle cripto-attività 0,2%, regime amministrato cripto, rivalutazione del costo di carico. Copre anche i temi cripto avanzati: DeFi (staking, lending, yield, liquidity pool, LP token, impermanent loss), airdrop e fork, mining occasionale vs professionale, NFT secondo il ruolo (investitore vs artista/creatore), e il ravvedimento operoso per regolarizzare cripto non dichiarate negli anni passati (quadro RW omesso, sanzioni, DAC8). Copre inoltre i casi di confine: trasferimenti tra wallet, bridge cross-chain e wrapping (WBTC, stETH), cripto detenute in attività d'impresa o partita IVA (IRES, IVA, forfettario che investe in cripto), cripto ricevuta come stipendio o compenso, neo-residenti e flat tax sui redditi esteri, e successione/donazione di criptovalute (eredità, costo di carico per gli eredi, territorialità). Trigger anche su domande di fine anno fiscale (novembre-dicembre) relative a portafogli italiani. NON usare per fiscalità USA (wash sale, HIFO, Roth IRA) — quella è coperta dalla skill upstream `tax-loss-harvesting`. NON sostituisce consulenza di un commercialista abilitato.
+description: "Ottimizzazione fiscale di minusvalenze e plusvalenze sotto la normativa italiana (regime amministrato, con i principi del dichiarativo). Usa questa skill quando l'utente parla di minusvalenze, plusvalenze, compensazione minus/plus, zainetto fiscale e scadenza a 4 anni, harvesting su broker italiani ed esteri, broker esteri in dichiarativo (Interactive Brokers, Degiro: quadri RT e RW, IVAFE), tassazione di ETF e fondi, redditi diversi vs redditi di capitale, Tobin tax, bollo sul dossier, dividendi esteri, successione e donazione del dossier; e per le cripto-attività (aliquota 33% dal 2026, minus in compartimento separato, DeFi, staking, airdrop, NFT, quadro RW, ravvedimento, cripto in P.IVA, neo-residenti). Trigger anche sulle domande di fine anno fiscale (novembre-dicembre) su portafogli italiani. Include l'importatore degli estratti broker in CSV. NON usare per la fiscalità USA (wash sale, HIFO, Roth IRA). NON sostituisce un commercialista abilitato."
+metadata:
+  version: "0.11"
 ---
 
 # it-tax-optimization
@@ -30,7 +32,7 @@ Questo è il vincolo strutturale del sistema italiano e la fonte degli errori pi
 
 | Categoria fiscale | Tipo provento | Compensabile con minus pregresse? |
 |---|---|---|
-| **Reddito diverso** (art. 67 TUIR, lett. c-bis, c-ter; dal 2027 art. 76 c. 1 lett. e, f) | Plusvalenze da: azioni, certificates, ETC/ETN, obbligazioni (solo la differenza di prezzo, al netto di cedole, ratei e scarto di emissione), warrant, opzioni quotate | **SÌ** (tra redditi diversi "tradizionali") |
+| **Reddito diverso** (art. 67 TUIR, lett. c, c-bis, c-ter, c-quater, c-quinquies; dal 2027 art. 76 c. 1 lett. d-h) | Plusvalenze da: azioni (anche partecipazioni qualificate, lett. c), obbligazioni (solo la differenza di prezzo, al netto di cedole, ratei e scarto di emissione), warrant; redditi da certificates, ETC/ETN, opzioni e altri derivati (di norma lett. c-quater, dal 2027 art. 76 c. 1 lett. g). Eccezione: un certificato a capitale protetto al 100% può essere un titolo similare alle obbligazioni, con proventi di capitale non compensabili (art. 44 c. 2 lett. c n. 2 TUIR, dal 2027 art. 46 c. 2 lett. b n. 2): verificare il prospetto | **SÌ**: le cinque lettere si compensano tra loro, escluse le plus di partecipazioni in Stati a fiscalità privilegiata (art. 68 c. 4 e 5 TUIR; dal 2027 art. 77 c. 6) |
 | **Reddito di capitale** (art. 44 TUIR; dal 2027 art. 46) | Dividendi azionari, cedole obbligazionarie, scarto di emissione (BOT, CTZ, zero coupon), plusvalenze di ETF e fondi (UCITS armonizzati e non armonizzati), proventi distribuiti da fondi, interessi su conti deposito | **NO** |
 | **Reddito diverso "cripto"** (art. 67 TUIR, lett. **c-sexies**; dal 2027 art. 76 c. 1 lett. i) | Plus/minus su cripto-attività (Bitcoin, Ethereum, altcoin, NFT, stablecoin) | **SÌ ma SOLO con altre cripto** (compartimento separato) |
 
@@ -74,7 +76,7 @@ Quando minus e plus hanno aliquote diverse, si applica il **coefficiente di abba
 | 12,5% | 12,5% | €100 (1:1) |
 | 12,5% | 26% | €48 (svantaggioso: minus 12,5% "pesa di meno") |
 
-⚠️ **ETF UCITS che investono in titoli di Stato NON sono al 12,5%**: l'intermediario applica un'aliquota *mista* in base alla quota di NAV whitelist. Detenere BTP direttamente ≠ detenerli via ETF UCITS. Inoltre la plus su ETF UCITS resta sempre reddito di capitale (non compensabile con minus pregresse), indipendentemente dalla composizione.
+⚠️ **ETF UCITS che investono in titoli di Stato NON sono al 12,5%**: l'intermediario applica un'aliquota *mista* in base alla percentuale media dell'attivo del fondo in titoli di Stato e white list, certificata dall'emittente ogni semestre (non è nel KID). Detenere BTP direttamente ≠ detenerli via ETF UCITS. Inoltre la plus su ETF UCITS resta sempre reddito di capitale (non compensabile con minus pregresse), indipendentemente dalla composizione.
 
 Per dettagli normativi, esempi numerici e edge case (ETF "Government Bond" misti, edge case fondi), consultare `references/aliquote-12-5-26.md`.
 
@@ -98,6 +100,15 @@ Sono costi del dossier che NON entrano nel calcolo minus/plus ma incidono sul re
 - **Ritenute estere sui dividendi** di azioni estere detenute direttamente: in amministrato il 26% italiano si applica sul netto frontiera, e il prelievo totale va dal 26,0% (Regno Unito; Irlanda con il modulo V2A) al 51,9% (Svizzera senza rimborso): 35,5% per la Francia, 37,1% per gli USA con W-8BEN. Non compensano nulla; il W-8BEN e le domande di rimborso le riducono. Per un ETF UCITS sono già nel rendimento del fondo. Vedi `references/dividendi-esteri.md`.
 
 ⚠️ **Implicazione per il retail**: un portafoglio diversificato basato su **ETF è sostanzialmente esente** da Tobin tax (ETF, fondi, obbligazioni, titoli di Stato sono tutti esclusi). La Tobin tax morde solo su **azioni italiane large-cap detenute direttamente**. Non sovrastimarne l'impatto: per il tipico investitore in ETF UCITS l'imposta è zero. Il raddoppio 2026 è rilevante solo per chi fa stock picking su singole azioni italiane di grandi società (es. Enel, Eni, Generali, Intesa, UniCredit, Ferrari, ecc.).
+
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/importa-estratto-broker.py" estratto.csv zainetto.csv --anno 2026 --json minus.json`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze dello script: Python 3.11 o successivo, solo libreria standard.
 
 ## Workflow operativo
 
@@ -143,6 +154,8 @@ Se `aliquota` non fornita, dedurla:
 - Regime per ciascun broker: amministrato (default) o dichiarativo. Trade Republic e Scalable Capital possono essere in amministrato con la succursale italiana, Interactive Brokers e Degiro sono in dichiarativo: vedi la tabella in `references/regime-dichiarativo.md`
 - Cut-off operativi specifici del broker (Directa e Sella di solito chiudono prima del 31/12)
 
+Se l'utente fornisce l'estratto del broker in CSV (ed eventualmente lo zainetto in un secondo CSV), lanciare l'importatore (comando in «Dove lavorare»; `--broker NOME` se il file è di un solo broker e non ha la colonna) invece di ricopiare i dati a mano: le posizioni «da classificare» vanno chiarite con l'utente prima dell'analisi, e gli avvisi (righe scartate, minus scadute, formato dei numeri) vanno riportati. Non lanciare l'importatore per i conti in dichiarativo: calcola sul PMC e per broker, mentre lì servono i lotti, i cambi del giorno e le minus del quadro RT.
+
 Se mancano dati essenziali → CHIEDERE, NON INVENTARE. Esempio: se l'utente fornisce solo controvalore totale senza ISIN, non si può fare analisi. Se non specifica i broker quando ne ha più di uno, l'analisi è inattendibile.
 
 ### Step 2: Analisi
@@ -164,7 +177,7 @@ Per ciascun intermediario separatamente:
 4. **Minus latenti** — potenziali nuovi contributi a zainetto se realizzate
 
 **Broker in dichiarativo** (Interactive Brokers, Degiro, o un conto per cui l'utente ha scelto il dichiarativo): il calcolo sul PMC e lo zainetto per broker non valgono.
-- Plus e minus si calcolano sui **lotti** (data, quantità, prezzo e cambio del giorno di ogni acquisto), in euro (art. 9 c. 2 TUIR; dal 2027 nel D.Lgs. 117/2026, articolo da verificare) e con il LIFO del dichiarativo. Il prezzo medio in valuta mostrato dal broker non basta: il cambio può invertire il segno della plus. Senza i lotti non calcolare plus e minus di quei conti: dirlo all'utente e rinviare al commercialista.
+- Plus e minus si calcolano sui **lotti** (data, quantità, prezzo e cambio del giorno di ogni acquisto), in euro (art. 9 c. 2 TUIR; dal 2027 art. 9 c. 2 D.Lgs. 117/2026) e con il LIFO del dichiarativo. Il prezzo medio in valuta mostrato dal broker non basta: il cambio può invertire il segno della plus. Senza i lotti non calcolare plus e minus di quei conti: dirlo all'utente e rinviare al commercialista.
 - Le minus del quadro RT degli anni precedenti sono del contribuente e valgono per tutti i conti in dichiarativo: tra due conti in dichiarativo il Pattern A è cross-broker.
 - Il Pattern D si valuta solo per i rapporti in amministrato. Tra un conto in amministrato con minus e uno in dichiarativo con plus si confrontano il Pattern D (revoca dell'amministrato sul conto con le minus: resta aperto, le minus certificate vanno nel quadro RT e da lì compensano le plus del conto in dichiarativo) e il Pattern E (chiusura del rapporto, con la stessa certificazione).
 - L'output aggiunge la sezione «Adempimenti del dichiarativo» (sezione 5).
@@ -232,7 +245,7 @@ se numero_broker > 1:
         ricordare irrevocabilità per anno
 ```
 
-L'opzione per il dichiarativo, come la revoca dell'amministrato, ha effetto dal periodo d'imposta successivo (art. 6 c. 2 D.Lgs. 461/97 → art. 306 c. 3 TU 2027): le minus che scadono il 31/12 dell'anno in corso non si salvano così. Per quelle, e quando un broker non ha più ragione di restare aperto, confrontare il Pattern E. Nel costo del dichiarativo va messo anche il calcolo operazione per operazione, con il LIFO e i cambi del giorno. Il cambio in sé non è un costo del dichiarativo: la plus fiscale si calcola in euro al cambio del giorno di acquisto e di vendita (art. 9 c. 2 TUIR; dal 2027 nel D.Lgs. 117/2026, articolo da verificare) in entrambi i regimi, e in dichiarativo cambia solo chi la calcola. Con liquidità in valuta oltre €51.645,69 per almeno sette giorni lavorativi continui diventano tassabili anche gli utili su cambi (art. 67 c. 1-ter TUIR, dal 2027 nell'art. 76 D.Lgs. 117/2026; vedi `references/regime-dichiarativo.md`).
+L'opzione per il dichiarativo, come la revoca dell'amministrato, ha effetto dal periodo d'imposta successivo (art. 6 c. 2 D.Lgs. 461/97 → art. 306 c. 3 TU 2027): le minus che scadono il 31/12 dell'anno in corso non si salvano così. Per quelle, e quando un broker non ha più ragione di restare aperto, confrontare il Pattern E. Nel costo del dichiarativo va messo anche il calcolo operazione per operazione, con il LIFO e i cambi del giorno. Il cambio in sé non è un costo del dichiarativo: la plus fiscale si calcola in euro al cambio del giorno di acquisto e di vendita (art. 9 c. 2 TUIR; dal 2027 art. 9 c. 2 D.Lgs. 117/2026) in entrambi i regimi, e in dichiarativo cambia solo chi la calcola. Con liquidità in valuta oltre €51.645,69 per almeno sette giorni lavorativi continui diventano tassabili anche gli utili su cambi (art. 67 c. 1-ter TUIR, dal 2027 nell'art. 76 D.Lgs. 117/2026; vedi `references/regime-dichiarativo.md`).
 
 **Pattern E — Consolidamento via certificazione (chiusura del rapporto)**: se un broker ha minus che lì non troveranno plus compensabili (tipico: un dossier fermo, senza posizioni in plus), chiudere il rapporto le sposta invece di lasciarle evaporare. Alla chiusura del rapporto, o alla revoca dell'opzione per l'amministrato, l'intermediario rilascia una **certificazione** delle minus residue (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027). Le minus certificate si usano:
 - su **un altro rapporto in amministrato intestato agli stessi soggetti** (con le cointestazioni gli intestatari devono coincidere), consegnando la certificazione al nuovo intermediario;
@@ -350,7 +363,7 @@ La checklist di `references/regime-dichiarativo.md` applicata ai conti dell'uten
 - ❌ Trattare i broker come fungibili in amministrato: lo zainetto è **per-intermediario**. Mai proporre compensazioni cross-broker assumendo che avvengano automaticamente.
 - ❌ Suggerire trasferimenti titoli pensando di "spostare anche lo zainetto" — il PMC si sposta, lo zainetto **resta sul broker originario** finché quel rapporto non viene chiuso (Pattern E).
 - ❌ Dire che chiudendo il rapporto lo zainetto va perso: si chiede la **certificazione** (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027) e le minus restano utilizzabili su un altro rapporto con gli stessi intestatari, o in dichiarazione, fino alla scadenza originaria. Ma non proporre la chiusura senza aver verificato tempi, costi e accettazione della certificazione da parte del broker ricevente.
-- ❌ Trattare gli ETF UCITS su titoli di Stato come "tassati al 12,5%": l'aliquota effettiva è **mista** (dipende dalla quota di NAV whitelist).
+- ❌ Trattare gli ETF UCITS su titoli di Stato come "tassati al 12,5%": l'aliquota effettiva è **mista** (dipende dalla percentuale media dell'attivo in titoli di Stato e white list).
 - ❌ Applicare il coefficiente di abbattimento 12,5/26 senza esplicitare il calcolo: l'utente deve poter verificare.
 - ❌ Raccomandare il passaggio a dichiarativo senza quantificare il delta vs costi (commercialista, onere amministrativo).
 
@@ -370,44 +383,3 @@ La checklist di `references/regime-dichiarativo.md` applicata ai conti dell'uten
 - `references/criptovalute-casi-speciali.md` — i casi di confine: trasferimenti, **bridge e wrapping** (trasferimento neutro vs permuta, interpello 135/2025); cripto in **impresa/P.IVA** (art. 110 c. 3-bis TUIR, dal 2027 art. 119 c. 5, per IRES, esenzione IVA Hedqvist, il forfettario che investe in cripto senza cumulo), **mining** e cripto come **compenso**; i **neo-residenti** e la flat tax sui redditi esteri (€300.000 per chi si trasferisce dal 2026) (con la questione aperta della fonte delle cripto); **successione e donazione** (territorialità, costo di carico per eredi/donatari, la documentazione che evita il costo zero, l'accesso alle chiavi)
 - **Vedi anche** `it-pianificazione/references/integrazione-fiscale-joint.md` — pattern fiscali joint con la pianificazione pensionistica: quando deduzione fondo + realizzo plus si combinano (es. soglia scaglione IRPEF, sterilizzazione redditi alti €200k). Particolarmente rilevante per redditi tra €40k-€100k e per chi è prossimo a una soglia di scaglione 28k/50k/200k.
 - **Vedi anche** `it-rebalance/references/coordinamento-zainetto.md` — come il ribilanciamento di fine anno sfrutta lo zainetto in scadenza: vendere posizioni sovrappesate in plus compensabile prima del 31/12 corregge il drift E usa minus che altrimenti evaporano.
-
-## Note per l'iterazione
-
-Questa è la versione 0.10 del PoC.
-
-**v0.10** (corrente):
-- **Freshness fiscale**: le reference con dati normativi (aliquote 26/12,5, trappola ETF, regime dichiarativo) portano il marcatore `Verificato: AAAA-MM`, sorvegliato dalla test suite del plugin (fallisce oltre i 12 mesi).
-
-**v0.9**:
-- Primo **asset** della skill: l'**importatore di estratti broker** (`assets/importa-estratto-broker.py`), per lavorare sui dati reali del portafoglio. Calcola le plus/minus latenti per posizione, separa le minus latenti (candidate all'harvesting) dalle plus latenti, e incrocia con lo zainetto (secondo CSV) per evidenziare quanta plus si può realizzare a imposta zero. Parser **tollerante ai formati** (sinonimi colonne, numeri IT/EN, delimitatore auto): la sfida non è leggere un formato ma reggere la varietà tra Directa, Fineco e Trade Republic. Validato su due formati diversi più l'incrocio con lo zainetto; bug di collisione colonne trovato e corretto in fase di test.
-- **MCP "live" sui broker: valutato ed escluso, con motivazione** (`references/import-dati-broker.md`). Verifica broker per broker: solo Directa ha un'API ufficiale (socket, richiede Darwin aperto in locale) e comunque non espone lo zainetto; Fineco e Trade Republic non hanno API retail. Il dato fiscale vive nei report esportabili, non nelle API — da cui la scelta dell'importatore di report invece del collegamento live (anche per non dare credenziali a un tool).
-
-**v0.8**:
-- Aggiunto il **regime dichiarativo** (`references/regime-dichiarativo.md`), il caso di chi usa broker esteri (Interactive Brokers, Degiro): i tre regimi a confronto (amministrato / dichiarativo / gestito), il quadro RT (plusvalenze) e RW (monitoraggio + IVAFE 0,2%, 0,4% black list), e il punto che più conta per l'ottimizzazione — in dichiarativo la **compensazione è unificata** a livello di contribuente, quindi la frammentazione dello zainetto per broker sparisce. Cifre 2026 verificate via web (IVAFE, bollo); la regola del quadro RW è stata poi corretta nella v0.10: nessuna soglia per titoli e cripto presso intermediari esteri, €15.000 solo per i conti. Il limite "non opera in dichiarativo" è stato di conseguenza ammorbidito.
-- **Corretto un errore**: l'imposta di bollo sul dossier non ha tetto per le persone fisiche (il tetto di €14.000 vale solo per società ed enti). Allineato all'IVAFE estera (anch'essa 0,2%).
-
-**v0.7**:
-- Aggiunti i **casi speciali e soggetti particolari** cripto (`references/criptovalute-casi-speciali.md`), completando la copertura cripto del plugin su tre reference (base, avanzata, casi speciali). Dati 2026 verificati via web. Stessa onestà metodologica: i punti contesi (wrapping come permuta, fonte delle cripto per i neo-residenti) sono segnalati come aperti.
-- **Trasferimenti, bridge, wrapping**: il principio dell'interpello 135/2025 (spostare cripto tra propri wallet non è realizzo, se documentato; senza documentazione costo zero); bridge dello stesso token come trasferimento; wrapping (BTC→WBTC, ETH→stETH) come permuta "stessa funzione economica" — tesi prevalente non imponibile, ma token tecnicamente distinto e prassi assente, quindi caveat.
-- **Cripto in impresa/P.IVA**: l'art. 110 c. 3-bis TUIR, dal 2027 art. 119 c. 5 (per le società le valutazioni di fine esercizio non concorrono a IRES/IRAP, tassazione al realizzo); l'esenzione IVA del cambio (Hedqvist C-264/14); il punto pratico del forfettario che investe in cripto (redditi diversi nel compartimento separato, nessun cumulo col reddito d'impresa, nessun impatto sul tetto); mining professionale vs occasionale; cripto come stipendio/compenso (reddito di lavoro a IRPEF, poi cessione separata).
-- **Neo-residenti**: la flat tax art. 24-bis TUIR, dal 2027 art. 246 D.Lgs. 117/2026 (€100.000/anno per i trasferimenti fino all'agosto 2024, €200.000 per quelli successivi, €300.000 dal 2026; +€25.000 per familiare, €50.000 dal 2026), con la **questione aperta** della fonte (estera vs italiana) delle cripto, decisiva per capire se la flat tax le copre.
-- **Successione e donazione**: riforma TUS (D.Lgs. 139/2024), cripto come beni mobili nell'attivo ereditario; territorialità (residente in Italia → tutto il patrimonio cripto anche estero); costo di carico per eredi/donatari; il rischio del **costo zero** senza documentazione (da trasmettere agli eredi); l'accesso alle chiavi private come problema di pianificazione. Descrizione YAML aggiornata.
-
-**v0.6**:
-- Aggiunti i **temi cripto avanzati** (`references/criptovalute-avanzate.md`): DeFi (staking/lending/yield, liquidity pool/LP token, impermanent loss), airdrop e fork (la questione dell'onerosità), mining occasionale vs professionale, NFT secondo il ruolo (investitore vs creatore), e il **ravvedimento operoso** per regolarizzare il pregresso (due violazioni RW/RT, frazioni di sanzione anno per anno, la finestra DAC8, la soglia penale €50.000).
-
-**v0.5**:
-- Aggiunto il **trattamento delle cripto-attività** (`references/criptovalute.md`): aliquota 33% dal 2026 (26% per gli e-money token in euro MiCA), il **compartimento separato** delle minusvalenze cripto (estende la tabella centrale: ora tre compartimenti — redditi di capitale, redditi diversi "tradizionali", redditi diversi "cripto"), eventi tassabili e neutri (con il punto controverso della permuta cripto-cripto trattato onestamente), costo medio ponderato in amministrato e LIFO in dichiarativo, monitoraggio RW e imposta sul valore 0,2%, il regime amministrato cripto (possibile dal 2023), e le leve (rivalutazione al 18%, harvisting intra-compartimento). Cripto rimosse dalle esclusioni.
-
-**v0.4**:
-- Aggiornamento Tobin tax 2026 (L. 199/2025): aliquote azioni raddoppiate (0,20% mercato regolamentato, 0,40% OTC); derivati invariati in misura fissa; chiarita l'esenzione ampia per ETF/fondi/obbligazioni che rende il retail in ETF sostanzialmente non impattato
-- Aggiunto codice tributo F24 4058 e dettaglio soglia capitalizzazione €500M (lista Consob)
-
-**v0.2-0.3**:
-- Gestione aliquota 12,5% con coefficiente di abbattimento, multi-intermediario, regime dichiarativo come escape hatch
-
-Da estendere in iterazioni successive:
-- ✅ Modellazione del regime dichiarativo (quadro RT, quadro RW, IVAFE): coperta in `references/regime-dichiarativo.md` (principi, adempimenti, compensazione unificata); la compilazione operativa del Modello Redditi resta da commercialista
-- ✅ MCP/collegamento broker: **valutato ed escluso** (le API non danno lo zainetto, richiederebbero credenziali a un tool); fatto invece il **pilota dell'importatore di estratti CSV** (`assets/importa-estratto-broker.py`). Estensione futura: parsing diretto dei PDF di certificazione, e supporto a più formati di export
-- Validazione test cases con casi reali AdE
-- Lista aggiornata delle principali azioni italiane > €500M cap (per auto-rilevare quando la Tobin tax si applica)

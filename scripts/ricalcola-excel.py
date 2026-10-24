@@ -49,9 +49,15 @@ PROFILO = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 
+WINDOWS = [os.path.join(base, "LibreOffice", "program", "soffice.exe")
+           for base in (os.environ.get("ProgramFiles", r"C:\Program Files"),
+                        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"))]
+
+
 def trova_soffice():
+    """Il binario di LibreOffice: $SOFFICE, poi il PATH, poi le installazioni standard di macOS e Windows."""
     for candidato in (os.environ.get("SOFFICE"), shutil.which("soffice"),
-                      shutil.which("libreoffice"), MACOS):
+                      shutil.which("libreoffice"), MACOS, *WINDOWS):
         if candidato and os.path.exists(candidato):
             return candidato
     return None
@@ -98,6 +104,11 @@ def tutti_gli_xlsx():
 
 
 def main():
+    for flusso in (sys.stdout, sys.stderr):   # UTF-8 anche su Windows (cp1252)
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(description="Ricalcola gli Excel con LibreOffice headless e segnala gli errori.")
     ap.add_argument("file", nargs="*", help="file .xlsx da ricalcolare")
     ap.add_argument("--tutti", action="store_true", help="tutti gli xlsx sotto skills/*/assets/")

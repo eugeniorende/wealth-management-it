@@ -2,6 +2,14 @@
 
 Questa reference affronta il tema fiscalmente più delicato e frainteso della pianificazione previdenziale per autonomi: **come il regime forfettario cambia (e spesso annulla) la convenienza fiscale del fondo pensione**.
 
+## Indice
+
+- Come funziona il forfettario (L. 190/2014; dal 2027 artt. 232-243 D.Lgs. 117/2026)
+- Il nodo: la deducibilità dei contributi previdenziali
+- Confronto fondo pensione vs ETF per un forfettario puro
+- Confronto regime forfettario vs ordinario (cenni)
+- Heuristic per la skill
+
 ## Come funziona il forfettario (L. 190/2014; dal 2027 artt. 232-243 D.Lgs. 117/2026)
 
 ```

@@ -12,7 +12,8 @@ costituisce consulenza fiscale o finanziaria.
 
 Formati: i broker (Directa, Fineco, Trade Republic...) esportano layout DIVERSI. Il parser
 riconosce i nomi-colonna tipici con sinonimi e matching tollerante (maiuscole, accenti, spazi
-ignorati); se il tuo export usa nomi diversi, aggiungili ai dizionari SINONIMI qui sotto. Il
+ignorati); se il tuo export usa nomi diversi, rinomina le colonne nella copia del CSV (mai questo
+file, che si sovrascrive a ogni aggiornamento) e segnala i nomi da aggiungere a SINONIMI. Il
 formato dei numeri si decide per file: se compare una virgola decimale («12,40») il file è
 all'italiana e «1.000» vale mille.
 
@@ -141,7 +142,8 @@ CATEGORIE = ("reddito_diverso", "reddito_capitale", "reddito_capitale_irpef", "d
 
 
 class ErroreInput(Exception):
-    """Errore sui file di input: messaggio leggibile, uscita con codice 2."""
+    """Errore sui file di input: messaggio «ERRORE: …» su stderr e uscita con codice 1 (il 2 è di argparse,
+    per la riga di comando)."""
 
 
 def _norm(s):
@@ -375,7 +377,8 @@ def parse_estratto(path, broker_default=None, avvisi=None):
     m = _mappa_colonne(intest, SINONIMI)
     if "isin" not in m and "descrizione" not in m:
         raise ErroreInput(f"{path}: estratto non riconosciuto, manca sia ISIN sia Descrizione. "
-                          "Controlla il file o aggiungi i nomi-colonna ai dizionari SINONIMI.")
+                          "Controlla il file, o rinomina le colonne nella tua copia del CSV con i nomi riconosciuti "
+                          "(vedi references/import-dati-broker.md).")
     locale, incertezza = rileva_locale((r[m[c]] for r in righe for c in COLONNE_NUMERICHE
                                         if c in m and m[c] < len(r)), delim)
     ambigui = [] if incertezza else None
@@ -611,7 +614,7 @@ def stampa(posizioni, zainetto, a, anno_rif, avvisi):
     print(f"Valore di mercato:        € {_eur(a['totale_valore']):>14}")
     print(f"Plus/minus netta latente: € {_eur(a['plus_minus_netta_latente']):>14}")
 
-    print("\n— MINUS LATENTI (candidate all'harvesting: vendere per caricare lo zainetto) —")
+    print("\n— MINUS LATENTI (candidate all'harvesting: venderle caricherebbe lo zainetto) —")
     minus = sorted((p for p in posizioni if p["plus_minus"] < 0), key=lambda p: p["plus_minus"])
     for p in minus:
         print(f"   {(p['descrizione'] or p['isin'])[:36]:<37}{_eur(p['plus_minus']):>13}  ({_pct(p['pct'])})")
@@ -681,9 +684,16 @@ def stampa(posizioni, zainetto, a, anno_rif, avvisi):
 
 
 def main(argv=None):
+    for flusso in (sys.stdout, sys.stderr):   # UTF-8 anche su Windows (cp1252)
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(
+        allow_abbrev=False,
         description="Plus/minus latenti da un estratto CSV del broker, incrociate con lo zainetto "
-                    "(regime amministrato). Strumento educativo, non è consulenza fiscale.")
+                    "(regime amministrato). Strumento educativo, non è consulenza fiscale. Codici d'uscita: 0 riuscito, "
+                    "1 file o dati non leggibili, 2 riga di comando errata.")
     ap.add_argument("estratto", help="CSV delle posizioni esportato dal broker")
     ap.add_argument("zainetto", nargs="?", help="CSV dello zainetto (anno, importo, aliquota[, broker])")
     ap.add_argument("--anno", type=int, default=datetime.date.today().year,
@@ -701,8 +711,8 @@ def main(argv=None):
         if not posizioni:
             raise ErroreInput(f"{args.estratto}: nessuna posizione valutabile (vedi gli avvisi: {avvisi[:2]})")
     except ErroreInput as e:
-        print(f"errore: {e}", file=sys.stderr)
-        sys.exit(2)
+        print(f"ERRORE: {e}", file=sys.stderr)
+        sys.exit(1)
     a = analizza(posizioni, zainetto)
     out = {"anno_riferimento": args.anno, "broker": args.broker, "posizioni": posizioni,
            "zainetto": zainetto, "analisi": a, "avvisi": avvisi}
@@ -715,8 +725,8 @@ def main(argv=None):
             with open(args.json, "w", encoding="utf-8") as f:
                 json.dump(out, f, ensure_ascii=False, indent=2)
         except OSError as e:
-            print(f"errore: impossibile scrivere {args.json}: {e}", file=sys.stderr)
-            sys.exit(2)
+            print(f"ERRORE: impossibile scrivere {args.json}: {e}", file=sys.stderr)
+            sys.exit(1)
         print(f"JSON completo scritto in {args.json}")
 
 

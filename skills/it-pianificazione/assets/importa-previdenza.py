@@ -13,10 +13,12 @@ e produce:
     con i tassi di capitalizzazione ufficiali ISTAT — variazione media quinquennale del PIL nominale)
   - montante del fondo pensione per comparto (quote nette × ultimo NAV), stima del mix azionario,
     versamenti per anno e per fonte (iscritto / azienda / TFR)
-  - un blocco di PARAMETRI PRONTI da incollare in proiezione-inps.py e montecarlo-pensione.py
+  - un blocco di PARAMETRI PRONTI per proiezione-inps.py e montecarlo-pensione.py: con --json li leggono
+    con --from, oppure si passano con --set
 
 Uso:
-    python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]
+    python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--set NOME=VALORE] [--json FILE]
+    (--help elenca le costanti sovrascrivibili, per esempio ALIQUOTA_COMPUTO=0.25 per la Gestione Separata)
 
 Con --anonimo non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): utile
 quando l'output finisce in chat o in un documento condiviso.
@@ -35,10 +37,11 @@ ONESTÀ METODOLOGICA
 """
 
 import csv
-import sys
 import datetime
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+
+from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 
 # ============================== PARAMETRI ==============================
 
@@ -113,8 +116,10 @@ def leggi_estratto_inps(path):
     """Estrae anagrafica e righe contributive dall'XML dell'estratto conto INPS."""
     try:
         root = ET.parse(path).getroot()
+    except OSError as e:
+        errore(f"file non trovato o illeggibile: {path} ({e.strerror})")
     except ET.ParseError as e:
-        sys.exit(f"ERRORE: '{path}' non è un XML valido ({e}).")
+        errore(f"'{path}' non è un XML valido ({e}).")
 
     # anagrafica
     anag = {}
@@ -148,7 +153,7 @@ def leggi_estratto_inps(path):
         righe.append(riga)
 
     if not righe:
-        sys.exit("ERRORE: nessuna RigaContributi leggibile nell'XML. "
+        errore("nessuna RigaContributi leggibile nell'XML. "
                  "Struttura diversa dall'estratto conto standard INPS?")
     return anag, righe
 
@@ -182,15 +187,19 @@ def ricostruisci_montante(retrib_per_anno, anno_corrente):
 
 def leggi_storico_fondo(path):
     """Legge lo storico movimenti del fondo (formato tipico: sep ';', decimali con virgola)."""
-    with open(path, encoding="utf-8", errors="replace") as f:
-        testa = f.read(4096)
+    # utf-8-sig: gli export con il BOM (Excel) non lasciano «\ufeff» davanti alla prima intestazione
+    try:
+        with open(path, encoding="utf-8-sig", errors="replace") as f:
+            testa = f.read(4096)
+    except OSError as e:
+        errore(f"file non trovato o illeggibile: {path} ({e.strerror})")
     sep = ";" if testa.count(";") >= testa.count(",") else ","
 
-    with open(path, encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
         rows = [{(k or "").strip(): (v or "").strip() for k, v in r.items()}
                 for r in csv.DictReader(f, delimiter=sep)]
     if not rows:
-        sys.exit(f"ERRORE: '{path}' vuoto o non leggibile come CSV.")
+        errore(f"'{path}' vuoto o non leggibile come CSV.")
 
     def col(*candidati):
         """Trova la colonna reale che contiene una delle keyword (match case-insensitive)."""
@@ -213,7 +222,7 @@ def leggi_storico_fondo(path):
     }
     mancanti = [k for k in ("data", "comparto", "nav") if C[k] is None]
     if mancanti:
-        sys.exit(f"ERRORE: colonne non riconosciute nel CSV: {mancanti}. "
+        errore(f"colonne non riconosciute nel CSV: {mancanti}. "
                  f"Colonne trovate: {list(rows[0])}")
 
     quote = defaultdict(float)                      # comparto → quote nette
@@ -253,22 +262,26 @@ def quota_azionaria(nome_comparto):
 # ================================ MAIN ================================
 
 def eta_stampata(eta, anonimo):
-    """Età da incollare in ETA_ATTUALE: con --anonimo in anni interi ARROTONDATI (proiezione-inps.py
+    """Età per ETA_ATTUALE (via --from o --set): con --anonimo in anni interi ARROTONDATI (proiezione-inps.py
     usa round(ETA_PENSIONAMENTO − ETA_ATTUALE): troncare allungherebbe l'orizzonte di un anno)."""
     return round(eta) if anonimo else round(eta, 1)
 
 
 def main():
-    uso = "Uso: python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]"
-    args = [a for a in sys.argv[1:] if a != "--anonimo"]
-    anonimo = len(args) < len(sys.argv) - 1
+    args = cli("Importa l'estratto conto contributivo INPS (XML) e lo storico del fondo pensione (CSV) e stampa i "
+               "parametri pronti per proiezione-inps.py e montecarlo-pensione.py (anche in JSON, con --json, "
+               "che quegli script leggono con --from).", globals(), json=True, argomenti=(
+                   (("estratto_inps",), {"help": "estratto conto contributivo INPS in XML (dal portale INPS)"}),
+                   (("storico_fondo",), {"nargs": "?", "help": "storico movimenti del fondo pensione in CSV (facoltativo)"}),
+                   (("--anonimo",), {"action": "store_true",
+                                     "help": "non stampa intestatario e data di nascita (l'età resta, in anni interi)"})))
     # argomenti validati PRIMA di stampare qualsiasi dato: un flag sbagliato non deve rivelare i dati
-    sconosciuti = [a for a in args if a.startswith(("-", "\u2014", "\u2013"))]
-    if not args or sconosciuti or len(args) > 2:
-        sys.exit(f"{uso}\n" + (f"Argomento non riconosciuto: {sconosciuti[0]}" if sconosciuti else
-                                (f"Troppi argomenti: {' '.join(args[2:])}" if len(args) > 2 else "")))
-    path_xml = args[0]
-    path_csv = args[1] if len(args) > 1 else None
+    for a in (args.estratto_inps, args.storico_fondo):
+        if a and a.startswith(("-", "\u2014", "\u2013")):
+            args.parser.error(f"argomento non riconosciuto: {a}")
+    anonimo = args.anonimo
+    path_xml = args.estratto_inps
+    path_csv = args.storico_fondo
     oggi = datetime.date.today()
 
     # ------------------------------ INPS ------------------------------
@@ -283,7 +296,7 @@ def main():
         if "nascita" in anag:
             n = anag["nascita"]
             anni = (oggi - n).days / 365.25
-            eta = f" — nato {n.strftime('%d/%m/%Y')} ({anni:.1f} anni)"
+            eta = f" — nato {n.strftime('%d/%m/%Y')} ({numero(anni, 1)} anni)"
         print(f"Intestatario: {anag.get('Cognome','')} {anag.get('Nome','')}{eta}")
 
     retrib = defaultdict(float)
@@ -295,17 +308,17 @@ def main():
     primo = min(r["dal"] for r in righe)
 
     print(f"Prima contribuzione: {primo.strftime('%m/%Y')} | "
-          f"settimane utili: {tot_sett} (≈ {tot_sett/52:.2f} anni)")
+          f"settimane utili: {tot_sett} (≈ {numero(tot_sett/52, 2)} anni)")
     print(f"\n  {'anno':<6}{'retribuzione €':>15}{'settimane':>11}")
     for a in sorted(retrib):
-        print(f"  {a:<6}{retrib[a]:>15,.0f}{sett[a]:>11}")
+        print(f"  {a:<6}{numero(retrib[a]):>15}{sett[a]:>11}")
 
     montante, nominali, anni_def = ricostruisci_montante(retrib, oggi.year)
     anni_completi = [a for a in retrib if sett[a] >= 52]
     ral_rif = retrib[max(anni_completi)] if anni_completi else retrib[max(retrib)]
 
-    print(f"\nContributi nominali (retribuzioni × {ALIQUOTA_COMPUTO:.0%}): € {nominali:,.0f}")
-    print(f"MONTANTE CONTRIBUTIVO RICOSTRUITO: ≈ € {montante:,.0f}")
+    print(f"\nContributi nominali (retribuzioni × {pct(ALIQUOTA_COMPUTO, 0)}): € {numero(nominali)}")
+    print(f"MONTANTE CONTRIBUTIVO RICOSTRUITO: ≈ € {numero(montante)}")
     print(f"  rivalutazione con tassi ufficiali ISTAT (PIL nominale quinquennale)")
     ultimo = max(TASSI_CAPITALIZZAZIONE)
     dopo = [a for a in anni_def if a > ultimo]
@@ -317,7 +330,7 @@ def main():
     if prima:
         anni_prima = sum(sett[a] for a in prima) / 52
         intervallo = f"{prima[0]}-{prima[-1]}" if len(prima) > 1 else f"{prima[0]}"
-        print(f"  ⚠ retribuzioni prima del 1996 ({intervallo}, ≈ {anni_prima:.1f} anni): posizione mista, "
+        print(f"  ⚠ retribuzioni prima del 1996 ({intervallo}, ≈ {numero(anni_prima, 1)} anni): posizione mista, "
               "con una quota retributiva che lo script non calcola (L. 335/1995 art. 1 c. 12-13). "
               "Il montante sopra conta solo i contributi dal 1996")
         if anni_prima >= 18:
@@ -340,14 +353,14 @@ def main():
                 continue
             v_nav = nav.get(comp, (None, 0.0))[1]
             val = quote[comp] * v_nav
-            pct, riconosciuto = quota_azionaria(comp)
+            quota_az, riconosciuto = quota_azionaria(comp)
             euristiche |= not riconosciuto
             fp_montante += val
-            az_ponderata += val * pct
+            az_ponderata += val * quota_az
             flag = "" if riconosciuto else "?"
-            print(f"  {comp[:37]:<38}{quote[comp]:>10.3f}{v_nav:>9.3f}{val:>11,.0f}{pct*100:>5.0f}{flag}")
+            print(f"  {comp[:37]:<38}{numero(quote[comp], 3):>10}{numero(v_nav, 3):>9}{numero(val):>11}{numero(quota_az*100):>5}{flag}")
         mix = az_ponderata / fp_montante if fp_montante else 0.0
-        print(f"\nMONTANTE FONDO: ≈ € {fp_montante:,.0f} | mix azionario stimato ≈ {mix:.0%}")
+        print(f"\nMONTANTE FONDO: ≈ € {numero(fp_montante)} | mix azionario stimato ≈ {pct(mix, 0)}")
         print("  ⚠ % azionaria EURISTICA dal nome del comparto"
               + (" ('?' = non riconosciuto, assunto 50%)" if euristiche else "")
               + ": verificala sulla nota informativa")
@@ -358,30 +371,41 @@ def main():
             for a in sorted(versamenti):
                 v = versamenti[a]
                 tot = sum(v.values())
-                print(f"  {a:<6}{v.get('iscritto',0):>10,.0f}{v.get('azienda',0):>10,.0f}"
-                      f"{v.get('TFR',0):>10,.0f}{tot:>10,.0f}")
+                print(f"  {a:<6}{numero(v.get('iscritto',0)):>10}{numero(v.get('azienda',0)):>10}"
+                      f"{numero(v.get('TFR',0)):>10}{numero(tot):>10}")
             ultimo_anno_v = max(a for a in versamenti if a < oggi.year) if \
                 [a for a in versamenti if a < oggi.year] else max(versamenti)
             v_annuo = sum(versamenti[ultimo_anno_v].values())
 
     # -------------------------- PARAMETRI PRONTI --------------------------
     print("\n" + "=" * 72)
-    print("PARAMETRI PRONTI (da incollare negli script della skill)")
+    print("PARAMETRI PRONTI (per --set, oppure --json qui e --from negli script a valle)")
     print("=" * 72)
     print("per proiezione-inps.py:")
-    print(f"  MONTANTE_ATTUALE = {montante:,.0f}".replace(",", "_") +
+    print(f"  MONTANTE_ATTUALE = {montante:_.0f}" +
           ("   # solo i contributi dal 1996: posizione mista, vedi l'avviso sopra" if prima else ""))
-    print(f"  RAL_ATTUALE      = {ral_rif:,.0f}".replace(",", "_") +
+    print(f"  RAL_ATTUALE      = {ral_rif:_.0f}" +
           "   # ultima annualità completa dall'estratto: verifica con la RAL da contratto")
     if "nascita" in anag:
         print(f"  ETA_ATTUALE      = {eta_stampata((oggi - anag['nascita']).days / 365.25, anonimo)}")
     if fp_montante is not None:
         print("per montecarlo-pensione.py:")
-        print(f"  FP_POT_ATTUALE      = {fp_montante:,.0f}".replace(",", "_"))
+        print(f"  FP_POT_ATTUALE      = {fp_montante:_.0f}")
         if versamenti:
-            print(f"  FP_VERSAMENTO_ANNUO = {v_annuo:,.0f}".replace(",", "_") +
+            print(f"  FP_VERSAMENTO_ANNUO = {v_annuo:_.0f}" +
                   f"   # osservato nel {ultimo_anno_v}: aggiorna se cambi contribuzione")
     print("\nQuesto strumento è educativo e non costituisce consulenza finanziaria o previdenziale.")
+
+    if args.json:   # mai nomi né date: solo i parametri (l'età come nei parametri pronti)
+        dati = {"montante_attuale": round(montante, 2), "ral_attuale": round(ral_rif, 2),
+                "contributi_solo_dal_1996": bool(prima)}
+        if "nascita" in anag:
+            dati["eta_attuale"] = eta_stampata((oggi - anag["nascita"]).days / 365.25, anonimo)
+        if fp_montante is not None:
+            dati["fp_montante_attuale"] = round(fp_montante, 2)
+            if versamenti:
+                dati["fp_versamento_annuo"] = round(v_annuo, 2)
+        scrivi_json(args.json, dati)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,20 @@
 
 Questa reference spiega la logica, i parametri e i limiti del glide path automatico. Lo strumento è `assets/glidepath-obiettivi.py`, che genera il calendario di de-risking che alimenta `it-rebalance`.
 
+## Indice
+
+- Perché de-riskare
+- La formula
+- I parametri (editabili)
+- Il glide path nel versamento
+- Le due viste
+- Obiettivi terminanti vs permanenti (flag)
+- Il collegamento con it-rebalance (e la fiscalità)
+- I limiti
+- Come eseguirlo
+- Heuristic per la skill
+- Obiettivi senza target ("il più possibile")
+
 ## Perché de-riskare
 
 Un obiettivo con una data fissa (la retta dell'università, l'anticipo della casa) non può permettersi una correzione di mercato proprio quando i soldi servono. A 13% di volatilità, un crollo l'anno prima della scadenza può azzerare anni di crescita nel momento peggiore. Il glide path riduce progressivamente l'esposizione azionaria man mano che la scadenza si avvicina, per **bloccare il valore raggiunto**. È la risposta al rischio di sequenza (vedi `monte-carlo.md`): non elimina la volatilità, ma la sposta lontano dal momento critico.

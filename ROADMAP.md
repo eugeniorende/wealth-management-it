@@ -1,6 +1,6 @@
 # Roadmap
 
-Stato al 22/10/2026, con la 0.10.0 rilasciata (ondata 0, T1-T8, T10, T11 e parte di T13). La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 24/10/2026: 0.11.0 rilasciata il 24/10/2026 (T9, T12, T14 e le voci di pre-pubblicazione non riservate al proprietario), dopo la 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11 e parte di T13). Restano T13 (da decidere) e le voci del proprietario: visibilità, branch protection, icona, prove di installazione da un account esterno e in Cowork. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
@@ -24,7 +24,7 @@ Prese il 20/10/2026.
 - **Fonti primarie.** Prima di aggiornare il marcatore `Verificato: AAAA-MM` si controllano Normattiva, la Gazzetta Ufficiale, le circolari di INPS e Agenzia delle Entrate e COVIP. Le fonti secondarie servono a trovare un problema, non a chiuderlo.
 - **Test che vincolano i numeri.** Si lavora in TDD, con valori chiusi o invarianti. Uno smoke test che controlla solo `rc == 0` non chiude un finding.
 - **Citazioni dal 2027.** Doppio riferimento, vecchio e nuovo testo unico, con la mappa di F035 (T11).
-- **Gitflow.** `feature/*` verso `develop`; `release/0.10.0` verso `main`, con il tag.
+- **Gitflow.** `feature/*` verso `develop` con merge commit e branch eliminato dopo il merge; `release/X.Y.Z` verso `main`, con il tag e il merge back su `develop`.
 
 ## 0.10.0 — correttiva, entro il 31/12/2026
 
@@ -121,7 +121,7 @@ Prese il 20/10/2026.
 
 - [x] **T11 Governance normativa** (P1, M): F024, F035.
   - [x] Elenco dei file obbligati al marcatore (PR #13).
-  - [x] `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 che si applica dal 1/1/2027, e doppie citazioni con un test per citazione (PR #34). Le voci «Da verificare» della mappa vanno chiuse su Normattiva prima del 1/1/2027.
+  - [x] `references/mappa-nuovo-tuir.md`, per il D.Lgs. 117/2026 che si applica dal 1/1/2027, e doppie citazioni con un test per citazione (PR #34). Le voci «Da verificare» sono state chiuse su Normattiva il 22/10/2026; restano i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6, da seguire con i correttivi.
   - [x] Tabella dello stato dei dati nel README, generata da `run_tests.py --tabella-freshness` (PR #14).
   - [x] Calendario dei parametri annuali: coefficienti di trasformazione 2027-28, legge di bilancio 2027, massimale e requisiti 2027 (PR #14).
 
@@ -133,23 +133,30 @@ Prese il 20/10/2026.
 
 ## 0.11 — script e test
 
-- [ ] **T12 Test e CI che vincolano i numeri** (P1, L): F032, F065.
-  - Test strutturali su ogni xlsx.
-  - `--json` con valori chiusi.
-  - Fixture realistiche.
+- [x] **T12 Test e CI che vincolano i numeri** (P1, L): F032, F065 (T12, dopo le quattro PR di T9).
+  - [x] Test strutturali su ogni xlsx (fogli, ancore, soglia di formule), Riepilogo del pianificatore e Patrimonio del cruscotto dal ricalcolo, cache del tracker confrontate escludendo le celle volatili.
+  - [x] `--json` con valori chiusi (Monte Carlo pensione, netto e ponte; allocatore sul JSON al centesimo); rami avanzati (curvatura, buffer, coefficiente frazionario, sensibilità al PIL).
+  - [x] Fixture realistiche (BOM, unità, segno, xmlns); verbali dei mutanti di T2, T3, T13 e T12; tabella strumenti ↔ test nel README generata dal runner.
   - [x] Matrice Python 3.11 e 3.14, con versioni minime delle dipendenze (PR #17).
   - [x] Versione fissata di claude-code nel job validate (PR #15).
-- [ ] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059.
-  - Helper `cli()` comune: `--help`, `--set`, `--json`, `--from`.
-  - Lettore unico del pianificatore.
-  - `--dati` per genera-ips e per il ribilanciamento.
-  - Catena `--json` → `--from` tra gli script.
+- [x] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059 (PR #43, #44, #45 e T9d).
+  - [x] Helper `cli()` comune: `--help`, `--set`, `--json`, `--from` (PR #43 e #45).
+  - [x] Lettore unico del pianificatore (PR #44).
+  - [x] `--dati` per genera-ips e per il ribilanciamento (con `--zainetto` dal JSON dell'importatore e `--out`), sezione «Dove lavorare» in ogni skill con `${CLAUDE_SKILL_DIR}` e `userConfig.cartella_lavoro`, vocabolario unico della categoria fiscale e glossario nel README (T9d).
+  - [x] Catena `--json` → `--from` tra gli script (T9c): importa-previdenza → proiezione INPS → Monte Carlo → netto e ponte, con `--json` anche su glide path e Monte Carlo degli obiettivi.
 - [x] **T10 Revisione annuale** (P1, M): F049, F050, F060, F064 (PR #12, #18). Anticipato: non dipendeva davvero da T4 e T7.
   - [x] TWR con 120 righe e ultima riga dinamica, Leggimi con i limiti.
   - [x] Costi dell'anno (trasparenza, non da sottrarre di nuovo).
   - [x] Semaforo per priorità (85/75/60%).
   - [x] In più, da F030: soglia 5/25 per classe nel cruscotto e nella riga aggregata del tracker.
-  - [ ] Contratto di input della revisione (F031): resta a T9.
+  - [x] Contratto di input della revisione (F031): tabella dominio → script `--json` → campo → cella in `it-revisione/SKILL.md` (T9c).
+
+### Linea di taglio e rilascio della 0.11.0
+
+- Criteri: T9 e T12 chiusi, le voci di «Pre-pubblicazione» spuntate o motivate come riservate al proprietario (visibilità, branch protection, icona, prove di installazione da account esterno e in Cowork).
+- `release/0.11.0` parte da `develop` → PR su `main` con merge commit → tag `v0.11.0` → `release.yml` (suite completa con freshness, zip con LICENSE e NOTICE) → merge back di `main` su `develop`.
+- Finestra: i marcatori più vecchi sono del 2026-06 e scadono a giugno 2027; `release.yml` esegue anche la freshness, quindi il tag va dato prima, oppure dopo una riverifica alle fonti.
+- [x] Rilasciata il 24/10/2026: T9 (PR #43-#46), T12 (#47), T14 (#48), pre-pubblicazione (#49).
 
 ## Pre-pubblicazione — prima di rendere pubblico il repository
 
@@ -157,23 +164,24 @@ Prese il 20/10/2026.
   - LICENSE e NOTICE (Apache-2.0) nel repository e nello zip, cioè in `INCLUDI` di `scripts/pacchetto.py`;
   - SHA dell'upstream fissato: l'ultimo commit prima della rimozione è `ef165e4160`; il confronto non trova righe di testo in comune con l'upstream;
   - sezione Licenza riscritta e link all'upstream fissato al commit. Il campo `upstream` di `plugin.json` resta a T14.
-- [ ] **Privacy dei dati utente:**
+- [x] **Privacy dei dati utente:**
   - [x] inventario dei campi che ogni script stampa: nessuna chiamata di rete; solo importa-previdenza stampa dati identificativi (intestatario e data di nascita);
-  - [ ] flag `--anonimo` in importa-previdenza (dopo il filone previdenza, che ha quel file);
+  - [x] flag `--anonimo` in importa-previdenza (PR #27): omette intestatario e data di nascita, stampa solo l'età;
   - [x] sezione «Dove vanno i tuoi dati» nel README.
-- [ ] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: oggi 6 script su 7 vanno in crash con cp1252.
-- [ ] **Formati italiani:**
-  - punto per le migliaia in tutti gli script;
-  - CSV degli ordini apribile in Excel italiano, con `;` come separatore e la virgola decimale.
-- [ ] **T14 Authoring, documentazione e packaging** (P2, M): F023, F025, F051, F057, F058, F061, F066.
-  - description entro i 1.024 caratteri;
-  - CHANGELOG.md;
-  - commands come alias delle skill;
-  - plugin.json senza warning.
-- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatta il 21/10/2026 la prova locale: marketplace locale e `/plugin install` in un profilo Claude Code vuoto, poi gli script lanciati dalla copia in cache da una cartella di lavoro. Restano GitHub senza accesso (dopo la pubblicazione) e Cowork.
+- [x] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: prima 11 script su 13 andavano in crash con cp1252 su qualsiasi output e gli altri 2 su percorsi specifici (T9a).
+- [x] **Formati italiani** (T9a):
+  - [x] punto per le migliaia e virgola per i decimali in tutti gli script, via `numero()`, `euro()` e `pct()`;
+  - [x] CSV degli ordini apribile in Excel italiano, con `;` come separatore, la virgola decimale e il BOM.
+- [x] **T14 Authoring, documentazione e packaging** (P2, M): F023, F025, F051, F057, F058, F061, F066.
+  - [x] description entro i 1.024 caratteri, quotate per un parser YAML stretto, con `metadata.version` per skill e i trigger non gestiti di it-pianificazione (riscatto, ricongiunzione, totalizzazione) dichiarati fuori perimetro;
+  - [x] CHANGELOG.md, con la storia delle skill tolta dai SKILL.md;
+  - [x] commands come alias delle skill (`disable-model-invocation`, `argument-hint`, `$ARGUMENTS`);
+  - [x] plugin.json senza warning: `upstream` in `metadata`, `claude plugin validate --strict` nella CI (resta solo ICON_MISSING del controllo per il plugin directory, che non cambia l'esito: l'icona la decide il proprietario);
+  - [x] indici nelle reference da 100 righe in su, istruzioni di aggiornamento nel README (`claude plugin update`, auto-update, `--scope`), titolo e lingua italiana nell'IPS in Word.
+- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatte il 21 e il 24/10/2026 le prove in profili Claude Code vuoti: marketplace locale, marketplace da GitHub (con le credenziali della sessione), `--config` e `/plugin configure` della cartella di lavoro, script lanciati dalla copia in cache, zip estratto e validato con `--strict` (verbale in `docs/sviluppo/verbale-installazione-2026-10-24.md`). **Restano al proprietario**: GitHub da un account senza accesso, possibile solo dopo la pubblicazione (decisione 2), e l'upload in Cowork, che richiede la sua interfaccia; i passi sono nel verbale.
 - [x] Supply chain della CI: action fissate per SHA con test di igiene, claude-code a versione fissa (PR #15). Dependabot su pip non serve: le dipendenze hanno solo versioni minime.
-- [ ] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4).
-- [ ] README coerente con un repository pubblico: marketplace e Releases.
+- [x] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4): OPZIONE e tetto dei €5.300 con il loro gate, CSV degli ordini con la categoria del vocabolario e i dati d'esempio dichiarati, IPS d'esempio dichiarato in copertina, leve previdenziali come scenari nelle skill (verbale in `docs/sviluppo/verbale-rilettura-output-2026-10-24.md`).
+- [x] README coerente con un repository pubblico: marketplace e Releases, aggiornamenti (`claude plugin update`, auto-update, `--scope`), opzione della cartella di lavoro, CHANGELOG.md.
 
 ## Dopo — da decidere
 
@@ -186,4 +194,4 @@ Prese il 20/10/2026.
 
 ## Fuori dal codice
 
-- [ ] Branch protection su `main` e `develop` con i check `test` e `validate`, da impostare su GitHub.
+- [ ] Branch protection su `main` e `develop` con i check `test` e `validate`, da impostare su GitHub **dopo la pubblicazione**: su un repository privato senza GitHub Pro non è attivabile (l'API risponde 403, verificato il 23/10/2026). Decisione del proprietario.

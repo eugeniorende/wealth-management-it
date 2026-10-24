@@ -1,6 +1,8 @@
 ---
 name: it-pianificazione-autonomi
-description: Pianificazione pensionistica per lavoratori autonomi e partite IVA italiane (regime forfettario e ordinario), iscritti alla Gestione Separata INPS o a casse professionali. Usa questa skill quando l'utente è un libero professionista, freelance, consulente, sviluppatore software con P.IVA, partita IVA forfettaria, autonomo senza cassa, o un professionista iscritto a un albo con cassa (ingegnere/architetto in Inarcassa, avvocato in Cassa Forense, medico in ENPAM, commercialista in CNPADC, psicologo in ENPAP, geometra in CIPAG, ecc.), e parla di: pensione da autonomo, Gestione Separata INPS, casse professionali, contributo soggettivo e integrativo, contributi minimi e massimale, deducibilità dei contributi cassa (anche in forfettario), contributi previdenziali partita IVA, coefficiente di redditività, imposta sostitutiva 15% o 5%, deducibilità contributi forfettario, fondo pensione per autonomi, "conviene il fondo pensione se sono forfettario?", quanto prenderò di pensione da freelance o da professionista, gap previdenziale autonomi. Trigger anche su confronto regime forfettario vs ordinario ai fini previdenziali. ATTENZIONE: per i forfettari il contributo volontario al fondo pensione NON è deducibile (regime sostitutivo, non IRPEF), mentre il contributo obbligatorio alla cassa o alla Gestione Separata SÌ — questo inverte la logica valida per i dipendenti. NON copre dipendenti privati (skill `it-pianificazione`), dipendenti pubblici, né artigiani e commercianti iscritti alle gestioni IVS INPS (contributi fissi sul minimale e aliquote proprie). NON sostituisce un commercialista o consulente previdenziale abilitato.
+description: "Pianificazione pensionistica per lavoratori autonomi e partite IVA italiane (forfettario e ordinario), iscritti alla Gestione Separata INPS o a una cassa professionale (Inarcassa, Cassa Forense, ENPAM, CNPADC, ENPAP, CIPAG, ecc.). Usa questa skill quando un libero professionista o freelance con P.IVA parla di pensione da autonomo, Gestione Separata, contributo soggettivo e integrativo, minimali e massimale, deducibilità dei contributi, coefficiente di redditività, imposta sostitutiva 15% o 5%, fondo pensione per autonomi («conviene se sono forfettario?»), gap previdenziale, forfettario vs ordinario ai fini previdenziali. ATTENZIONE: per i forfettari il contributo volontario al fondo pensione NON è deducibile (imposta sostitutiva, non IRPEF), i contributi obbligatori sì: la logica dei dipendenti si inverte. NON copre dipendenti privati (`it-pianificazione`), dipendenti pubblici, né artigiani e commercianti delle gestioni IVS INPS. NON sostituisce un commercialista o un consulente previdenziale."
+metadata:
+  version: "0.4"
 ---
 
 # it-pianificazione-autonomi
@@ -110,6 +112,15 @@ Per un developer/consulente, il coefficiente tipico è **78%**: significa che il
 
 Vedi `references/fiscalita-forfettario.md` per esempi numerici completi e il confronto forfettario vs ordinario.
 
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/proiezione-pensione-autonomi.xlsx`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Questa skill non ha script: la proiezione è nel foglio, e non serve Python.
+
 ## Workflow operativo
 
 ### Step 1: Ingestion
@@ -189,15 +200,15 @@ E confrontato onestamente con l'alternativa (PAC di ETF su dossier ordinario), c
 
 Identica metodologia di `it-pianificazione/references/proiezione-tenore-vita.md`: gap = spesa target (spesa attuale × fattore, in euro di oggi) − pensione netta, in tre scenari. Nel foglio Excel è la tabella «Scenari» del Riepilogo. L'unica differenza è che il tasso di sostituzione pubblico dell'autonomo è strutturalmente più basso (per via dell'aliquota di computo 25% vs 33%), quindi il gap tende a essere più ampio.
 
-### Step 5: Raccomandazioni
+### Step 5: Leve da valutare (scenari, non raccomandazioni)
 
-Pattern specifici per autonomi:
+Pattern specifici per autonomi, presentati come scenari quantificati e non come raccomandazioni personali: la scelta resta all'utente.
 
 - **Pattern A1 — Versare i contributi INPS regolarmente e per intero**: sono deducibili dal forfettario e costruiscono pensione. Non saltarli quando il fatturato cala (in Gestione Separata non c'è minimo, ma versare poco = montante basso).
 - **Pattern A2 — Valutare onestamente il fondo pensione SENZA il falso mito della deduzione**: per il forfettario puro, confrontare fondo vs ETF/PAC a parità di importo, considerando liquidità, tassazione in uscita (zero sui non dedotti comunicati), costi. Se versa, ricordare la comunicazione annuale dei non dedotti al fondo.
 - **Pattern A3 — Sfruttare i redditi IRPEF collaterali per la deduzione**: se l'autonomo ha affitti o altri redditi IRPEF, il fondo pensione deduce fino a capienza di quelli.
 - **Pattern A4 — Considerare il passaggio a ordinario se conviene**: in alcuni casi (costi reali alti, necessità di dedurre), il regime ordinario può essere più efficiente — ma è una valutazione fiscale complessa, da fare con un commercialista.
-- **Pattern A5 — Massimizzare la complementare proprio perché la pubblica è più magra**: l'autonomo ha più bisogno della complementare del dipendente, anche senza il vantaggio deduzione.
+- **Pattern A5 — Più complementare perché la pubblica è più magra**: l'autonomo ha più bisogno della complementare del dipendente, anche senza il vantaggio deduzione.
 
 ## Strumento operativo: il foglio di proiezione
 
@@ -220,7 +231,7 @@ Report markdown in 5 sezioni (analogo a `it-pianificazione`):
 2. **Proiezione previdenza obbligatoria**: pensione lorda/netta attesa, tasso di sostituzione (evidenziare che è più basso per via dell'aliquota di computo del 25%)
 3. **Valutazione previdenza complementare**: con l'analisi corretta della deducibilità (zero per forfettario puro), confronto fondo vs ETF
 4. **Gap analysis tenore di vita**: con scenari conservativo/base/ottimistico
-5. **Raccomandazioni**: pattern A1-A5 quantificati
+5. **Leve da valutare**: pattern A1-A5 quantificati come scenari
 
 ### Disclaimer (obbligatorio in fondo)
 
@@ -249,19 +260,3 @@ Report markdown in 5 sezioni (analogo a `it-pianificazione`):
   - `it-pianificazione/references/previdenza-complementare.md` — meccanica fondi pensione (forme, comparti, tassazione finale, anticipazioni): valida per tutti, autonomi inclusi
   - `it-pianificazione/references/proiezione-tenore-vita.md` — metodologia gap analysis e scenari: valida per tutti
 - **Vedi anche** `it-pianificazione/references/integrazione-fiscale-joint.md` per l'interazione con eventuali redditi finanziari, e `it-tax-optimization` se l'autonomo ha un dossier titoli
-
-## Note per l'iterazione
-
-Questa è la versione 0.3 della skill (introdotta in v0.6 del plugin, estesa in v0.7.13).
-
-In quest'iterazione:
-- Focus su Gestione Separata (la maggioranza dei freelance tech/digitali)
-- Regime forfettario e ordinario (cenni)
-- Casse professionali trattate in dettaglio (`references/casse-professionali.md`)
-- **Foglio Excel di proiezione dedicato agli autonomi** (`assets/proiezione-pensione-autonomi.xlsx`): aliquota 26,07%/cassa, no TFR, foglio Fiscalità con il confronto forfettario vs ordinario e la deducibilità corretta del fondo pensione
-
-Roadmap:
-- Artigiani e commercianti (contributi fissi sul minimale, riduzioni del 35% e del 50%): fuori perimetro per decisione del 20/10/2026; la skill li rinvia a INPS o al commercialista
-- Minimale della Gestione Separata (€18.808 nel 2026) e mesi accreditati sotto il minimale: non cambiano il montante, ma l'anzianità per i requisiti; il foglio non li modella ancora
-- v0.5: simulatore numerico del confronto forfettario vs ordinario ai fini previdenziali (oltre alla fotografia annua già nel foglio Excel)
-- Possibile: dettaglio per singola cassa con i coefficienti di trasformazione e le regole di rivalutazione specifiche (ENPAM Quota A/B, casse 103/1996)

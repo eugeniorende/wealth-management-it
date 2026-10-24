@@ -1,0 +1,9 @@
+{
+ "branch": "feature/t13-reference (mergiato in develop con la PR #32)",
+ "fonte": "verbale ricostruito il 24/10/2026 (T12) dal messaggio del commit a9b740a",
+ "applicati": [
+  "Confermati di review-t13.json e revisione mirata sull'integrazione (commit a9b740a): indice e casi limite di it-tax-optimization/SKILL.md, ritenute estere tra i costi non compensabili (dal 26,0% al 51,9%, come la tabella), trigger nella description; sequenza-liquidazione.md con il netto frontiera e la finalità successoria; bucket «Eredità» in it-pianificazione-obiettivi (allocazione-capitale, asset-location, glide-path, SKILL, allocatore) con la riserva sugli ETF e la franchigia per ciascun beneficiario; dividendi-esteri.md con la nota (*) corretta, il caso francese del 25%, base lorda o netta in dichiarativo tra le cose da verificare; regime-dichiarativo.md con i dividendi esteri sul lordo nel quadro RM e nella sintesi; successione-donazione.md senza la risoluzione non verificata, percorso di asset-location; criptovalute-casi-speciali allineata (affini, art. 56, rinvio alla tabella); PIR e BTP non esenti dall'imposta di donazione; OBBLIGATI_FRESHNESS con le due reference, multi-intermediario e import-dati-broker"
+ ],
+ "non_applicati": [],
+ "mutanti": "a9b740a: indice delle reference limitato a «Riferimenti», numeri della tabella e degli esempi ricalcolati dal testo, aliquote e franchigie con la copia cripto, propagazione delle regole su ETF in eredità, BTP e PIR in donazione e dividendi in dichiarativo: 24 mutanti uccisi su 24"
+}

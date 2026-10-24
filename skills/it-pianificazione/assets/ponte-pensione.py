@@ -56,8 +56,8 @@ Questo strumento è educativo e non costituisce consulenza finanziaria o previde
 
 import numpy as np
 
-from motore_bootstrap import (applica_override, blocchi_bootstrap, carica_inflazione, carica_storico, deflaziona,
-                              pctl, percorso_json, scrivi_json)
+from motore_bootstrap import (blocchi_bootstrap, carica_inflazione, carica_storico, cli, deflaziona, errore, numero,
+                              pct, pctl, scrivi_json)
 
 # ============================== PARAMETRI ==============================
 
@@ -76,6 +76,10 @@ DRAG_FISCALE_ANNUO = 0.004    # attrito fiscale sui prelievi (26% sui gain reali
 # RITA — rendita-ponte dal fondo pensione
 RITA_ATTIVA = True
 MONTANTE_FP_ALL_USCITA = 250_000.0  # montante del fondo pensione all'uscita (dal Monte Carlo pensione)
+# Da --from: gli anni del Monte Carlo (mc.json) e quelli alla vecchiaia (inps.json) dicono a che età
+# è il montante letto; None = non noti (il valore viene da qui o da --set).
+ANNI_MONTANTE_FP = None
+ANNI_AL_PENSIONAMENTO = None
 QUOTA_MONTANTE_IN_RITA = 1.0        # quota del montante destinata alla RITA (0–1)
 ANNI_MAX_RITA = 5                   # 5 = ordinaria; 10 = con inoccupazione >24 mesi
 ANNI_ISCRIZIONE_FP = 30             # anni di partecipazione alla complementare all'avvio RITA
@@ -108,10 +112,10 @@ def inflazione_usata():
     """Inflazione per deflazionare la serie: l'array storico, o una costante (INFLAZIONE o il
     ripiego se la serie non ha la colonna). Ritorna (inflazione, descrizione)."""
     if INFLAZIONE is not None:
-        return INFLAZIONE, f"inflazione costante {INFLAZIONE*100:.1f}%"
+        return INFLAZIONE, f"inflazione costante {numero(INFLAZIONE*100, 1)}%"
     storica = carica_inflazione(FILE_STORICO)
     if storica is None:
-        return INFLAZIONE_RIPIEGO, (f"inflazione costante {INFLAZIONE_RIPIEGO*100:.1f}% "
+        return INFLAZIONE_RIPIEGO, (f"inflazione costante {numero(INFLAZIONE_RIPIEGO*100, 1)}% "
                                     "(la serie non ha la colonna inflazione)")
     return storica, "inflazione USA storica anno per anno (CPI dicembre su dicembre)"
 
@@ -151,14 +155,31 @@ def capitale_per_confidenza(target, rendimenti, prelievi, lo=0.0, hi=3_000_000.0
 
 
 def main():
-    applica_override(globals())
-    json_out = percorso_json()
+    args = cli("Ponte pensionistico: Monte Carlo del capitale che copre l'uscita anticipata, RITA e costi "
+               "permanenti sulla pensione.", globals(), json=True,
+               da_json={"montante_fp.mediana": "MONTANTE_FP_ALL_USCITA",        # da montecarlo-pensione.py
+                        "anni": "ANNI_MONTANTE_FP",                             # da montecarlo-pensione.py
+                        "eta_pensionamento": "ETA_PENSIONE_VECCHIAIA",         # da proiezione-inps.py
+                        "anni_al_pensionamento": "ANNI_AL_PENSIONAMENTO",      # da proiezione-inps.py
+                        "coefficiente_trasformazione": "COEFF_TRASFORMAZIONE"})
+    json_out = args.json
+    # Il montante del Monte Carlo è a «oggi + ANNI»: se quell'età non è l'uscita (tipico: il mc.json
+    # della catena è alla vecchiaia), la RITA e i versamenti persi sarebbero sbagliati in silenzio.
+    forzato = any(v.split("=")[0].strip() == "MONTANTE_FP_ALL_USCITA" for v in (args.set or []))
+    if ANNI_MONTANTE_FP is not None and ANNI_AL_PENSIONAMENTO is not None and not forzato:
+        eta_oggi = ETA_PENSIONE_VECCHIAIA - ANNI_AL_PENSIONAMENTO
+        eta_montante = eta_oggi + ANNI_MONTANTE_FP
+        if abs(eta_montante - ETA_USCITA) > 0.5:
+            errore(f"il montante del fondo letto da --from è a {numero(eta_montante)} anni, non all'uscita "
+                   f"({numero(ETA_USCITA)}): rigenera il Monte Carlo fino all'uscita con montecarlo-pensione.py "
+                   f"--from inps.json --set ANNI={int(round(ETA_USCITA - eta_oggi))} --json mc-uscita.json e passa "
+                   f"quel file al ponte (oppure indica il montante con --set MONTANTE_FP_ALL_USCITA=…)")
     if SEED is not None:
         np.random.seed(SEED)
 
     anni_ponte = int(round(ETA_PENSIONE_VECCHIAIA - ETA_USCITA))
     if anni_ponte <= 0:
-        raise SystemExit("ETA_PENSIONE_VECCHIAIA deve superare ETA_USCITA.")
+        errore("ETA_PENSIONE_VECCHIAIA deve superare ETA_USCITA.")
 
     # ── RITA ──
     if RITA_ATTIVA:
@@ -188,35 +209,35 @@ def main():
     print(f"PONTE PENSIONISTICO — uscita a {ETA_USCITA:.0f}, copertura da {ETA_PENSIONE_VECCHIAIA:.0f} "
           f"({anni_ponte} anni da finanziare)")
     print("=" * 74)
-    print(f"Spesa annua nel ponte (netta, reale): € {SPESA_ANNUA_PONTE:,.0f}")
+    print(f"Spesa annua nel ponte (netta, reale): € {numero(SPESA_ANNUA_PONTE)}")
     if RITA_ATTIVA and anni_rita > 0:
         print(f"\nRITA: dal compimento dei {eta_inizio_rita:.0f} anni ({anni_rita} anni), "
-              f"montante destinato € {montante_rita:,.0f}")
-        print(f"  rata lorda € {rata_lorda:,.0f}/anno → netta € {rata_netta:,.0f} "
-              f"(aliquota {aliq:.1%} con {ANNI_ISCRIZIONE_FP} anni di partecipazione)")
+              f"montante destinato € {numero(montante_rita)}")
+        print(f"  rata lorda € {numero(rata_lorda)}/anno → netta € {numero(rata_netta)} "
+              f"(aliquota {pct(aliq)} con {ANNI_ISCRIZIONE_FP} anni di partecipazione)")
         print(f"  requisiti versione 5 anni: cessazione lavoro, ≥20 anni contributi INPS, "
               f"≥5 anni di complementare")
     print(f"\nFabbisogno dal capitale-ponte, per fase:")
     for y in range(anni_ponte):
         eta = ETA_USCITA + y
-        print(f"  {eta:.0f} → {eta+1:.0f} anni: € {prelievi[y]:>8,.0f}"
+        print(f"  {eta:.0f} → {eta+1:.0f} anni: € {numero(prelievi[y]):>8}"
               + ("   (RITA attiva)" if prelievi[y] < SPESA_ANNUA_PONTE - 0.01 else ""))
-    print(f"  totale (euro di oggi, non scontato): € {prelievi.sum():,.0f}")
+    print(f"  totale (euro di oggi, non scontato): € {numero(prelievi.sum())}")
 
-    print(f"\nMONTE CARLO ({N_SIM:,} percorsi, {PESO_AZIONARIO_PONTE:.0%} azioni, "
-          f"drag fiscale {DRAG_FISCALE_ANNUO:.1%}):")
+    print(f"\nMONTE CARLO ({numero(N_SIM)} percorsi, {pct(PESO_AZIONARIO_PONTE, 0)} azioni, "
+          f"drag fiscale {pct(DRAG_FISCALE_ANNUO)}):")
     print(f"  serie storica USA nominale in dollari, deflazionata con {inflazione_usata()[1]}")
-    print(f"  capitale-ponte disponibile: € {CAPITALE_PONTE:,.0f}")
-    print(f"  → PROBABILITÀ di coprire il ponte: {prob:.1%}")
+    print(f"  capitale-ponte disponibile: € {numero(CAPITALE_PONTE)}")
+    print(f"  → PROBABILITÀ di coprire il ponte: {pct(prob)}")
     if prob > 0:
         ok = saldi[vivi]
         print(f"  residuo a {ETA_PENSIONE_VECCHIAIA:.0f} anni (nei percorsi riusciti): "
-              f"P10 € {pctl(ok,10):,.0f} | mediana € {pctl(ok,50):,.0f} | P90 € {pctl(ok,90):,.0f}")
+              f"P10 € {numero(pctl(ok,10))} | mediana € {numero(pctl(ok,50))} | P90 € {numero(pctl(ok,90))}")
 
     print(f"\nCAPITALE NECESSARIO all'uscita:")
     necessari = {conf: capitale_per_confidenza(conf, rendimenti, prelievi) for conf in (0.85, 0.95)}
     for conf, c in necessari.items():
-        print(f"  per {conf:.0%} di confidenza: € {c:,.0f}")
+        print(f"  per {pct(conf, 0)} di confidenza: € {numero(c)}")
 
     # ── Costi permanenti ──
     d_montante_inps = anni_ponte * RAL_ALL_USCITA * ALIQUOTA_COMPUTO * \
@@ -229,12 +250,12 @@ def main():
 
     print(f"\nCOSTI PERMANENTI dell'uscita a {ETA_USCITA:.0f} (lordi, sulla pensione da "
           f"{ETA_PENSIONE_VECCHIAIA:.0f} in poi, per sempre):")
-    print(f"  INPS: −€ {d_inps:,.0f}/anno   ({anni_ponte} anni di contributi in meno "
-          f"su RAL € {RAL_ALL_USCITA:,.0f})")
-    print(f"  Rendita fondo: −€ {d_fondo_vers:,.0f}/anno per i versamenti mancati"
-          + (f", −€ {d_fondo_rita:,.0f}/anno per il montante usato in RITA" if montante_rita else ""))
+    print(f"  INPS: −€ {numero(d_inps)}/anno   ({anni_ponte} anni di contributi in meno "
+          f"su RAL € {numero(RAL_ALL_USCITA)})")
+    print(f"  Rendita fondo: −€ {numero(d_fondo_vers)}/anno per i versamenti mancati"
+          + (f", −€ {numero(d_fondo_rita)}/anno per il montante usato in RITA" if montante_rita else ""))
     tot = d_inps + d_fondo_vers + d_fondo_rita
-    print(f"  TOTALE: ≈ −€ {tot:,.0f}/anno di pensione lorda, per sempre")
+    print(f"  TOTALE: ≈ −€ {numero(tot)}/anno di pensione lorda, per sempre")
     print(f"  (al netto il divario si attenua — vedi netto-pensione.py; e in cambio hai avuto")
     print(f"   {anni_ponte} anni di libertà + l'eventuale RITA già incassata)")
 
@@ -245,10 +266,13 @@ def main():
     if json_out:
         scrivi_json(json_out, {
             "anni_ponte": anni_ponte,
+            "eta_uscita": ETA_USCITA,
+            "eta_pensione_vecchiaia": ETA_PENSIONE_VECCHIAIA,
+            "montante_fp_all_uscita": MONTANTE_FP_ALL_USCITA,
             "probabilita_successo": round(float(prob), 4),
             "inflazione": inflazione_usata()[1],
             "capitale_ponte": CAPITALE_PONTE,
-            "capitale_necessario": {f"{c:.0%}": round(v, 0) for c, v in necessari.items()},
+            "capitale_necessario": {f"{pct(c, 0)}": round(v, 0) for c, v in necessari.items()},
             "rita": {"attiva": bool(RITA_ATTIVA), "eta_inizio": eta_inizio_rita,
                      "rata_lorda": round(rata_lorda, 2), "rata_netta": round(rata_netta, 2),
                      "aliquota": aliq},

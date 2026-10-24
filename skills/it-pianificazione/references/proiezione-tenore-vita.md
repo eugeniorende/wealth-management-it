@@ -1,5 +1,14 @@
 # Proiezione tenore di vita post-pensionamento
 
+## Indice
+
+- L'approccio gap analysis
+- Spesa target post-pensione
+- Reddito pensionistico totale
+- Scenari di proiezione
+- Pattern di copertura del gap
+- Heuristic per la skill
+
 ## L'approccio gap analysis
 
 La pianificazione pensionistica si riduce concettualmente a una domanda: **il reddito atteso dalla pensione coprirà il tenore di vita desiderato?**
@@ -84,7 +93,7 @@ Calcolata in `references/previdenza-obbligatoria.md`. Output: importo netto annu
 
 ### Prestazione previdenza complementare
 
-Due regimi possibili:
+Tre possibilità: rendita vitalizia; capitale fino al 50% del montante (art. 11 c. 3 D.Lgs. 252/2005); per il resto, al posto della vitalizia, le forme del c. 3-bis (rendita a durata definita, prelievi entro le rate maturate, erogazione frazionata), con il residuo che resta investito nel fondo (vedi `previdenza-complementare.md`).
 
 **Se rendita vitalizia**: contribuisce direttamente al reddito mensile.
 ```
@@ -104,7 +113,7 @@ Tassi di conversione tipici (immediata vitalizia, persona singola, senza opzioni
 
 Con reversibilità coniuge 60%: -10% tasso. Con certezza 10 anni: -5% tasso. Con controassicurazione completa: -15% tasso.
 
-**Se capitale**: NON è reddito ricorrente, è patrimonio. Va trattato come:
+**Se capitale** (fino al 50%, il resto in vitalizia o nelle forme del c. 3-bis): NON è reddito ricorrente, è patrimonio. Va trattato come:
 
 ```
 flusso_annuo_da_capitale = capitale_netto × tasso_prelievo_sostenibile
@@ -135,9 +144,9 @@ Tutti i tre scenari con stesse ipotesi di vita (es. orizzonte 30 anni post-pensi
 
 ## Pattern di copertura del gap
 
-Quando gap > 0 (manca copertura), proporre pattern ordinati per impatto stimato:
+Quando gap > 0 (manca copertura), presentare le leve come scenari quantificati, ordinati per impatto stimato (la scelta resta all'utente):
 
-### P1: Massimizzare contributo deducibile complementare
+### P1: Usare lo spazio deducibile (tetto fiscale, non importo consigliato)
 
 Se i contributi del lavoratore (dovuti e volontari) e del datore insieme non saturano il plafond di €5.300 (il TFR non conta):
 
@@ -149,7 +158,7 @@ risparmio_fiscale_cumulato = risparmio_fiscale_annuo × anni_residui  # in nomin
 beneficio_totale_v.t. = delta_montante_finale + risparmio_fiscale_cumulato
 ```
 
-Per RAL nel secondo scaglione (28-50k) il rapporto costo/beneficio è particolarmente favorevole: ogni €1.000 versato torna €330 di IRPEF risparmiato + €1.000 capitalizzato 30 anni a 4% netto = €3.243 finali. **Praticamente impossibile fare di meglio** sul medesimo €1.000 in altri strumenti.
+Per RAL nel secondo scaglione (28-50k) ogni €1.000 versato e dedotto riduce l'IRPEF di €330 e, capitalizzato 30 anni al 4% netto, diventa circa €3.243; in uscita l'imposta del 9-15% sui contributi dedotti ne toglie da €90 a €150 (sul solo contributo, i rendimenti sono già tassati). Lo spazio residuo è un **tetto fiscale, non un importo consigliato**: il versamento è vincolato fino alla pensione, e vengono prima la liquidità, il fondo di emergenza e i debiti cari. Si mostra come scenario accanto alle alternative (PAC in ETF, nessun versamento), la scelta resta all'utente.
 
 ### P2: Cambiare comparto del fondo (se troppo conservativo per l'orizzonte)
 
@@ -161,7 +170,7 @@ montante_alternativo = projection(rendimento_Y, anni_residui)  # Y più aggressi
 delta = montante_alternativo - montante_attuale_comparto_X
 ```
 
-Su 25 anni, passare da garantito (1,5% netto) a bilanciato (3,5% netto) raddoppia tipicamente il montante. Vincolo: l'utente deve essere comodo con la volatilità — non cambiare comparto in panico durante crisi.
+Su 25 anni, passare da garantito (1,5% netto) a bilanciato (3,5% netto) fa crescere di circa il 60% il montante di un capitale già accumulato e di circa il 30% quello dei versamenti costanti (1,035²⁵/1,015²⁵ ≈ 1,63; somme delle capitalizzazioni ≈ 1,30), con più volatilità. Vincolo: l'utente deve essere comodo con la volatilità — non cambiare comparto in panico durante crisi.
 
 ### P3: Ritardare pensionamento
 
@@ -214,7 +223,7 @@ A questo punto la skill rinvia a strumenti separati (PAC ETF, immobiliare a redd
 
 2. **3 scenari obbligatori** nel report: conservativo, base, ottimistico. Mai un singolo numero proiettato — orizzonte 30 anni rende la precisione apparente fuorviante.
 
-3. **Quantificare ogni raccomandazione**: ogni pattern deve avere stima di impatto (€ delta, % gap chiuso, anni di anticipo della "indipendenza"), altrimenti è chiacchiera.
+3. **Quantificare ogni leva**: ogni pattern deve avere stima di impatto (€ delta, % gap chiuso, anni di anticipo della "indipendenza"), altrimenti è chiacchiera.
 
 4. **Soglia minima per agire**: se un pattern produce delta < 5% del gap o < €5.000 nominali, non vale la complessità. Skill deve dire "non vale la pena" quando appropriato.
 

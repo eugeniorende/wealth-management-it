@@ -2,6 +2,21 @@
 
 Tutto il resto della skill assume il regime **amministrato**, dove l'intermediario italiano fa da sostituto d'imposta: trattiene il 26% a ogni realizzo, gestisce lo zainetto, e tu non dichiari nulla. Ma chi usa un **broker estero** senza sostituto d'imposta italiano (Interactive Brokers, Degiro) finisce nel regime **dichiarativo**: deve fare tutto da sé in dichiarazione. Alcuni broker nati esteri hanno aperto una succursale italiana e offrono l'amministrato: lo stato di ciascuno è nella tabella qui sotto. Questa reference copre il dichiarativo a livello di principi e adempimenti: il motore di calcolo della skill (e l'importatore) resta sull'amministrato, e per la compilazione effettiva serve un commercialista. Non è consulenza.
 
+## Indice
+
+- I tre regimi a confronto
+- Quali broker sono in dichiarativo (stato a ottobre 2026)
+- Il dichiarativo in pratica: i quadri RT, RM e RW
+- Quali titoli si considerano venduti in dichiarativo: LIFO
+- Titoli in valuta: il cambio del giorno
+- Liquidità in valuta: la soglia di €51.645,69
+- Le minus vanno indicate nell'anno di realizzo
+- Il vero motivo per cui il dichiarativo conta nell'ottimizzazione: zainetto unificato
+- Quando conviene scegliere il dichiarativo
+- Cripto e quadro RW
+- Checklist degli adempimenti con un broker estero
+- In sintesi
+
 ## I tre regimi a confronto
 
 L'investitore italiano può trovarsi in uno di tre regimi:
@@ -46,13 +61,13 @@ Qui non c'è il costo medio ponderato dell'amministrato. In dichiarativo, per le
 
 ## Titoli in valuta: il cambio del giorno
 
-I corrispettivi e i costi in valuta estera si convertono in euro «secondo il cambio del giorno» in cui sono percepiti o sostenuti, o del giorno precedente più vicino (art. 9 c. 2 TUIR; dal 2027 la corrispondenza nel D.Lgs. 117/2026 è da verificare): il costo al cambio del giorno di acquisto, il corrispettivo al cambio del giorno di vendita. La plusvalenza fiscale è quella **in euro**, e può avere segno opposto a quella in valuta.
+I corrispettivi e i costi in valuta estera si convertono in euro «secondo il cambio del giorno» in cui sono percepiti o sostenuti, o del giorno precedente più vicino (art. 9 c. 2 TUIR; dal 2027 art. 9 c. 2 D.Lgs. 117/2026): il costo al cambio del giorno di acquisto, il corrispettivo al cambio del giorno di vendita. La plusvalenza fiscale è quella **in euro**, e può avere segno opposto a quella in valuta.
 
 Esempio: 100 azioni comprate a $100 con il cambio EUR/USD a 1,10 (costo €9.090,91) e vendute a $110 con il cambio a 1,25 (corrispettivo €8.800,00). In dollari è un guadagno di $1.000; in euro è una minus di €290,91, che va nel quadro RT. Al contrario, se il dollaro si rafforza si può avere una plus imponibile in euro anche con il prezzo in dollari fermo. Con un portafoglio in valuta il cambio entra quindi nell'imponibile, non solo nel rendimento.
 
 ## Liquidità in valuta: la soglia di €51.645,69
 
-Sul broker estero la liquidità resta spesso in dollari. La cessione a pronti di valuta estera presa da depositi e conti correnti, e lo stesso **prelievo**, sono redditi diversi (art. 67 c. 1 lett. c-ter TUIR → art. 76 c. 1 lett. f TU 2027) solo se nel periodo d'imposta la giacenza in valuta di **tutti** i conti e depositi del contribuente, calcolata al cambio di inizio periodo, ha superato **€51.645,69 per almeno sette giorni lavorativi continui** (art. 67 c. 1-ter TUIR; dal 2027 art. 76 D.Lgs. 117/2026, comma da verificare). Sotto soglia gli utili su cambi della liquidità non sono tassati. Sopra soglia, in dichiarativo il costo della valuta è il cambio storico individuato con il LIFO (istruzioni del quadro RT). Soglia e regola non dipendono dal regime: con un conto in valuta presso un intermediario italiano in amministrato, chiedere all'intermediario se gli utili su cambi li gestisce lui o vanno dichiarati nel quadro RT.
+Sul broker estero la liquidità resta spesso in dollari. La cessione a pronti di valuta estera presa da depositi e conti correnti, e lo stesso **prelievo**, sono redditi diversi (art. 67 c. 1 lett. c-ter TUIR → art. 76 c. 1 lett. f TU 2027) solo se nel periodo d'imposta la giacenza in valuta di **tutti** i conti e depositi del contribuente, calcolata al cambio di inizio periodo, ha superato **€51.645,69 per almeno sette giorni lavorativi continui** (art. 67 c. 1-ter TUIR; dal 2027 art. 76 c. 3 D.Lgs. 117/2026). Sotto soglia gli utili su cambi della liquidità non sono tassati. Sopra soglia, in dichiarativo il costo della valuta è il cambio storico individuato con il LIFO (istruzioni del quadro RT). Soglia e regola non dipendono dal regime: con un conto in valuta presso un intermediario italiano in amministrato, chiedere all'intermediario se gli utili su cambi li gestisce lui o vanno dichiarati nel quadro RT.
 
 Il giroconto nella stessa valuta tra due conti dello stesso intestatario, senza cambio e senza acquisto di prodotti finanziari, non è un prelievo fiscalmente rilevante (Ris. AdE 60/E del 9/12/2024). Per gli altri usi della valuta, per esempio l'acquisto di titoli in dollari con la liquidità del conto, la qualificazione va verificata con il commercialista.
 
@@ -100,4 +115,4 @@ Il dichiarativo è il regime di chi usa broker senza sostituto d'imposta italian
 *Dati normativi (regole del regime dichiarativo e zainetto fiscale) — Verificato: 2026-06.*
 *LIFO in dichiarativo (art. 67 c. 1-bis TUIR, art. 76 c. 2 D.Lgs. 117/2026; istruzioni del quadro RT, Redditi PF 2026; per le cripto Circ. 30/E/2023 par. 3.2.1) — Verificato: 2026-10.*
 *Quadro RW: obbligo per titoli e cripto senza soglia, esonero dei soli conti fino a €15.000, IVAFE e sanzioni (art. 4-5 DL 167/1990, istruzioni Redditi PF 2026 e 730/2026; dal 2027 art. 58 D.Lgs. 141/2026, art. 67 D.Lgs. 173/2024, art. 168 D.Lgs. 123/2025) — Verificato: 2026-10.*
-*Cambio del giorno (art. 9 c. 2 TUIR; dal 2027 articolo da verificare), valute (art. 67 c. 1 lett. c-ter e c. 1-ter TUIR, dal 2027 art. 76 c. 1 lett. f e comma da verificare; Ris. AdE 60/E/2024), riporto delle minus (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), quadri RM e RT, IVAFE con codice 4043 e scadenze (istruzioni Redditi PF 2026, fasc. 2; scheda AdE sul Redditi PF 2026), passaggio di regime (art. 6 c. 2 e c. 5 D.Lgs. 461/97, dal 2027 art. 306 c. 3 e 6), corrispondenze nel D.Lgs. 117/2026 — Verificato: 2026-10.*
+*Cambio del giorno (art. 9 c. 2 TUIR; dal 2027 art. 9 c. 2), valute (art. 67 c. 1 lett. c-ter e c. 1-ter TUIR, dal 2027 art. 76 c. 1 lett. f e c. 3; Ris. AdE 60/E/2024), riporto delle minus (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), quadri RM e RT, IVAFE con codice 4043 e scadenze (istruzioni Redditi PF 2026, fasc. 2; scheda AdE sul Redditi PF 2026), passaggio di regime (art. 6 c. 2 e c. 5 D.Lgs. 461/97, dal 2027 art. 306 c. 3 e 6), corrispondenze nel D.Lgs. 117/2026 — Verificato: 2026-10.*

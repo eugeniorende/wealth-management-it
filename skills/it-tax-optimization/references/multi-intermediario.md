@@ -1,5 +1,13 @@
 # Zainetto multi-intermediario
 
+## Indice
+
+- Il principio
+- Implicazioni operative
+- Il regime dichiarativo
+- Heuristic per la skill
+- Caso pratico
+
 ## Il principio
 
 In **regime amministrato**, lo zainetto fiscale (registro delle minus pregresse) è **per-intermediario**, anzi per rapporto: le minus si compensano con le plus realizzate «nell'ambito del medesimo rapporto» (art. 6 c. 5 D.Lgs. 461/97 → art. 306 c. 6 TU 2027). Ogni broker tiene il proprio "libro" delle minus realizzate sui dossier presso di lui. Conseguenze:

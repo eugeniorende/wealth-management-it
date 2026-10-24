@@ -39,10 +39,12 @@ Flussi: i versamenti e i flussi in entrata entrano nel totale prima di misurare 
 tutti; il PRELIEVO in decumulo esce dal totale, si finanzia con vendite (imposta compresa)
 e non si reinveste. Le minus realizzate ricaricano lo zainetto del broker per le vendite
 successive; ogni posizione ha la sua aliquota (26%, o 12,5% per titoli di Stato e
-equiparati, che compensano lo zainetto al 48,08%).
+equiparati, che compensano lo zainetto al 48,08%; per ETF e fondi su titoli di Stato
+un'aliquota mista, dalla quota di titoli di Stato e white list del fondo).
 
-Tutti i parametri sono editabili qui sotto. I valori di default sono un caso reale di
-validazione (vedi il commento ATTESO in fondo). plus = plusvalenza/minusvalenza latente
+I valori qui sotto sono l'esempio di validazione (vedi il commento ATTESO in fondo): i dati
+reali arrivano da --dati piano.json, le cui chiavi sostituiscono le costanti omonime, e lo
+zainetto anche da --zainetto (il JSON dell'importatore). plus = plusvalenza/minusvalenza latente
 in euro (negativo = minus). Realizzi parziali pro-rata: in amministrato è il calcolo esatto,
 perché la plus si determina sul costo medio ponderato
 (art. 6 c. 4 D.Lgs. 461/97 → art. 306 c. 5 TU 2027); il LIFO vale solo in dichiarativo,
@@ -55,15 +57,21 @@ dove, con quale effetto fiscale), non ordini caricabili in un click. La colonna
 scegliere lo strumento specifico (quale ETF/fondo) da movimentare.
 """
 
+import argparse
 import csv
 import os
+import sys
 
 # ─────────────────────────── INPUT (editabili) ───────────────────────────
 # Per posizione: broker, asset_class (una delle chiavi di TARGET), tipo ("diverso" o
 # "capitale"), valore e plus in euro, e se serve "aliquota" (0.26 di default; 0.125 per
 # titoli di Stato italiani e white list, enti territoriali e organismi internazionali).
-# ETF e fondi su titoli di Stato hanno una tassazione mista (aliquota effettiva tra il 12,5% e
-# il 26%) che qui non si rappresenta: indicarli al 26% sovrastima l'imposta (prudente).
+# ETF e fondi (tipo "capitale") su titoli di Stato: "quota_titoli_stato", la quota media
+# dell'attivo in titoli di Stato e white list che l'emittente certifica ogni semestre (non è
+# nel KID; vale quella del semestre della vendita), oppure direttamente l'"aliquota" effettiva
+# tra 0.125 e 0.26. Aliquota = 12,5% × quota + 26% × (1 − quota), e le minus del fondo entrano
+# nello zainetto per aliquota / 26% (DM 13/12/2011, art. 1; misura del 48,08% dalla circ. AdE
+# 19/E/2014, par. 5.1).
 POSITIONS = [
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "capitale", "valore": 40000, "plus": 10000},
     {"broker": "Fineco",  "asset_class": "azionario",      "tipo": "diverso",  "valore": 10000, "plus":  4000},
@@ -115,30 +123,197 @@ BROKER_VERSAMENTI = "Fineco"   # broker su cui atterrano versamenti/flussi in en
 # ──────────────────────────────────────────────────────────────────────────
 
 
-K_12_5 = 12.5 / 26     # coefficiente 48,08%: una plus o minus al 12,5% vale così nello zainetto
+# Vocabolario: i nomi e i valori canonici sono quelli del plugin (README, «Glossario»); lo script
+# accetta i sinonimi dei nomi delle chiavi e li normalizza, così le posizioni del JSON
+# dell'importatore si copiano così come sono, aggiungendo solo la classe. Internamente il tipo
+# fiscale è «diverso» o «capitale»; l'aliquota è una frazione (0.26, 0.125), e quella in percento
+# dell'importatore (26, 12.5) si converte dicendolo.
+SINONIMI_CHIAVI = {"classe": "asset_class", "asset class": "asset_class", "asset_class": "asset_class",
+                   "categoria_fiscale": "tipo", "tipo_fiscale": "tipo", "categoria": "tipo", "tipo": "tipo",
+                   "plus_minus": "plus", "plusvalenza": "plus", "plus": "plus",
+                   "controvalore": "valore", "valore": "valore", "intermediario": "broker", "broker": "broker"}
+SINONIMI_TIPO = {"diverso": "diverso", "reddito_diverso": "diverso", "redditi_diversi": "diverso",
+                 "capitale": "capitale", "reddito_capitale": "capitale", "reddito_di_capitale": "capitale",
+                 "redditi_di_capitale": "capitale"}
+TIPI_FUORI_PERIMETRO = {"reddito_capitale_irpef": "la plus va a IRPEF progressiva: fuori dal perimetro del "
+                                                  "ribilanciamento, trattala a parte",
+                        "da_classificare": "classifica prima la posizione (vedi it-tax-optimization)"}
+
+
+def normalizza_posizione(p):
+    """La posizione con le chiavi e i valori canonici dello script: accetta i sinonimi del vocabolario
+    del plugin (categoria_fiscale o tipo_fiscale → tipo; reddito_diverso → diverso; classe → asset_class;
+    plus_minus → plus; controvalore → valore). Le chiavi ignote restano com'erano."""
+    q = {}
+    for k, v in p.items():
+        chiave = str(k).strip().lower().replace(" ", "_")
+        q[SINONIMI_CHIAVI.get(chiave, str(k).strip())] = v
+    if isinstance(q.get("tipo"), str):
+        t = q["tipo"].strip().lower().replace(" ", "_")
+        q["tipo"] = SINONIMI_TIPO.get(t, t)
+    for k in ("asset_class", "broker"):
+        if isinstance(q.get(k), str):
+            q[k] = q[k].strip()
+    return q
+
+
+def _aliquota_da_percento(p, n):
+    """L'aliquota in percento dell'importatore (26, 12.5) diventa la frazione dello script, con un avviso:
+    le frazioni valide stanno tra 0,125 e 0,26, i percento tra 12,5 e 26, quindi non si confondono."""
+    a = p.get("aliquota")
+    if isinstance(a, (int, float)) and not isinstance(a, bool) and 1 < a <= 100:
+        p["aliquota"] = a / 100
+        print(f"ℹ posizione {n}: aliquota {numero(a, 1)} letta in percento → {numero(a / 100, 3)}")
+
+
+# Chiavi del JSON di --dati (minuscole) → costanti dello script.
+CHIAVI_DATI = {"posizioni": "POSITIONS", "zainetto": "ZAINETTO", "target": "TARGET",
+               "nuovi_versamenti": "NUOVI_VERSAMENTI", "flussi_attesi": "FLUSSI_ATTESI", "prelievo": "PRELIEVO",
+               "aliquota_default": "ALIQUOTA", "obiettivo_rientro": "OBIETTIVO_RIENTRO",
+               "margine_rientro": "MARGINE_RIENTRO", "modula_volatilita": "MODULA_VOLATILITA",
+               "genera_csv": "GENERA_CSV", "cartella_output": "CARTELLA_OUTPUT",
+               "broker_versamenti": "BROKER_VERSAMENTI"}
+
+
+def carica_dati(path, zainetto_esterno=False):
+    """Portafoglio, zainetto, target e opzioni dal JSON di --dati (schema in SKILL.md): sostituiscono le
+    costanti in testa allo script. Chiavi ignote → errore, così un refuso non passa in silenzio.
+    «posizioni» e «target» sono obbligatorie, e «zainetto» anche, salvo che arrivi da --zainetto:
+    altrimenti resterebbero quelli d'esempio, mescolati ai dati reali."""
+    import json
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = json.load(f)
+    except OSError as e:
+        raise ErroreInput(f"--dati: impossibile leggere {path} ({e.strerror})")
+    except ValueError as e:
+        raise ErroreInput(f"--dati: {path} non è un JSON valido ({e})")
+    if not isinstance(dati, dict):
+        raise ErroreInput(f"--dati: {path} deve contenere un oggetto JSON con posizioni, zainetto e target")
+    ignote = [k for k in dati if str(k).lower() not in CHIAVI_DATI]
+    if ignote:
+        raise ErroreInput(f"--dati: chiavi non riconosciute {ignote}; attese: {', '.join(CHIAVI_DATI)}")
+    presenti = {str(k).lower() for k in dati}
+    obbligatorie = ["posizioni", "target"] + ([] if zainetto_esterno else ["zainetto"])
+    mancanti = [k for k in obbligatorie if k not in presenti]
+    if mancanti:
+        raise ErroreInput(f"--dati: manca «{mancanti[0]}»" + (" (usa {} se non hai minus, oppure --zainetto con il JSON "
+                          "dell'importatore)" if mancanti[0] == "zainetto" else "") + "; senza, lo script userebbe l'esempio")
+    for k, v in dati.items():
+        globals()[CHIAVI_DATI[str(k).lower()]] = v
+    if not isinstance(POSITIONS, list) or not isinstance(ZAINETTO, dict) or not isinstance(TARGET, dict):
+        raise ErroreInput("--dati: «posizioni» è una lista, «zainetto» e «target» sono oggetti broker → euro e classe → peso")
+    globals()["DATI_ESEMPIO"] = False
+    return dati
+
+
+def carica_zainetto_importatore(path):
+    """Lo zainetto per broker dal JSON di importa-estratto-broker.py --json: analisi.per_broker[b].
+    zainetto_26_equivalente, cioè le minus valide in euro al 26% (quelle al 12,5% già al 48,08%)."""
+    import json
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = json.load(f)
+        per_broker = dati["analisi"]["per_broker"]
+        zainetto = {b: float(v["zainetto_26_equivalente"]) for b, v in per_broker.items()}
+    except OSError as e:
+        raise ErroreInput(f"--zainetto: impossibile leggere {path} ({e.strerror})")
+    except (ValueError, KeyError, TypeError):
+        raise ErroreInput(f"--zainetto: {path} non è il JSON di importa-estratto-broker.py --json "
+                          f"(manca analisi.per_broker[].zainetto_26_equivalente)")
+    globals()["ZAINETTO"] = zainetto
+    return zainetto
 
 
 class ErroreInput(Exception):
-    """Parametri in testa al file non validi: messaggio leggibile, uscita con codice 2."""
+    """Parametri non validi: messaggio «ERRORE: …» su stderr e uscita con codice 1 (il 2 è di argparse)."""
+
+
+def _numero_vero(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def allinea_zainetto(posizioni, zainetto):
+    """Le chiavi dello zainetto con i nomi dei broker delle posizioni: «FINECO» o « fineco » diventano
+    «Fineco» (sommando se due chiavi coincidono), con un avviso; uno zainetto di un broker senza
+    posizioni resta inutilizzato, e lo si dice invece di perderlo in silenzio."""
+    canonici = {}
+    for p in posizioni:
+        canonici.setdefault(str(p["broker"]).strip().casefold(), p["broker"])
+    allineato = {}
+    for chiave, importo in zainetto.items():
+        nome = canonici.get(str(chiave).strip().casefold(), chiave)
+        if nome != chiave:
+            print(f"ℹ zainetto «{chiave}» → «{nome}», il nome del broker nelle posizioni")
+        allineato[nome] = allineato.get(nome, 0.0) + importo
+    for nome, importo in allineato.items():
+        if importo > 0 and nome not in canonici.values():
+            suggerimento = (" (l'estratto non aveva la colonna broker: rilancia l'importatore con --broker NOME)"
+                            if nome == "(broker non indicato)" else "")
+            print(f"⚠ zainetto «{nome}» di €{numero(importo)} non usato: nessuna posizione con quel broker "
+                  f"(broker delle posizioni: {', '.join(sorted(set(canonici.values())))}){suggerimento}")
+    return allineato
 
 
 def valida():
-    """Validazione minima dell'input (in attesa dell'interfaccia comune degli script)."""
-    if abs(sum(TARGET.values()) - 1) > 1e-6:
-        raise ErroreInput(f"TARGET somma a {sum(TARGET.values()):.4f}, non a 1")
+    """Validazione dell'input, dopo la normalizzazione dei sinonimi del vocabolario: tipi (numeri veri,
+    mai testo), aliquote, classi e broker; lo zainetto allineato ai broker delle posizioni."""
+    globals()["POSITIONS"] = [normalizza_posizione(p) for p in POSITIONS]
+    if not isinstance(TARGET, dict) or not TARGET:
+        raise ErroreInput("TARGET vuoto: indicare le classi con il peso target (somma 1)")
+    if not all(_numero_vero(v) for v in TARGET.values()):
+        raise ErroreInput("TARGET: i pesi devono essere numeri (es. 0.6, non «60%» o «0.6» tra virgolette)")
+    somma = sum(TARGET.values())
+    if abs(somma - 1) > 1e-6:
+        raise ErroreInput(f"TARGET somma a {numero(somma, 4)}, non a 1")
+    if not isinstance(ZAINETTO, dict):
+        raise ErroreInput("ZAINETTO: oggetto broker → euro di minus al 26% (es. {\"Fineco\": 5000})")
+    for chiave, importo in ZAINETTO.items():
+        if not _numero_vero(importo) or importo < 0:
+            raise ErroreInput(f"ZAINETTO «{chiave}»: {importo!r} non è un importo in euro (es. 5000, non «5.000»)")
+    for nome in ("NUOVI_VERSAMENTI", "FLUSSI_ATTESI", "PRELIEVO", "MARGINE_RIENTRO", "ALIQUOTA"):
+        if not _numero_vero(globals()[nome]):
+            raise ErroreInput(f"{nome.lower()}: {globals()[nome]!r} non è un numero (scriverlo senza virgolette)")
     for n, p in enumerate(POSITIONS, start=1):
+        for campo in ("broker", "asset_class", "tipo", "valore", "plus"):
+            if campo not in p:
+                raise ErroreInput(f"posizione {n}: manca «{campo}» (chiavi: broker, asset_class, tipo, valore, plus)")
+        if not isinstance(p.get("broker"), str) or not p["broker"]:
+            raise ErroreInput(f"posizione {n}: broker vuoto o mancante (lo zainetto è per broker)")
+        _aliquota_da_percento(p, n)
         if p.get("asset_class") not in TARGET:
             raise ErroreInput(f"posizione {n}: classe «{p.get('asset_class')}» assente da TARGET")
+        if p.get("tipo") in TIPI_FUORI_PERIMETRO:
+            raise ErroreInput(f"posizione {n}: {p['tipo']}: {TIPI_FUORI_PERIMETRO[p['tipo']]}")
         if p.get("tipo") not in ("diverso", "capitale"):
-            raise ErroreInput(f"posizione {n}: tipo «{p.get('tipo')}» (attesi «diverso» o «capitale»)")
-        if p.get("aliquota", ALIQUOTA) not in (0.26, 0.125):
-            raise ErroreInput(f"posizione {n}: aliquota {p.get('aliquota')} (attese 0.26 o 0.125)")
+            raise ErroreInput(f"posizione {n}: tipo «{p.get('tipo')}» (attesi «diverso» o «capitale», "
+                              f"anche come reddito_diverso o reddito_capitale)")
+        for campo in ("valore", "plus"):
+            if isinstance(p[campo], bool) or not isinstance(p[campo], (int, float)):
+                raise ErroreInput(f"posizione {n}: {campo} {p[campo]!r} non numerico")
+        for campo in ("aliquota", "quota_titoli_stato"):
+            if campo in p and (isinstance(p[campo], bool) or not isinstance(p[campo], (int, float))):
+                raise ErroreInput(f"posizione {n}: {campo} {p[campo]!r} non numerica (es. 0.125, non «12,5%»)")
+        quota = p.get("quota_titoli_stato")
+        if quota is not None:
+            if p["tipo"] != "capitale":
+                raise ErroreInput(f"posizione {n}: quota_titoli_stato vale solo per fondi ed ETF (tipo «capitale»)")
+            if "aliquota" in p:
+                raise ErroreInput(f"posizione {n}: indicare quota_titoli_stato oppure aliquota, non entrambe")
+            if not 0 <= quota <= 1:
+                raise ErroreInput(f"posizione {n}: quota_titoli_stato {quota} (attesa tra 0 e 1)")
+        elif p["tipo"] == "diverso" and _aliquota(p) not in (0.26, 0.125):
+            raise ErroreInput(f"posizione {n}: aliquota {_aliquota(p)} (attese 0.26 o 0.125 per un titolo "
+                              f"detenuto direttamente)")
+        elif not 0.125 <= _aliquota(p) <= 0.26:
+            raise ErroreInput(f"posizione {n}: aliquota {_aliquota(p)} (per fondi ed ETF tra 0.125 e 0.26)")
         if p.get("valore", -1) < 0:
             raise ErroreInput(f"posizione {n}: valore negativo o mancante")
     if OBIETTIVO_RIENTRO not in ("misto", "target", "banda"):
         raise ErroreInput(f"OBIETTIVO_RIENTRO «{OBIETTIVO_RIENTRO}» (attesi misto, target, banda)")
     if min(PRELIEVO, NUOVI_VERSAMENTI, FLUSSI_ATTESI) < 0:
         raise ErroreInput("PRELIEVO, NUOVI_VERSAMENTI e FLUSSI_ATTESI vanno indicati come importi positivi")
+    globals()["ZAINETTO"] = allinea_zainetto(POSITIONS, ZAINETTO)
 
 
 def aggrega(positions):
@@ -170,12 +345,19 @@ def banda(target_w, asset_class=None):
 
 
 def _aliquota(p):
+    """Aliquota effettiva della posizione. Per fondi ed ETF con quota_titoli_stato è la media
+    12,5% × quota + 26% × (1 − quota): la parte di proventi riferibile ai titoli di Stato e white
+    list (DM 13/12/2011, art. 1) conta per il 48,08% (circ. AdE 19/E/2014, par. 5.1)."""
+    if p.get("quota_titoli_stato") is not None:
+        return 0.125 * p["quota_titoli_stato"] + 0.26 * (1 - p["quota_titoli_stato"])
     return p.get("aliquota", ALIQUOTA)
 
 
 def _coeff(p):
-    """Peso nello zainetto (in minus al 26%) di un euro di plus o minus della posizione."""
-    return K_12_5 if _aliquota(p) == 0.125 else 1.0
+    """Peso nello zainetto (in minus al 26%) di un euro di plus o minus della posizione: aliquota
+    / 26%, cioè 48,08% al 12,5% (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027) e, per un
+    fondo misto, 1 − 51,92% × quota (DM 13/12/2011, art. 1 c. 4; circ. AdE 19/E/2014, par. 5.1)."""
+    return _aliquota(p) * 100 / 26     # non / 0.26: 0.125 / 0.26 differisce di un ulp da 12,5 / 26
 
 
 def effetto_vendita(p, vendi, zain):
@@ -203,7 +385,7 @@ def quota_costo_zero(p, zain, residuo):
 
 def _etichetta_rientro():
     """Come si chiama il punto di rientro della parte tassata (target + MARGINE_RIENTRO × banda stretta)."""
-    return "a metà banda" if MARGINE_RIENTRO == 0.5 else f"al {MARGINE_RIENTRO:.0%} della banda stretta"
+    return "a metà banda" if MARGINE_RIENTRO == 0.5 else f"al {pct(MARGINE_RIENTRO, 0)} della banda stretta"
 
 
 def piano_quote(quote, zain, residuo, totale=None, solo_costo_zero=False):
@@ -348,7 +530,7 @@ def pianifica():
         netto = cassa_in + sum(e[1] - e[3] for e in eventi) - PRELIEVO
         if netto < -0.01:
             raise ErroreInput(f"prelievo non finanziabile: il netto massimo dopo l'imposta è "
-                              f"€{netto + PRELIEVO:,.0f} (vendendo tutto)")
+                              f"€{numero(netto + PRELIEVO)} (vendendo tutto)")
 
     # 4) sottopesate fuori banda: prima la cassa (pro-rata al fabbisogno), poi vendite a costo zero
     #    dalle classi sopra il target (anche in banda); con imposta solo se dopo cassa e costo zero il
@@ -454,26 +636,26 @@ def pianifica():
         etichetta, deriva = _etichetta_rientro(), d["drift_decisione"] * 100
         if d["esito"] == "scelta":
             d["motivo"] = (f"fermato {etichetta} per scelta (OBIETTIVO_RIENTRO «banda»): a target "
-                           f"costerebbe altri €{d['costo_a_target'] - pagata:,.0f}")
+                           f"costerebbe altri €{numero(d['costo_a_target'] - pagata)}")
         elif d["esito"] == "rinviata":
             costo = d["costo_in_banda"] if OBIETTIVO_RIENTRO == "banda" else d["costo_a_target"]
-            d["motivo"] = (f"vendita rinviata: imposta €{costo - pagata:,.0f} con drift {deriva:+.1f}% "
-                           f"entro la banda larga {d['wide']*100:.1f}%")
+            d["motivo"] = (f"vendita rinviata: imposta €{numero(costo - pagata)} con drift {numero(deriva, 1, segno=True)}% "
+                           f"entro la banda larga {numero(d['wide']*100, 1)}%")
             if OBIETTIVO_RIENTRO == "banda":
                 d["motivo"] += f"; tra il rientro {etichetta} e il target resta per scelta (OBIETTIVO_RIENTRO «banda»)"
         elif d["esito"] == "rientro" and OBIETTIVO_RIENTRO == "target":
-            d["motivo"] = (f"rientro a target con imposta €{pagata:,.0f} (drift {deriva:+.1f}% oltre la banda "
-                           f"larga {d['wide']*100:.1f}%): lo scostamento che resta viene dall'imposta pagata, "
+            d["motivo"] = (f"rientro a target con imposta €{numero(pagata)} (drift {numero(deriva, 1, segno=True)}% oltre la banda "
+                           f"larga {numero(d['wide']*100, 1)}%): lo scostamento che resta viene dall'imposta pagata, "
                            f"che esce dal portafoglio")
         elif d["esito"] == "rientro":
-            d["motivo"] = (f"rientro {etichetta} (drift {deriva:+.1f}% oltre la banda larga "
-                           f"{d['wide']*100:.1f}%): a target costerebbe €{d['costo_a_target']:,.0f}, "
-                           f"così €{d['costo_in_banda']:,.0f}")
+            d["motivo"] = (f"rientro {etichetta} (drift {numero(deriva, 1, segno=True)}% oltre la banda larga "
+                           f"{numero(d['wide']*100, 1)}%): a target costerebbe €{numero(d['costo_a_target'])}, "
+                           f"così €{numero(d['costo_in_banda'])}")
         else:
             d["motivo"] = "scostamento rimasto dopo il prelievo e l'imposta"
         per_prelievo = sum(s["prelievo"] for s in sells if s["classe"] == cl)
         if per_prelievo > 0.5:
-            d["motivo"] += f"; €{per_prelievo:,.0f} già venduti per il prelievo"
+            d["motivo"] += f"; €{numero(per_prelievo)} già venduti per il prelievo"
 
     liquidato = total_finale <= 0.005
     risultante = {cl: 0.0 if liquidato else valore(cl) / total_finale for cl in TARGET}
@@ -495,31 +677,67 @@ def _ripartisci(valori, importo):
     return {cl: max(0.0, v - TARGET[cl] * hi) for cl, v in valori.items()}
 
 
-CAMPI_CSV = ["broker", "operazione", "classe", "tipo_fiscale", "strumento_ISIN",
+CAMPI_CSV = ["broker", "operazione", "classe", "categoria_fiscale", "strumento_ISIN",
              "importo_eur", "plus_minus_eur", "imposta_eur", "compensazione_zainetto_eur", "nota"]
 # Ultima riga di ogni CSV: chi apre il file vede il disclaimer, e l'intestazione resta la prima riga.
 NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non costituisce consulenza "
             "di investimento né un ordine. Verificare saldi, prezzo medio di carico e zainetto "
             "sul portale del broker prima di operare.")
+# Senza --dati il piano è quello dei dati d'esempio: lo dice anche il CSV, che può circolare da solo.
+NOTA_CSV_ESEMPIO = "DATI DI ESEMPIO dello script, non un portafoglio reale. " + NOTA_CSV
+DATI_ESEMPIO = True     # diventa False quando i dati arrivano da --dati
+# Nel CSV la categoria fiscale ha i valori del vocabolario del plugin (README, «Glossario»).
+CATEGORIA_CSV = {"diverso": "reddito_diverso", "capitale": "reddito_capitale"}
+
+
+def numero(x, decimali=0, segno=False):
+    """Numero in formato italiano: punto per le migliaia, virgola per i decimali (come
+    motore_bootstrap.numero nelle skill previdenziali: questa skill non ha il motore)."""
+    testo = f"{x:{'+' if segno else ''},.{decimali}f}"
+    return testo.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def pct(frazione, decimali=1, segno=False):
+    return numero(frazione * 100, decimali, segno) + "%"
+
+
+def _percento(x, decimali=1):
+    return pct(x, decimali)
+
+
+def _mista(a):
+    """Aliquota mista a un decimale, a due quando l'arrotondamento la farebbe sembrare 12,5% o 26%."""
+    testo = _percento(a)
+    return _percento(a, 2) if testo in ("12,5%", "26,0%") else testo
+
+
+def _etichetta_aliquota(a):
+    return "al 12,5%" if a == 0.125 else f"ad aliquota mista {_mista(a)}"
 
 
 def effetto_fiscale(s):
-    """Effetto fiscale di una vendita del piano, con il consumo reale dello zainetto (al 48,08% per
-    le plus e minus al 12,5%) e l'avviso d'ordine per le minus."""
-    al_12_5 = s["aliquota"] == 0.125
+    """Effetto fiscale di una vendita del piano, con il consumo reale dello zainetto (48,08% per
+    le plus e minus al 12,5%, aliquota / 26% per un fondo misto) e l'avviso d'ordine per le minus."""
+    ridotta = s["aliquota"] < 0.26
+    computata = _percento(s["aliquota"] / 0.26, 2)
     if s["plus_real"] < 0:
-        testo = f"minus €{-s['plus_real']:,.0f} a zainetto {s['broker']}"
-        if al_12_5:
-            testo += f" (vale €{s['zainetto']:,.0f} di zainetto: minus al 12,5% computata al 48,08%)"
+        testo = f"minus €{numero(-s['plus_real'])} a zainetto {s['broker']}"
+        if ridotta:
+            testo += (f" (vale €{numero(s['zainetto'])} di zainetto: minus {_etichetta_aliquota(s['aliquota'])} "
+                      f"computata al {computata})")
         return testo + ", da eseguire prima delle vendite in plus"
     if s["comp"] > 0:
-        testo = f"plus €{s['plus_real']:,.0f} compensata €{s['comp']:,.0f} dallo zainetto {s['broker']}"
-        if al_12_5:
-            testo += f" (consuma €{-s['zainetto']:,.0f} di zainetto: plus al 12,5% computata al 48,08%)"
+        testo = f"plus €{numero(s['plus_real'])} compensata €{numero(s['comp'])} dallo zainetto {s['broker']}"
+        if ridotta:
+            testo += (f" (consuma €{numero(-s['zainetto'])} di zainetto: plus {_etichetta_aliquota(s['aliquota'])} "
+                      f"computata al {computata})")
         if s["plus_real"] - s["comp"] > 0.005:
-            testo += f", il resto €{s['plus_real'] - s['comp']:,.0f} TASSATO"
+            testo += f", il resto €{numero(s['plus_real'] - s['comp'])} TASSATO"
         return testo
-    return f"plus €{s['plus_real']:,.0f} TASSATA (no zainetto compensabile qui)"
+    aliquota = "" if s["aliquota"] == 0.26 else f" {_etichetta_aliquota(s['aliquota'])}"
+    if s["tipo"] == "capitale":
+        return f"plus €{numero(s['plus_real'])} TASSATA{aliquota} (reddito di capitale: non si compensa con lo zainetto)"
+    return f"plus €{numero(s['plus_real'])} TASSATA{aliquota} (no zainetto compensabile qui)"
 
 
 def genera_ordini(plan):
@@ -536,12 +754,12 @@ def genera_ordini(plan):
         if s["forzata"]:
             motivo = "finanzia il prelievo"
         elif s["prelievo"] > 0.005:
-            motivo = f"riduce sovrappeso {s['classe']}; €{s['prelievo']:,.0f} finanziano il prelievo"
+            motivo = f"riduce sovrappeso {s['classe']}; €{numero(s['prelievo'])} finanziano il prelievo"
         else:
             motivo = f"riduce sovrappeso {s['classe']}"
         nota = f"{motivo}; {effetto_fiscale(s)}" if s["plus_real"] else motivo
         ordini.append({"broker": s["broker"], "operazione": "VENDITA", "classe": s["classe"],
-                       "tipo_fiscale": s["tipo"], "importo_eur": round(s["vendi"], 2),
+                       "categoria_fiscale": CATEGORIA_CSV.get(s["tipo"], s["tipo"]), "importo_eur": round(s["vendi"], 2),
                        "plus_minus_eur": round(s["plus_real"], 2), "imposta_eur": round(s["tassa"], 2),
                        "compensazione_zainetto_eur": round(s["comp"], 2), "nota": nota})
 
@@ -561,7 +779,7 @@ def genera_ordini(plan):
             if quota <= 1e-6:
                 continue
             ordini.append({"broker": broker, "operazione": operazione, "classe": classe,
-                           "tipo_fiscale": "", "importo_eur": round(quota, 2), "plus_minus_eur": "",
+                           "categoria_fiscale": "", "importo_eur": round(quota, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "", "nota": nota})
             cassa[broker] -= quota
             rimanente -= quota
@@ -572,7 +790,7 @@ def genera_ordini(plan):
         rimanente = preleva(plan["prelievo"], "PRELIEVO", "", "bonifico del prelievo netto sul conto corrente")
         if rimanente > 0.005:   # difesa: pianifica() rifiuta i prelievi non finanziabili
             ordini.append({"broker": "(da finanziare)", "operazione": "PRELIEVO", "classe": "",
-                           "tipo_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
+                           "categoria_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "",
                            "nota": "prelievo non coperto dalla cassa netta dei broker"})
     # ACQUISTI — instradati sui broker che hanno cassa
@@ -582,10 +800,20 @@ def genera_ordini(plan):
         rimanente = preleva(amt, "ACQUISTO", cl, f"riempie sottopeso {cl}")
         if rimanente > 1e-6:   # cassa insufficiente ovunque: serve un versamento/trasferimento
             ordini.append({"broker": "(da finanziare)", "operazione": "ACQUISTO", "classe": cl,
-                           "tipo_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
+                           "categoria_fiscale": "", "importo_eur": round(rimanente, 2), "plus_minus_eur": "",
                            "imposta_eur": "", "compensazione_zainetto_eur": "",
                            "nota": f"riempie sottopeso {cl} — cassa insufficiente, richiede versamento o trasferimento"})
     return ordini
+
+
+DELIMITATORE_CSV = ";"
+
+
+def _cella_csv(v):
+    """Importi con due decimali e la virgola (8000,00); il resto com'è."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return v
+    return f"{v:.2f}".replace(".", ",")
 
 
 def scrivi_csv_per_broker(ordini, cartella=None):
@@ -599,24 +827,26 @@ def scrivi_csv_per_broker(ordini, cartella=None):
         righe = [o for o in ordini if o["broker"] == b]
         slug = "".join(c if c.isalnum() else "_" for c in b)
         path = os.path.join(cartella, f"ordini_{slug}.csv")
-        with open(path, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=CAMPI_CSV, extrasaction="ignore")
+        # Apribile in Excel italiano con un doppio clic: «;» come separatore, virgola decimale,
+        # UTF-8 con BOM (senza BOM Excel legge il file in cp1252 e sporca «€»).
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=CAMPI_CSV, extrasaction="ignore", delimiter=DELIMITATORE_CSV)
             w.writeheader()
             for o in righe:
-                row = dict(o)
+                row = {k: _cella_csv(v) for k, v in o.items()}
                 row.setdefault("strumento_ISIN", "")   # colonna da compilare a mano
                 w.writerow(row)
-            w.writerow({"broker": b, "operazione": "NOTA", "nota": NOTA_CSV})
+            w.writerow({"broker": b, "operazione": "NOTA", "nota": NOTA_CSV_ESEMPIO if DATI_ESEMPIO else NOTA_CSV})
         scritti.append((path, len(righe)))
     return scritti
 
 
 def stampa(plan):
     drift = plan["drift"]
-    print(f"\n{'='*70}\nRIBILANCIAMENTO MULTI-BROKER  —  patrimonio €{plan['totale']:,.0f}\n{'='*70}")
+    print(f"\n{'='*70}\nRIBILANCIAMENTO MULTI-BROKER  —  patrimonio €{numero(plan['totale'])}\n{'='*70}")
     if plan["entrate"] or plan["prelievo"]:
-        print(f"   pesi e gap misurati su €{plan['totale_post']:,.0f}: versamenti e flussi "
-              f"+€{plan['entrate']:,.0f}, prelievo −€{plan['prelievo']:,.0f}")
+        print(f"   pesi e gap misurati su €{numero(plan['totale_post'])}: versamenti e flussi "
+              f"+€{numero(plan['entrate'])}, prelievo −€{numero(plan['prelievo'])}")
 
     etichetta = _etichetta_rientro()
     regola = {"misto": f"a target se costa zero, {etichetta} se tassato", "target": "a target",
@@ -628,8 +858,8 @@ def stampa(plan):
         dec = "in banda — non agire"
         if d["fuori_banda"]:
             dec = "FUORI banda — ribilanciare"
-        print(f"{cl:<18}{d['peso']*100:>7.1f}%{d['target']*100:>7.0f}%{d['drift']*100:>+7.1f}%"
-              f"{d['tight']*100:>10.1f}%{d['wide']*100:>9.1f}%  {dec}")
+        print(f"{cl:<18}{numero(d['peso']*100, 1):>7}%{numero(d['target']*100):>7}%{numero(d['drift']*100, 1, segno=True):>7}%"
+              f"{numero(d['tight']*100, 1):>10}%{numero(d['wide']*100, 1):>9}%  {dec}")
 
     print(f"\n2) PIANO — vendite (ottimizzate per broker e tipo fiscale; da eseguire nell'ordine "
           f"elencato, le minus prima delle plus)")
@@ -643,49 +873,85 @@ def stampa(plan):
             print("   nessuna vendita necessaria: tutte le classi sono in banda")
     for s in plan["vendite"]:
         nota = f"  → {effetto_fiscale(s)}" if s["plus_real"] else ""
-        aliq = "" if s["aliquota"] == 0.26 else " (12,5%)"
-        motivo = "  [prelievo]" if s["forzata"] else (f"  [€{s['prelievo']:,.0f} per il prelievo]"
+        aliq = "" if s["aliquota"] == 0.26 else (" (12,5%)" if s["aliquota"] == 0.125
+                                                 else f" (aliquota mista {_mista(s['aliquota'])})")
+        motivo = "  [prelievo]" if s["forzata"] else (f"  [€{numero(s['prelievo'])} per il prelievo]"
                                                        if s["prelievo"] > 0.005 else "")
-        print(f"   VENDI €{s['vendi']:,.0f} {s['classe']}/{s['tipo']}{aliq} @ {s['broker']}"
-              f"  | imposta €{s['tassa']:,.0f}{nota}{motivo}")
+        print(f"   VENDI €{numero(s['vendi'])} {s['classe']}/{s['tipo']}{aliq} @ {s['broker']}"
+              f"  | imposta €{numero(s['tassa'])}{nota}{motivo}")
     for cl, d in rinviati.items():
-        print(f"   {cl}: residuo non corretto €{d['residuo_non_corretto']:,.0f} — {d['motivo']}")
+        print(f"   {cl}: residuo non corretto €{numero(d['residuo_non_corretto'])} — {d['motivo']}")
     for cl, d in drift.items():
         if d["costo_a_target"] > 1e-6 or d["costo_in_banda"] > 1e-6:
-            print(f"   {cl}: costo fiscale della parte tassata a target €{d['costo_a_target']:,.0f}, "
-                  f"{etichetta} €{d['costo_in_banda']:,.0f}")
+            print(f"   {cl}: costo fiscale della parte tassata a target €{numero(d['costo_a_target'])}, "
+                  f"{etichetta} €{numero(d['costo_in_banda'])}")
 
     print(f"\n   acquisti (riempimento sottopesate; broker a scelta, neutro ai fini fiscali)")
     if not any(q > 0.5 for q in plan["acquisti"].values()):
         print("   nessun acquisto")
     for cl, q in plan["acquisti"].items():
         if q > 1e-6:
-            print(f"   COMPRA €{q:,.0f} {cl}")
+            print(f"   COMPRA €{numero(q)} {cl}")
 
-    print(f"\n3) COSTO FISCALE TOTALE: €{plan['imposta']:,.0f}")
+    print(f"\n3) COSTO FISCALE TOTALE: €{numero(plan['imposta'])}")
     print(f"   zainetto residuo per broker: " +
-          ", ".join(f"{b} €{v:,.0f}" for b, v in plan["zainetto"].items()))
+          ", ".join(f"{b} €{numero(v)}" for b, v in plan["zainetto"].items()))
     if plan["prelievo"]:
         lordo = sum(s["vendi"] for s in plan["vendite"])
         reinvestito = sum(plan["acquisti"].values())
-        print(f"   vendite lorde €{lordo:,.0f}, imposta €{plan['imposta']:,.0f}, "
-              f"netto prelevato €{plan['prelievo']:,.0f}"
-              + (f" (€{reinvestito:,.0f} reinvestiti)" if reinvestito > 0.5 else ""))
+        print(f"   vendite lorde €{numero(lordo)}, imposta €{numero(plan['imposta'])}, "
+              f"netto prelevato €{numero(plan['prelievo'])}"
+              + (f" (€{numero(reinvestito)} reinvestiti)" if reinvestito > 0.5 else ""))
 
     print(f"\n4) ALLOCAZIONE RISULTANTE vs TARGET")
     if plan["liquidato"]:
         print("   portafoglio interamente liquidato dal prelievo")
     for cl in TARGET:
-        print(f"   {cl:<18}{plan['risultante'][cl]*100:>6.1f}%  (target {TARGET[cl]*100:.0f}%)")
+        print(f"   {cl:<18}{numero(plan['risultante'][cl]*100, 1):>6}%  (target {numero(TARGET[cl]*100)}%)")
     print()
 
 
-def main():
+def _configura_stdout():
+    """UTF-8 su stdout e stderr anche su Windows (cp1252), come motore_bootstrap.configura_stdout."""
+    for flusso in (sys.stdout, sys.stderr):
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
+def main(argv=None):
+    _configura_stdout()
+    ap = argparse.ArgumentParser(
+        allow_abbrev=False,
+        description="Ribilanciamento tax-aware multi-broker: drift e bande 5/25, piano di vendite per broker e "
+                    "tipo fiscale nell'ordine di esecuzione, prelievo in decumulo, ordini in CSV per broker. "
+                    "Portafoglio, zainetto, target, versamenti e prelievo arrivano dal JSON di --dati (schema in "
+                    "SKILL.md), lo zainetto anche da --zainetto; senza --dati lo script gira sull'esempio di "
+                    "validazione in testa al file. "
+                    "Codici d'uscita: 0 riuscito, 1 parametri incoerenti, 2 riga di comando errata.")
+    ap.add_argument("--dati", metavar="FILE",
+                    help="JSON con posizioni, zainetto, target e opzioni (schema in SKILL.md); senza, i dati di "
+                         "esempio in testa allo script")
+    ap.add_argument("--zainetto", metavar="FILE",
+                    help="JSON di importa-estratto-broker.py --json: lo zainetto per broker in euro 26%%-equivalenti "
+                         "(analisi.per_broker), al posto di quello del JSON di --dati o dello script")
+    ap.add_argument("--out", metavar="DIR", help="cartella dei CSV degli ordini (default: ./ordini nella cartella corrente)")
+    args = ap.parse_args(argv)
     try:
+        if args.dati:
+            carica_dati(args.dati, zainetto_esterno=bool(args.zainetto))
+        else:
+            print("⚠️  Dati di esempio: portafoglio, zainetto e target sono quelli in testa allo script. "
+                  "Passa --dati piano.json con i tuoi (schema in SKILL.md).")
+        if args.zainetto:
+            carica_zainetto_importatore(args.zainetto)
+        if args.out:
+            globals()["CARTELLA_OUTPUT"] = args.out
         plan = pianifica()
     except ErroreInput as e:
-        print(f"errore nei parametri: {e}")
-        raise SystemExit(2)
+        print(f"ERRORE: parametri: {e}", file=sys.stderr)
+        raise SystemExit(1)
     stampa(plan)
     if GENERA_CSV:
         esporta_ordini(plan)
@@ -703,15 +969,15 @@ def esporta_ordini(plan):
         print()
         return
     scritti = scrivi_csv_per_broker(ordini)
-    print(f"5) ORDINI ESPORTATI — un CSV per broker in ./{CARTELLA_OUTPUT}/")
+    print(f"5) ORDINI ESPORTATI — un CSV per broker in {os.path.join(CARTELLA_OUTPUT, '')}")
     for path, n in scritti:
         print(f"   {path}  ({n} ordini)")
     # anteprima leggibile
     print(f"\n   Anteprima:")
-    print(f"   {'broker':<14}{'op.':<9}{'classe':<16}{'tipo':<10}{'importo':>10}  nota")
+    print(f"   {'broker':<14}{'op.':<9}{'classe':<16}{'categoria':<17}{'importo':>10}  nota")
     for o in ordini:
-        imp = f"€{o['importo_eur']:,.0f}"
-        print(f"   {o['broker']:<14}{o['operazione']:<9}{o['classe']:<16}{str(o['tipo_fiscale']):<10}{imp:>10}  {o['nota']}")
+        imp = f"€{numero(o['importo_eur'])}"
+        print(f"   {o['broker']:<14}{o['operazione']:<9}{o['classe']:<16}{str(o['categoria_fiscale']):<17}{imp:>10}  {o['nota']}")
     print(f"\n   I broker italiani non importano ordini da CSV: questi file sono una checklist di")
     print(f"   esecuzione e una traccia. Compila la colonna strumento_ISIN con lo strumento scelto.")
     print()

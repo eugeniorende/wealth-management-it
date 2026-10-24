@@ -5,12 +5,14 @@ genera-ips.py — genera l'Investment Policy Statement (IPS) come documento Word
 
 L'IPS è il deliverable finale del flusso: traduce l'analisi (obiettivi, allocazione,
 glide path, pensione) nel documento operativo che l'investitore esegue e rilegge.
-Questo script lo produce da un unico blocco DATI qui sotto, con testi di policy
-standard (ribilanciamento, guardrail, fiscalità italiana, checklist) come default
-sovrascrivibili: compila i dati del TUO caso e il documento esce completo.
+Lo script compone il documento dai dati del TUO caso, passati con --dati ips.json (un JSON
+nella cartella di lavoro, con le chiavi del blocco DATI, schema in SKILL.md). Il blocco DATI qui
+sotto è l'esempio e non va modificato. I testi di policy standard (ribilanciamento, guardrail,
+fiscalità italiana, revisione, checklist) sono default sovrascrivibili.
 
 Uso:
-    python genera-ips.py [output.docx]        # default: IPS.docx nella directory corrente
+    python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json
+    # senza --dati: l'IPS d'esempio, dichiarato come tale; output di default IPS.docx
 
 Dipendenze: python-docx  (pip install python-docx)
 
@@ -27,6 +29,7 @@ ONESTÀ METODOLOGICA
 Questo strumento è educativo e non costituisce consulenza finanziaria.
 """
 
+import argparse
 import datetime
 import re
 import sys
@@ -38,9 +41,17 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
+def numero(x, decimali=0):
+    """Numero in formato italiano: punto per le migliaia, virgola per i decimali (come
+    motore_bootstrap.numero nelle skill previdenziali: questa skill non ha il motore)."""
+    testo = f"{x:,.{decimali}f}"
+    return testo.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
 # ═══════════════════════════════ DATI ═══════════════════════════════
-# Compila questo blocco con i risultati del flusso (allocatore, glide path,
-# proiezione pensione). Le chiavi assenti usano i default di policy più sotto.
+# Dati d'ESEMPIO (Mario Rossi): non modificarli qui. I dati del caso arrivano da --dati ips.json
+# con le stesse chiavi: quelle del caso sono obbligatorie (CHIAVI_OBBLIGATORIE), le note e il
+# broker facoltativi, e solo i testi di policy hanno un default (POLICY_* più sotto).
 
 DATI = {
     "investitore": "Mario Rossi",
@@ -140,13 +151,19 @@ POLICY_RIBILANCIAMENTO = [
 
 # Verificato: 2026-10 — plus ETF/fondi = redditi di capitale (art. 44 c. 1 lett. g TUIR, dal 2027 art. 46 c. 1 lett. h; circ. 33/E/2011),
 # aliquote 26%/12,5% (art. 3 DL 66/2014), fondo pensione 20%/12,5% (art. 17 D.Lgs. 252/2005, dal 2027 art. 257 D.Lgs. 117/2026; L. 190/2014
-# c. 622, dal 2027 art. 257 c. 10), riporto delle minus 4 anni (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), comunicazione dei non dedotti (art. 8 c. 4
-# D.Lgs. 252/2005). Non verificata su fonte primaria la compensabilità dei certificati.
+# c. 622, dal 2027 art. 257 c. 10), riporto delle minus 4 anni e compensazione tra le lettere c, c-bis, c-ter, c-quater e
+# c-quinquies dell'art. 67 (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6; riletto su Normattiva il 24/10/2026), comunicazione dei non
+# dedotti (art. 8 c. 4 D.Lgs. 252/2005).
+# Fuori dal marcatore, interpretazione: i certificati stanno di norma nella lett. c-quater (dal 2027 art. 76 c. 1 lett. g; nessuna risoluzione AdE specifica
+# trovata); quelli a capitale protetto al 100% possono essere titoli similari alle obbligazioni, con proventi di capitale non
+# compensabili (art. 44 c. 2 lett. c n. 2 TUIR, dal 2027 art. 46 c. 2 lett. b n. 2 D.Lgs. 117/2026).
 POLICY_FISCALITA = [
     ("**La \u201ctrappola degli ETF\u201d.** In Italia le plusvalenze da ETF e fondi sono redditi di "
      "capitale: NON compensabili con le minusvalenze dello zainetto fiscale. Le minusvalenze "
      "(redditi diversi) si compensano con le plus da azioni singole, certificati e obbligazioni "
-     "(per queste solo la differenza di prezzo: cedole e scarto di emissione sono redditi di capitale)."),
+     "(per queste solo la differenza di prezzo: cedole e scarto di emissione sono redditi di capitale). "
+     "Un certificato a capitale protetto al 100% può invece dare redditi di capitale: va verificato "
+     "sul prospetto."),
     ("**Aliquote.** 26% sulla generalità delle rendite finanziarie; 12,5% sui titoli di Stato "
      "italiani e white-list."),
     ("**Asset location.** Il fondo pensione tassa i rendimenti al 20% (12,5% sulla quota in titoli "
@@ -224,6 +241,33 @@ def runs_markup(par, testo, size=None, color=None, italic=False):
         if color:
             r.font.color.rgb = _rgb(color)
     return par
+
+
+def proprieta_italiane(doc, titolo):
+    """Titolo e lingua del documento: senza, Word apre l'IPS con titolo vuoto e controllo
+    ortografico in inglese. La lingua va nelle proprietà del file e, come w:lang it-IT,
+    nei default dei run (docDefaults), così vale per ogni stile."""
+    doc.core_properties.title = titolo
+    doc.core_properties.language = "it-IT"
+    doc.core_properties.subject = "Investment Policy Statement"
+    defaults = doc.styles.element.find(qn("w:docDefaults"))
+    if defaults is None:
+        defaults = OxmlElement("w:docDefaults")
+        doc.styles.element.insert(0, defaults)
+    rpr_default = defaults.find(qn("w:rPrDefault"))
+    if rpr_default is None:
+        rpr_default = OxmlElement("w:rPrDefault")
+        defaults.insert(0, rpr_default)
+    rpr = rpr_default.find(qn("w:rPr"))
+    if rpr is None:
+        rpr = OxmlElement("w:rPr")
+        rpr_default.append(rpr)
+    lang = rpr.find(qn("w:lang"))
+    if lang is None:
+        lang = OxmlElement("w:lang")
+        rpr.append(lang)
+    lang.set(qn("w:val"), "it-IT")
+    lang.set(qn("w:eastAsia"), "it-IT")
 
 
 def bordo_sotto(par, colore=ACCENT, spessore=8):
@@ -337,9 +381,9 @@ def nota_rischio(quota_azioni):
         giudizio = "dinamica"
     else:
         giudizio = "prudente"
-    return (f"**Onestà sul rischio.** Un'allocazione al {quota_azioni:.0f}% azionario è {giudizio}: "
+    return (f"**Onestà sul rischio.** Un'allocazione al {numero(quota_azioni)}% azionario è {giudizio}: "
             f"in un mercato orso tipico il portafoglio complessivo può perdere circa il "
-            f"{drawdown:.0f}% del valore. La strategia regge solo se non si vende nel panico "
+            f"{numero(drawdown)}% del valore. La strategia regge solo se non si vende nel panico "
             f"(vedi Guardrail).")
 
 
@@ -349,17 +393,84 @@ MESI = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
         "agosto", "settembre", "ottobre", "novembre", "dicembre")  # strftime("%B") dipende dal locale
 
 
+CHIAVI_DATI = set(DATI) | {"ribilanciamento", "guardrail", "revisione", "fiscalita", "checklist"}
+# Con --dati queste vengono tutte dal JSON: nessuna si riempie con l'esempio di Mario Rossi.
+CHIAVI_OBBLIGATORIE = ("investitore", "capitale", "profilo", "obiettivi", "allocazione", "glide_path",
+                       "versamenti", "strumenti", "previdenza")
+# Base di partenza con --dati: le chiavi facoltative che non sono testi di policy.
+BASE_DATI = {"data": "", "sottotitolo": "Piano personale su base obiettivi", "broker": None}
+
+
+def _forma_errata(dati):
+    """Il primo campo di forma sbagliata nel JSON di --dati (nome e motivo), o None: i numeri devono
+    essere numeri, le tabelle liste di righe della lunghezza attesa."""
+    def numero_vero(x):
+        return isinstance(x, (int, float)) and not isinstance(x, bool)
+    if not numero_vero(dati["capitale"]) or dati["capitale"] <= 0:
+        return "capitale", "un numero positivo (es. 50000, non «50.000» o «€50.000»)"
+    righe = {"profilo": 2, "obiettivi": 5, "allocazione": 3, "glide_path": 4, "strumenti": 2}
+    for chiave, n in righe.items():
+        v = dati[chiave]
+        if not isinstance(v, list) or not v or any(not isinstance(r, (list, tuple)) or len(r) != n for r in v):
+            return chiave, f"una lista non vuota di righe da {n} elementi"
+    if any(not numero_vero(r[4]) for r in dati["obiettivi"]):
+        return "obiettivi", "il capitale assegnato (quinto elemento) come numero"
+    if any(not numero_vero(r[1]) or not numero_vero(r[2]) for r in dati["allocazione"]):
+        return "allocazione", "importo e quota % (secondo e terzo elemento) come numeri"
+    for chiave in ("versamenti", "previdenza"):
+        if not isinstance(dati[chiave], list) or any(not isinstance(r, str) for r in dati[chiave]):
+            return chiave, "una lista di testi"
+    return None
+
+
+def carica_dati(path):
+    """I dati del caso dal JSON di --dati: un oggetto con le chiavi del blocco DATI (le liste prendono il
+    posto delle tuple). Le chiavi del caso (CHIAVI_OBBLIGATORIE) devono esserci tutte e avere la forma
+    giusta; le note e il broker sono facoltativi; i testi di policy assenti usano i default POLICY_*.
+    Una chiave ignota, mancante o di forma errata è un errore (rc 1)."""
+    import json
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = json.load(f)
+    except OSError as e:
+        print(f"ERRORE: --dati: impossibile leggere {path}: {e.strerror}", file=sys.stderr)
+        raise SystemExit(1)
+    except ValueError as e:
+        print(f"ERRORE: --dati: {path} non è un JSON valido ({e})", file=sys.stderr)
+        raise SystemExit(1)
+    if not isinstance(dati, dict) or "investitore" not in dati:
+        print(f"ERRORE: --dati: {path} deve essere un oggetto JSON con almeno «investitore» (schema in SKILL.md)",
+              file=sys.stderr)
+        raise SystemExit(1)
+    ignote = sorted(set(dati) - CHIAVI_DATI)
+    if ignote:
+        print(f"ERRORE: --dati: chiavi non riconosciute {ignote}; attese: {', '.join(sorted(CHIAVI_DATI))}",
+              file=sys.stderr)
+        raise SystemExit(1)
+    mancanti = [k for k in CHIAVI_OBBLIGATORIE if k not in dati]
+    if mancanti:
+        print(f"ERRORE: --dati: chiavi mancanti {mancanti}: i dati del caso vanno tutti nel JSON "
+              f"(solo le note, il broker e i testi di policy sono facoltativi; schema in SKILL.md)", file=sys.stderr)
+        raise SystemExit(1)
+    errata = _forma_errata(dati)
+    if errata:
+        print(f"ERRORE: --dati: «{errata[0]}» deve essere {errata[1]}", file=sys.stderr)
+        raise SystemExit(1)
+    return dati
+
+
 def genera(dati, path_out):
-    d = dict(DATI)
+    # senza --dati l'esempio; con --dati solo il JSON, sopra una base senza dati personali
+    d = dict(DATI) if dati is None else dict(BASE_DATI)
     d.update(dati or {})
 
     # validazioni oneste (avvisano, non bloccano)
     tot_pct = sum(p for _, _, p in d["allocazione"])
     if abs(tot_pct - 100) > 0.6:
-        print(f"⚠ l'allocazione somma a {tot_pct:.1f}% (attesi 100%)")
+        print(f"⚠ l'allocazione somma a {numero(tot_pct, 1)}% (attesi 100%)")
     tot_cap = sum(o[4] for o in d["obiettivi"])
     if abs(tot_cap - d["capitale"]) > max(1, d["capitale"] * 0.005):
-        print(f"⚠ i capitali per obiettivo sommano a €{tot_cap:,.0f} vs capitale €{d['capitale']:,.0f}")
+        print(f"⚠ i capitali per obiettivo sommano a €{numero(tot_cap)} vs capitale €{numero(d['capitale'])}")
     # tutte le classi azionarie ("Azionario sviluppati", "ETF azionario globale", "Equity"),
     # non solo la prima; \b esclude "obbligazionario", che contiene "azion" a metà parola
     quota_az = sum(p for cl, _, p in d["allocazione"] if re.search(r"\b(azion|equity)", cl, re.I))
@@ -367,6 +478,7 @@ def genera(dati, path_out):
         print("⚠ nessuna classe azionaria riconosciuta nell'allocazione: la nota di rischio usa 0%")
 
     doc = Document()
+    proprieta_italiane(doc, f"Investment Policy Statement — {d['investitore']}")
     st = doc.styles["Normal"]
     st.font.name = "Arial"
     st.font.size = Pt(10)
@@ -379,7 +491,7 @@ def genera(dati, path_out):
     runs_markup(p, "INVESTMENT POLICY STATEMENT", size=24, color=DARK)
     p.runs[0].bold = True
     bordo_sotto(p, spessore=14)
-    para(doc, f"Piano di dispiegamento e gestione di un capitale di €{d['capitale']:,.0f}".replace(",", "."),
+    para(doc, f"Piano di dispiegamento e gestione di un capitale di €{numero(d['capitale'])}",
          size=13, color=GREY)
     para(doc, d["sottotitolo"], size=12, color=GREY, italic=True)
     doc.add_paragraph()
@@ -391,6 +503,10 @@ def genera(dati, path_out):
         doc.add_paragraph()
     para(doc, "Documento di pianificazione personale. Non costituisce consulenza finanziaria "
               "o di investimento (vedi nota finale).", size=9, color=GREY, italic=True)
+    if dati is None:
+        # il documento può circolare da solo: chi lo apre deve sapere che non è un caso reale
+        para(doc, "DATI DI ESEMPIO: questo IPS è generato con i dati dimostrativi dello script, non con "
+                  "quelli di un investitore reale.", size=9, color=GREY, italic=True)
     doc.add_page_break()
 
     # 1–2
@@ -405,15 +521,15 @@ def genera(dati, path_out):
     # 3
     h1(doc, "3. Obiettivi")
     tabella(doc, ["Obiettivo", "Orizzonte / tipo", "Profilo (% azioni)", "Target", "Capitale"],
-            [(n, o, pr, t, f"€{c:,.0f}".replace(",", ".")) for n, o, pr, t, c in d["obiettivi"]],
+            [(n, o, pr, t, f"€{numero(c)}") for n, o, pr, t, c in d["obiettivi"]],
             [3.6, 3.4, 3.6, 2.6, 3.3])
     if d.get("obiettivi_nota"):
         para(doc, d["obiettivi_nota"])
 
     # 4
     h1(doc, "4. Allocazione strategica target")
-    righe = [(cl, f"€{imp:,.0f}".replace(",", "."), f"{pct:.1f}%") for cl, imp, pct in d["allocazione"]]
-    righe.append(("Totale", f"€{sum(i for _, i, _ in d['allocazione']):,.0f}".replace(",", "."), f"{tot_pct:.0f}%"))
+    righe = [(cl, f"€{numero(imp)}", f"{numero(quota, 1)}%") for cl, imp, quota in d["allocazione"]]
+    righe.append(("Totale", f"€{numero(sum(i for _, i, _ in d['allocazione']))}", f"{numero(tot_pct)}%"))
     tabella(doc, ["Classe", "Importo", "Quota"], righe, [5.5, 5.5, 5.5])
     if d.get("allocazione_nota"):
         para(doc, "**Variabile dominante.** " + d["allocazione_nota"])
@@ -485,11 +601,40 @@ def genera(dati, path_out):
 
     doc.save(path_out)
     print(f"IPS generato: {path_out}")
-    print(f"  investitore: {d['investitore']} | capitale €{d['capitale']:,.0f} | "
-          f"azioni {quota_az:.0f}% | obiettivi: {len(d['obiettivi'])}"
+    print(f"  investitore: {d['investitore']} | capitale €{numero(d['capitale'])} | "
+          f"azioni {numero(quota_az)}% | obiettivi: {len(d['obiettivi'])}"
           + (f" | Appendice B: {d['broker']['nome']}" if d.get("broker") else ""))
 
 
+def main(argv=None):
+    for flusso in (sys.stdout, sys.stderr):   # UTF-8 anche su Windows (cp1252)
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+    ap = argparse.ArgumentParser(
+        allow_abbrev=False,
+        description="Genera l'Investment Policy Statement come documento Word dai dati del JSON passato con --dati "
+                    "(senza, l'IPS d'esempio del blocco DATI, dichiarato come tale). "
+                    "Codici d'uscita: 0 riuscito, 1 errore nei dati o nella scrittura, 2 riga di comando errata.")
+    ap.add_argument("output", nargs="?", default="IPS.docx",
+                    help="file .docx da scrivere (default: IPS.docx nella cartella corrente)")
+    ap.add_argument("--dati", metavar="FILE",
+                    help="JSON con i dati del tuo caso, le stesse chiavi del blocco DATI (schema in SKILL.md); "
+                         "senza, l'IPS d'esempio")
+    args = ap.parse_args(argv)
+    dati = None
+    if args.dati:
+        dati = carica_dati(args.dati)
+    else:
+        print(f"⚠️  Dati di esempio: l'IPS è quello di «{DATI['investitore']}». Passa --dati ips.json con i tuoi "
+              f"dati (schema in SKILL.md).")
+    try:
+        genera(dati, args.output)
+    except OSError as e:
+        print(f"ERRORE: impossibile scrivere {args.output}: {e}", file=sys.stderr)
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else "IPS.docx"
-    genera(None, out)
+    main()

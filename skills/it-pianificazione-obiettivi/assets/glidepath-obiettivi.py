@@ -36,10 +36,9 @@ modella la volatilità). Vedi glide-path.md per i limiti e l'interpretazione.
 
 import sys
 import os
-from openpyxl import load_workbook
 
-from motore_bootstrap import (applica_override, finestra_nel_foglio, frazioni_glide, leggi_finestra_derisk,
-                              pmt_glide, quota_glide, scarti_dal_foglio, verifica_intestazioni_obiettivi)
+from motore_bootstrap import (cli, errore, euro, frazioni_glide, leggi_pianificatore, numero, pmt_glide, quota_glide,
+                              scarti_dal_foglio, scrivi_json)
 
 # ---- Parametri del glide path (editabili) ----
 FINESTRA_DERISK = None   # anni prima della scadenza in cui inizia il de-risking;
@@ -50,50 +49,14 @@ CURVATURA = 1.0          # forma della rampa: 1.0 = lineare; <1 tiene la quota a
                          #   (più crescita, de-risking tardivo); >1 de-riska prima e più dolce dopo
 
 # Posizioni note nel foglio (coerenti con build_obiettivi.py)
-CAP_ROW = 5
-INFL_ROW = 6
-PROF_START = 10
-PROF_N = 6
-GOAL_START = 5
-GOAL_N = 10
 
 
 def leggi_excel(path):
-    wb = load_workbook(path, data_only=True)
-    verifica_intestazioni_obiettivi(wb["Obiettivi"])
-    par = wb["Parametri"]
-    obj = wb["Obiettivi"]
-    inflazione = par.cell(row=INFL_ROW, column=2).value or 0
-    finestra = leggi_finestra_derisk(par)
-    nel_foglio = finestra_nel_foglio(par)
-    profili = {}
-    for i in range(PROF_N):
-        r = PROF_START + i
-        nome = par.cell(row=r, column=1).value
-        rend = par.cell(row=r, column=2).value
-        eq = par.cell(row=r, column=4).value  # % azionario (colonna D)
-        if nome:
-            profili[nome] = (float(rend), float(eq))
-    obiettivi = []
-    for i in range(GOAL_N):
-        r = GOAL_START + i
-        nome = obj.cell(row=r, column=1).value
-        imp = obj.cell(row=r, column=2).value
-        oriz = obj.cell(row=r, column=3).value
-        prof = obj.cell(row=r, column=4).value
-        gia = obj.cell(row=r, column=6).value
-        tipo = obj.cell(row=r, column=14).value  # colonna N: terminante / permanente
-        if nome and oriz and prof:
-            obiettivi.append({
-                "nome": nome,
-                # target opzionale: vuoto = "il più possibile" (si proietta il solo capitale)
-                "target_oggi": float(imp) if imp else None,
-                "orizzonte": int(oriz),
-                "profilo": prof, "gia": float(gia) if gia else 0.0,
-                # default: terminante (caso comune); permanente solo se indicato
-                "permanente": (str(tipo).strip().lower() == "permanente"),
-            })
-    return inflazione, finestra, nel_foglio, profili, obiettivi
+    """Parametri, profili (rendimento, % azionario) e obiettivi dal lettore unico del motore: qui entrano
+    anche gli obiettivi senza target («il più possibile», marcati (max))."""
+    d = leggi_pianificatore(path)
+    profili = {n: (p["rendimento"], p["azionario"]) for n, p in d["profili"].items()}
+    return d["inflazione"], d["finestra"], d["finestra_nel_foglio"], profili, d["obiettivi"]
 
 
 def rendimento_a_quota(quota, profili):
@@ -113,24 +76,17 @@ def equity_glide(anni_residui, eq_start, finestra, atterraggio):
 
 
 def pct(x):
-    return f"{x*100:.0f}%"
+    return f"{numero(x*100)}%"
 
 
 def main():
-    applica_override(globals())
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-    else:
-        here = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.join(here, "pianificatore-obiettivi.xlsx")
-    if not os.path.exists(path):
-        print(f"File non trovato: {path}")
-        sys.exit(1)
-
+    args = cli("Calendario di de-risking anno per anno (glide path) per ogni obiettivo del pianificatore e per "
+               "l'aggregato di portafoglio.", globals(), json=True, argomenti=(
+                   (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
+    path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
     inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     if not obiettivi:
-        print("Nessun obiettivo trovato nel foglio.")
-        sys.exit(0)
+        errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     rend_atterraggio = rendimento_a_quota(ATTERRAGGIO_AZ, profili)
     # i versamenti coincidono con la colonna I solo coi parametri del glide path del foglio
@@ -141,7 +97,7 @@ def main():
 
     # pre-calcolo per ogni obiettivo: pmt, finestra, capitale proiettato anno per anno
     for g in obiettivi:
-        rend, eq = profili.get(g["profilo"], (0.0, 0.0))
+        rend, eq = profili[g["profilo"]]        # il lettore ha già respinto i profili ignoti
         g["rend"], g["eq_start"] = rend, eq
         g["finestra"] = min(finestra, g["orizzonte"])
         # i terminanti de-riskano: rendimento dell'anno lineare nella quota tra profilo e atterraggio
@@ -175,7 +131,7 @@ def main():
     print("GLIDE PATH — CALENDARIO DI DE-RISKING")
     print("=" * 78)
     print(f"Finestra de-risking: {finestra} anni  |  Atterraggio: {pct(ATTERRAGGIO_AZ)} azionario alla scadenza")
-    print(f"Inflazione: {inflazione*100:.1f}%")
+    print(f"Inflazione: {numero(inflazione*100, 1)}%")
     print("-" * 78)
 
     # intestazione tabella per-obiettivo
@@ -186,6 +142,8 @@ def main():
     print(intest)
     print("-" * len(intest))
 
+    calendario = {g["nome"]: [] for g in obiettivi}   # quota azionaria per anno (None = concluso)
+    aggregato = []
     for t in range(orizzonte_max + 1):
         celle = []
         num = 0.0   # capitale azionario aggregato
@@ -194,6 +152,7 @@ def main():
             attivo = (t <= g["orizzonte"]) or g["permanente"]
             if not attivo:
                 celle.append(f"{'concl.':>16}")
+                calendario[g["nome"]].append(None)
                 continue
             if g["permanente"]:
                 # nessun glide: una riserva permanente tiene la quota del profilo (non ha scadenza di spesa)
@@ -204,10 +163,12 @@ def main():
                 eqt = equity_glide(ar, g["eq_start"], g["finestra"], ATTERRAGGIO_AZ)
                 etich = pct(eqt)
             celle.append(f"{etich:>16}")
+            calendario[g["nome"]].append(round(eqt, 4))
             capt = g["cap"][t]
             num += capt * eqt
             den += capt
         agg = (num / den) if den > 0 else 0.0
+        aggregato.append(round(agg, 4))
         riga = f"{t:>4}  " + "  ".join(celle) + f"   |  {pct(agg):>10}"
         print(riga)
 
@@ -218,7 +179,7 @@ def main():
     else:
         print("VERSAMENTI usati nella proiezione (come la colonna I del foglio, de-risking compreso):")
     for g in obiettivi:
-        quanto = "— (nessun target)" if g["target_oggi"] is None else f"€{g['pmt']:,.0f}/mese".replace(",", ".")
+        quanto = "— (nessun target)" if g["target_oggi"] is None else f"{euro(g['pmt'])}/mese"
         print(f"  {g['nome']}: {quanto}")
 
     # transizioni chiave dell'aggregato
@@ -237,6 +198,19 @@ def main():
     print("\nNON è consulenza di investimento. Proiezione al rendimento atteso di ogni anno lungo")
     print("il glide path (non modella la volatilità). Le % azionario per profilo e i parametri")
     print("del glide path sono editabili (la finestra anche nel foglio, Parametri!B7). Vedi glide-path.md.")
+
+    if args.json:
+        scrivi_json(args.json, {
+            "finestra": finestra, "atterraggio": ATTERRAGGIO_AZ, "curvatura": CURVATURA,
+            "inflazione": inflazione, "scarti_dal_foglio": scarti,
+            "anni": list(range(orizzonte_max + 1)),
+            "portafoglio": aggregato,          # quota azionaria aggregata per anno
+            "obiettivi": [{"nome": g["nome"], "profilo": g["profilo"], "orizzonte": g["orizzonte"],
+                           "permanente": g["permanente"], "target_oggi": g["target_oggi"],
+                           "gia": g["gia"], "versamento_mensile": round(g["pmt"], 2),
+                           "quota_azionaria": calendario[g["nome"]],
+                           "capitale_proiettato": [round(c, 2) for c in g["cap"]]} for g in obiettivi],
+        })
 
 
 if __name__ == "__main__":

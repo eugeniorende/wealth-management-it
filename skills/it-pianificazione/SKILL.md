@@ -1,11 +1,13 @@
 ---
 name: it-pianificazione
-description: Pianificazione pensionistica integrata per lavoratori dipendenti italiani. Coordina previdenza obbligatoria (INPS contributivo), previdenza complementare (fondi pensione, PIP, TFR) e proiezione del tenore di vita post-pensionamento. Usa questa skill ogni volta che l'utente parla di: pensione futura, quando andrò in pensione, quanto prenderò di pensione, conferimento TFR, scelta fondo pensione (negoziale/aperto/PIP), deduzione fiscale €5.300, anzianità contributiva, coefficiente di trasformazione, tasso di sostituzione, gap pensionistico, tenore di vita post-67 anni, simulazione "ce la farò a mantenere lo stile di vita?", anticipata vs vecchiaia, riscatto laurea, ricongiunzione, totalizzazione. Trigger anche su domande di scelta tra fondo aperto/negoziale/PIP, anticipazioni fondo pensione, opzione capitale vs rendita, decisioni a 30-40 anni dal pensionamento. Questa skill è per i lavoratori DIPENDENTI; per autonomi/partite IVA/forfettari usa `it-pianificazione-autonomi`. NON sostituisce un consulente previdenziale abilitato e NON copre dipendenti pubblici.
+description: "Pianificazione pensionistica integrata per lavoratori dipendenti italiani: previdenza obbligatoria (INPS contributivo), complementare (fondi pensione, PIP, TFR) e proiezione del tenore di vita dopo la pensione. Usa questa skill quando l'utente parla di pensione futura, quando e quanto prenderò di pensione, conferimento del TFR, scelta del fondo pensione (negoziale, aperto, PIP), deduzione €5.300, anzianità contributiva, coefficiente di trasformazione, tasso di sostituzione, gap pensionistico, anticipata vs vecchiaia, anticipazioni del fondo, capitale vs rendita, RITA, uscita anticipata con capitale-ponte, o chiede «ce la farò a mantenere lo stile di vita?». Legge l'estratto conto INPS e lo storico del fondo con gli script della skill. Per autonomi, partite IVA e forfettari usa `it-pianificazione-autonomi`. NON copre dipendenti pubblici, riscatto della laurea, ricongiunzione e totalizzazione (rinvia a INPS o a un consulente). NON sostituisce un consulente previdenziale abilitato."
+metadata:
+  version: "0.12"
 ---
 
 # it-pianificazione
 
-Skill per la pianificazione pensionistica integrata di un lavoratore dipendente privato italiano. Coordina tre sottosistemi (obbligatoria, complementare, tenore di vita) per produrre proiezioni multi-anno e raccomandazioni d'azione.
+Skill per la pianificazione pensionistica integrata di un lavoratore dipendente privato italiano. Coordina tre sottosistemi (obbligatoria, complementare, tenore di vita) per produrre proiezioni multi-anno e le leve da valutare, quantificate come scenari.
 
 ## Scope esplicito
 
@@ -14,9 +16,9 @@ Skill per la pianificazione pensionistica integrata di un lavoratore dipendente 
 2. **Proiezione previdenza complementare**: capitalizzazione contributi (TFR + volontari + datore) con tassazione finale
 3. **Confronto TFR azienda vs fondo**: blocco «Confronto TFR» nel foglio Complementare dell'Excel (rivalutazione tassata al 17% e tassazione separata contro 15→9% sulle sole quote), con il vantaggio netto in euro di oggi
 4. **Gap analysis tenore di vita**: confronto tra pensione totale attesa e spesa proiettata
-5. **Raccomandazioni d'azione**: pattern di copertura del gap, quantificati
+5. **Leve da valutare**: pattern di copertura del gap, quantificati come scenari: la scelta resta all'utente
 
-**Cosa NON fa (v0.1):**
+**Cosa NON fa:**
 - ❌ Non copre lavoratori autonomi, P.IVA forfettari, casse professionali → usa la skill gemella `it-pianificazione-autonomi` (regime previdenziale e fiscale diverso: Gestione Separata 26,07%, no TFR, e per i forfettari il fondo pensione NON è deducibile)
 - ❌ Non copre dipendenti pubblici (TFS vs TFR, regimi specifici)
 - ❌ Non gestisce ricongiunzione, totalizzazione, riscatto laurea (questi richiederebbero accesso a dati INPS reali)
@@ -64,7 +66,7 @@ Strategie di copertura del gap (vedi `references/proiezione-tenore-vita.md`):
 - Cambiare comparto (più rischio → più rendimento atteso, se orizzonte lungo)
 - Ritardare pensionamento (più anni contribuzione + coefficiente più alto)
 - Risparmio non previdenziale extra (PAC ETF, immobiliare, ecc.)
-- Conferire TFR se ancora in azienda (decisione fiscalmente quasi sempre conveniente)
+- Conferire TFR se ancora in azienda (scenario: vantaggio fiscale certo, rendimento incerto, scelta irrevocabile)
 
 ## Regole fiscali e contributive fondamentali (2026)
 
@@ -93,7 +95,7 @@ Sterilizzazione benefit per redditi > €200.000: le detrazioni per oneri al 19%
 
 - **Accantonamento annuo**: RAL_lordo × (1 / 13,5) ≈ 6,91% (formula esatta: RAL ÷ 13,5 deducendo lo 0,5% destinato a INPS Fondo di Garanzia)
 - **Rivalutazione TFR in azienda**: 1,5% + 75% inflazione ISTAT (art. 2120 c.c.), con imposta sostitutiva del **17%** sulla rivalutazione di ogni anno
-- **Tassazione TFR liquidato in azienda**: separata (artt. 17 e 19 TUIR; dal 2027 nel D.Lgs. 117/2026, articoli da verificare), sulle quote senza le rivalutazioni già tassate, all'aliquota media del «reddito di riferimento» (TFR × 12 / anni di servizio); gli uffici poi riliquidano sull'aliquota media dei 5 anni precedenti (tipicamente 23-30%)
+- **Tassazione TFR liquidato in azienda**: separata (artt. 17 e 19 TUIR; dal 2027 artt. 19 e 21 D.Lgs. 117/2026), sulle quote senza le rivalutazioni già tassate, all'aliquota media del «reddito di riferimento» (TFR × 12 / anni di servizio); gli uffici poi riliquidano sull'aliquota media dei 5 anni precedenti (tipicamente 23-30%)
 - **Tassazione TFR conferito a fondo**: 15% scendente al 9% (vedi sopra) sulle sole quote di TFR; i rendimenti, già tassati ogni anno nel fondo, sono esclusi
 
 ### Tassazione assegno pensionistico
@@ -102,6 +104,16 @@ L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si
 - Detrazione pensionati (art. 13 c. 3 TUIR, dal 2027 art. 13 c. 3 D.Lgs. 117/2026; R = reddito complessivo): €1.955 fino a €8.500 (no tax area); 700 + 1.255 × (28.000 − R) / 19.500 fino a €28.000; 700 × (50.000 − R) / 22.000 fino a €50.000; zero oltre; +€50 tra €25.000 e €29.000 (c. 3-bis; dal 2027 art. 13 c. 4 D.Lgs. 117/2026). È la formula di `assets/netto-pensione.py`
 - Addizionali regionali e comunali (variabili: 0,7-3,33% regionale, 0-0,9% comunale)
 
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/proiezione-pensione.xlsx`;
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/importa-previdenza.py" estratto.xml fondo.csv --anonimo --json dati.json`, `python "${CLAUDE_SKILL_DIR}/assets/proiezione-inps.py" --from dati.json --json inps.json`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze degli script: Python 3.11 o successivo con numpy (`pip install numpy`).
+
 ## Workflow operativo
 
 ### Step 1: Ingestion
@@ -109,10 +121,23 @@ L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si
 **Percorso automatico (preferito)**: se l'utente ha i file reali, usare `assets/importa-previdenza.py`:
 
 ```bash
-python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]
+python "${CLAUDE_SKILL_DIR}/assets/importa-previdenza.py" estratto_inps.xml [storico_fondo.csv] [--anonimo] [--set ALIQUOTA_COMPUTO=0.25] [--json dati.json]
 ```
 
-Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): proporlo quando l'output finisce in chat o in un documento da condividere.
+Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): proporlo quando l'output finisce in chat o in un documento da condividere. Con `--json` i parametri pronti finiscono in un file che gli script a valle leggono con `--from`, senza ricopiarli:
+
+```bash
+A="${CLAUDE_SKILL_DIR}/assets"      # dalla cartella di lavoro
+python "$A/importa-previdenza.py" estratto.xml fondo.csv --anonimo --json dati.json
+python "$A/proiezione-inps.py"     --from dati.json --json inps.json
+python "$A/montecarlo-pensione.py" --from dati.json --from inps.json --json mc.json
+python "$A/netto-pensione.py"      --from mc.json --json netto.json
+# per l'uscita anticipata: un secondo Monte Carlo fino all'età di uscita (ANNI = 62 − età di oggi)
+python "$A/montecarlo-pensione.py" --from dati.json --from inps.json --set ANNI=25 --json mc-uscita.json
+python "$A/ponte-pensione.py"      --from inps.json --from mc-uscita.json --set ETA_USCITA=62 --json ponte.json
+```
+
+Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Il ponte vuole il montante del fondo **all'uscita**, non alla vecchiaia: se riceve il `mc.json` della vecchiaia si ferma e indica il valore di `ANNI` con cui rigenerarlo.
 
 Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico movimenti del fondo pensione** (CSV), e produce: anzianità e retribuzioni per anno, la ricostruzione del montante contributivo (contributi × aliquota, capitalizzati coi tassi ufficiali ISTAT — tabella verificata nello script, ±qualche % rispetto al dato esatto de "La mia pensione futura"), montante del fondo per comparto con stima euristica del mix azionario, versamenti per anno/fonte, e il blocco di parametri pronti per `proiezione-inps.py` e `montecarlo-pensione.py`. I dati reali battono sempre quelli dichiarati a memoria.
 
@@ -270,17 +295,20 @@ gap_annuo = spesa_target_annua - reddito_pensione_totale
 gap_percentuale = gap_annuo / spesa_target_annua
 ```
 
-### Step 5: Raccomandazioni
+### Step 5: Leve da valutare (scenari, non raccomandazioni)
 
-Per ciascun pattern di copertura, quantificare l'impatto:
+Per ciascun pattern di copertura, quantificare l'impatto come scenario, con costi e vincoli: la scelta resta all'utente.
 
-- **Pattern P1 — Massimizzare contributo deducibile**: se contributi del lavoratore e del datore insieme non saturano i €5.300/anno, calcolare il delta montante finale + il risparmio IRPEF cumulato
+- **Pattern P1 — Usare lo spazio deducibile**: se contributi del lavoratore e del datore insieme non saturano i €5.300/anno, calcolare il delta montante finale + il risparmio IRPEF cumulato. Lo spazio residuo è un tetto fiscale, non un importo consigliato: dipende da liquidità, fondo di emergenza e alternative
 - **Pattern P2 — Cambiare comparto**: se l'utente è in garantito con 25+ anni alla pensione, mostrare il delta atteso passando a bilanciato/azionario
 - **Pattern P3 — Ritardare pensionamento**: confronto 64/67/70 anni — più anni contributi + coefficiente migliore + meno anni di pensione (ma tenore di vita)
 - **Pattern P4 — Conferire TFR**: se ancora in azienda, simulare il delta cumulato sulle quote future di TFR (il maturato resta in azienda), come scenario: la scelta è irrevocabile
 - **Pattern P5 — Risparmio non previdenziale**: copertura del residuo gap via PAC ETF (rinviare a competenze separate)
+- **Pattern P6 — Uscita anticipata con capitale-ponte** («posso smettere a X anni?»): `ponte-pensione.py` simula il capitale che copre gli anni dall'uscita alla vecchiaia, in euro di oggi, con la probabilità di farcela e il capitale necessario per confidenza; vedi «Uscita anticipata e RITA» qui sotto
 
 Per ogni pattern: pro, contro, vincoli (es. €5.300 cap, rischio comparto), orizzonte temporale.
+
+**Uscita anticipata e RITA.** La RITA (Rendita integrativa temporanea anticipata, art. 11 c. 4-4-quater D.Lgs. 252/2005; dal 2027 la tassazione è all'art. 258 c. 1 D.Lgs. 117/2026) eroga il montante del fondo, tutto o in parte, a rate fino all'età di vecchiaia. Requisiti di legge: cessazione dell'attività, vecchiaia entro 5 anni e almeno 20 anni di contributi nei regimi obbligatori (c. 4); oppure inoccupazione da oltre 24 mesi e vecchiaia entro 10 anni (c. 4-bis); la prassi della COVIP chiede anche 5 anni di partecipazione alla complementare. La parte imponibile è tassata al 15%, ridotto di 0,30 punti per anno oltre il 15° di partecipazione, fino al 9% (c. 4-ter). `ponte-pensione.py` la integra nel capitale-ponte e quantifica i **costi permanenti** dell'uscita: contributi INPS che non si versano, versamenti al fondo che si fermano, montante consumato in RITA che non sarà rendita a 67 anni. Il montante da usare è quello del fondo **all'uscita** (secondo Monte Carlo, Step 1). Si presenta come scenario: la scelta di smettere prima resta all'utente.
 
 ## Formato output
 
@@ -318,10 +346,10 @@ Report markdown in 5 sezioni + (su richiesta) Excel di proiezione.
 - Gap (assoluto e %)
 - Sensitivity: scenari conservativo / base / ottimistico (basati su variazioni di crescita retributiva, rivalutazione PIL, rendimento comparto)
 
-### 5. Raccomandazioni d'azione
+### 5. Leve da valutare
 
-Lista dei pattern applicabili, ordinati per impatto stimato:
-- Cosa fare
+Lista dei pattern applicabili, come scenari quantificati e ordinati per impatto stimato (la scelta resta all'utente):
+- Cosa cambia
 - Perché
 - Quanto cambia il gap
 - Vincoli e rischi
@@ -342,7 +370,7 @@ Il template `assets/proiezione-pensione.xlsx` (incluso nella skill) è il delive
 
 Il template usa convenzioni industry-standard (blu = input, nero = formule, verde = cross-sheet) e si auto-aggiorna quando l'utente modifica le celle blu. Il ricalcolo in locale italiano con LibreOffice (CI) verifica che nessuna cella vada in errore. **Il coefficiente di trasformazione è proiettato in calo** all'anno di pensionamento (non usa quello attuale), così la pensione stimata è realistica anche su orizzonti lunghi.
 
-✅ **Montante INPS iniziale (migliorato in v0.3)**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma la somma anno per anno di `min(RAL/(1+g)^k, massimale) × 33% × (1+rivalutazione)^(k−1)`, che tiene conto della retribuzione passata più bassa, del massimale (costante in euro di oggi) e della rivalutazione dei contributi già versati (e si avvicina alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis sul portale INPS, www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo").
+✅ **Montante INPS iniziale**: il template ora accetta il **montante reale dall'estratto conto INPS** (cella dedicata nel foglio Input) e lo usa quando valorizzato — è il dato esatto. Se assente, la stima di ripiego non è più la grezza `anzianità × RAL × 33%` ma la somma anno per anno di `min(RAL/(1+g)^k, massimale) × 33% × (1+rivalutazione)^(k−1)`, che tiene conto della retribuzione passata più bassa, del massimale (costante in euro di oggi) e della rivalutazione dei contributi già versati (e si avvicina alla grezza quando i due effetti si compensano). Resta comunque preferibile inserire il valore reale (gratis sul portale INPS, www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo").
 
 ### Disclaimer (obbligatorio in fondo)
 
@@ -369,55 +397,9 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 - `references/montecarlo-pensione.md` — la dimensione **stocastica** della proiezione: perché i due pilastri hanno rischi opposti (il pubblico INPS è rivalutato al PIL, non al mercato → àncora deterministica; il fondo pensione è esposto al mercato → Monte Carlo), e la lettura onesta che ne segue (tutta la dispersione del tasso di sostituzione viene dal complementare)
 - `references/integrazione-fiscale-joint.md` — pattern fiscali joint con `it-tax-optimization`: allocazione risparmio extra, realizzo plus + deduzione fondo, sterilizzazione redditi alti
 - `assets/proiezione-pensione.xlsx` — template Excel editabile con 5 fogli (Input, Coefficienti, Pubblica, Complementare, Scenari), in euro di oggi, deterministico, con coefficiente proiettato all'anno di pensionamento e cella dedicata per il **montante INPS reale da estratto conto** (con stima di ripiego migliorata se assente)
+- `assets/importa-previdenza.py` — legge l'estratto conto INPS (XML) e lo storico del fondo pensione (CSV): anzianità, retribuzioni, montante ricostruito, mix del fondo; `--anonimo` per non stampare i dati personali, `--json` per la catena dello Step 1
+- `assets/proiezione-inps.py` — proiezione parametrica della pensione INPS in euro di oggi, con il coefficiente proiettato all'età di pensionamento e la sensibilità a PIL reale e coefficienti; avvisa se la posizione è mista (retribuzioni prima del 1996)
+- `assets/netto-pensione.py` — dal lordo al netto: IRPEF da pensionato, detrazioni e addizionali sulla pensione INPS, tassazione agevolata della rendita del fondo; il tasso di sostituzione **netto** è quello che misura il tenore di vita
+- `assets/ponte-pensione.py` — «posso smettere a X anni?»: Monte Carlo del capitale-ponte dall'uscita alla vecchiaia, RITA integrata, costi permanenti dell'uscita (vedi «Uscita anticipata e RITA»)
 - `assets/montecarlo-pensione.py` — il **Monte Carlo** del tasso di sostituzione: àncora l'INPS al valore deterministico del foglio e simula solo il fondo pensione via block bootstrap sulla serie storica USA nominale in dollari (Damodaran), di cui di default usa solo la forma: la media è ricentrata sul rendimento reale del comparto; con `RICENTRA_MEDIA = False` la serie si deflaziona anno per anno (stesso motore di obiettivi). Restituisce i percentili del tasso di sostituzione, la probabilità di una soglia obiettivo, e la decomposizione àncora-pubblica / banda-di-mercato-complementare. Richiede numpy; usa `rendimenti-storici.csv`
 - `assets/rendimenti-storici.csv` — serie annuale azionario/obbligazionario (Damodaran/NYU Stern, 1928–2025) per il bootstrap; sostituibile con una propria serie
-
-## Note per iterazione (v0.4)
-
-Questa è la versione 0.11 della skill (introdotta in v0.4 del plugin, estesa in v0.8.11).
-
-In quest'iterazione (v0.11):
-- **Pipeline `--json <file>`** su tutta la catena previdenziale (`proiezione-inps`, `montecarlo-pensione`, `netto-pensione`, `ponte-pensione`): i risultati chiave si scrivono anche in JSON, così passano da uno script all'altro senza travasi a mano. Componibile con `--set`.
-- **Freshness fiscale**: i dati normativi negli script e nelle reference portano il marcatore `Verificato: AAAA-MM`; la test suite fallisce se un marcatore supera i 12 mesi — i dati fiscali scadono per design, e la suite obbliga a riverificarli.
-
-In quest'iterazione (v0.10):
-- **`ponte-pensione.py`** — risponde a "posso smettere a X anni?": Monte Carlo del capitale-ponte dall'uscita anticipata all'età di copertura, sulla serie storica USA deflazionata anno per anno con l'inflazione USA perché la spesa è in euro di oggi (probabilità di successo + capitale necessario per confidenza via bisezione sugli stessi percorsi), **RITA integrata** (D.Lgs. 252/2005 art. 11 co. 4, requisiti verificati su COVIP/AdE: 5 anni dalla vecchiaia con ≥20 anni di contributi e ≥5 di complementare; 10 anni se inoccupati >24 mesi; tassazione 15%→9%), e — la parte che i calcoli ingenui omettono — i **costi permanenti** dell'uscita: contributi INPS mancati, versamenti al fondo fermi e montante consumato in RITA, tradotti in euro/anno di pensione persa per sempre. La quota di montante da destinare alla RITA è parametrica: calibrarla sulla spesa (invece di usare tutto) preserva rendita a 69. Supporta `--set`.
-
-In quest'iterazione (v0.9):
-- **`netto-pensione.py`** — dal tasso di sostituzione LORDO a quello NETTO/NETTO: IRPEF 2026 a tre scaglioni (23/33/43, secondo scaglione ridotto dalla L.199/2025 — verificato), detrazioni pensione e lavoro dipendente (art. 13 TUIR, dal 2027 art. 13 D.Lgs. 117/2026), contributi IVS 9,19%, addizionali parametriche, e imposta sostitutiva sulla rendita complementare 15%→9% con l'anzianità di partecipazione (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026). Accetta più scenari di rendita (P10/P50/P90 dal Monte Carlo) e confronta pensione netta / ultimo stipendio netto. Il lordo sottostima sistematicamente la copertura: sul caso reale validato, la mediana passa dal 74,6% lordo al 97,5% netto. Supporta `--set`.
-
-In quest'iterazione (v0.8):
-- **Override `--set NOME=VALORE`** (via `motore_bootstrap.applica_override`): le costanti in testa a `montecarlo-pensione.py` e `proiezione-inps.py` si sovrascrivono da riga di comando senza modificare i file — es. `python proiezione-inps.py --set PIL_REALE=0.0 --set COEFF_ESPLICITO=0.048`. I nomi inesistenti vengono respinti (protezione dai refusi), gli override applicati sono stampati (run documentato e ripetibile).
-
-In quest'iterazione (v0.7):
-- **Motore bootstrap condiviso** (`motore_bootstrap.py`): `carica_storico`, campionamento a blocchi circolari (`indici_bootstrap`/`blocchi_bootstrap`) e percentili vivono in un modulo unico, copia sincronizzata con `it-pianificazione-obiettivi` (l'identità è verificata dalla test suite). `montecarlo-pensione.py` lo importa; refactor validato bit-per-bit: con lo stesso seed produce output identico alla versione precedente.
-
-In quest'iterazione (v0.6):
-- **`importa-previdenza.py`**: ingestione dei dati previdenziali reali — parser dell'estratto conto INPS (XML) e dello storico movimenti del fondo pensione (CSV, tollerante su separatori e formato numerico italiano), ricostruzione del montante contributivo coi tassi di capitalizzazione ufficiali (tabella verificata: floor a 1,0 nel 2021 post-COVID, recupero 2022, fino a 1,040445 per decorrenze 2026), montante fondo per comparto e stima euristica del mix azionario (keyword specifiche prima delle generiche: "obbligazionar" prima di "azionar"). Validato su estratto e storico reali.
-- **`proiezione-inps.py`**: proiezione parametrica della pensione INPS in termini reali, con tabella coefficienti di trasformazione 2025-26 (DM 436/2024), riduzione parametrica per speranza di vita e sensibilità 3×3 (PIL reale × coefficienti). Chiude la catena: importatore → proiezione INPS → Monte Carlo del fondo, senza calcoli a mano.
-
-In quest'iterazione (v0.5):
-- **Crescita reale dei versamenti** nel Monte Carlo pensione (`CRESCITA_VERSAMENTO_REALE`): TFR e contributi crescono con lo stipendio, invece di restare costanti. Serve a proiettare in modo realistico chi prevede una progressione di carriera — e fa emergere l'effetto chiave: una RAL crescente *abbassa* il tasso di sostituzione (la pensione contributiva, basata sulla media dei versamenti di una vita, sostituisce una quota minore di uno stipendio finale più alto). Validato su caso reale.
-
-In quest'iterazione (v0.4):
-- **Monte Carlo del tasso di sostituzione** (`assets/montecarlo-pensione.py` + `references/montecarlo-pensione.md`): la proiezione non è più solo deterministica. Il punto metodologico è trattare i due pilastri secondo il loro rischio reale — l'INPS pubblico è rivalutato al PIL (àncora deterministica), il fondo pensione è esposto al mercato (Monte Carlo via block bootstrap, stesso motore di obiettivi). La lettura onesta che ne emerge: tutta la dispersione del tasso di sostituzione viene dal complementare, ed è lì che la scelta del comparto conta. Validato contro replica indipendente (mediana sotto il deterministico per il volatility drag, percentili coerenti).
-
-In quest'iterazione (v0.3):
-- **Accuratezza del montante INPS iniziale**: input del montante reale da estratto conto + stima di ripiego migliorata (serie geometrica che tiene conto di crescita salariale e rivalutazione passate). Era l'unica approssimazione nota dichiarata della skill. Validato su tre rami (montante reale fornito, caso limite riv=g che ritorna alla stima grezza, riv>g che la corregge al rialzo).
-
-Versioni precedenti:
-- v0.2: coefficiente di trasformazione proiettato in calo all'anno di pensionamento; integrazione fiscale joint con `it-tax-optimization`
-- v0.1: dipendenti privati INPS, proiezione deterministica con scenari, Excel a 5 fogli
-
-Limiti dell'iterazione corrente:
-- Solo dipendenti privati italiani (non pubblici)
-- Il foglio Excel resta deterministico; la dimensione stocastica è nello script Monte Carlo (`montecarlo-pensione.py`), limitata al pilastro complementare — il pubblico INPS è àncora deterministica per scelta metodologica (rivalutato al PIL, non al mercato)
-- Solo regime pubblico INPS (non casse professionali → `it-pianificazione-autonomi`)
-
-Roadmap:
-- ✅ Lavoratori autonomi/forfettari → coperti dalla skill dedicata `it-pianificazione-autonomi`
-- ✅ Accuratezza del montante INPS iniziale → fatto in v0.3 (estratto conto reale + stima migliorata)
-- Dipendenti pubblici (TFS, regimi specifici)
-- ✅ Monte Carlo per scenari di rendimento → fatto in v0.4 (`montecarlo-pensione.py`, due pilastri: complementare stocastico, pubblico àncora)
-- Integrazione completa con it-tax-optimization (ottimizzazione joint IRPEF + finanziaria)
-- Ricongiunzione, totalizzazione, riscatto laurea (richiedono dati INPS reali)

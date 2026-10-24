@@ -1,6 +1,6 @@
 {
   "name": "wealth-management-it",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Wealth management plugin per la fiscalità italiana (regime amministrato). Fork derivato da anthropics/financial-services adattato alle regole TUIR su minusvalenze/plusvalenze, asimmetria redditi diversi vs redditi di capitale, scadenza zainetto 4 anni e certificazione alla chiusura del rapporto, costo medio ponderato (LIFO solo in dichiarativo). NON COSTITUISCE CONSULENZA FISCALE.",
   "author": {
     "name": "Eugenio Rende",
@@ -8,9 +8,19 @@
   },
   "repository": "https://github.com/eugeniorende/wealth-management-it",
   "license": "Apache-2.0",
-  "upstream": {
-    "repo": "anthropics/financial-services",
-    "path": "plugins/vertical-plugins/wealth-management",
-    "rationale": "L'upstream è cablato sul fisco USA (wash sale, HIFO, Roth/401k). Le regole italiane sono strutturalmente diverse: questa versione le riscrive da zero invece di estenderle."
+  "metadata": {
+    "upstream": {
+      "repo": "anthropics/financial-services",
+      "path": "plugins/vertical-plugins/wealth-management",
+      "rationale": "L'upstream è cablato sul fisco USA (wash sale, HIFO, Roth/401k). Le regole italiane sono strutturalmente diverse: questa versione le riscrive da zero invece di estenderle."
+    }
+  },
+  "userConfig": {
+    "cartella_lavoro": {
+      "type": "directory",
+      "title": "Cartella di lavoro del piano",
+      "description": "Dove vivono i tuoi dati, gli Excel compilati e gli output degli script (mai dentro il plugin)",
+      "default": "~/piano-finanziario"
+    }
   }
 }

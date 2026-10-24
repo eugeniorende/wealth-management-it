@@ -4,6 +4,14 @@ Questa skill lavora meglio sui dati reali del tuo portafoglio. Il modo per porta
 un collegamento "live" via API ai broker — quella strada è stata valutata e scartata, per ragioni
 che vale la pena ricordare perché spiegano il design di ciò che c'è qui.
 
+## Indice
+
+- Perché non un MCP "live" sui broker
+- Cosa fa l'importatore
+- Il parser è tollerante ai formati (deve esserlo)
+- Come esportare da ciascun broker
+- Limiti dichiarati (onestà del pilota)
+
 ## Perché non un MCP "live" sui broker
 
 Tre broker italiani diffusi — Directa, Fineco, Trade Republic — sono stati verificati uno per uno:
@@ -62,7 +70,7 @@ python importa-estratto-broker.py estratto.csv [zainetto.csv] [--anno 2026] [--b
 ```
 
 `--json -` stampa solo il JSON su stdout. Gli errori sui file (mancanti, vuoti, colonne non
-riconosciute, aliquote ignote) escono con un messaggio leggibile e codice 2. Solo libreria standard.
+riconosciute, aliquote ignote, JSON non scrivibile) escono con un messaggio che inizia per `ERRORE:` su stderr e codice 1; una riga di comando errata (flag ignoto, estratto non indicato) stampa l'usage ed esce con codice 2, come per tutti gli script del plugin (README, «Convenzioni degli script»). Solo libreria standard.
 
 ### Come classifica senza la colonna «tipo fiscale»
 
@@ -118,8 +126,9 @@ tre cifre indica sempre le migliaia, in entrambi i formati: `1.500` e `1,500` va
 perché un importo in euro con tre decimali non è plausibile. Prezzi e quantità seguono il formato del file.
 Le righe senza costo o valore leggibili sono scartate con un avviso, mai in silenzio. Riconosce per esempio `ISIN`/`Codice ISIN`, `Descrizione`/`Strumento`/`Titolo`, `Quantità`/`Pezzi`,
 `Prezzo medio di carico`/`PMC`/`Prezzo di carico`, `Controvalore`/`Valore di mercato`. Se il tuo
-export usa nomi che non riconosce, li aggiungi ai dizionari `SINONIMI` in testa allo script — è una
-riga. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il formato atteso: sugli
+export usa nomi che non riconosce, rinomina le colonne nella copia del CSV che sta nella cartella di
+lavoro (mai lo script nel plugin, che si sovrascrive a ogni aggiornamento) e segnala i nomi, così
+entrano tra i sinonimi. I file `assets/esempio-estratto.csv` ed `esempio-zainetto.csv` mostrano il formato atteso: sugli
 esempi le uniche plus sono di un ETF, quindi l'importatore risponde «€ 0 a imposta zero».
 Lo zainetto accetta le colonne anno di **realizzo** (non di scadenza), importo residuo, aliquota e,
 se serve, broker. Le varianti della certificazione sono gestite con un avviso:

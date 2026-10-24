@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NOME = "wealth-management-it"
 
 # Cosa entra nello zip (relativo alla radice del repository).
-INCLUDI = [".claude-plugin", "commands", "skills", "README.md", "LICENSE", "NOTICE"]
+INCLUDI = [".claude-plugin", "commands", "skills", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE"]
 # Cosa resta fuori anche se dentro una cartella inclusa.
 ESCLUDI_DIR = {"__pycache__", ".git", "ordini"}
 ESCLUDI_FILE = {".DS_Store"}
@@ -64,6 +64,11 @@ def costruisci(out_dir, versione):
 
 
 def main():
+    for flusso in (sys.stdout, sys.stderr):   # UTF-8 anche su Windows (cp1252)
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"), metavar="DIR",
                     help="cartella di destinazione (default: dist/)")

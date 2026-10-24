@@ -48,8 +48,7 @@ Uso:  python allocatore-capitale.py [percorso/pianificatore-obiettivi.xlsx] [cap
 import os
 import sys
 
-from motore_bootstrap import (applica_override, crescita_glide, leggi_finestra_derisk, percorso_json,
-                              scrivi_json, verifica_intestazioni_obiettivi)
+from motore_bootstrap import cli, crescita_glide, errore, euro, leggi_pianificatore, numero, scrivi_json
 
 try:
     from openpyxl import load_workbook
@@ -75,53 +74,23 @@ FINESTRA_DERISK = None   # glide path dei terminanti: None = dal foglio (Paramet
 # ────────────────────────────────────────────────────────────────────────────
 
 # layout del foglio (coerente con pianificatore-obiettivi.xlsx)
-INFL_ROW = 6
-PROF_START, PROF_N = 10, 6
-GOAL_START, GOAL_N = 5, 10
 
 RANK_PRIORITA = {"essenziale": 0, "importante": 1, "desiderabile": 2}
 
 
 def leggi_excel(path):
-    wb = load_workbook(path, data_only=True)
-    verifica_intestazioni_obiettivi(wb["Obiettivi"])
-    par = wb["Parametri"]
-    obj = wb["Obiettivi"]
-
-    inflazione = par.cell(row=INFL_ROW, column=2).value or 0.0
-    finestra = leggi_finestra_derisk(par)
-
-    profili = {}
-    for i in range(PROF_N):
-        r = PROF_START + i
-        nome = par.cell(row=r, column=1).value
-        rend = par.cell(row=r, column=2).value
-        vol = par.cell(row=r, column=3).value
-        peso = par.cell(row=r, column=4).value
-        if nome:
-            profili[nome] = (float(rend), float(vol or 0), float(peso) if peso is not None else 0.0)
-
+    """Parametri, profili (rendimento, volatilità, % azionario) e obiettivi dal lettore unico del motore.
+    L'allocatore finanzia un importo: gli obiettivi senza target restano fuori, e lo dice."""
+    d = leggi_pianificatore(path)
+    profili = {n: (p["rendimento"], p["volatilita"], p["azionario"]) for n, p in d["profili"].items()}
     obiettivi = []
-    for i in range(GOAL_N):
-        r = GOAL_START + i
-        nome = obj.cell(row=r, column=1).value
-        imp = obj.cell(row=r, column=2).value
-        oriz = obj.cell(row=r, column=3).value
-        prof = obj.cell(row=r, column=4).value
-        gia = obj.cell(row=r, column=6).value
-        prio = obj.cell(row=r, column=7).value
-        tipo = obj.cell(row=r, column=14).value
-        if nome and imp and oriz and prof:
-            obiettivi.append({
-                "nome": nome,
-                "target_oggi": float(imp),
-                "orizzonte": int(oriz),
-                "profilo": prof,
-                "gia": float(gia) if gia else 0.0,
-                "priorita": (prio or "").strip().lower(),
-                "tipo": (tipo or "terminante").strip().lower(),
-            })
-    return inflazione, finestra, profili, obiettivi
+    for g in d["obiettivi"]:
+        if g["target_oggi"] is None:
+            print(f"⚠️  {g['nome']}: senza importo target («il più possibile») non c'è un capitale richiesto da "
+                  f"allocare: escluso. Il capitale libero può andarci via CAPITALE_LIBERO_SPLIT.")
+            continue
+        obiettivi.append(g)
+    return d["inflazione"], d["finestra"], profili, obiettivi
 
 
 def present_value(target_oggi, inflazione, rend, anni, rend_atterraggio=None, finestra=0):
@@ -202,27 +171,20 @@ def aggrega(righe, surplus, profili):
     return az, ob, cassa
 
 
-def euro(x):
-    return f"€{x:,.0f}".replace(",", ".")
-
-
 def main():
-    applica_override(globals())
-    json_out = percorso_json()
-    path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
-    capitale = float(sys.argv[2]) if len(sys.argv) > 2 else CAPITALE_DA_ALLOCARE
-    if not os.path.exists(path):
-        print(f"File non trovato: {path}")
-        sys.exit(1)
-
+    args = cli("Alloca una somma liquida tra i secchielli degli obiettivi del pianificatore e dà la vista aggregata "
+               "su tre classi (azioni, obbligazioni, liquidità).", globals(), json=True, argomenti=(
+                   (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),
+                   (("capitale",), {"nargs": "?", "type": float, "help": "somma da allocare in euro (default: CAPITALE_DA_ALLOCARE)"})))
+    json_out = args.json
+    path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
+    capitale = args.capitale if args.capitale is not None else CAPITALE_DA_ALLOCARE
     inflazione, finestra_foglio, profili, obiettivi = leggi_excel(path)
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     if PROFILO_CAPITALE_LIBERO not in profili:
         print(f"⚠️  Profilo capitale libero '{PROFILO_CAPITALE_LIBERO}' non in tabella.")
     if not obiettivi:
-        print("Nessun obiettivo nel foglio. Compila il pianificatore prima.")
-        sys.exit(1)
+        errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
 
     righe, residuo = alloca(obiettivi, capitale, inflazione, profili, finestra)
     tot_richiesto = sum(r["richiesto"] for r in righe)
@@ -232,7 +194,7 @@ def main():
     print("=" * 78)
     print("ALLOCATORE DI CAPITALE — come distribuire la somma liquida")
     print("=" * 78)
-    print(f"Capitale da allocare: {euro(capitale)}  |  inflazione attesa {inflazione*100:.1f}%")
+    print(f"Capitale da allocare: {euro(capitale)}  |  inflazione attesa {numero(inflazione*100, 1)}%")
     if CAPITALE_LIBERO_SPLIT:
         dett = ", ".join(f"{n} {int(round(p/(sum(x[1] for x in CAPITALE_LIBERO_SPLIT) or 1)*100))}%" for n, p, _ in CAPITALE_LIBERO_SPLIT)
         print(f"Capitale libero diviso tra: {dett}")
@@ -244,7 +206,9 @@ def main():
     print(f"  {'Obiettivo':<22}{'Profilo':<16}{'Richiesto oggi':>16}{'Allocato':>12}  Stato")
     for r in righe:
         base = "valore pieno (liquido)" if r["permanente"] and TRATTA_PERMANENTI_A_VALORE_PIENO else "present value"
-        if r["allocato"] <= 1e-6:
+        if r["richiesto"] <= 1e-6:
+            stato = "✓ già coperto"          # il già accantonato copre il target: niente da allocare
+        elif r["allocato"] <= 1e-6:
             stato = "✗ da versamenti"
         elif r["pieno"]:
             stato = "✓ pieno"
@@ -258,11 +222,11 @@ def main():
         for nome, imp, prof, waz in buckets_capitale_libero(surplus, profili):
             print(f"  {nome:<22}{prof:<16}{'—':>16}{euro(imp):>12}  capitale libero")
         if CAPITALE_LIBERO_SPLIT:
-            print(f"\nCAPITALE LIBERO: {euro(surplus)} ({surplus/capitale*100:.0f}% del capitale), diviso tra gli")
+            print(f"\nCAPITALE LIBERO: {euro(surplus)} ({numero(surplus/capitale*100)}% del capitale), diviso tra gli")
             print("  obiettivi di lungo termine qui sopra. È la parte che pesa di più sull'aggregato:")
             print("  cambiarne i pesi o i profili sposta l'allocazione complessiva più di ogni altra leva.")
         else:
-            print(f"\nCAPITALE LIBERO: {euro(surplus)} eccede gli obiettivi dichiarati ({surplus/capitale*100:.0f}% del capitale).")
+            print(f"\nCAPITALE LIBERO: {euro(surplus)} eccede gli obiettivi dichiarati ({numero(surplus/capitale*100)}% del capitale).")
             print(f"  Trattato come lungo termine al profilo {PROFILO_CAPITALE_LIBERO}. Definisci un obiettivo")
             print("  reale per questa somma, o usa CAPITALE_LIBERO_SPLIT per dividerla tra più obiettivi.")
     elif deficit > 1e-6:
@@ -280,10 +244,10 @@ def main():
     print("ALLOCAZIONE AGGREGATA — la tua vista finale sul capitale")
     print("-" * 78)
     if tot > 0:
-        print(f"  Azioni:        {euro(az):>12}   {az/tot*100:5.1f}%")
-        print(f"  Obbligazioni:  {euro(ob):>12}   {ob/tot*100:5.1f}%")
-        print(f"  Liquidità:     {euro(cassa):>12}   {cassa/tot*100:5.1f}%")
-        print(f"  {'Totale':<14}{euro(tot):>12}   100.0%")
+        print(f"  Azioni:        {euro(az):>12}   {numero(az/tot*100, 1):>5}%")
+        print(f"  Obbligazioni:  {euro(ob):>12}   {numero(ob/tot*100, 1):>5}%")
+        print(f"  Liquidità:     {euro(cassa):>12}   {numero(cassa/tot*100, 1):>5}%")
+        print(f"  {'Totale':<14}{euro(tot):>12}   100,0%")
     print("\nÈ questa l'allocazione target che il pianificatore Excel e it-rebalance")
     print("useranno come riferimento.")
 

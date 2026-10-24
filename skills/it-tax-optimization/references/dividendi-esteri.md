@@ -2,6 +2,15 @@
 
 Un dividendo pagato da una società estera viene tassato due volte: prima nello Stato della società, con una ritenuta alla fonte, poi in Italia. Questa reference spiega quanto resta in tasca all'investitore persona fisica residente, che detiene partecipazioni non qualificate fuori da un'attività d'impresa, e cosa si può recuperare. Riguarda soprattutto chi possiede azioni estere singole: per chi investe in ETF UCITS ad accumulazione il problema esiste, ma resta dentro il fondo (vedi più avanti). Non è consulenza: per i casi concreti serve un commercialista.
 
+## Indice
+
+- Il meccanismo in due passaggi
+- Le ritenute nei principali Paesi
+- Esempio: €1.000 di dividendo USA in regime amministrato
+- Il credito per le imposte estere: posizione dell'Agenzia e giurisprudenza
+- ETF ad accumulazione, ETF a distribuzione e azioni dirette
+- Cosa resta da verificare col commercialista
+
 ## Il meccanismo in due passaggi
 
 1. **Ritenuta estera.** Lo Stato della società trattiene un'imposta alla fonte con la propria aliquota interna. La convenzione contro le doppie imposizioni con l'Italia fissa un tetto più basso (di solito il 15% per l'investitore privato), ma il tetto si ottiene solo con la documentazione richiesta da quello Stato: un modulo prima del pagamento oppure una domanda di rimborso dopo.
@@ -56,7 +65,7 @@ Prelievo totale                        371,00 (37,1%)  482,00 (48,2%)
 
 Senza W-8BEN si perdono €111 ogni €1.000 di dividendo lordo. Non sono €150 perché il netto frontiera attutisce: la ritenuta italiana si calcola su una base più piccola. Il W-8BEN è il primo controllo da fare su qualsiasi dossier con azioni USA.
 
-Per confronto, lo stesso dividendo incassato tramite un broker estero che non fa da sostituto d'imposta (regime dichiarativo). Secondo l'Agenzia, l'imposta sostitutiva del 26% (art. 18 TUIR; dal 2027 nel D.Lgs. 117/2026, articolo da verificare) si calcola sul **lordo** (risposta 111/2020). Le istruzioni del Modello Redditi PF 2026 chiedono di indicare nel rigo RM31 l'importo «al lordo di eventuali ritenute subìte nello Stato estero»:
+Per confronto, lo stesso dividendo incassato tramite un broker estero che non fa da sostituto d'imposta (regime dichiarativo). Secondo l'Agenzia, l'imposta sostitutiva del 26% (art. 18 TUIR, dal 2027 art. 20 D.Lgs. 117/2026) si calcola sul **lordo** (risposta 111/2020). Le istruzioni del Modello Redditi PF 2026 chiedono di indicare nel rigo RM31 l'importo «al lordo di eventuali ritenute subìte nello Stato estero»:
 
 ```
 Dividendo lordo                      1.000,00
@@ -74,7 +83,7 @@ La Cassazione ha preso una strada diversa in due sentenze (Sez. V, n. 25698/2022
 
 Sono **aperture giurisprudenziali, non una regola**. Farle valere richiede un'istanza di rimborso all'Agenzia, con probabile contenzioso, e un commercialista che valuti la convenzione del singolo Paese. Se il credito fosse riconosciuto, nel caso dichiarativo dell'esempio il prelievo complessivo scenderebbe verso il 26%: è questa la posta in gioco.
 
-Dal 1° gennaio 2027 l'art. 165 TUIR diventa l'art. 185 del nuovo testo unico delle imposte sui redditi (D.Lgs. 117/2026), con lo stesso comma 1. L'art. 18 TUIR confluisce nel D.Lgs. 117/2026 (articolo da verificare).
+Dal 1° gennaio 2027 l'art. 165 TUIR diventa l'art. 185 del nuovo testo unico delle imposte sui redditi (D.Lgs. 117/2026), con lo stesso comma 1. L'art. 18 TUIR diventa l'art. 20 D.Lgs. 117/2026, con lo stesso comma 1.
 
 ## ETF ad accumulazione, ETF a distribuzione e azioni dirette
 
@@ -92,7 +101,7 @@ Come per la Tobin tax, l'impatto non va sovrastimato. Il profilo tipico del plug
 
 - Il trattamento in Italia delle somme rimborsate dallo Stato estero (ritenuta dell'intermediario o dichiarazione).
 - In dichiarativo, se la base del 26% sia il lordo, come ritiene l'Agenzia (rigo RM31), o il netto frontiera dell'amministrato: sul dividendo USA la differenza è di 3,9 punti (41,0% contro 37,1%).
-- Le aliquote e i moduli dei Paesi che non sono in tabella. Per i dividendi da Stati a fiscalità privilegiata valgono regole diverse (art. 27 c. 4 lett. b DPR 600/73; dal 2027 art. 55 dell'allegato al D.Lgs. 33/2025, comma da verificare).
+- Le aliquote e i moduli dei Paesi che non sono in tabella. Per i dividendi da Stati a fiscalità privilegiata valgono regole diverse (art. 27 c. 4 lett. b DPR 600/73; dal 2027 art. 55 c. 6 dell'allegato al D.Lgs. 33/2025).
 - L'istanza di rimborso basata sulla giurisprudenza della Cassazione: requisiti, termini e probabilità di successo per la convenzione del singolo Paese.
 - I casi particolari: dividendi in azioni o in natura, REIT e fondi esteri quotati, ADR, partecipazioni qualificate.
 - Le cedole di obbligazioni estere: seguono un meccanismo diverso, non trattato in questa reference.
