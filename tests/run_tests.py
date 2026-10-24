@@ -4604,6 +4604,9 @@ def t_excel_valori_sentinella():
     per_priorita = {p: sum((o[f"I{k}"].value or 0) for k in range(5, 15) if o[f"G{k}"].value == p)
                     for p in ("essenziale", "importante", "desiderabile")}
     assert abs(r["B12"].value - per_priorita["essenziale"]) < 0.01 and abs(r["B14"].value - per_priorita["desiderabile"]) < 0.01
+    # revisione T12: anche il totale «importante», e le tre priorità che ricompongono i versamenti
+    assert abs(r["B13"].value - per_priorita["importante"]) < 0.01, (r["B13"].value, per_priorita)
+    assert abs(r["B12"].value + r["B13"].value + r["B14"].value - r["B5"].value) < 0.01
     assert abs(r["B18"].value - sum(o[f"F{k}"].value or 0 for k in range(5, 15))) < 0.01 and r["B18"].value == 5000
     # cruscotto, modello consegnato: senza debiti il netto coincide con le attività e le quote sommano a 1
     orig = asset("it-revisione", "cruscotto-patrimoniale.xlsx")
