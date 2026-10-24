@@ -4605,7 +4605,7 @@ def t_excel_valori_sentinella():
                     for p in ("essenziale", "importante", "desiderabile")}
     assert abs(r["B12"].value - per_priorita["essenziale"]) < 0.01 and abs(r["B14"].value - per_priorita["desiderabile"]) < 0.01
     assert abs(r["B18"].value - sum(o[f"F{k}"].value or 0 for k in range(5, 15))) < 0.01 and r["B18"].value == 5000
-    # cruscotto: Patrimonio netto = attività − passività, quote sul netto che sommano a 1
+    # cruscotto, modello consegnato: senza debiti il netto coincide con le attività e le quote sommano a 1
     orig = asset("it-revisione", "cruscotto-patrimoniale.xlsx")
     pat = load_workbook(ricalcolati[orig], data_only=True)["Patrimonio"]
     attivita = sum(pat[f"B{k}"].value or 0 for k in range(6, 14))
@@ -4613,6 +4613,23 @@ def t_excel_valori_sentinella():
     assert pat["B14"].value == attivita == 64000 and pat["B19"].value == passivita and pat["B21"].value == attivita - passivita
     assert abs(sum(pat[f"C{k}"].value for k in range(6, 14)) - 1) < 1e-9, "le quote sul netto devono sommare a 1"
     assert abs(pat["C6"].value - 40000 / 64000) < 1e-9
+    # revisione T12: con passività a zero il modello non distingue netto e attività. La variante con
+    # un mutuo (B17), un altro debito (B18) e una voce in B12 vincola netto = attività − passività,
+    # quote sul netto (sommano a più di 1) e il totale delle attività esteso a B6:B13.
+    tmp = tempfile.mkdtemp()
+    try:
+        wb = load_workbook(orig)
+        wb["Patrimonio"]["B17"], wb["Patrimonio"]["B18"], wb["Patrimonio"]["B12"] = 20000, 5000, 1000
+        variante = os.path.join(tmp, "debiti.xlsx")
+        wb.save(variante)
+        (ricalcolata,) = ricalcolatore().ricalcola([variante], os.path.join(tmp, "out"))
+        v = load_workbook(ricalcolata, data_only=True)["Patrimonio"]
+        assert (v["B14"].value, v["B19"].value, v["B21"].value) == (65000, 25000, 40000), \
+            (v["B14"].value, v["B19"].value, v["B21"].value)
+        assert abs(v["C6"].value - 1) < 1e-9 and abs(v["C12"].value - 1000 / 40000) < 1e-9, (v["C6"].value, v["C12"].value)
+        assert abs(sum(v[f"C{k}"].value for k in range(6, 14)) - 65000 / 40000) < 1e-9, "quote non calcolate sul netto"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     # tracker: le cache consegnate coincidono col ricalcolo, salvo le celle volatili (TODAY)
     import math
     orig = asset("it-revisione", "tracker-secchielli.xlsx")
@@ -4632,7 +4649,11 @@ def t_excel_valori_sentinella():
     assert confrontate >= 139 and not diverse, (confrontate, diverse[:3])
 
 
-# Valori chiusi sui default (seed 42): cambiano solo se cambia la meccanica, e allora va detto nel changelog.
+# Valori chiusi sui default (seed 42). Cambiano se cambia la meccanica, ma anche se cambiano i parametri
+# normativi di netto-pensione.py (scaglioni, detrazioni, addizionali, contributi) o la serie
+# rendimenti-storici.csv con la CPI (montecarlo-pensione e ponte-pensione: vale anche per
+# PROB_PONTE_DEFAULT e il capitale necessario). Si aggiornano insieme al dato, seguendo il «Calendario»
+# del README, e la modifica va detta nel changelog.
 MC_PENSIONE_MEDIANA_DEFAULT = 169_205
 NETTO_TASSO_NETTO_MEDIANA_DEFAULT = 0.9693
 
@@ -4684,7 +4705,7 @@ def t_rami_avanzati():
         g_cur = json.load(open(_json_di(gp, "--set", "CURVATURA=0.5", "--json", os.path.join(tmp, "c.json")), encoding="utf-8"))
         lungo_l = next(o for o in g_lin["obiettivi"] if o["nome"].startswith("Lungo"))["quota_azionaria"]
         lungo_c = next(o for o in g_cur["obiettivi"] if o["nome"].startswith("Lungo"))["quota_azionaria"]
-        # a 3,5 anni dalla scadenza (metà della finestra di 7): lineare 0,65 × 0,5, curva 0,65 × sqrt(0,5)
+        # a 3 anni dalla scadenza (indice 17 su orizzonte 20, finestra di 7): lineare 0,65 × 3/7 ≈ 0,279, curva 0,65 × sqrt(3/7) ≈ 0,426
         assert abs(lungo_l[17] - 0.65 * 3 / 7) < 1e-3 and lungo_c[17] > lungo_l[17] and abs(lungo_c[17] - 0.65 * (3 / 7) ** 0.5) < 1e-3
         assert g_cur["curvatura"] == 0.5 and any("curvatura" in sc for sc in g_cur["scarti_dal_foglio"])
     finally:
