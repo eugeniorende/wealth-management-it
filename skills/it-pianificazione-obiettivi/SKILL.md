@@ -349,7 +349,7 @@ Questa è la versione 0.19 della skill (introdotta in v0.7 del plugin, estesa fi
 
 In quest'iterazione (v0.19):
 - **Guardia sulle intestazioni** del pianificatore (via `motore_bootstrap.verifica_intestazioni_obiettivi`): gli script leggono le colonne per posizione, quindi un layout modificato produrrebbe dati sbagliati in silenzio — ora produce un errore esplicito che indica colonna e intestazione attesa. Attiva in tutti e quattro i lettori (Monte Carlo, glide path, allocatore, asset location).
-- **`--json <file>`** sull'allocatore: aggregato a tre classi, surplus/deficit e allocazioni per obiettivo in output machine-readable (per passare i numeri ad altri strumenti senza ricopiarli; oggi nessuno script lo legge in automatico).
+- **`--json <file>`** sull'allocatore (aggregato a tre classi, surplus/deficit e allocazioni per obiettivo), sul glide path (calendario della quota azionaria per obiettivo e aggregata, versamenti) e sul Monte Carlo (probabilità, percentili e versamenti per obiettivo, rischio sistemico): output machine-readable per il cruscotto di `it-revisione` (il suo contratto di input dice quale campo va in quale cella) e per altri strumenti, senza ricopiare i numeri.
 
 In quest'iterazione (v0.18):
 - **Override `--set NOME=VALORE`** su tutti gli script della skill (Monte Carlo, glide path, allocatore, asset location, decumulo), via `motore_bootstrap.applica_override`: parametri di scenario da riga di comando, senza toccare i file, componibili con gli argomenti esistenti — es. `python glidepath-obiettivi.py piano.xlsx --set FINESTRA_DERISK=5`. Refusi respinti, override loggati.

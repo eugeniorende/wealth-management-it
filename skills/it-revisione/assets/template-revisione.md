@@ -2,7 +2,7 @@
 
 > Data della revisione: [gg/mm/aaaa] · Periodo coperto: [da] → [a] · Prossima revisione: [quando]
 
-*Template da compilare. Le parti tra [parentesi] vanno sostituite; le righe in corsivo sono promemoria di cosa inserire e si possono cancellare. Genera la parte quantitativa con il cruscotto (`cruscotto-patrimoniale.xlsx`) e tira l'avanzamento dei domini dagli strumenti delle skill specifiche.*
+*Template da compilare. Le parti tra [parentesi] vanno sostituite; le righe in corsivo sono promemoria di cosa inserire e si possono cancellare. Genera la parte quantitativa con il cruscotto (`cruscotto-patrimoniale.xlsx`) e tira l'avanzamento dei domini dagli strumenti delle skill specifiche: gli script con `--json` (`montecarlo-obiettivi.py`, `glidepath-obiettivi.py`, `allocatore-capitale.py`, la catena `proiezione-inps.py` → `montecarlo-pensione.py` → `netto-pensione.py`, `importa-estratto-broker.py`) scrivono i campi che il contratto di input di `SKILL.md` associa a ogni cella del cruscotto.*
 
 ---
 

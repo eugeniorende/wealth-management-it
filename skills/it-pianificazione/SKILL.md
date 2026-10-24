@@ -109,10 +109,20 @@ L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si
 **Percorso automatico (preferito)**: se l'utente ha i file reali, usare `assets/importa-previdenza.py`:
 
 ```bash
-python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--set ALIQUOTA_COMPUTO=0.25]
+python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--set ALIQUOTA_COMPUTO=0.25] [--json dati.json]
 ```
 
-Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): proporlo quando l'output finisce in chat o in un documento da condividere.
+Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): proporlo quando l'output finisce in chat o in un documento da condividere. Con `--json` i parametri pronti finiscono in un file che gli script a valle leggono con `--from`, senza ricopiarli:
+
+```bash
+python importa-previdenza.py estratto.xml fondo.csv --anonimo --json dati.json
+python proiezione-inps.py      --from dati.json --json inps.json
+python montecarlo-pensione.py  --from dati.json --from inps.json --json mc.json
+python netto-pensione.py       --from mc.json --json netto.json
+python ponte-pensione.py       --from inps.json --from mc.json --set ETA_USCITA=62 --json ponte.json
+```
+
+Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin.
 
 Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico movimenti del fondo pensione** (CSV), e produce: anzianità e retribuzioni per anno, la ricostruzione del montante contributivo (contributi × aliquota, capitalizzati coi tassi ufficiali ISTAT — tabella verificata nello script, ±qualche % rispetto al dato esatto de "La mia pensione futura"), montante del fondo per comparto con stima euristica del mix azionario, versamenti per anno/fonte, e il blocco di parametri pronti per `proiezione-inps.py` e `montecarlo-pensione.py`. I dati reali battono sempre quelli dichiarati a memoria.
 
@@ -377,7 +387,7 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 Questa è la versione 0.11 della skill (introdotta in v0.4 del plugin, estesa in v0.8.11).
 
 In quest'iterazione (v0.11):
-- **Pipeline `--json <file>`** su tutta la catena previdenziale (`proiezione-inps`, `montecarlo-pensione`, `netto-pensione`, `ponte-pensione`): i risultati chiave si scrivono anche in JSON, così passano da uno script all'altro senza travasi a mano. Componibile con `--set`.
+- **Pipeline `--json <file>`** su tutta la catena previdenziale (`proiezione-inps`, `montecarlo-pensione`, `netto-pensione`, `ponte-pensione`): i risultati chiave si scrivono anche in JSON. Dalla 0.11 gli script a valle li leggono con `--from <file>` (importa-previdenza → proiezione INPS → Monte Carlo → netto e ponte), con la precedenza `--set` > `--from` > default: la catena gira senza travasi a mano, vedi lo Step 1.
 - **Freshness fiscale**: i dati normativi negli script e nelle reference portano il marcatore `Verificato: AAAA-MM`; la test suite fallisce se un marcatore supera i 12 mesi — i dati fiscali scadono per design, e la suite obbliga a riverificarli.
 
 In quest'iterazione (v0.10):

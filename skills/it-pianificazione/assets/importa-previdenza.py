@@ -40,7 +40,7 @@ import datetime
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 
-from motore_bootstrap import cli, errore, numero, pct
+from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 
 # ============================== PARAMETRI ==============================
 
@@ -267,7 +267,8 @@ def eta_stampata(eta, anonimo):
 
 def main():
     args = cli("Importa l'estratto conto contributivo INPS (XML) e lo storico del fondo pensione (CSV) e stampa i "
-               "parametri pronti per proiezione-inps.py e montecarlo-pensione.py.", globals(), argomenti=(
+               "parametri pronti per proiezione-inps.py e montecarlo-pensione.py (anche in JSON, con --json, "
+               "che quegli script leggono con --from).", globals(), json=True, argomenti=(
                    (("estratto_inps",), {"help": "estratto conto contributivo INPS in XML (dal portale INPS)"}),
                    (("storico_fondo",), {"nargs": "?", "help": "storico movimenti del fondo pensione in CSV (facoltativo)"}),
                    (("--anonimo",), {"action": "store_true",
@@ -392,6 +393,17 @@ def main():
             print(f"  FP_VERSAMENTO_ANNUO = {v_annuo:_.0f}" +
                   f"   # osservato nel {ultimo_anno_v}: aggiorna se cambi contribuzione")
     print("\nQuesto strumento è educativo e non costituisce consulenza finanziaria o previdenziale.")
+
+    if args.json:   # mai nomi né date: solo i parametri (l'età come nei parametri pronti)
+        dati = {"montante_attuale": round(montante, 2), "ral_attuale": round(ral_rif, 2),
+                "contributi_solo_dal_1996": bool(prima)}
+        if "nascita" in anag:
+            dati["eta_attuale"] = eta_stampata((oggi - anag["nascita"]).days / 365.25, anonimo)
+        if fp_montante is not None:
+            dati["fp_montante_attuale"] = round(fp_montante, 2)
+            if versamenti:
+                dati["fp_versamento_annuo"] = round(v_annuo, 2)
+        scrivi_json(args.json, dati)
 
 
 if __name__ == "__main__":

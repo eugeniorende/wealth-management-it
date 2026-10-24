@@ -45,7 +45,7 @@ import os
 import numpy as np
 
 from motore_bootstrap import (blocchi_bootstrap, carica_storico, cli, errore, euro, frazioni_glide, indici_bootstrap,
-                              leggi_pianificatore, numero, pmt_glide, scarti_dal_foglio)
+                              leggi_pianificatore, numero, pmt_glide, scarti_dal_foglio, scrivi_json)
 
 # ---- Parametri della simulazione ----
 N_SIM = 20000              # numero di percorsi simulati
@@ -263,7 +263,7 @@ def simula_congiunta(obiettivi_def, n_sim=N_SIM):
 
 def main():
     args = cli("Monte Carlo degli obiettivi: probabilità di successo, percentili del capitale finale e versamento "
-               "per la confidenza-obiettivo, dal pianificatore compilato.", globals(), argomenti=(
+               "per la confidenza-obiettivo, dal pianificatore compilato.", globals(), json=True, argomenti=(
                    (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
     if SEED is not None:
         np.random.seed(SEED)
@@ -312,6 +312,8 @@ def main():
     totale_pmt_det = 0.0
     totale_pmt_conf = 0.0
     obiettivi_def = []   # raccolti per la simulazione congiunta (rischio sistemico)
+    risultati = []       # per il JSON
+    sistemico = None
 
     for g in obiettivi:
         rend, vol, peso_az = profili[g["profilo"]]     # il lettore ha già respinto i profili ignoti
@@ -336,6 +338,15 @@ def main():
 
         totale_pmt_det += pmt_det
         totale_pmt_conf += pmt_conf
+        risultati.append({
+            "nome": g["nome"], "profilo": g["profilo"], "priorita": g["priorita"], "anni": anni,
+            "target_oggi": g["target_oggi"], "target_nominale": round(target_nom, 2), "gia": g["gia"],
+            "probabilita_successo": round(float(p_succ), 4),
+            "capitale_finale": {"p10": round(float(p10), 2), "mediana": round(float(p50), 2), "p90": round(float(p90), 2)},
+            "versamento_deterministico": round(pmt_det, 2), "sovra_finanziato": bool(sovra_finanziato),
+            "versamento_confidenza": round(pmt_conf, 2), "confidenza": CONFIDENZA_TARGET,
+            "glide_path": glide is not None,
+        })
         obiettivi_def.append({
             "nome": g["nome"], "gia": g["gia"], "pmt": pmt_det, "target_nom": target_nom,
             "anni": anni, "peso_az": peso_az, "rend": rend, "priorita": g["priorita"],
@@ -474,6 +485,9 @@ def main():
             print(f"      mercato condiviso (congiunta):     {numero(all_fail_cor*100, 1):>5}%   ← realistico")
             direzione = "SOTTOSTIMA" if all_fail_cor > all_fail_ind else "sovrastima"
             print(f"      → l'indipendenza {direzione} di {numero(abs(all_fail_cor-all_fail_ind)*100, 1)} punti il rischio che salti tutto insieme.")
+            sistemico = {"obiettivi": [o["nome"] for o in usati],
+                         "tutti_falliscono": {"indipendenti": round(all_fail_ind, 4), "congiunta": round(all_fail_cor, 4)},
+                         "tutti_riescono": {"indipendenti": round(all_succ_ind, 4), "congiunta": round(all_succ_cor, 4)}}
             print(f"\n  P(TUTTI riescono insieme):")
             print(f"      indipendenti (prodotto):           {numero(all_succ_ind*100, 1):>5}%")
             print(f"      mercato condiviso (congiunta):     {numero(all_succ_cor*100, 1):>5}%")
@@ -481,6 +495,16 @@ def main():
             print("  condividono il mercato (l'effetto cresce se condividono esposizione azionaria).")
             print("  Per questo il fondo emergenza e gli essenziali vanno coperti per primi.")
             print("  Dettagli in mercati-e-correlazione.md.")
+
+    if args.json:
+        scrivi_json(args.json, {
+            "modello": MODELLO, "n_sim": N_SIM, "seed": SEED, "capacita_mensile": capacita,
+            "inflazione": inflazione, "finestra": finestra, "glide": bool(GLIDE), "scarti_dal_foglio": scarti,
+            "obiettivi": risultati,
+            "totale_versamento_deterministico": round(totale_pmt_det, 2),
+            "totale_versamento_confidenza": round(totale_pmt_conf, 2),
+            "rischio_sistemico": sistemico,
+        })
 
 
 if __name__ == "__main__":

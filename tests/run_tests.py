@@ -4165,6 +4165,95 @@ def t_json():
         assert k in d, f"chiave JSON mancante: {k}"
 
 
+@test("T9 catena --json → --from: importa-previdenza → proiezione INPS → Monte Carlo → netto e ponte, stessi numeri")
+def t_catena_previdenziale():
+    # F027: la catena era promessa in SKILL.md e nel changelog ma nessuno script leggeva un JSON.
+    import json as _json
+    P = lambda n: asset("it-pianificazione", n)
+    tmp = tempfile.mkdtemp()
+    j = lambda n: os.path.join(tmp, n)
+    leggi = lambda n: _json.load(open(j(n), encoding="utf-8"))
+    try:
+        rc, out = run_script(P("importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-test.xml"),
+                             os.path.join(FIXTURES, "storico-fondo-test.csv"), "--anonimo", "--json", j("dati.json"))
+        assert rc == 0, out[-300:]
+        dati = leggi("dati.json")
+        assert set(dati) >= {"montante_attuale", "ral_attuale", "eta_attuale", "fp_montante_attuale", "fp_versamento_annuo"}, dati
+        assert "ROSSI" not in open(j("dati.json"), encoding="utf-8").read() and dati["eta_attuale"] == int(dati["eta_attuale"]), dati
+        assert dati["ral_attuale"] == 31000 and dati["fp_montante_attuale"] == 2000, dati
+        rc, out = run_script(P("proiezione-inps.py"), "--from", j("dati.json"), "--json", j("inps.json"))
+        assert rc == 0 and "[from] dati.json: MONTANTE_ATTUALE=" in out and "RAL_ATTUALE=31000" in out, out[-400:]
+        inps = leggi("inps.json")
+        assert abs(euro(out, "PENSIONE LORDA ANNUA") - inps["pensione_inps_lorda_annua"]) <= 1
+        assert inps["eta_pensionamento"] == 69 and "RAL: € 31.000 oggi" in out, out[:400]
+        rc, out = run_script(P("montecarlo-pensione.py"), "--from", j("dati.json"), "--from", j("inps.json"),
+                             "--set", "N_SIM=2000", "--json", j("mc.json"))
+        assert rc == 0 and "[from] inps.json: PENSIONE_INPS_ANNUA=" in out and "[from] dati.json: FP_POT_ATTUALE=2000" in out, out[-500:]
+        mc = leggi("mc.json")
+        assert mc["pensione_inps_lorda"] == inps["pensione_inps_lorda_annua"] and mc["ral_finale"] == inps["ral_finale"], (mc, inps)
+        assert mc["anni"] == inps["anni_al_pensionamento"]
+        rc, out = run_script(P("netto-pensione.py"), "--from", j("mc.json"), "--json", j("netto.json"))
+        assert rc == 0 and "[from] mc.json: PENSIONE_INPS_LORDA=" in out and "RENDITE_FP=" in out, out[-400:]
+        netto = leggi("netto.json")
+        mod = _modulo_previdenza("netto-pensione.py")
+        atteso, _, _ = mod.netto_pensionato(inps["pensione_inps_lorda_annua"], mod.ADDIZIONALE_REGIONALE, mod.ADDIZIONALE_COMUNALE)
+        assert abs(netto["netto_pensione_inps"] - atteso) < 0.01, (netto["netto_pensione_inps"], atteso)
+        assert [s["rendita_lorda"] for s in netto["scenari"]] == [mc["rendita_fp"]["p10"], mc["rendita_fp"]["mediana"], mc["rendita_fp"]["p90"]]
+        rc, out = run_script(P("ponte-pensione.py"), "--from", j("inps.json"), "--from", j("mc.json"),
+                             "--set", "N_SIM=2000", "--json", j("ponte.json"))
+        assert rc == 0 and "[from] mc.json: MONTANTE_FP_ALL_USCITA=" in out, out[-400:]
+        ponte = leggi("ponte.json")
+        assert ponte["montante_fp_all_uscita"] == mc["montante_fp"]["mediana"] and ponte["eta_pensione_vecchiaia"] == 69, ponte
+        assert abs(ponte["rita"]["rata_lorda"] - mc["montante_fp"]["mediana"] / 5) < 0.01, ponte["rita"]
+        # precedenza: --set prevale su --from; un JSON di un altro script → rc 1; file mancante → rc 1
+        rc, out = run_script(P("montecarlo-pensione.py"), "--from", j("inps.json"), "--set", "PENSIONE_INPS_ANNUA=1.0",
+                             "--set", "N_SIM=500", "--json", j("mc2.json"))
+        assert rc == 0 and leggi("mc2.json")["pensione_inps_lorda"] == 1.0, out[-300:]
+        rc, out = run_script(P("proiezione-inps.py"), "--from", j("mc.json"))
+        assert rc == 1 and "nessuna delle chiavi attese" in out and "Traceback" not in out, (rc, out[-300:])
+        rc, out = run_script(P("proiezione-inps.py"), "--from", j("manca.json"))
+        assert rc == 1 and "non trovato" in out, (rc, out[-300:])
+        rc, out = run_script(P("netto-pensione.py"), "--help")
+        assert "chiavi lette da --from" in out and "rendita_fp → RENDITE_FP" in out, out[-500:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T9 --json di glide path e Monte Carlo degli obiettivi: gli stessi numeri dello stdout, chiavi del contratto")
+def t_json_obiettivi():
+    import json as _json
+    OB = "it-pianificazione-obiettivi"
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(asset(OB, "glidepath-obiettivi.py"), "--json", os.path.join(tmp, "g.json"))
+        assert rc == 0, out[-300:]
+        g = _json.load(open(os.path.join(tmp, "g.json"), encoding="utf-8"))
+        nomi = {o["nome"]: o for o in g["obiettivi"]}
+        assert set(nomi) == {"Fondo di emergenza", "Anticipo casa", "Lungo termine / libertà"} and g["finestra"] == 7
+        lungo = nomi["Lungo termine / libertà"]
+        assert lungo["quota_azionaria"][:14] == [0.65] * 14 and lungo["quota_azionaria"][20] == 0.0 and len(lungo["quota_azionaria"]) == 21
+        assert nomi["Anticipo casa"]["quota_azionaria"][7] is None, "terminante concluso → None"
+        assert nomi["Fondo di emergenza"]["permanente"] and nomi["Fondo di emergenza"]["quota_azionaria"][20] == 0.0
+        assert f"Lungo termine / libertà: {_euro_it(lungo['versamento_mensile'])}/mese" in out, lungo["versamento_mensile"]
+        assert len(g["portafoglio"]) == 21 and all(0 <= x <= 1 for x in g["portafoglio"]) and g["portafoglio"][20] == 0.0
+        assert _pct_it(g["portafoglio"][3] * 100, 0) + "%" in out.split("PORTAFOGLIO")[1], g["portafoglio"][3]
+        rc, out = run_script(asset(OB, "montecarlo-obiettivi.py"), "--set", "N_SIM=3000", "--set", "MODELLO='bootstrap'",
+                             "--json", os.path.join(tmp, "m.json"))
+        assert rc == 0, out[-300:]
+        m = _json.load(open(os.path.join(tmp, "m.json"), encoding="utf-8"))
+        prob = _prob_obiettivi(out)
+        for o in m["obiettivi"]:
+            assert round(o["probabilita_successo"] * 100) == prob[o["nome"]], (o["nome"], o["probabilita_successo"], prob)
+            assert o["capitale_finale"]["p10"] <= o["capitale_finale"]["mediana"] <= o["capitale_finale"]["p90"]
+            assert o["versamento_confidenza"] >= o["versamento_deterministico"] >= 0 and o["confidenza"] == 0.85
+        assert abs(sum(o["versamento_deterministico"] for o in m["obiettivi"]) - m["totale_versamento_deterministico"]) < 0.05
+        assert m["modello"] == "bootstrap" and m["n_sim"] == 3000
+        rs = m["rischio_sistemico"]
+        assert rs and rs["tutti_falliscono"]["congiunta"] >= rs["tutti_falliscono"]["indipendenti"], rs
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 @test("guardia intestazioni: colonna spostata → errore esplicito, non dati sbagliati")
 def t_guardia():
     from openpyxl import load_workbook

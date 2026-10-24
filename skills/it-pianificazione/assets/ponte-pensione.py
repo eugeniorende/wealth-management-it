@@ -152,7 +152,10 @@ def capitale_per_confidenza(target, rendimenti, prelievi, lo=0.0, hi=3_000_000.0
 
 def main():
     args = cli("Ponte pensionistico: Monte Carlo del capitale che copre l'uscita anticipata, RITA e costi "
-               "permanenti sulla pensione.", globals(), json=True)
+               "permanenti sulla pensione.", globals(), json=True,
+               da_json={"montante_fp.mediana": "MONTANTE_FP_ALL_USCITA",        # da montecarlo-pensione.py
+                        "eta_pensionamento": "ETA_PENSIONE_VECCHIAIA",         # da proiezione-inps.py
+                        "coefficiente_trasformazione": "COEFF_TRASFORMAZIONE"})
     json_out = args.json
     if SEED is not None:
         np.random.seed(SEED)
@@ -246,6 +249,9 @@ def main():
     if json_out:
         scrivi_json(json_out, {
             "anni_ponte": anni_ponte,
+            "eta_uscita": ETA_USCITA,
+            "eta_pensione_vecchiaia": ETA_PENSIONE_VECCHIAIA,
+            "montante_fp_all_uscita": MONTANTE_FP_ALL_USCITA,
             "probabilita_successo": round(float(prob), 4),
             "inflazione": inflazione_usata()[1],
             "capitale_ponte": CAPITALE_PONTE,

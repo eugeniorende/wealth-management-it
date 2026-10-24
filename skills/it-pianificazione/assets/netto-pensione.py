@@ -176,7 +176,13 @@ def netto_lavoratore(ral, aliq_contr, add_reg, add_com):
 
 def main():
     args = cli("Tasso di sostituzione netto: pensione netta (IRPEF, detrazioni, rendita del fondo) su ultimo "
-               "stipendio netto, per più scenari di rendita.", globals(), json=True)
+               "stipendio netto, per più scenari di rendita.", globals(), json=True,
+               da_json={"pensione_inps_lorda_annua": "PENSIONE_INPS_LORDA",   # da proiezione-inps.py
+                        "pensione_inps_lorda": "PENSIONE_INPS_LORDA",         # da montecarlo-pensione.py
+                        "ral_finale": "RAL_FINALE_LORDA",
+                        "rendita_fp": ("RENDITE_FP", lambda d: [("P10", float(d["p10"])),
+                                                                ("mediana", float(d["mediana"])),
+                                                                ("P90", float(d["p90"]))])})
     json_out = args.json
 
     print("=" * 74)

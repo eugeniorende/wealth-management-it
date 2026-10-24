@@ -73,6 +73,24 @@ Report in markdown, cinque sezioni che ricalcano il workflow. C'è un **template
 
 Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo; dal repository del plugin, `python scripts/ricalcola-excel.py <file>` lo ricalcola in locale italiano e segnala le celle in errore. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
 
+### Contratto di input: da dove viene ogni numero
+
+Ogni cella di input del cruscotto ha una fonte precisa. Dove la fonte è uno script, lanciarlo con `--json FILE` dalla cartella di lavoro e leggere dal file i campi indicati; il resto viene dagli estratti. Le celle sono quelle del foglio consegnato.
+
+| Dominio | Fonte (skill) | Campo del JSON o dell'estratto | Cella del cruscotto |
+|---|---|---|---|
+| Patrimonio | estratti di broker, fondo e banca (nessuno script) | saldi a oggi per contenitore; debiti residui | `Patrimonio!B6:B13`; `B17:B18` |
+| Allocazione attuale | `importa-estratto-broker.py --json` (it-tax-optimization), più fondo e liquidità | `posizioni[].valore`, sommati per classe (lo script dà la categoria fiscale, la classe la assegni tu) | `Allocazione!B5:B9` |
+| Allocazione target | `allocatore-capitale.py --json` (it-pianificazione-obiettivi) | `aggregato.azioni`, `.obbligazioni`, `.liquidita` diviso `aggregato.totale` | `Allocazione!D5:D7` (`D8:D9` a mano) |
+| Glide path | `glidepath-obiettivi.py --json` (it-pianificazione-obiettivi) | `portafoglio[anno]`, la quota azionaria aggregata dell'anno del piano | `Allocazione!D5`, se il target segue il calendario |
+| Andamento | estratti (nessuno script) | saldo iniziale e finale, versamenti netti; inflazione del periodo | `Andamento!B4:B6`; `B14` |
+| Obiettivi | `montecarlo-obiettivi.py --json` (it-pianificazione-obiettivi) | `obiettivi[].probabilita_successo`; `obiettivi[].gia` e `obiettivi[].target_oggi` (o le colonne F e B del pianificatore); `obiettivi[].priorita` | `Sintesi!E6:E9`; `B6:B9` e `C6:C9`; `G6:G9` |
+| Pensione, dipendenti | `proiezione-inps.py --json` → `montecarlo-pensione.py --from --json` → `netto-pensione.py --from --json` (it-pianificazione) | `tasso_sostituzione_lordo_vs_ral_finale` dalla proiezione, oppure `scenari[].tasso_sostituzione_netto` del netto (è il netto che misura il tenore di vita: dirlo nel report) | `Sintesi!B12`; l'obiettivo `B13` a mano |
+| Pensione, autonomi | `proiezione-pensione-autonomi.xlsx`, foglio Riepilogo (nessuno script) | tasso di sostituzione | `Sintesi!B12` |
+| Fiscalità | `importa-estratto-broker.py --json` | `analisi.per_broker[broker].zainetto_in_scadenza` e `.plus_realizzabili_a_costo_zero` | foglio `Azioni`, righe di scadenza al 31/12 (nessuna cella numerica) |
+
+Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione; `--help` di ogni script elenca anche le chiavi che legge con `--from`.
+
 ## Anti-pattern (NON FARE MAI)
 
 - ❌ **Ricalcolare da zero** ciò che fanno le altre skill: la revisione le **richiama** e sintetizza. Per la proiezione pensionistica si usa `it-pianificazione`, non si rifà il calcolo qui.
