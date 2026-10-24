@@ -6,8 +6,8 @@ Documento per riprendere lo sviluppo in un'altra sessione (Claude Code in cloud 
 
 - **0.10.0 rilasciata il 22/10/2026**: tag `v0.10.0`, release con lo zip, merge back su develop (PR #35 e #36). Dentro: ondata 0, T1-T8, T10, T11 e parte di T13. Le sessioni cloud del 21-23/10 hanno chiuso T2, T3, T13, T8, T7, T11 (sessione A) e T5, T4, T6 con le note previdenziali (sessione B).
 - **Dopo il tag, su develop** (e9d804c, CI verde su 3.11 e 3.14): PR #37 (art. 13 c. 10 del TUIR 2027 in `netto-pensione.py`, Inarcassa under 35), PR #38 (corrispondenze 2027 verificate su Normattiva, verbali in `t11/verifica-2026-10-22-*.md`), PR #39 (LibreOffice in CI con i `.deb` in cache, `scripts/installa-libreoffice.sh`), PR #40 (T7: campo `quota_titoli_stato` e aliquota mista per ETF e fondi su titoli di Stato). Nessuna delle quattro è nel changelog del README né nello «Stato al» di `ROADMAP.md`. La prossima versione è la **0.11.0**: la #40 è una funzionalità nuova, quindi niente 0.10.1.
-- Nessuna PR aperta oltre a quella di questo documento. Branch remoti già mergiati e da cancellare: `claude/kind-meitner-crztg2`, `claude/vigilant-cannon-1otexq`, `feature/verifiche-fonti` (`delete_branch_on_merge` è spento sul repository).
-- Suite: 108 test (`@test` in `tests/run_tests.py`). Freshness: nessun marcatore scade prima del 2027-06.
+- PR #41 (questo documento) mergiata il 24/10/2026; PR #42 «stato dopo la 0.10.0» (§ 2.1). Branch remoti già mergiati e **da cancellare dal proprietario**: `claude/kind-meitner-crztg2`, `claude/vigilant-cannon-1otexq`, `feature/verifiche-fonti`, `feature/handoff-0.11` e i `feature/*` delle PR di questa sessione. Dalla sessione cloud la cancellazione è negata: il proxy GitHub risponde 403 sia a `git push origin --delete` sia a `DELETE /git/refs` (`delete_branch_on_merge` è spento sul repository e non si può accendere da qui).
+- Suite: 110 test (`@test` in `tests/run_tests.py`; il conteggio nel README è vincolato da un test di igiene). Freshness: nessun marcatore scade prima del 2027-06.
 - Il repository è **privato** e resta tale: la visibilità la decide il proprietario (decisione 2 di `ROADMAP.md`).
 
 Questo documento nasce da una ricognizione del 23/10/2026 su develop e9d804c: cinque lettori, uno per fetta della roadmap, e due verificatori avversariali per ogni voce (lenti «stato» ed «evidenza»). Le righe citate valgono a quel commit. Delle 11 note fuori perimetro del passaggio precedente 10 sono chiuse (PR #27, #28, #30, #31, #32, #38 e i commit dei temi); le revisioni avversariali di T7, T11 e T13 non hanno rilievi non applicati.
@@ -16,15 +16,9 @@ Questo documento nasce da una ricognizione del 23/10/2026 su develop e9d804c: ci
 
 ### 2.1 Incoerenze documentali, da chiudere per prime
 
-- `ROADMAP.md:162` «flag `--anonimo`» non spuntato, ma la PR #27 è mergiata (`importa-previdenza.py:19-21`, `:255-264`; `README.md:151`; `python tests/run_tests.py --only anonimo` verde): spuntare, e con essa «Privacy dei dati utente» (`:160`).
-- `ROADMAP.md:3` «Stato al 22/10/2026» e changelog del README (`README.md:126` «v0.10.0 (corrente)») senza le PR #37-#40: aprire una sezione «Non rilasciato» con le quattro voci.
-- Conteggio dei test: `README.md:74` dice 107, `README.md:470` dice «40 test, circa 15 secondi»; i decoratori sono 108. Un solo conteggio, con un test di igiene che confronti il numero nel README con i `@test` (oggi nessun test lo fa).
-- `README.md:27` «Errori noti»: le corrispondenze 2027 «da verificare» sono chiuse dalla PR #38 salvo due punti (DM 21/02/2013 e art. 306 c. 6, § 2.7).
-- `.github/workflows/freshness.yml:38` e `release.yml:27` girano su Python 3.12, fuori dalla matrice 3.11/3.14 di `tests.yml`.
-- `ROADMAP.md:189` branch protection: non attivabile su un repository privato senza GitHub Pro (l'API risponde 403): annotare «dopo la pubblicazione».
-- Quattro frasi superate nel README, nella stessa PR dei conteggi: `README.md:474` «Contiene solo manifest, comandi, skill e README» (lo zip ha anche LICENSE e NOTICE: `scripts/pacchetto.py:28`, `README.md:554`); `:545` dice che il test di igiene e il packaging verificano l'allineamento delle versioni, ma `t_marketplace` (`run_tests.py:83-91`) confronta solo `name` e `source` e `pacchetto.py:74-79` solo il tag con `plugin.json` (diventa vera con l'assert di F061); `:437` «procedura verificata … luglio 2026»; `:68` «smoke test».
-- `ROADMAP.md` non ha una «Linea di taglio e rilascio» per la 0.11, a differenza della 0.10.0 (`:128-132`), e la regola Gitflow di `:27` cita ancora `release/0.10.0`: aggiungere criteri (T9, T12 e pre-pubblicazione chiuse) e finestra (§ 3, passo 7).
-- Questo file va tenuto aggiornato a ogni PR (§ 1 e § 2).
+Chiusa dalla PR #42 (24/10/2026): `--anonimo` e «Privacy» spuntati; «Stato al 24/10/2026» e sezione «Non rilasciato» del changelog con le PR #37-#40; un solo conteggio dei test nel README vincolato da `t_conteggio_test` (storico del changelog escluso); «Errori noti» aggiornato; `freshness.yml` e `release.yml` su Python 3.11 con `t_python_workflow` che li tiene nella matrice; branch protection rinviata a dopo la pubblicazione; frasi superate del README corrette (zip con LICENSE e NOTICE, prova di installazione del 21/10/2026, niente «smoke test»); `t_marketplace` confronta anche `version` (l'assert di F061); «Linea di taglio e rilascio della 0.11.0» e regola Gitflow generica in ROADMAP.
+
+Resta, nella PR dell'encoding (§ 2.3): `ROADMAP.md` «Windows ed encoding», «oggi 6 script su 7 vanno in crash con cp1252» → 12 su 14.
 
 ### 2.2 T9 — interfaccia degli script e flusso dati (P1, XL)
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-Stato al 22/10/2026, con la 0.10.0 rilasciata (ondata 0, T1-T8, T10, T11 e parte di T13). La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 24/10/2026: 0.10.0 rilasciata il 22/10/2026 (ondata 0, T1-T8, T10, T11 e parte di T13); su `develop`, non ancora rilasciate, le PR #37 (art. 13 c. 10 TUIR 2027, Inarcassa under 35), #38 (corrispondenze 2027 verificate su Normattiva), #39 (LibreOffice in cache nella CI) e #40 (aliquota mista di T7), raccolte nella sezione «Non rilasciato» del changelog del README. La prossima versione è la 0.11.0. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
@@ -24,7 +24,7 @@ Prese il 20/10/2026.
 - **Fonti primarie.** Prima di aggiornare il marcatore `Verificato: AAAA-MM` si controllano Normattiva, la Gazzetta Ufficiale, le circolari di INPS e Agenzia delle Entrate e COVIP. Le fonti secondarie servono a trovare un problema, non a chiuderlo.
 - **Test che vincolano i numeri.** Si lavora in TDD, con valori chiusi o invarianti. Uno smoke test che controlla solo `rc == 0` non chiude un finding.
 - **Citazioni dal 2027.** Doppio riferimento, vecchio e nuovo testo unico, con la mappa di F035 (T11).
-- **Gitflow.** `feature/*` verso `develop`; `release/0.10.0` verso `main`, con il tag.
+- **Gitflow.** `feature/*` verso `develop` con merge commit e branch eliminato dopo il merge; `release/X.Y.Z` verso `main`, con il tag e il merge back su `develop`.
 
 ## 0.10.0 — correttiva, entro il 31/12/2026
 
@@ -151,15 +151,21 @@ Prese il 20/10/2026.
   - [x] In più, da F030: soglia 5/25 per classe nel cruscotto e nella riga aggregata del tracker.
   - [ ] Contratto di input della revisione (F031): resta a T9.
 
+### Linea di taglio e rilascio della 0.11.0
+
+- Criteri: T9 e T12 chiusi, le voci di «Pre-pubblicazione» spuntate o motivate come riservate al proprietario (visibilità, branch protection, icona, prove di installazione da account esterno e in Cowork).
+- `release/0.11.0` parte da `develop` → PR su `main` con merge commit → tag `v0.11.0` → `release.yml` (suite completa con freshness, zip con LICENSE e NOTICE) → merge back di `main` su `develop`.
+- Finestra: i marcatori più vecchi sono del 2026-06 e scadono a giugno 2027; `release.yml` esegue anche la freshness, quindi il tag va dato prima, oppure dopo una riverifica alle fonti.
+
 ## Pre-pubblicazione — prima di rendere pubblico il repository
 
 - [x] **Licenza** (PR #16):
   - LICENSE e NOTICE (Apache-2.0) nel repository e nello zip, cioè in `INCLUDI` di `scripts/pacchetto.py`;
   - SHA dell'upstream fissato: l'ultimo commit prima della rimozione è `ef165e4160`; il confronto non trova righe di testo in comune con l'upstream;
   - sezione Licenza riscritta e link all'upstream fissato al commit. Il campo `upstream` di `plugin.json` resta a T14.
-- [ ] **Privacy dei dati utente:**
+- [x] **Privacy dei dati utente:**
   - [x] inventario dei campi che ogni script stampa: nessuna chiamata di rete; solo importa-previdenza stampa dati identificativi (intestatario e data di nascita);
-  - [ ] flag `--anonimo` in importa-previdenza (dopo il filone previdenza, che ha quel file);
+  - [x] flag `--anonimo` in importa-previdenza (PR #27): omette intestatario e data di nascita, stampa solo l'età;
   - [x] sezione «Dove vanno i tuoi dati» nel README.
 - [ ] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: oggi 6 script su 7 vanno in crash con cp1252.
 - [ ] **Formati italiani:**
@@ -186,4 +192,4 @@ Prese il 20/10/2026.
 
 ## Fuori dal codice
 
-- [ ] Branch protection su `main` e `develop` con i check `test` e `validate`, da impostare su GitHub.
+- [ ] Branch protection su `main` e `develop` con i check `test` e `validate`, da impostare su GitHub **dopo la pubblicazione**: su un repository privato senza GitHub Pro non è attivabile (l'API risponde 403, verificato il 23/10/2026). Decisione del proprietario.
