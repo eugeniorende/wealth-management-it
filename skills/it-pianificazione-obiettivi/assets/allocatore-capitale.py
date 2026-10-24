@@ -48,8 +48,7 @@ Uso:  python allocatore-capitale.py [percorso/pianificatore-obiettivi.xlsx] [cap
 import os
 import sys
 
-from motore_bootstrap import (cli, crescita_glide, errore, euro, leggi_finestra_derisk, numero, scrivi_json,
-                              verifica_intestazioni_obiettivi)
+from motore_bootstrap import cli, crescita_glide, errore, euro, leggi_pianificatore, numero, scrivi_json
 
 try:
     from openpyxl import load_workbook
@@ -75,53 +74,23 @@ FINESTRA_DERISK = None   # glide path dei terminanti: None = dal foglio (Paramet
 # ────────────────────────────────────────────────────────────────────────────
 
 # layout del foglio (coerente con pianificatore-obiettivi.xlsx)
-INFL_ROW = 6
-PROF_START, PROF_N = 10, 6
-GOAL_START, GOAL_N = 5, 10
 
 RANK_PRIORITA = {"essenziale": 0, "importante": 1, "desiderabile": 2}
 
 
 def leggi_excel(path):
-    wb = load_workbook(path, data_only=True)
-    verifica_intestazioni_obiettivi(wb["Obiettivi"])
-    par = wb["Parametri"]
-    obj = wb["Obiettivi"]
-
-    inflazione = par.cell(row=INFL_ROW, column=2).value or 0.0
-    finestra = leggi_finestra_derisk(par)
-
-    profili = {}
-    for i in range(PROF_N):
-        r = PROF_START + i
-        nome = par.cell(row=r, column=1).value
-        rend = par.cell(row=r, column=2).value
-        vol = par.cell(row=r, column=3).value
-        peso = par.cell(row=r, column=4).value
-        if nome:
-            profili[nome] = (float(rend), float(vol or 0), float(peso) if peso is not None else 0.0)
-
+    """Parametri, profili (rendimento, volatilità, % azionario) e obiettivi dal lettore unico del motore.
+    L'allocatore finanzia un importo: gli obiettivi senza target restano fuori, e lo dice."""
+    d = leggi_pianificatore(path)
+    profili = {n: (p["rendimento"], p["volatilita"], p["azionario"]) for n, p in d["profili"].items()}
     obiettivi = []
-    for i in range(GOAL_N):
-        r = GOAL_START + i
-        nome = obj.cell(row=r, column=1).value
-        imp = obj.cell(row=r, column=2).value
-        oriz = obj.cell(row=r, column=3).value
-        prof = obj.cell(row=r, column=4).value
-        gia = obj.cell(row=r, column=6).value
-        prio = obj.cell(row=r, column=7).value
-        tipo = obj.cell(row=r, column=14).value
-        if nome and imp and oriz and prof:
-            obiettivi.append({
-                "nome": nome,
-                "target_oggi": float(imp),
-                "orizzonte": int(oriz),
-                "profilo": prof,
-                "gia": float(gia) if gia else 0.0,
-                "priorita": (prio or "").strip().lower(),
-                "tipo": (tipo or "terminante").strip().lower(),
-            })
-    return inflazione, finestra, profili, obiettivi
+    for g in d["obiettivi"]:
+        if g["target_oggi"] is None:
+            print(f"⚠️  {g['nome']}: senza importo target («il più possibile») non c'è un capitale richiesto da "
+                  f"allocare: escluso. Il capitale libero può andarci via CAPITALE_LIBERO_SPLIT.")
+            continue
+        obiettivi.append(g)
+    return d["inflazione"], d["finestra"], profili, obiettivi
 
 
 def present_value(target_oggi, inflazione, rend, anni, rend_atterraggio=None, finestra=0):
@@ -210,9 +179,6 @@ def main():
     json_out = args.json
     path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
     capitale = args.capitale if args.capitale is not None else CAPITALE_DA_ALLOCARE
-    if not os.path.exists(path):
-        errore(f"file non trovato: {path}")
-
     inflazione, finestra_foglio, profili, obiettivi = leggi_excel(path)
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     if PROFILO_CAPITALE_LIBERO not in profili:
@@ -240,7 +206,9 @@ def main():
     print(f"  {'Obiettivo':<22}{'Profilo':<16}{'Richiesto oggi':>16}{'Allocato':>12}  Stato")
     for r in righe:
         base = "valore pieno (liquido)" if r["permanente"] and TRATTA_PERMANENTI_A_VALORE_PIENO else "present value"
-        if r["allocato"] <= 1e-6:
+        if r["richiesto"] <= 1e-6:
+            stato = "✓ già coperto"          # il già accantonato copre il target: niente da allocare
+        elif r["allocato"] <= 1e-6:
             stato = "✗ da versamenti"
         elif r["pieno"]:
             stato = "✓ pieno"

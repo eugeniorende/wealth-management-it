@@ -36,9 +36,8 @@ Vedi asset-location.md.
 
 import sys
 import os
-from openpyxl import load_workbook
 
-from motore_bootstrap import cli, errore, euro, numero, verifica_intestazioni_obiettivi
+from motore_bootstrap import cli, errore, euro, leggi_pianificatore, numero
 
 # ============================================================
 # PARAMETRI EDITABILI
@@ -75,40 +74,14 @@ REINVESTI_RISPARMIO_IRPEF = True  # True: il risparmio IRPEF è reinvestito nel 
                                   # False: contato come cassa nominale non reinvestita
 
 # Posizioni note nel foglio
-INFL_ROW = 6
-PROF_START = 10
-PROF_N = 6
-GOAL_START = 5
-GOAL_N = 10
 
 
 def leggi_excel(path):
-    wb = load_workbook(path, data_only=True)
-    verifica_intestazioni_obiettivi(wb["Obiettivi"])
-    par = wb["Parametri"]
-    obj = wb["Obiettivi"]
-    inflazione = par.cell(row=INFL_ROW, column=2).value or 0
-    profili = {}
-    for i in range(PROF_N):
-        r = PROF_START + i
-        nome = par.cell(row=r, column=1).value
-        rend = par.cell(row=r, column=2).value
-        if nome:
-            profili[nome] = float(rend)
-    obiettivi = []
-    for i in range(GOAL_N):
-        r = GOAL_START + i
-        nome = obj.cell(row=r, column=1).value
-        imp = obj.cell(row=r, column=2).value
-        oriz = obj.cell(row=r, column=3).value
-        prof = obj.cell(row=r, column=4).value
-        gia = obj.cell(row=r, column=6).value
-        if nome and imp and oriz and prof:
-            obiettivi.append({
-                "nome": nome, "orizzonte": int(oriz), "profilo": prof,
-                "gia": float(gia) if gia else 0.0,
-            })
-    return inflazione, profili, obiettivi
+    """Inflazione, rendimento per profilo e obiettivi con un importo dal lettore unico del motore."""
+    d = leggi_pianificatore(path)
+    profili = {n: p["rendimento"] for n, p in d["profili"].items()}
+    obiettivi = [g for g in d["obiettivi"] if g["target_oggi"] is not None]
+    return d["inflazione"], profili, obiettivi
 
 
 def lordo_da_netto(netto):

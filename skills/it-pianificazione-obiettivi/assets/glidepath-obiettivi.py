@@ -36,10 +36,9 @@ modella la volatilità). Vedi glide-path.md per i limiti e l'interpretazione.
 
 import sys
 import os
-from openpyxl import load_workbook
 
-from motore_bootstrap import (cli, errore, euro, finestra_nel_foglio, frazioni_glide, leggi_finestra_derisk, numero,
-                              pmt_glide, quota_glide, scarti_dal_foglio, verifica_intestazioni_obiettivi)
+from motore_bootstrap import (cli, errore, euro, frazioni_glide, leggi_pianificatore, numero, pmt_glide, quota_glide,
+                              scarti_dal_foglio)
 
 # ---- Parametri del glide path (editabili) ----
 FINESTRA_DERISK = None   # anni prima della scadenza in cui inizia il de-risking;
@@ -50,50 +49,14 @@ CURVATURA = 1.0          # forma della rampa: 1.0 = lineare; <1 tiene la quota a
                          #   (più crescita, de-risking tardivo); >1 de-riska prima e più dolce dopo
 
 # Posizioni note nel foglio (coerenti con build_obiettivi.py)
-CAP_ROW = 5
-INFL_ROW = 6
-PROF_START = 10
-PROF_N = 6
-GOAL_START = 5
-GOAL_N = 10
 
 
 def leggi_excel(path):
-    wb = load_workbook(path, data_only=True)
-    verifica_intestazioni_obiettivi(wb["Obiettivi"])
-    par = wb["Parametri"]
-    obj = wb["Obiettivi"]
-    inflazione = par.cell(row=INFL_ROW, column=2).value or 0
-    finestra = leggi_finestra_derisk(par)
-    nel_foglio = finestra_nel_foglio(par)
-    profili = {}
-    for i in range(PROF_N):
-        r = PROF_START + i
-        nome = par.cell(row=r, column=1).value
-        rend = par.cell(row=r, column=2).value
-        eq = par.cell(row=r, column=4).value  # % azionario (colonna D)
-        if nome:
-            profili[nome] = (float(rend), float(eq))
-    obiettivi = []
-    for i in range(GOAL_N):
-        r = GOAL_START + i
-        nome = obj.cell(row=r, column=1).value
-        imp = obj.cell(row=r, column=2).value
-        oriz = obj.cell(row=r, column=3).value
-        prof = obj.cell(row=r, column=4).value
-        gia = obj.cell(row=r, column=6).value
-        tipo = obj.cell(row=r, column=14).value  # colonna N: terminante / permanente
-        if nome and oriz and prof:
-            obiettivi.append({
-                "nome": nome,
-                # target opzionale: vuoto = "il più possibile" (si proietta il solo capitale)
-                "target_oggi": float(imp) if imp else None,
-                "orizzonte": int(oriz),
-                "profilo": prof, "gia": float(gia) if gia else 0.0,
-                # default: terminante (caso comune); permanente solo se indicato
-                "permanente": (str(tipo).strip().lower() == "permanente"),
-            })
-    return inflazione, finestra, nel_foglio, profili, obiettivi
+    """Parametri, profili (rendimento, % azionario) e obiettivi dal lettore unico del motore: qui entrano
+    anche gli obiettivi senza target («il più possibile», marcati (max))."""
+    d = leggi_pianificatore(path)
+    profili = {n: (p["rendimento"], p["azionario"]) for n, p in d["profili"].items()}
+    return d["inflazione"], d["finestra"], d["finestra_nel_foglio"], profili, d["obiettivi"]
 
 
 def rendimento_a_quota(quota, profili):
@@ -121,9 +84,6 @@ def main():
                "l'aggregato di portafoglio.", globals(), argomenti=(
                    (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
     path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
-    if not os.path.exists(path):
-        errore(f"file non trovato: {path}")
-
     inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     if not obiettivi:
         errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
@@ -137,7 +97,7 @@ def main():
 
     # pre-calcolo per ogni obiettivo: pmt, finestra, capitale proiettato anno per anno
     for g in obiettivi:
-        rend, eq = profili.get(g["profilo"], (0.0, 0.0))
+        rend, eq = profili[g["profilo"]]        # il lettore ha già respinto i profili ignoti
         g["rend"], g["eq_start"] = rend, eq
         g["finestra"] = min(finestra, g["orizzonte"])
         # i terminanti de-riskano: rendimento dell'anno lineare nella quota tra profilo e atterraggio

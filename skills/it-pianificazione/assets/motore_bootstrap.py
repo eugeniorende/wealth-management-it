@@ -23,6 +23,8 @@ Contenuto:
   - applica_override(spazio): override '--set NOME=VALORE' delle costanti da riga di comando
   - scrivi_json: i risultati chiave su file JSON (il flag --json lo dà cli())
   - verifica_intestazioni_obiettivi(ws): guardia sul layout del pianificatore Excel
+  - leggi_pianificatore(path): l'unico lettore del pianificatore compilato (parametri, profili,
+    obiettivi), con le stesse regole per i quattro script degli obiettivi
   - quota_glide / frazioni_glide / pmt_glide / crescita_glide / leggi_finestra_derisk /
     finestra_nel_foglio / scarti_dal_foglio: il glide path del pianificatore obiettivi, unica
     definizione per foglio, Monte Carlo, glide path e allocatore
@@ -289,6 +291,125 @@ def verifica_intestazioni_obiettivi(ws, riga=4):
                 f"Struttura del pianificatore NON riconosciuta: in colonna {col} (riga {riga}) "
                 f"attendevo un'intestazione contenente '{kw}', trovato {val!r}. Gli script leggono "
                 f"le colonne per posizione: se il layout è stato modificato, ripristinalo.")
+
+
+# ── Lettore unico del pianificatore ─────────────────────────────────────────
+# Layout del pianificatore-obiettivi.xlsx (letto per posizione, con la guardia sulle intestazioni):
+#   Parametri!B5 capacità di risparmio mensile, B6 inflazione, A7:B7 finestra di de-risking,
+#   A10:D15 profili (nome, rendimento, volatilità, % azionario); Obiettivi, righe 5-14:
+#   A nome, B target in euro di oggi, C orizzonte in anni, D profilo, F già accantonato,
+#   G priorità, N tipo (terminante / permanente).
+RIGA_CAPACITA, RIGA_INFLAZIONE = 5, 6
+PROFILI_PRIMA_RIGA, PROFILI_N = 10, 6
+OBIETTIVI_PRIMA_RIGA, OBIETTIVI_N = 5, 10
+
+
+def _numero_cella(valore, dove, cosa):
+    """Numero da una cella del pianificatore; una cella di testo («40.000») è un errore esplicito."""
+    if valore is None or valore == "":
+        return None
+    if isinstance(valore, bool) or not isinstance(valore, (int, float)):
+        try:
+            return float(str(valore).replace(".", "").replace(",", "."))
+        except ValueError:
+            errore(f"{cosa} non numerico in {dove}: {valore!r} (la cella è testo: riscrivila come numero)")
+    return float(valore)
+
+
+def leggi_pianificatore(path, avvisa=print):
+    """Legge il pianificatore compilato e ritorna un dizionario con capacita, inflazione, finestra,
+    finestra_nel_foglio, profili e obiettivi: l'unico lettore dei quattro script degli obiettivi, così
+    gli errori di compilazione più comuni danno lo stesso esito ovunque.
+
+    - foglio Parametri o Obiettivi mancante, importi scritti come testo, profilo che non è nella tabella,
+      orizzonte non intero → ERRORE esplicito (rc 1), mai un KeyError o un numero sbagliato in silenzio
+    - il profilo si confronta senza maiuscole e spazi, come il CERCA.VERT del foglio: «crescita» → «Crescita»
+    - target vuoto → None, cioè «il più possibile»: ogni script decide se usarlo (il glide path sì,
+      Monte Carlo e allocatore no, e lo dicono)
+    - riga con il nome ma senza orizzonte o profilo → scartata con un avviso che dice il motivo
+    - priorità e tipo in minuscolo; tipo mancante = terminante; coperto = il già accantonato copre il target
+    - un avviso se il file è il modello dentro il plugin: i dati vanno in una copia nella cartella di lavoro
+    profili: {nome: {"rendimento", "volatilita", "azionario"}}; obiettivi: lista di dizionari con nome,
+    target_oggi, orizzonte, profilo (il nome canonico della tabella), gia, priorita, tipo, permanente, coperto.
+    """
+    from openpyxl import load_workbook
+    if not os.path.exists(path):
+        errore(f"file non trovato: {path}")
+    if os.path.dirname(os.path.abspath(path)) == os.path.dirname(os.path.abspath(__file__)):
+        avvisa("⚠️  Stai leggendo il pianificatore d'esempio dentro il plugin: copia il file nella tua cartella "
+               "di lavoro, compilalo lì e passane il percorso allo script.")
+    try:
+        wb = load_workbook(path, data_only=True)
+    except Exception as e:   # zipfile.BadZipFile, InvalidFileException, OSError: non è un xlsx leggibile
+        errore(f"{path} non è un pianificatore xlsx leggibile ({type(e).__name__}: {e})")
+    for foglio in ("Parametri", "Obiettivi"):
+        if foglio not in wb.sheetnames:
+            errore(f"foglio «{foglio}» mancante in {os.path.basename(path)} (fogli presenti: "
+                   f"{', '.join(wb.sheetnames)}): non è un pianificatore-obiettivi.xlsx")
+    par, obj = wb["Parametri"], wb["Obiettivi"]
+    verifica_intestazioni_obiettivi(obj)
+
+    profili = {}
+    for r in range(PROFILI_PRIMA_RIGA, PROFILI_PRIMA_RIGA + PROFILI_N):
+        nome = par.cell(row=r, column=1).value
+        if nome is None or str(nome).strip() == "":
+            continue
+        nome = str(nome).strip()
+        rend = _numero_cella(par.cell(row=r, column=2).value, f"Parametri!B{r}", f"rendimento del profilo «{nome}»")
+        if rend is None:
+            errore(f"profilo «{nome}» senza rendimento in Parametri!B{r}")
+        profili[nome] = {
+            "rendimento": rend,
+            "volatilita": _numero_cella(par.cell(row=r, column=3).value, f"Parametri!C{r}", "volatilità") or 0.0,
+            "azionario": _numero_cella(par.cell(row=r, column=4).value, f"Parametri!D{r}", "% azionario") or 0.0,
+        }
+    if not profili:
+        errore(f"nessun profilo in Parametri!A{PROFILI_PRIMA_RIGA}:A{PROFILI_PRIMA_RIGA + PROFILI_N - 1}")
+    canonici = {n.casefold(): n for n in profili}
+
+    obiettivi = []
+    for r in range(OBIETTIVI_PRIMA_RIGA, OBIETTIVI_PRIMA_RIGA + OBIETTIVI_N):
+        celle = {col: obj.cell(row=r, column=c).value for col, c in
+                 (("nome", 1), ("target", 2), ("orizzonte", 3), ("profilo", 4), ("gia", 6), ("priorita", 7), ("tipo", 14))}
+        vuote = all(v is None or str(v).strip() == "" for v in celle.values())
+        if vuote:
+            continue
+        nome = str(celle["nome"] or "").strip()
+        if not nome:
+            avvisa(f"⚠️  Obiettivi!riga {r}: riga senza nome scartata (compilata solo in parte)")
+            continue
+        mancanti = [c for c in ("orizzonte", "profilo") if celle[c] is None or str(celle[c]).strip() == ""]
+        if mancanti:
+            avvisa(f"⚠️  Obiettivi!riga {r}: «{nome}» scartato, manca {' e '.join(mancanti)}")
+            continue
+        oriz = _numero_cella(celle["orizzonte"], f"Obiettivi!C{r}", f"orizzonte di «{nome}»")
+        if oriz is None or oriz <= 0 or not float(oriz).is_integer():
+            errore(f"orizzonte di «{nome}» in Obiettivi!C{r} non valido: {celle['orizzonte']!r} "
+                   f"(il pianificatore ragiona per anni interi, da 1 in su)")
+        profilo = canonici.get(str(celle["profilo"]).strip().casefold())
+        if profilo is None:
+            errore(f"profilo «{celle['profilo']}» di «{nome}» (Obiettivi!D{r}) non è nella tabella dei profili: "
+                   f"{', '.join(profili)}")
+        target = _numero_cella(celle["target"], f"Obiettivi!B{r}", f"target di «{nome}»")
+        gia = _numero_cella(celle["gia"], f"Obiettivi!F{r}", f"già accantonato di «{nome}»") or 0.0
+        tipo = str(celle["tipo"] or "terminante").strip().casefold() or "terminante"
+        obiettivi.append({
+            "nome": nome, "target_oggi": target, "orizzonte": int(oriz), "profilo": profilo, "gia": gia,
+            "priorita": str(celle["priorita"] or "").strip().casefold(), "tipo": tipo,
+            "permanente": tipo.startswith("perman"),
+            "coperto": target is not None and gia >= target - 1e-6,
+        })
+
+    return {
+        "capacita": _numero_cella(par.cell(row=RIGA_CAPACITA, column=2).value, f"Parametri!B{RIGA_CAPACITA}",
+                                  "capacità di risparmio") or 0.0,
+        "inflazione": _numero_cella(par.cell(row=RIGA_INFLAZIONE, column=2).value, f"Parametri!B{RIGA_INFLAZIONE}",
+                                    "inflazione") or 0.0,
+        "finestra": leggi_finestra_derisk(par),
+        "finestra_nel_foglio": finestra_nel_foglio(par),
+        "profili": profili,
+        "obiettivi": obiettivi,
+    }
 
 
 # ── Glide path del pianificatore obiettivi ──────────────────────────────────
