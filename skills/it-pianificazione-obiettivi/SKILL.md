@@ -1,6 +1,8 @@
 ---
 name: it-pianificazione-obiettivi
-description: Pianificazione finanziaria goals-based (per obiettivi) per investitori privati italiani. Aiuta a definire più obiettivi finanziari (fondo di emergenza, acquisto casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte temporale, importo e priorità, e per ognuno determina il profilo di allocazione appropriato all'orizzonte e il piano di accumulo necessario per raggiungerlo. Usa questa skill quando l'utente parla di: pianificare gli investimenti, da dove iniziare a investire, quanto mettere da parte al mese, obiettivi finanziari, fondo di emergenza, risparmiare per la casa / per i figli / per la pensione, asset allocation per obiettivo, orizzonte temporale e rischio, "ho X € e non so come allocarli", PAC piano di accumulo, bucket strategy, quanto devo risparmiare per raggiungere un obiettivo, probabilità di raggiungere un obiettivo, simulazione Monte Carlo del piano. È il passo A MONTE di `it-rebalance`: definisce l'allocazione target che poi it-rebalance mantiene. È EDUCATIVA e METODOLOGICA: insegna il framework e mostra allocazioni-tipo come esempi illustrativi, NON raccomanda titoli specifici né costituisce consulenza di investimento. NON sceglie l'asset allocation "giusta" al posto dell'utente; gli dà gli strumenti per decidere.
+description: "Pianificazione finanziaria per obiettivi (goals-based) per investitori privati italiani: più obiettivi (fondo di emergenza, casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte, importo e priorità, con il profilo di allocazione adatto all'orizzonte e il piano di accumulo per raggiungerlo. Usa questa skill quando l'utente parla di pianificare gli investimenti, da dove iniziare, quanto mettere da parte al mese, fondo di emergenza, risparmiare per la casa o per i figli, asset allocation per obiettivo, orizzonte e rischio, «ho X € e non so come allocarli», PAC, bucket strategy, probabilità di raggiungere un obiettivo, Monte Carlo del piano, glide path. È il passo a monte di `it-rebalance`: definisce l'allocazione target che quella mantiene. Postura educativa e metodologica: mostra allocazioni-tipo come esempi, NON raccomanda titoli specifici, NON sceglie l'allocazione al posto dell'utente e NON è consulenza di investimento."
+metadata:
+  version: "0.20"
 ---
 
 # it-pianificazione-obiettivi
@@ -352,50 +354,3 @@ Workflow tipico end-to-end: l'utente parte da qui per definire obiettivi e alloc
 - `assets/decumulo-obiettivi.py` — simulazione del decumulo: probabilità di successo, sensibilità sul tasso di prelievo, dimostrazione del rischio di sequenza, confronto con/senza buffer, lente USA vs scenario globale (de-rating) (richiede numpy; usa rendimenti-storici.csv)
 - `references/mercati-e-correlazione.md` — le due correzioni di onestà al Monte Carlo: la **non-USA-centricità** (l'azionario mondiale rende ~5,2% reale vs gli USA eccezionali, fonte DMS; de-rating e calibrazione globale) e la **correlazione sistemica** tra obiettivi (un crollo li colpisce insieme; l'indipendenza sottostima il rischio che saltino tutti nello stesso scenario)
 - **Vedi anche** `it-rebalance/SKILL.md` (mantenimento delle allocazioni), `it-tax-optimization/SKILL.md` (fiscalità degli strumenti), `it-pianificazione/SKILL.md` (obiettivo pensione)
-
-## Note per l'iterazione
-
-Questa è la versione 0.19 della skill (introdotta in v0.7 del plugin, estesa fino a v0.9.4).
-
-In quest'iterazione (v0.19):
-- **Guardia sulle intestazioni** del pianificatore (via `motore_bootstrap.verifica_intestazioni_obiettivi`): gli script leggono le colonne per posizione, quindi un layout modificato produrrebbe dati sbagliati in silenzio — ora produce un errore esplicito che indica colonna e intestazione attesa. Attiva in tutti e quattro i lettori (Monte Carlo, glide path, allocatore, asset location).
-- **`--json <file>`** sull'allocatore (aggregato a tre classi, surplus/deficit e allocazioni per obiettivo), sul glide path (calendario della quota azionaria per obiettivo e aggregata, versamenti) e sul Monte Carlo (probabilità, percentili e versamenti per obiettivo, rischio sistemico): output machine-readable per il cruscotto di `it-revisione` (il suo contratto di input dice quale campo va in quale cella) e per altri strumenti, senza ricopiare i numeri.
-
-In quest'iterazione (v0.18):
-- **Override `--set NOME=VALORE`** su tutti gli script della skill (Monte Carlo, glide path, allocatore, asset location, decumulo), via `motore_bootstrap.applica_override`: parametri di scenario da riga di comando, senza toccare i file, componibili con gli argomenti esistenti — es. `python "${CLAUDE_SKILL_DIR}/assets/glidepath-obiettivi.py" piano.xlsx --set FINESTRA_DERISK=5`. Refusi respinti, override loggati.
-
-In quest'iterazione (v0.17):
-- **Motore bootstrap condiviso** (`motore_bootstrap.py`, copia sincronizzata con `it-pianificazione`): `montecarlo-obiettivi.py` importa `carica_storico`, `blocchi_bootstrap` (traiettorie di portafoglio) e `indici_bootstrap` (estrazione condivisa di anni storici per il rischio congiunto — stessi shock per tutti gli obiettivi). Refactor validato bit-per-bit sul modello bootstrap con seed. `decumulo-obiettivi.py` mantiene deliberatamente la sua variante (blocchi non circolari, Generator): unificarla cambierebbe i percorsi simulati.
-
-In quest'iterazione (v0.16):
-- **Glide path con obiettivi senza target**: `glidepath-obiettivi.py` accetta nativamente gli obiettivi "il più possibile" (colonna target vuota) — prima venivano saltati e serviva un target fittizio. Per questi obiettivi non si calcola alcun versamento "necessario" (si proietta il solo capitale assegnato); il marcatore `(max)` li identifica nell'output. Se terminanti de-riskano e a scadenza si spendono; se permanenti restano e non de-riskano mai. Validato sul caso reale a quattro obiettivi (due con target, due senza).
-
-In quest'iterazione (v0.15):
-- **Capitale libero divisibile tra più obiettivi di lungo termine** nell'allocatore (`CAPITALE_LIBERO_SPLIT`): l'eccedenza non va più a un unico bucket ma può essere ripartita (con pesi e profili distinti) tra obiettivi come integrazione pensione ed eredità — è la leva che muove di più l'aggregato. Aggiunto un **sesto profilo "Azionario totale" (100%)** per obiettivi a orizzonte perpetuo (es. eredità che passa agli eredi senza mai liquidare: nessun rischio di sequenza da proteggere). Il profilo è first-class (tendina Excel, VLOOKUP estesi, letto da tutti gli script). Validato su dati reali (aggregato che passa dal 57% al 70% azionario spostando l'eredità al 100%) e a invariante (somma classi = capitale).
-
-In quest'iterazione (v0.14):
-- **Allocatore di capitale** (`assets/allocatore-capitale.py`): per chi parte da una **somma liquida** da investire (es. liquidando un vecchio gestito), propone come distribuirla tra i secchielli e ne ricava la **vista aggregata a tre classi** (azioni/obbligazioni/liquidità). Logica per valore attuale: riserve permanenti al valore pieno in liquidità, obiettivi terminanti al present value; allocazione per priorità; eccedenza come capitale libero (segnalato come da formalizzare). Colma il pezzo mancante tra "ho una somma" e "qual è la mia allocazione": l'Excel prendeva la ripartizione come dato e si fermava ad azionario vs non azionario, l'allocatore propone la ripartizione e dà le tre classi. Onesto sui limiti (vista lump sum; fiscalità della liquidazione rimandata a it-tax-optimization). Validato su dati reali e casi limite (capitale insufficiente, già accantonato, invariante somma = capitale). Dettagli in `references/allocazione-capitale.md`.
-
-In quest'iterazione (v0.13):
-- **Seconda strada nel Monte Carlo — la leva di rischio** (`assets/montecarlo-obiettivi.py`): quando il versamento per la confidenza supera la capacità e non si può versare di più, lo strumento mostra l'alternativa di alzare la quota azionaria a parità di versamento. Fa lo sweep dell'allocazione, trova quella che massimizza la probabilità, e — punto di onestà — mostra la **distribuzione intera** (non solo la probabilità) perché più rischio peggiora la coda sinistra. Segnala quando la leva è inadatta (essenziale/breve), controproducente (già in linea) o un'opzione reale (sotto-finanziato, lungo orizzonte), col costo sul caso brutto quantificato. Validato su dati reali e sintetici; la relazione rischio-probabilità non-monotòna è catturata. Allinea il modello allo spirito del fork (l'allocazione è una leva con un costo, non un 60/40 fisso). Dettagli in `references/monte-carlo.md`.
-
-Versioni precedenti:
-- Pianificazione goals-based generale multi-obiettivo
-- Profili di allocazione come esempi illustrativi (no robo-advisory)
-- Strumenti italiani principali (conto deposito, BTP, ETF UCITS, PAC)
-- Selection spec criteri-based per la scelta dello strumento concreto (uso personale)
-- Pianificatore Excel multi-obiettivo (`assets/pianificatore-obiettivi.xlsx`)
-- Simulazione Monte Carlo della probabilità di raggiungimento (`assets/montecarlo-obiettivi.py`)
-- Allocazione complessiva del portafoglio (aggregazione dei secchielli, stock + flusso)
-- Glide path automatico: calendario di de-risking anno per anno (`assets/glidepath-obiettivi.py`)
-- Flag terminante/permanente per obiettivo
-- Asset location avanzato: quale contenitore fiscale per quale obiettivo (`references/asset-location.md`)
-- Ottimizzatore quantitativo dell'asset location: beneficio fiscale netto per contenitore (`assets/asset-location-optimizer.py`), con reinvestimento opzionale del risparmio IRPEF
-- Monte Carlo con modello **bootstrap** dalla serie storica (`assets/rendimenti-storici.csv`) in alternativa alla Normale: code grasse, correlazioni e mean reversion della storia
-- **Fase di decumulo** (`references/decumulo.md` + `assets/decumulo-obiettivi.py`): tasso di prelievo sostenibile, rischio di sequenza dei rendimenti, mitigazioni, con la regola del 4% scontata onestamente per l'Europa
-- **Due correzioni di onestà al Monte Carlo** (`references/mercati-e-correlazione.md`): la non-USA-centricità del bootstrap (de-rating dell'azionario per passare dalla serie USA — eccezionale — allo scenario globale ~5,2% reale del Global Investment Returns Yearbook) e la correlazione sistemica tra obiettivi (simulazione congiunta con un unico percorso di mercato condiviso: l'indipendenza sottostima il rischio che saltino tutti insieme). Entrambe spostano le conclusioni verso il prudente.
-- Glide path a **curvatura** regolabile (lineare o non lineare)
-
-Roadmap:
-- ✅ Fase di **decumulo** delle riserve permanenti: coperta in `references/decumulo.md` + `assets/decumulo-obiettivi.py` (tasso sostenibile, rischio di sequenza, mitigazioni); la sequenza di liquidazione **fiscale** è in `it-rebalance/references/sequenza-liquidazione.md`
-- Possibile: bootstrap da serie storiche multiple (Europa, mondo) oltre a quella USA

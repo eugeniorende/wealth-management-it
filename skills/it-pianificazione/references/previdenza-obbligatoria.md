@@ -1,5 +1,16 @@
 # Previdenza obbligatoria INPS (lavoratore dipendente privato)
 
+## Indice
+
+- Il sistema contributivo
+- Formula di calcolo (contributivo puro)
+- Aliquote contributive lavoro dipendente privato 2026
+- Coefficienti di trasformazione 2025-2026 — Tabella ufficiale DM 20/11/2024
+- Requisiti di accesso pensione 2026
+- Tassazione assegno pensionistico
+- Tasso di sostituzione tipico (sistema contributivo puro)
+- Heuristic per la skill
+
 ## Il sistema contributivo
 
 Per i lavoratori senza contribuzione al 31/12/1995 (Legge Dini 335/1995), il sistema è interamente **contributivo**: la pensione si calcola in base ai contributi effettivamente versati, rivalutati, e trasformati in rendita all'età di pensionamento.

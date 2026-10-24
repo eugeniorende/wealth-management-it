@@ -2,6 +2,14 @@
 
 Questa reference è il punto di contatto tra `it-pianificazione` (IRPEF progressiva, regime previdenziale) e `it-tax-optimization` (imposta sostitutiva 26%/12,5%, regime amministrato sui finanziari). Le due fiscalità operano su **regimi distinti** e non si compensano direttamente, ma esistono **decisioni joint** dove coordinarle produce un beneficio fiscale combinato superiore alla somma delle singole.
 
+## Indice
+
+- Mappa concettuale: due regimi separati, leve coordinabili
+- I quattro pattern joint con valore concreto
+- Protocollo di handoff tra le due skill
+- Anti-pattern (NON FARE)
+- Heuristic operative per la skill
+
 ## Mappa concettuale: due regimi separati, leve coordinabili
 
 ```

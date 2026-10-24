@@ -2,6 +2,16 @@
 
 Questa reference approfondisce le 4 leve con esempi numerici completi. Il principio guida: **esaurire le leve a costo fiscale zero prima di passare a quelle che realizzano plusvalenze tassabili**.
 
+## Indice
+
+- Quadro riassuntivo
+- Portafoglio di esempio (usato in tutti i casi)
+- CASO A: Fase di accumulo con versamento disponibile (Leva 1 sola)
+- CASO B: Accumulo senza versamento sufficiente (Leve 1+3)
+- CASO C: La Leva 3 in azione (vendita in minus che ribilancia)
+- CASO D: Fase di decumulo (prelievi che ribilanciano)
+- Regola pratica finale
+
 ## Quadro riassuntivo
 
 | Leva | Meccanismo | Costo fiscale | Quando usarla |

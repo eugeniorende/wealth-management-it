@@ -2,6 +2,15 @@
 
 Questa reference contiene le formule per calcolare quanto risparmiare per raggiungere un obiettivo, il trattamento dell'inflazione, il glide path nel versamento, esempi worked e la logica di riconciliazione quando gli obiettivi sono più di uno e le risorse non bastano. Gli esempi usano i parametri del pianificatore Excel (`assets/pianificatore-obiettivi.xlsx`), quindi i numeri coincidono con quelli del foglio.
 
+## Indice
+
+- Le tre domande del piano di accumulo
+- Le convenzioni sui rendimenti
+- Le formule
+- Esempi worked
+- Riconciliazione multi-obiettivo
+- Heuristic per la skill
+
 ## Le tre domande del piano di accumulo
 
 1. **Quanto devo versare al mese** per raggiungere un obiettivo, dato un rendimento atteso?

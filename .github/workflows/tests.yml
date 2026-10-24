@@ -79,8 +79,10 @@ jobs:
       - run: pip install -r tests/requirements.txt
       - run: python tests/run_tests.py --skip freshness
 
-  # Il manifest del plugin passa `claude plugin validate` (errori bloccano,
-  # i warning no). Evita di scoprire un plugin.json rotto solo all'installazione.
+  # Il manifest del plugin passa `claude plugin validate --strict`: anche i warning
+  # (campi sconosciuti, nomi non kebab-case) bloccano. Evita di scoprire un plugin.json
+  # rotto solo all'installazione. Il solo avviso ammesso è ICON_MISSING del controllo
+  # per il plugin directory, che non cambia l'esito (l'icona la decide il proprietario).
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -89,4 +91,4 @@ jobs:
         with:
           node-version: 22
       - run: npm install -g @anthropic-ai/claude-code@2.1.305   # versione fissata: aggiornarla a mano
-      - run: claude plugin validate .
+      - run: claude plugin validate . --strict

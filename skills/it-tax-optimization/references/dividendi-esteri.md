@@ -2,6 +2,15 @@
 
 Un dividendo pagato da una società estera viene tassato due volte: prima nello Stato della società, con una ritenuta alla fonte, poi in Italia. Questa reference spiega quanto resta in tasca all'investitore persona fisica residente, che detiene partecipazioni non qualificate fuori da un'attività d'impresa, e cosa si può recuperare. Riguarda soprattutto chi possiede azioni estere singole: per chi investe in ETF UCITS ad accumulazione il problema esiste, ma resta dentro il fondo (vedi più avanti). Non è consulenza: per i casi concreti serve un commercialista.
 
+## Indice
+
+- Il meccanismo in due passaggi
+- Le ritenute nei principali Paesi
+- Esempio: €1.000 di dividendo USA in regime amministrato
+- Il credito per le imposte estere: posizione dell'Agenzia e giurisprudenza
+- ETF ad accumulazione, ETF a distribuzione e azioni dirette
+- Cosa resta da verificare col commercialista
+
 ## Il meccanismo in due passaggi
 
 1. **Ritenuta estera.** Lo Stato della società trattiene un'imposta alla fonte con la propria aliquota interna. La convenzione contro le doppie imposizioni con l'Italia fissa un tetto più basso (di solito il 15% per l'investitore privato), ma il tetto si ottiene solo con la documentazione richiesta da quello Stato: un modulo prima del pagamento oppure una domanda di rimborso dopo.

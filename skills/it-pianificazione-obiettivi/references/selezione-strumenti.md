@@ -2,6 +2,16 @@
 
 Questa reference serve per l'**uso personale**: dà i criteri concreti per scegliere lo strumento in ciascun comparto del portafoglio, cuciti sulla fiscalità italiana. Non elenca ISIN specifici, e per una ragione precisa.
 
+## Indice
+
+- Perché criteri e non ISIN
+- I criteri universali per un ETF UCITS (la checklist)
+- La spec per ciascun comparto
+- I ganci fiscali (collegamento a it-tax-optimization)
+- Come applicare la spec (workflow)
+- Asset location (quale strumento in quale obiettivo)
+- Heuristic per la skill
+
 ## Perché criteri e non ISIN
 
 Anche quando dare strumenti concreti è perfettamente lecito (decidere per sé stessi), **hardcodare un ISIN è un errore tecnico**: gli ISIN cambiano, i fondi chiudono o si fondono, nascono nuove classi di quote, i TER variano, la disponibilità cambia da broker a broker. Un elenco statico invecchia in pochi mesi e inizia a indicare strumenti superati o inesistenti — lo stesso scollamento "guida vs realtà" che è un anti-pattern in tutto il plugin.

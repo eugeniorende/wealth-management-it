@@ -2,6 +2,15 @@
 
 Questa reference dettaglia come tradurre l'orizzonte di un obiettivo in un profilo di allocazione e poi negli strumenti concreti del mercato italiano. Resta materiale **didattico**: descrive categorie di strumenti, non raccomanda prodotti o emissioni specifiche.
 
+## Indice
+
+- L'obiettivo 0: il fondo di emergenza
+- La mappa orizzonte → profilo → strumenti
+- Gli strumenti italiani in dettaglio
+- Dall'allocazione per obiettivo all'allocazione di portafoglio
+- Il glide path (de-risking progressivo)
+- Heuristic per la skill
+
 ## L'obiettivo 0: il fondo di emergenza
 
 Prima di qualsiasi altro obiettivo viene il **fondo di emergenza**. Non è un investimento: è un cuscinetto di liquidità che serve a non dover liquidare gli investimenti nel momento sbagliato (un imprevisto durante un calo di mercato).

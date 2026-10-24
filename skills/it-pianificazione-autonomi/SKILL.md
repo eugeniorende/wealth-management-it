@@ -1,6 +1,8 @@
 ---
 name: it-pianificazione-autonomi
-description: Pianificazione pensionistica per lavoratori autonomi e partite IVA italiane (regime forfettario e ordinario), iscritti alla Gestione Separata INPS o a casse professionali. Usa questa skill quando l'utente è un libero professionista, freelance, consulente, sviluppatore software con P.IVA, partita IVA forfettaria, autonomo senza cassa, o un professionista iscritto a un albo con cassa (ingegnere/architetto in Inarcassa, avvocato in Cassa Forense, medico in ENPAM, commercialista in CNPADC, psicologo in ENPAP, geometra in CIPAG, ecc.), e parla di: pensione da autonomo, Gestione Separata INPS, casse professionali, contributo soggettivo e integrativo, contributi minimi e massimale, deducibilità dei contributi cassa (anche in forfettario), contributi previdenziali partita IVA, coefficiente di redditività, imposta sostitutiva 15% o 5%, deducibilità contributi forfettario, fondo pensione per autonomi, "conviene il fondo pensione se sono forfettario?", quanto prenderò di pensione da freelance o da professionista, gap previdenziale autonomi. Trigger anche su confronto regime forfettario vs ordinario ai fini previdenziali. ATTENZIONE: per i forfettari il contributo volontario al fondo pensione NON è deducibile (regime sostitutivo, non IRPEF), mentre il contributo obbligatorio alla cassa o alla Gestione Separata SÌ — questo inverte la logica valida per i dipendenti. NON copre dipendenti privati (skill `it-pianificazione`), dipendenti pubblici, né artigiani e commercianti iscritti alle gestioni IVS INPS (contributi fissi sul minimale e aliquote proprie). NON sostituisce un commercialista o consulente previdenziale abilitato.
+description: "Pianificazione pensionistica per lavoratori autonomi e partite IVA italiane (forfettario e ordinario), iscritti alla Gestione Separata INPS o a una cassa professionale (Inarcassa, Cassa Forense, ENPAM, CNPADC, ENPAP, CIPAG, ecc.). Usa questa skill quando un libero professionista o freelance con P.IVA parla di pensione da autonomo, Gestione Separata, contributo soggettivo e integrativo, minimali e massimale, deducibilità dei contributi, coefficiente di redditività, imposta sostitutiva 15% o 5%, fondo pensione per autonomi («conviene se sono forfettario?»), gap previdenziale, forfettario vs ordinario ai fini previdenziali. ATTENZIONE: per i forfettari il contributo volontario al fondo pensione NON è deducibile (imposta sostitutiva, non IRPEF), i contributi obbligatori sì: la logica dei dipendenti si inverte. NON copre dipendenti privati (`it-pianificazione`), dipendenti pubblici, né artigiani e commercianti delle gestioni IVS INPS. NON sostituisce un commercialista o un consulente previdenziale."
+metadata:
+  version: "0.4"
 ---
 
 # it-pianificazione-autonomi
@@ -258,19 +260,3 @@ Report markdown in 5 sezioni (analogo a `it-pianificazione`):
   - `it-pianificazione/references/previdenza-complementare.md` — meccanica fondi pensione (forme, comparti, tassazione finale, anticipazioni): valida per tutti, autonomi inclusi
   - `it-pianificazione/references/proiezione-tenore-vita.md` — metodologia gap analysis e scenari: valida per tutti
 - **Vedi anche** `it-pianificazione/references/integrazione-fiscale-joint.md` per l'interazione con eventuali redditi finanziari, e `it-tax-optimization` se l'autonomo ha un dossier titoli
-
-## Note per l'iterazione
-
-Questa è la versione 0.3 della skill (introdotta in v0.6 del plugin, estesa in v0.7.13).
-
-In quest'iterazione:
-- Focus su Gestione Separata (la maggioranza dei freelance tech/digitali)
-- Regime forfettario e ordinario (cenni)
-- Casse professionali trattate in dettaglio (`references/casse-professionali.md`)
-- **Foglio Excel di proiezione dedicato agli autonomi** (`assets/proiezione-pensione-autonomi.xlsx`): aliquota 26,07%/cassa, no TFR, foglio Fiscalità con il confronto forfettario vs ordinario e la deducibilità corretta del fondo pensione
-
-Roadmap:
-- Artigiani e commercianti (contributi fissi sul minimale, riduzioni del 35% e del 50%): fuori perimetro per decisione del 20/10/2026; la skill li rinvia a INPS o al commercialista
-- Minimale della Gestione Separata (€18.808 nel 2026) e mesi accreditati sotto il minimale: non cambiano il montante, ma l'anzianità per i requisiti; il foglio non li modella ancora
-- v0.5: simulatore numerico del confronto forfettario vs ordinario ai fini previdenziali (oltre alla fotografia annua già nel foglio Excel)
-- Possibile: dettaglio per singola cassa con i coefficienti di trasformazione e le regole di rivalutazione specifiche (ENPAM Quota A/B, casse 103/1996)

@@ -1,5 +1,12 @@
 # Previdenza obbligatoria per autonomi: Gestione Separata e casse
 
+## Indice
+
+- La Gestione Separata INPS
+- Le casse professionali (cenni)
+- Il caso del doppio reddito (P.IVA + dipendente)
+- Heuristic per la skill
+
 ## La Gestione Separata INPS
 
 Istituita dalla Legge 335/1995 (riforma Dini), è la gestione previdenziale per i lavoratori autonomi e parasubordinati **privi di una cassa professionale di categoria**. Copre la maggioranza dei freelance moderni: consulenti, sviluppatori software, grafici, formatori, copywriter, project manager, e in generale ogni P.IVA "senza albo con cassa".

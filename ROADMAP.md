@@ -171,11 +171,12 @@ Prese il 20/10/2026.
 - [x] **Formati italiani** (T9a):
   - [x] punto per le migliaia e virgola per i decimali in tutti gli script, via `numero()`, `euro()` e `pct()`;
   - [x] CSV degli ordini apribile in Excel italiano, con `;` come separatore, la virgola decimale e il BOM.
-- [ ] **T14 Authoring, documentazione e packaging** (P2, M): F023, F025, F051, F057, F058, F061, F066.
-  - description entro i 1.024 caratteri;
-  - CHANGELOG.md;
-  - commands come alias delle skill;
-  - plugin.json senza warning.
+- [x] **T14 Authoring, documentazione e packaging** (P2, M): F023, F025, F051, F057, F058, F061, F066.
+  - [x] description entro i 1.024 caratteri, quotate per un parser YAML stretto, con `metadata.version` per skill e i trigger non gestiti di it-pianificazione (riscatto, ricongiunzione, totalizzazione) dichiarati fuori perimetro;
+  - [x] CHANGELOG.md, con la storia delle skill tolta dai SKILL.md;
+  - [x] commands come alias delle skill (`disable-model-invocation`, `argument-hint`, `$ARGUMENTS`);
+  - [x] plugin.json senza warning: `upstream` in `metadata`, `claude plugin validate --strict` nella CI (resta solo ICON_MISSING del controllo per il plugin directory, che non cambia l'esito: l'icona la decide il proprietario);
+  - [x] indici nelle reference da 100 righe in su, istruzioni di aggiornamento nel README (`claude plugin update`, auto-update, `--scope`), titolo e lingua italiana nell'IPS in Word.
 - [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatta il 21/10/2026 la prova locale: marketplace locale e `/plugin install` in un profilo Claude Code vuoto, poi gli script lanciati dalla copia in cache da una cartella di lavoro. Restano GitHub senza accesso (dopo la pubblicazione) e Cowork.
 - [x] Supply chain della CI: action fissate per SHA con test di igiene, claude-code a versione fissa (PR #15). Dependabot su pip non serve: le dipendenze hanno solo versioni minime.
 - [ ] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4).
