@@ -310,6 +310,8 @@ def main():
         errore(f"file non trovato: {path}")
 
     capacita, inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
+    if not obiettivi:
+        errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     rend_l, vol_l = interp_profilo(ATTERRAGGIO_AZ, profili)    # il portafoglio di atterraggio
     scarti = scarti_dal_foglio(finestra, finestra_foglio if nel_foglio else None, ATTERRAGGIO_AZ,
@@ -515,7 +517,7 @@ def main():
             print(f"      indipendenti (prodotto):           {numero(all_fail_ind*100, 1):>5}%   ← ipotesi ingenua")
             print(f"      mercato condiviso (congiunta):     {numero(all_fail_cor*100, 1):>5}%   ← realistico")
             direzione = "SOTTOSTIMA" if all_fail_cor > all_fail_ind else "sovrastima"
-            print(f"      → l'indipendenza {direzione} di {abs(all_fail_cor-all_fail_ind)*100:.1f} punti il rischio che salti tutto insieme.")
+            print(f"      → l'indipendenza {direzione} di {numero(abs(all_fail_cor-all_fail_ind)*100, 1)} punti il rischio che salti tutto insieme.")
             print(f"\n  P(TUTTI riescono insieme):")
             print(f"      indipendenti (prodotto):           {numero(all_succ_ind*100, 1):>5}%")
             print(f"      mercato condiviso (congiunta):     {numero(all_succ_cor*100, 1):>5}%")

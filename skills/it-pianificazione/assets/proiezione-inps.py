@@ -11,7 +11,8 @@ e la rivalutazione del montante usa il PIL REALE (il montante per legge cresce c
 cioè PIL reale + inflazione; deflazionando, resta il PIL reale).
 
 Uso:
-    python proiezione-inps.py          # modifica le costanti qui sotto, poi esegui
+    python proiezione-inps.py [--set NOME=VALORE ...] [--json FILE]
+    (--help elenca le costanti sovrascrivibili; senza --set valgono i default qui sotto)
 
 ONESTÀ METODOLOGICA
 - Una RAL crescente ABBASSA il tasso di sostituzione: la pensione contributiva si basa sulla

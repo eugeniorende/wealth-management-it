@@ -126,8 +126,7 @@ def main():
 
     inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     if not obiettivi:
-        print("Nessun obiettivo trovato nel foglio.")
-        sys.exit(0)
+        errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     rend_atterraggio = rendimento_a_quota(ATTERRAGGIO_AZ, profili)
     # i versamenti coincidono con la colonna I solo coi parametri del glide path del foglio

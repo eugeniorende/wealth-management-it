@@ -141,7 +141,8 @@ CATEGORIE = ("reddito_diverso", "reddito_capitale", "reddito_capitale_irpef", "d
 
 
 class ErroreInput(Exception):
-    """Errore sui file di input: messaggio leggibile, uscita con codice 2."""
+    """Errore sui file di input: messaggio «ERRORE: …» su stderr e uscita con codice 1 (il 2 è di argparse,
+    per la riga di comando)."""
 
 
 def _norm(s):
@@ -687,6 +688,7 @@ def main(argv=None):
         except (AttributeError, ValueError):
             pass
     ap = argparse.ArgumentParser(
+        allow_abbrev=False,
         description="Plus/minus latenti da un estratto CSV del broker, incrociate con lo zainetto "
                     "(regime amministrato). Strumento educativo, non è consulenza fiscale. Codici d'uscita: 0 riuscito, "
                     "1 file o dati non leggibili, 2 riga di comando errata.")
