@@ -200,15 +200,15 @@ E confrontato onestamente con l'alternativa (PAC di ETF su dossier ordinario), c
 
 Identica metodologia di `it-pianificazione/references/proiezione-tenore-vita.md`: gap = spesa target (spesa attuale × fattore, in euro di oggi) − pensione netta, in tre scenari. Nel foglio Excel è la tabella «Scenari» del Riepilogo. L'unica differenza è che il tasso di sostituzione pubblico dell'autonomo è strutturalmente più basso (per via dell'aliquota di computo 25% vs 33%), quindi il gap tende a essere più ampio.
 
-### Step 5: Raccomandazioni
+### Step 5: Leve da valutare (scenari, non raccomandazioni)
 
-Pattern specifici per autonomi:
+Pattern specifici per autonomi, presentati come scenari quantificati e non come raccomandazioni personali: la scelta resta all'utente.
 
 - **Pattern A1 — Versare i contributi INPS regolarmente e per intero**: sono deducibili dal forfettario e costruiscono pensione. Non saltarli quando il fatturato cala (in Gestione Separata non c'è minimo, ma versare poco = montante basso).
 - **Pattern A2 — Valutare onestamente il fondo pensione SENZA il falso mito della deduzione**: per il forfettario puro, confrontare fondo vs ETF/PAC a parità di importo, considerando liquidità, tassazione in uscita (zero sui non dedotti comunicati), costi. Se versa, ricordare la comunicazione annuale dei non dedotti al fondo.
 - **Pattern A3 — Sfruttare i redditi IRPEF collaterali per la deduzione**: se l'autonomo ha affitti o altri redditi IRPEF, il fondo pensione deduce fino a capienza di quelli.
 - **Pattern A4 — Considerare il passaggio a ordinario se conviene**: in alcuni casi (costi reali alti, necessità di dedurre), il regime ordinario può essere più efficiente — ma è una valutazione fiscale complessa, da fare con un commercialista.
-- **Pattern A5 — Massimizzare la complementare proprio perché la pubblica è più magra**: l'autonomo ha più bisogno della complementare del dipendente, anche senza il vantaggio deduzione.
+- **Pattern A5 — Più complementare perché la pubblica è più magra**: l'autonomo ha più bisogno della complementare del dipendente, anche senza il vantaggio deduzione.
 
 ## Strumento operativo: il foglio di proiezione
 
@@ -231,7 +231,7 @@ Report markdown in 5 sezioni (analogo a `it-pianificazione`):
 2. **Proiezione previdenza obbligatoria**: pensione lorda/netta attesa, tasso di sostituzione (evidenziare che è più basso per via dell'aliquota di computo del 25%)
 3. **Valutazione previdenza complementare**: con l'analisi corretta della deducibilità (zero per forfettario puro), confronto fondo vs ETF
 4. **Gap analysis tenore di vita**: con scenari conservativo/base/ottimistico
-5. **Raccomandazioni**: pattern A1-A5 quantificati
+5. **Leve da valutare**: pattern A1-A5 quantificati come scenari
 
 ### Disclaimer (obbligatorio in fondo)
 

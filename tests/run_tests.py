@@ -455,7 +455,7 @@ def t_csv_italiano():
         assert grezzo.startswith(b"\xef\xbb\xbf"), "senza BOM Excel apre il CSV in cp1252 e sporca «€»"
         testo = grezzo.decode("utf-8-sig")
         assert testo.splitlines()[0] == ";".join(m.CAMPI_CSV), testo.splitlines()[0]
-        assert re.search(r"^Fineco;VENDITA;azionario;diverso;;8000,00;3200,00;0,00;3200,00;", testo, re.M), testo
+        assert re.search(r"^Fineco;VENDITA;azionario;reddito_diverso;;8000,00;3200,00;0,00;3200,00;", testo, re.M), testo
         assert not re.search(r"\d\.\d\d;", testo), "importi con il punto decimale"
         with open(path, encoding="utf-8-sig", newline="") as f:
             righe = list(csv.DictReader(f, delimiter=";"))
@@ -1717,10 +1717,17 @@ def t_dati_ribilanciamento():
         assert os.path.exists(os.path.join(tmp, "csv", "ordini_Fineco.csv")) and not os.path.exists(os.path.join(tmp, "ordini")), os.listdir(tmp)
         with open(os.path.join(tmp, "csv", "ordini_Fineco.csv"), encoding="utf-8-sig", newline="") as f:
             righe = list(csv.DictReader(f, delimiter=";"))
-        assert righe[0]["categoria_fiscale"] == "diverso" and "tipo_fiscale" not in righe[0], righe[0]
-        # senza --dati: dati di esempio dichiarati
+        # rilettura degli output (§ 2.6): nel CSV il valore canonico del vocabolario, non la forma breve interna
+        assert righe[0]["categoria_fiscale"] == "reddito_diverso" and "tipo_fiscale" not in righe[0], righe[0]
+        assert "esempio" not in righe[-1]["nota"].lower(), righe[-1]
+        assert "un CSV per broker in " + os.path.join(tmp, "csv") + os.sep in out and "./" + tmp not in out, \
+            "intestazione della sezione 5 con il percorso di --out così com'è"
+        # senza --dati: dati di esempio dichiarati, anche nella riga NOTA del CSV
         rc, out = run_script(script, cwd=tmp)
         assert rc == 0 and "Dati di esempio" in out, out[:300]
+        with open(os.path.join(tmp, "ordini", "ordini_Fineco.csv"), encoding="utf-8-sig", newline="") as f:
+            nota = list(csv.DictReader(f, delimiter=";"))[-1]["nota"]
+        assert nota.startswith("DATI DI ESEMPIO") and "non costituisce consulenza" in nota, nota
         # chiave ignota, posizione fuori perimetro, tipo sconosciuto, target sbagliato → rc 1 con il motivo
         for dati, atteso in (({"posizioni": pos, "zainetto": {}, "target": {"azionario": 1.0}, "prelievi": 1}, "non riconosciute"),
                              ({"posizioni": [dict(pos[0], categoria_fiscale="da_classificare")], "zainetto": {}, "target": {"azionario": 1.0}}, "classifica prima"),
@@ -1785,8 +1792,12 @@ def t_dati_ips():
         assert "Giulia Test" in testo and "Mario Rossi" not in testo and "€50.000" in testo, testo[:600]
         m = re.search(r"perdere circa il (\d+)%", testo)
         assert m and int(m.group(1)) == 16, "nota di rischio dalla quota azionaria del JSON (32% → 16%)"
+        assert "DATI DI ESEMPIO" not in testo, "IPS con i dati del JSON marcato come esempio"
         rc, out = run_script(script, os.path.join(tmp, "demo.docx"), cwd=tmp)
         assert rc == 0 and "Dati di esempio" in out and "Mario Rossi" in out, out[-300:]
+        # rilettura degli output (§ 2.6): il documento può circolare da solo, lo dice anche lui
+        demo = "\n".join(p.text for p in Document(os.path.join(tmp, "demo.docx")).paragraphs)
+        assert "DATI DI ESEMPIO" in demo.split("INVESTMENT POLICY STATEMENT")[1][:600], "copertina senza l'avviso dei dati di esempio"
         assert not os.path.exists(os.path.join(tmp, "--dati")), "«--dati» non è un nome di file di output"
         json.dump({"capitale": 1}, open(dati, "w", encoding="utf-8"))
         rc, out = run_script(script, "--dati", dati, cwd=tmp)

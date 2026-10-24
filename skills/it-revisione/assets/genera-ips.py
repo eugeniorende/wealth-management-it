@@ -456,6 +456,10 @@ def genera(dati, path_out):
         doc.add_paragraph()
     para(doc, "Documento di pianificazione personale. Non costituisce consulenza finanziaria "
               "o di investimento (vedi nota finale).", size=9, color=GREY, italic=True)
+    if dati is None:
+        # il documento può circolare da solo: chi lo apre deve sapere che non è un caso reale
+        para(doc, "DATI DI ESEMPIO: questo IPS è generato con i dati dimostrativi dello script, non con "
+                  "quelli di un investitore reale.", size=9, color=GREY, italic=True)
     doc.add_page_break()
 
     # 1–2

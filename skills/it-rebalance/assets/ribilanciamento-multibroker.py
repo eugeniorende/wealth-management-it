@@ -183,6 +183,7 @@ def carica_dati(path):
         globals()[CHIAVI_DATI[str(k).lower()]] = v
     if not isinstance(POSITIONS, list) or not isinstance(ZAINETTO, dict) or not isinstance(TARGET, dict):
         raise ErroreInput("--dati: «posizioni» è una lista, «zainetto» e «target» sono oggetti broker → euro e classe → peso")
+    globals()["DATI_ESEMPIO"] = False
     return dati
 
 
@@ -626,6 +627,11 @@ CAMPI_CSV = ["broker", "operazione", "classe", "categoria_fiscale", "strumento_I
 NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non costituisce consulenza "
             "di investimento né un ordine. Verificare saldi, prezzo medio di carico e zainetto "
             "sul portale del broker prima di operare.")
+# Senza --dati il piano è quello dei dati d'esempio: lo dice anche il CSV, che può circolare da solo.
+NOTA_CSV_ESEMPIO = "DATI DI ESEMPIO dello script, non un portafoglio reale. " + NOTA_CSV
+DATI_ESEMPIO = True     # diventa False quando i dati arrivano da --dati
+# Nel CSV la categoria fiscale ha i valori del vocabolario del plugin (README, «Glossario»).
+CATEGORIA_CSV = {"diverso": "reddito_diverso", "capitale": "reddito_capitale"}
 
 
 def numero(x, decimali=0, segno=False):
@@ -697,7 +703,7 @@ def genera_ordini(plan):
             motivo = f"riduce sovrappeso {s['classe']}"
         nota = f"{motivo}; {effetto_fiscale(s)}" if s["plus_real"] else motivo
         ordini.append({"broker": s["broker"], "operazione": "VENDITA", "classe": s["classe"],
-                       "categoria_fiscale": s["tipo"], "importo_eur": round(s["vendi"], 2),
+                       "categoria_fiscale": CATEGORIA_CSV.get(s["tipo"], s["tipo"]), "importo_eur": round(s["vendi"], 2),
                        "plus_minus_eur": round(s["plus_real"], 2), "imposta_eur": round(s["tassa"], 2),
                        "compensazione_zainetto_eur": round(s["comp"], 2), "nota": nota})
 
@@ -774,7 +780,7 @@ def scrivi_csv_per_broker(ordini, cartella=None):
                 row = {k: _cella_csv(v) for k, v in o.items()}
                 row.setdefault("strumento_ISIN", "")   # colonna da compilare a mano
                 w.writerow(row)
-            w.writerow({"broker": b, "operazione": "NOTA", "nota": NOTA_CSV})
+            w.writerow({"broker": b, "operazione": "NOTA", "nota": NOTA_CSV_ESEMPIO if DATI_ESEMPIO else NOTA_CSV})
         scritti.append((path, len(righe)))
     return scritti
 
@@ -905,15 +911,15 @@ def esporta_ordini(plan):
         print()
         return
     scritti = scrivi_csv_per_broker(ordini)
-    print(f"5) ORDINI ESPORTATI — un CSV per broker in ./{CARTELLA_OUTPUT}/")
+    print(f"5) ORDINI ESPORTATI — un CSV per broker in {os.path.join(CARTELLA_OUTPUT, '')}")
     for path, n in scritti:
         print(f"   {path}  ({n} ordini)")
     # anteprima leggibile
     print(f"\n   Anteprima:")
-    print(f"   {'broker':<14}{'op.':<9}{'classe':<16}{'tipo':<10}{'importo':>10}  nota")
+    print(f"   {'broker':<14}{'op.':<9}{'classe':<16}{'categoria':<17}{'importo':>10}  nota")
     for o in ordini:
         imp = f"€{numero(o['importo_eur'])}"
-        print(f"   {o['broker']:<14}{o['operazione']:<9}{o['classe']:<16}{str(o['categoria_fiscale']):<10}{imp:>10}  {o['nota']}")
+        print(f"   {o['broker']:<14}{o['operazione']:<9}{o['classe']:<16}{str(o['categoria_fiscale']):<17}{imp:>10}  {o['nota']}")
     print(f"\n   I broker italiani non importano ordini da CSV: questi file sono una checklist di")
     print(f"   esecuzione e una traccia. Compila la colonna strumento_ISIN con lo strumento scelto.")
     print()

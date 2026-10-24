@@ -16,7 +16,7 @@ Skill per la pianificazione pensionistica integrata di un lavoratore dipendente 
 2. **Proiezione previdenza complementare**: capitalizzazione contributi (TFR + volontari + datore) con tassazione finale
 3. **Confronto TFR azienda vs fondo**: blocco «Confronto TFR» nel foglio Complementare dell'Excel (rivalutazione tassata al 17% e tassazione separata contro 15→9% sulle sole quote), con il vantaggio netto in euro di oggi
 4. **Gap analysis tenore di vita**: confronto tra pensione totale attesa e spesa proiettata
-5. **Raccomandazioni d'azione**: pattern di copertura del gap, quantificati
+5. **Leve da valutare**: pattern di copertura del gap, quantificati come scenari: la scelta resta all'utente
 
 **Cosa NON fa:**
 - ❌ Non copre lavoratori autonomi, P.IVA forfettari, casse professionali → usa la skill gemella `it-pianificazione-autonomi` (regime previdenziale e fiscale diverso: Gestione Separata 26,07%, no TFR, e per i forfettari il fondo pensione NON è deducibile)
@@ -293,11 +293,11 @@ gap_annuo = spesa_target_annua - reddito_pensione_totale
 gap_percentuale = gap_annuo / spesa_target_annua
 ```
 
-### Step 5: Raccomandazioni
+### Step 5: Leve da valutare (scenari, non raccomandazioni)
 
-Per ciascun pattern di copertura, quantificare l'impatto:
+Per ciascun pattern di copertura, quantificare l'impatto come scenario, con costi e vincoli: la scelta resta all'utente.
 
-- **Pattern P1 — Massimizzare contributo deducibile**: se contributi del lavoratore e del datore insieme non saturano i €5.300/anno, calcolare il delta montante finale + il risparmio IRPEF cumulato
+- **Pattern P1 — Usare lo spazio deducibile**: se contributi del lavoratore e del datore insieme non saturano i €5.300/anno, calcolare il delta montante finale + il risparmio IRPEF cumulato. Lo spazio residuo è un tetto fiscale, non un importo consigliato: dipende da liquidità, fondo di emergenza e alternative
 - **Pattern P2 — Cambiare comparto**: se l'utente è in garantito con 25+ anni alla pensione, mostrare il delta atteso passando a bilanciato/azionario
 - **Pattern P3 — Ritardare pensionamento**: confronto 64/67/70 anni — più anni contributi + coefficiente migliore + meno anni di pensione (ma tenore di vita)
 - **Pattern P4 — Conferire TFR**: se ancora in azienda, simulare il delta cumulato sulle quote future di TFR (il maturato resta in azienda), come scenario: la scelta è irrevocabile
@@ -341,10 +341,10 @@ Report markdown in 5 sezioni + (su richiesta) Excel di proiezione.
 - Gap (assoluto e %)
 - Sensitivity: scenari conservativo / base / ottimistico (basati su variazioni di crescita retributiva, rivalutazione PIL, rendimento comparto)
 
-### 5. Raccomandazioni d'azione
+### 5. Leve da valutare
 
-Lista dei pattern applicabili, ordinati per impatto stimato:
-- Cosa fare
+Lista dei pattern applicabili, come scenari quantificati e ordinati per impatto stimato (la scelta resta all'utente):
+- Cosa cambia
 - Perché
 - Quanto cambia il gap
 - Vincoli e rischi

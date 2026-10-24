@@ -612,7 +612,7 @@ def stampa(posizioni, zainetto, a, anno_rif, avvisi):
     print(f"Valore di mercato:        € {_eur(a['totale_valore']):>14}")
     print(f"Plus/minus netta latente: € {_eur(a['plus_minus_netta_latente']):>14}")
 
-    print("\n— MINUS LATENTI (candidate all'harvesting: vendere per caricare lo zainetto) —")
+    print("\n— MINUS LATENTI (candidate all'harvesting: venderle caricherebbe lo zainetto) —")
     minus = sorted((p for p in posizioni if p["plus_minus"] < 0), key=lambda p: p["plus_minus"])
     for p in minus:
         print(f"   {(p['descrizione'] or p['isin'])[:36]:<37}{_eur(p['plus_minus']):>13}  ({_pct(p['pct'])})")

@@ -198,7 +198,7 @@ claude --plugin-dir /percorso/assoluto/wealth-management-it
 
 Da una shell, senza aprire una sessione, gli stessi passi sono `claude plugin marketplace add eugeniorende/wealth-management-it` e `claude plugin install wealth-management-it@wm-it`. L'installazione vale per l'utente in tutti i progetti; con `--scope project` vale per chi lavora nel repository corrente (la voce va in `.claude/settings.json`), con `--scope local` solo per te e solo lì.
 
-**Aggiornamenti.** L'installazione copia il plugin nella cache di Claude Code (`~/.claude/plugins/`): non modificare quella copia, che a ogni aggiornamento si sostituisce. Il manifest fissa la versione, quindi un'installazione resta sulla sua versione finché non esce una release. Per i marketplace di terze parti come questo l'aggiornamento automatico è spento di default. Due modi per aggiornare:
+**Aggiornamenti.** Con la via A l'installazione copia il plugin nella cache di Claude Code (`~/.claude/plugins/cache/`): non modificare quella copia, che a ogni aggiornamento si sostituisce. Con la via B il plugin si legge direttamente dalla cartella indicata. Il manifest fissa la versione, quindi un'installazione resta sulla sua versione finché non esce una release. Per i marketplace di terze parti come questo l'aggiornamento automatico è spento di default. Due modi per aggiornare:
 
 ```bash
 # a mano, da una shell (dentro una sessione: /plugin → Installed → wealth-management-it → Update now)
@@ -212,7 +212,7 @@ Dopo un aggiornamento, `/reload-plugins` lo carica nella sessione aperta; le ses
 
 ### Cartella di lavoro (importante)
 
-Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cartella dedicata al piano (es. `~/piano-finanziario/`) e lavora sempre da lì: metti lì i file reali (estratto conto INPS, storico del fondo, CSV dei broker), **copia** lì gli Excel da compilare (`pianificatore-obiettivi.xlsx`, `tracker-secchielli.xlsx`, `cruscotto-patrimoniale.xlsx`, `investment-policy-statement.xlsx`, `proiezione-pensione.xlsx` o `proiezione-pensione-autonomi.xlsx` — mai editare quelli dentro il plugin), e lì finiranno gli output degli script (JSON della pipeline, CSV degli ordini, l'IPS generato). Il plugin resta immutabile e aggiornabile; la cartella di lavoro è la tua.
+Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cartella dedicata al piano (es. `~/piano-finanziario/`) e lavora sempre da lì: metti lì i file reali (estratto conto INPS, storico del fondo, CSV dei broker), **copia** lì gli Excel da compilare (`pianificatore-obiettivi.xlsx`, `tracker-secchielli.xlsx`, `cruscotto-patrimoniale.xlsx`, `investment-policy-statement.xlsx`, `proiezione-pensione.xlsx` o `proiezione-pensione-autonomi.xlsx` — mai editare quelli dentro il plugin), e lì finiranno gli output degli script (JSON della pipeline, CSV degli ordini, l'IPS generato). Il plugin resta immutabile e aggiornabile; la cartella di lavoro è la tua. In Claude Code la si indica al plugin come opzione `cartella_lavoro`: all'installazione con `claude plugin install wealth-management-it@wm-it --config cartella_lavoro=/percorso/della/cartella`, oppure dopo con `/plugin configure wealth-management-it@wm-it` in una sessione. Se resta vuota, le skill la chiedono.
 
 ### Dove vanno i tuoi dati
 

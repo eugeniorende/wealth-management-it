@@ -177,10 +177,10 @@ Prese il 20/10/2026.
   - [x] commands come alias delle skill (`disable-model-invocation`, `argument-hint`, `$ARGUMENTS`);
   - [x] plugin.json senza warning: `upstream` in `metadata`, `claude plugin validate --strict` nella CI (resta solo ICON_MISSING del controllo per il plugin directory, che non cambia l'esito: l'icona la decide il proprietario);
   - [x] indici nelle reference da 100 righe in su, istruzioni di aggiornamento nel README (`claude plugin update`, auto-update, `--scope`), titolo e lingua italiana nell'IPS in Word.
-- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatta il 21/10/2026 la prova locale: marketplace locale e `/plugin install` in un profilo Claude Code vuoto, poi gli script lanciati dalla copia in cache da una cartella di lavoro. Restano GitHub senza accesso (dopo la pubblicazione) e Cowork.
+- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatte il 21 e il 24/10/2026 le prove in profili Claude Code vuoti: marketplace locale, marketplace da GitHub (con le credenziali della sessione), `--config` e `/plugin configure` della cartella di lavoro, script lanciati dalla copia in cache, zip estratto e validato con `--strict` (verbale in `docs/sviluppo/verbale-installazione-2026-10-24.md`). **Restano al proprietario**: GitHub da un account senza accesso, possibile solo dopo la pubblicazione (decisione 2), e l'upload in Cowork, che richiede la sua interfaccia; i passi sono nel verbale.
 - [x] Supply chain della CI: action fissate per SHA con test di igiene, claude-code a versione fissa (PR #15). Dependabot su pip non serve: le dipendenze hanno solo versioni minime.
-- [ ] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4).
-- [ ] README coerente con un repository pubblico: marketplace e Releases.
+- [x] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4): OPZIONE e tetto dei €5.300 con il loro gate, CSV degli ordini con la categoria del vocabolario e i dati d'esempio dichiarati, IPS d'esempio dichiarato in copertina, leve previdenziali come scenari nelle skill (verbale in `docs/sviluppo/verbale-rilettura-output-2026-10-24.md`).
+- [x] README coerente con un repository pubblico: marketplace e Releases, aggiornamenti (`claude plugin update`, auto-update, `--scope`), opzione della cartella di lavoro, CHANGELOG.md.
 
 ## Dopo — da decidere
 
