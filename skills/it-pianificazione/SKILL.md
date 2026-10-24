@@ -109,7 +109,7 @@ L'assegno pensione INPS è soggetto a IRPEF ordinaria con scaglioni standard. Si
 **Percorso automatico (preferito)**: se l'utente ha i file reali, usare `assets/importa-previdenza.py`:
 
 ```bash
-python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--json dati.json]
+python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--set ALIQUOTA_COMPUTO=0.25] [--json dati.json]
 ```
 
 Con `--anonimo` lo script non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): proporlo quando l'output finisce in chat o in un documento da condividere. Con `--json` i parametri pronti finiscono in un file che gli script a valle leggono con `--from`, senza ricopiarli:
@@ -397,7 +397,7 @@ In quest'iterazione (v0.9):
 - **`netto-pensione.py`** — dal tasso di sostituzione LORDO a quello NETTO/NETTO: IRPEF 2026 a tre scaglioni (23/33/43, secondo scaglione ridotto dalla L.199/2025 — verificato), detrazioni pensione e lavoro dipendente (art. 13 TUIR, dal 2027 art. 13 D.Lgs. 117/2026), contributi IVS 9,19%, addizionali parametriche, e imposta sostitutiva sulla rendita complementare 15%→9% con l'anzianità di partecipazione (art. 11 c. 6 D.Lgs. 252/2005; dal 2027 art. 258 c. 4 D.Lgs. 117/2026). Accetta più scenari di rendita (P10/P50/P90 dal Monte Carlo) e confronta pensione netta / ultimo stipendio netto. Il lordo sottostima sistematicamente la copertura: sul caso reale validato, la mediana passa dal 74,6% lordo al 97,5% netto. Supporta `--set`.
 
 In quest'iterazione (v0.8):
-- **Override `--set NOME=VALORE`** (via `motore_bootstrap.applica_override`): le costanti in testa a `montecarlo-pensione.py` e `proiezione-inps.py` si sovrascrivono da riga di comando senza modificare i file — es. `python proiezione-inps.py --set PIL_REALE=0.0 --set COEFF_ESPLICITO=0.048`. I nomi inesistenti vengono respinti (protezione dai refusi), gli override applicati sono stampati (run documentato e ripetibile).
+- **Override `--set NOME=VALORE`** (via `motore_bootstrap.cli`): le costanti in testa a tutti gli script della skill (`importa-previdenza.py`, `proiezione-inps.py`, `montecarlo-pensione.py`, `netto-pensione.py`, `ponte-pensione.py`) si sovrascrivono da riga di comando senza modificare i file; `--help` ne elenca i nomi, gli errori escono con rc 1 e `ERRORE:` su stderr — es. `python proiezione-inps.py --set PIL_REALE=0.0 --set COEFF_ESPLICITO=0.048`. I nomi inesistenti vengono respinti (protezione dai refusi), gli override applicati sono stampati (run documentato e ripetibile).
 
 In quest'iterazione (v0.7):
 - **Motore bootstrap condiviso** (`motore_bootstrap.py`): `carica_storico`, campionamento a blocchi circolari (`indici_bootstrap`/`blocchi_bootstrap`) e percentili vivono in un modulo unico, copia sincronizzata con `it-pianificazione-obiettivi` (l'identità è verificata dalla test suite). `montecarlo-pensione.py` lo importa; refactor validato bit-per-bit: con lo stesso seed produce output identico alla versione precedente.

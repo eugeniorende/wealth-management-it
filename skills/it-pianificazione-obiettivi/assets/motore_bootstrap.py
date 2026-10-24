@@ -23,7 +23,7 @@ Contenuto:
     (la catena --json → --from; --set prevale su --from, che prevale sui default)
   - numero / euro / pct: numeri in formato italiano (punto per le migliaia, virgola per i decimali)
   - applica_override(spazio): override '--set NOME=VALORE' delle costanti da riga di comando
-  - percorso_json / scrivi_json: flag '--json <file>' per l'output machine-readable (pipeline)
+  - scrivi_json: i risultati chiave su file JSON (il flag --json lo dà cli())
   - verifica_intestazioni_obiettivi(ws): guardia sul layout del pianificatore Excel
   - leggi_pianificatore(path): l'unico lettore del pianificatore compilato (parametri, profili,
     obiettivi), con le stesse regole per i quattro script degli obiettivi
@@ -81,9 +81,11 @@ def errore(messaggio, codice=1):
 
 
 def costanti_sovrascrivibili(spazio):
-    """Le costanti in testa allo script che --set può sovrascrivere: nomi MAIUSCOLI non callable."""
+    """Le costanti in testa allo script che --set può sovrascrivere: nomi MAIUSCOLI non callable, escluse le
+    coordinate del foglio Excel (…_ROW, …_START, …_N) e le tabelle (dict), che non sono parametri di scenario."""
     return [k for k, v in spazio.items()
-            if k.isupper() and not k.startswith("_") and not callable(v) and not hasattr(v, "__file__")]
+            if k.isupper() and not k.startswith("_") and not callable(v) and not hasattr(v, "__file__")
+            and not k.endswith(("_ROW", "_START", "_N")) and not isinstance(v, dict)]
 
 
 _MANCA = object()
@@ -147,7 +149,7 @@ def cli(descrizione, spazio=None, argomenti=(), json=False, da_json=None, argv=N
         if da_json:
             epilogo += "\n\nchiavi lette da --from FILE (JSON scritto con --json da un altro script):\n  " + \
                 ", ".join(f"{k} → {v[0] if isinstance(v, tuple) else v}" for k, v in da_json.items())
-    ap = argparse.ArgumentParser(description=descrizione, epilog=epilogo,
+    ap = argparse.ArgumentParser(description=descrizione, epilog=epilogo, allow_abbrev=False,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     for nomi, opzioni in argomenti:
         ap.add_argument(*nomi, **opzioni)
@@ -273,9 +275,10 @@ def applica_override(spazio, argv=None):
         python script.py --set N_SIM=2000 --set MODELLO=bootstrap [altri argomenti]
     - NOME deve già esistere nello script (protegge dai refusi)
     - VALORE è interpretato con ast.literal_eval (numeri, liste, None, True/False);
-      se non interpretabile resta stringa (comodo per MODELLO=bootstrap)
-    - gli argomenti --set vengono RIMOSSI da sys.argv: il resto del parsing
-      (es. il path dell'Excel) non cambia
+      se non interpretabile resta stringa (comodo per MODELLO=bootstrap), ma una
+      costante numerica non accetta una stringa (RAL_ATTUALE=abc → ERRORE, rc 1)
+    - dagli script si usa tramite cli(), che raccoglie i --set con argparse e li passa
+      qui; chiamato da solo legge e RIMUOVE i --set da argv
     Gli override applicati vengono stampati: il run resta documentato e ripetibile.
     """
     if argv is None:
@@ -298,41 +301,27 @@ def applica_override(spazio, argv=None):
             raise SystemExit(f"ERRORE: --set: costante sconosciuta o malformata '{espr}' "
                              f"(i nomi validi sono le costanti in testa allo script)")
         try:
-            spazio[nome] = ast.literal_eval(val)
+            nuovo = ast.literal_eval(val)
         except (ValueError, SyntaxError):
-            spazio[nome] = val
+            nuovo = val
+        vecchio = spazio[nome]
+        if isinstance(vecchio, (int, float)) and not isinstance(vecchio, bool) and isinstance(nuovo, str):
+            raise SystemExit(f"ERRORE: --set {nome}={val}: non è un numero (il default è {vecchio!r})")
+        spazio[nome] = nuovo
         applicati.append(f"{nome}={spazio[nome]!r}")
     if applicati:
         print("[override] " + ", ".join(applicati))
     return applicati
 
 
-def percorso_json(argv=None):
-    """Estrae '--json <file>' (o '--json=<file>') da argv; ritorna il path o None.
-
-    Con questo flag gli script scrivono i risultati chiave anche in JSON, così i
-    numeri passano da uno script all'altro (pipeline) senza travasi a mano."""
-    if argv is None:
-        argv = sys.argv
-    i = 1
-    while i < len(argv):
-        if argv[i] == "--json" and i + 1 < len(argv):
-            path = argv[i + 1]
-            del argv[i:i + 2]
-            return path
-        if argv[i].startswith("--json="):
-            path = argv[i][len("--json="):]
-            del argv[i]
-            return path
-        i += 1
-    return None
-
-
 def scrivi_json(path, dati):
-    """Scrive i risultati chiave su file JSON (UTF-8, leggibile)."""
+    """Scrive i risultati chiave su file JSON (UTF-8, leggibile); percorso non scrivibile → ERRORE, rc 1."""
     import json
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(dati, f, ensure_ascii=False, indent=2)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(dati, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        errore(f"impossibile scrivere {path}: {e.strerror}")
     print(f"[json] risultati scritti in {path}")
 
 
@@ -401,7 +390,10 @@ def leggi_pianificatore(path, avvisa=print):
     if os.path.dirname(os.path.abspath(path)) == os.path.dirname(os.path.abspath(__file__)):
         avvisa("⚠️  Stai leggendo il pianificatore d'esempio dentro il plugin: copia il file nella tua cartella "
                "di lavoro, compilalo lì e passane il percorso allo script.")
-    wb = load_workbook(path, data_only=True)
+    try:
+        wb = load_workbook(path, data_only=True)
+    except Exception as e:   # zipfile.BadZipFile, InvalidFileException, OSError: non è un xlsx leggibile
+        errore(f"{path} non è un pianificatore xlsx leggibile ({type(e).__name__}: {e})")
     for foglio in ("Parametri", "Obiettivi"):
         if foglio not in wb.sheetnames:
             errore(f"foglio «{foglio}» mancante in {os.path.basename(path)} (fogli presenti: "

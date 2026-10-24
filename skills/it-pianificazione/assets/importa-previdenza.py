@@ -16,7 +16,8 @@ e produce:
   - un blocco di PARAMETRI PRONTI da incollare in proiezione-inps.py e montecarlo-pensione.py
 
 Uso:
-    python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo]
+    python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--set NOME=VALORE] [--json FILE]
+    (--help elenca le costanti sovrascrivibili, per esempio ALIQUOTA_COMPUTO=0.25 per la Gestione Separata)
 
 Con --anonimo non stampa intestatario e data di nascita (l'età resta, arrotondata all'anno): utile
 quando l'output finisce in chat o in un documento condiviso.
@@ -114,6 +115,8 @@ def leggi_estratto_inps(path):
     """Estrae anagrafica e righe contributive dall'XML dell'estratto conto INPS."""
     try:
         root = ET.parse(path).getroot()
+    except OSError as e:
+        errore(f"file non trovato o illeggibile: {path} ({e.strerror})")
     except ET.ParseError as e:
         errore(f"'{path}' non è un XML valido ({e}).")
 
@@ -183,8 +186,11 @@ def ricostruisci_montante(retrib_per_anno, anno_corrente):
 
 def leggi_storico_fondo(path):
     """Legge lo storico movimenti del fondo (formato tipico: sep ';', decimali con virgola)."""
-    with open(path, encoding="utf-8", errors="replace") as f:
-        testa = f.read(4096)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            testa = f.read(4096)
+    except OSError as e:
+        errore(f"file non trovato o illeggibile: {path} ({e.strerror})")
     sep = ";" if testa.count(";") >= testa.count(",") else ","
 
     with open(path, encoding="utf-8", errors="replace") as f:
@@ -268,8 +274,9 @@ def main():
                    (("--anonimo",), {"action": "store_true",
                                      "help": "non stampa intestatario e data di nascita (l'età resta, in anni interi)"})))
     # argomenti validati PRIMA di stampare qualsiasi dato: un flag sbagliato non deve rivelare i dati
-    if args.storico_fondo and args.storico_fondo.startswith(("-", "\u2014", "\u2013")):
-        args.parser.error(f"argomento non riconosciuto: {args.storico_fondo}")
+    for a in (args.estratto_inps, args.storico_fondo):
+        if a and a.startswith(("-", "\u2014", "\u2013")):
+            args.parser.error(f"argomento non riconosciuto: {a}")
     anonimo = args.anonimo
     path_xml = args.estratto_inps
     path_csv = args.storico_fondo
