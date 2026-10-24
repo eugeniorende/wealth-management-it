@@ -133,10 +133,10 @@ Prese il 20/10/2026.
 
 ## 0.11 — script e test
 
-- [ ] **T12 Test e CI che vincolano i numeri** (P1, L): F032, F065.
-  - Test strutturali su ogni xlsx.
-  - `--json` con valori chiusi.
-  - Fixture realistiche.
+- [x] **T12 Test e CI che vincolano i numeri** (P1, L): F032, F065 (T12, dopo le quattro PR di T9).
+  - [x] Test strutturali su ogni xlsx (fogli, ancore, soglia di formule), Riepilogo del pianificatore e Patrimonio del cruscotto dal ricalcolo, cache del tracker confrontate escludendo le celle volatili.
+  - [x] `--json` con valori chiusi (Monte Carlo pensione, netto e ponte; allocatore sul JSON al centesimo); rami avanzati (curvatura, buffer, coefficiente frazionario, sensibilità al PIL).
+  - [x] Fixture realistiche (BOM, unità, segno, xmlns); verbali dei mutanti di T2, T3, T13 e T12; tabella strumenti ↔ test nel README generata dal runner.
   - [x] Matrice Python 3.11 e 3.14, con versioni minime delle dipendenze (PR #17).
   - [x] Versione fissata di claude-code nel job validate (PR #15).
 - [x] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059 (PR #43, #44, #45 e T9d).
