@@ -357,14 +357,13 @@ OBIETTIVI_PRIMA_RIGA, OBIETTIVI_N = 5, 10
 
 
 def _numero_cella(valore, dove, cosa):
-    """Numero da una cella del pianificatore; una cella di testo («40.000») è un errore esplicito."""
+    """Numero da una cella del pianificatore. Una cella di testo è sempre un errore esplicito, anche
+    quando sembra un numero: «40.000», «1.5» e «0.02» non si possono convertire senza indovinare se il
+    punto separa le migliaia o i decimali (prima «1.5» diventava 15 anni e «0.02» un 200%)."""
     if valore is None or valore == "":
         return None
     if isinstance(valore, bool) or not isinstance(valore, (int, float)):
-        try:
-            return float(str(valore).replace(".", "").replace(",", "."))
-        except ValueError:
-            errore(f"{cosa} non numerico in {dove}: {valore!r} (la cella è testo: riscrivila come numero)")
+        errore(f"{cosa} in {dove} è testo: {valore!r} (riscrivi la cella come numero)")
     return float(valore)
 
 
@@ -373,11 +372,13 @@ def leggi_pianificatore(path, avvisa=print):
     finestra_nel_foglio, profili e obiettivi: l'unico lettore dei quattro script degli obiettivi, così
     gli errori di compilazione più comuni danno lo stesso esito ovunque.
 
-    - foglio Parametri o Obiettivi mancante, importi scritti come testo, profilo che non è nella tabella,
+    - foglio Parametri o Obiettivi mancante, celle numeriche scritte come testo (anche «40.000» o «1.5»),
+      profilo che non è nella tabella,
       orizzonte non intero → ERRORE esplicito (rc 1), mai un KeyError o un numero sbagliato in silenzio
     - il profilo si confronta senza maiuscole e spazi, come il CERCA.VERT del foglio: «crescita» → «Crescita»
-    - target vuoto → None, cioè «il più possibile»: ogni script decide se usarlo (il glide path sì,
-      Monte Carlo e allocatore no, e lo dicono)
+    - target vuoto → None, cioè «il più possibile»: ogni script decide se usarlo (il glide path e
+      l'asset location sì, l'asset location perché il target non gli serve; Monte Carlo e allocatore
+      no, e lo dicono)
     - riga con il nome ma senza orizzonte o profilo → scartata con un avviso che dice il motivo
     - priorità e tipo in minuscolo; tipo mancante = terminante; coperto = il già accantonato copre il target
     - un avviso se il file è il modello dentro il plugin: i dati vanno in una copia nella cartella di lavoro

@@ -117,7 +117,7 @@ I dati personali e i file compilati vivono nella **cartella di lavoro** dell'ute
 - i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/proiezione-pensione-autonomi.xlsx`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
 
-`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-pianificazione-autonomi`). Dipendenze degli script: Python 3.11 o successivo con numpy, openpyxl e python-docx (`pip install numpy openpyxl python-docx`). Questa skill non ha script: la proiezione è nel foglio.
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-pianificazione-autonomi`). Questa skill non ha script: la proiezione è nel foglio, e non serve Python.
 
 ## Workflow operativo
 

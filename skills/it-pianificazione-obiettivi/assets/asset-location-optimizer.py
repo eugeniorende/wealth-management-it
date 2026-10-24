@@ -77,11 +77,12 @@ REINVESTI_RISPARMIO_IRPEF = True  # True: il risparmio IRPEF è reinvestito nel 
 
 
 def leggi_excel(path):
-    """Inflazione, rendimento per profilo e obiettivi con un importo dal lettore unico del motore."""
+    """Inflazione, rendimento per profilo e obiettivi dal lettore unico del motore. Il target non
+    serve: contano capitale già accantonato, orizzonte e profilo, quindi entrano anche gli obiettivi
+    «il più possibile» (target vuoto)."""
     d = leggi_pianificatore(path)
     profili = {n: p["rendimento"] for n, p in d["profili"].items()}
-    obiettivi = [g for g in d["obiettivi"] if g["target_oggi"] is not None]
-    return d["inflazione"], profili, obiettivi
+    return d["inflazione"], profili, d["obiettivi"]
 
 
 def lordo_da_netto(netto):
