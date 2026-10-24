@@ -1472,6 +1472,13 @@ def t_lettore_pianificatore():
     rc, out = run_script(script["asset-location-optimizer.py"], xlsx)
     assert rc == 0 and "▸ Senza target" in out and "scenario di esempio" not in out, out[-500:]
     shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # revisione T9: due obiettivi con lo stesso nome mescolavano i calendari del glide path (chiave = nome)
+    xlsx = _excel_test([("Anticipo casa", 40000, 6, "Moderato", 0, "importante", "terminante"),
+                        (" anticipo CASA", 20000, 3, "Conservativo", 0, "importante", "terminante")])
+    for nome, path in script.items():
+        rc, out = run_script(path, xlsx)
+        assert rc == 1 and "ERRORE:" in out and "ripetuto" in out and "Obiettivi!A6" in out and "Obiettivi!A5" in out, f"{nome}: {out[-300:]}"
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
     # (c) orizzonte 1,5 anni: errore esplicito, non «1 anni»; (f) profilo ignoto: errore con la tabella
     for caso, atteso in ((("Casa", 40000, 1.5, "Moderato", 0, "importante", "terminante"), "anni interi"),
                          (("Casa", 40000, 6, "Boh", 0, "importante", "terminante"), "non è nella tabella dei profili")):
@@ -4495,6 +4502,68 @@ def t_catena_previdenziale():
         assert rc == 1 and "non trovato" in out, (rc, out[-300:])
         rc, out = run_script(P("netto-pensione.py"), "--help")
         assert "chiavi lette da --from" in out and "rendita_fp → RENDITE_FP" in out, out[-500:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T9 contratto di input della revisione: ogni chiave della tabella esiste nel JSON del suo script")
+def t_contratto_revisione():
+    # F031 e revisione T9: la tabella dice quale campo va in quale cella; una chiave rinominata in uno
+    # script la romperebbe in silenzio. B12 e B13 della pensione stanno sulla stessa base (lorda).
+    import json as _json
+    skill = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    tabella = skill.split("### Contratto di input")[1].split("\n## ")[0]
+    tmp = tempfile.mkdtemp()
+    pian = asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx")
+    lanci = {
+        "mc.json": (asset("it-pianificazione", "montecarlo-pensione.py"), ["--set", "N_SIM=500"]),
+        "netto.json": (asset("it-pianificazione", "netto-pensione.py"), []),
+        "mco.json": (asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
+        "alloc.json": (asset("it-pianificazione-obiettivi", "allocatore-capitale.py"), [pian]),
+        "glide.json": (asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py"), [pian]),
+        "imp.json": (asset("it-tax-optimization", "importa-estratto-broker.py"),
+                     [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
+    }
+    try:
+        js = {}
+        for nome, (script, argomenti) in lanci.items():
+            rc, out = run_script(script, *argomenti, "--json", os.path.join(tmp, nome), cwd=tmp)
+            assert rc == 0, f"{os.path.basename(script)}: {out[-300:]}"
+            js[nome] = _json.load(open(os.path.join(tmp, nome), encoding="utf-8"))
+        def valori(dato, percorso):
+            """I valori al percorso «a.b», «a[].b» o «a[nome=x].b» (tutti gli elementi della lista o quello col nome)."""
+            correnti = [dato]
+            for pezzo in percorso.split("."):
+                m = re.fullmatch(r"(\w+)(?:\[(?:(\w+)=\"?([^\]\"]*)\"?)?\])?", pezzo)
+                chiave, filtro_k, filtro_v = m.groups()
+                prossimi = []
+                for c in correnti:
+                    assert isinstance(c, dict) and chiave in c, f"manca «{chiave}» in {percorso}"
+                    v = c[chiave]
+                    if "[" in pezzo:
+                        elementi = list(v.values()) if isinstance(v, dict) else v
+                        if filtro_k:
+                            elementi = [e for e in elementi if str(e.get(filtro_k)) == filtro_v]
+                        assert elementi, f"{percorso}: nessun elemento"
+                        prossimi.extend(elementi)
+                    else:
+                        prossimi.append(v)
+                correnti = prossimi
+            return correnti
+        attese = (("mc.json", "tasso_sostituzione_lordo.mediana"), ("mc.json", "target"),
+                  ("netto.json", 'scenari[nome="mediana"].tasso_sostituzione_netto'),
+                  ("mco.json", "obiettivi[].probabilita_successo"), ("mco.json", "obiettivi[].gia"),
+                  ("mco.json", "obiettivi[].target_oggi"), ("mco.json", "obiettivi[].priorita"),
+                  ("alloc.json", "aggregato.azioni"), ("alloc.json", "aggregato.totale"), ("glide.json", "portafoglio"),
+                  ("imp.json", "posizioni[].valore"), ("imp.json", "analisi.per_broker[].zainetto_in_scadenza"),
+                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"))
+        for nome, percorso in attese:
+            assert percorso.replace("[]", "[") .split("[")[0].split(".")[-1] in tabella or percorso in tabella, \
+                f"la tabella del contratto non nomina «{percorso}»"
+            assert valori(js[nome], percorso), percorso
+        riga = next(r for r in tabella.splitlines() if r.startswith("| Pensione, dipendenti"))
+        assert "`tasso_sostituzione_lordo.mediana`" in riga and "`target`" in riga and "mai in B12" in riga, riga
+        assert js["mc.json"]["target"] == 0.70 and 0 < js["mc.json"]["tasso_sostituzione_lordo"]["mediana"] < 2
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

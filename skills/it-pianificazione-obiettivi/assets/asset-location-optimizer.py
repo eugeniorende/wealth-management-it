@@ -284,7 +284,7 @@ def main():
     print("  ipotesi: --set RENDIMENTO_LORDO=0.07. Il lordo ricavato dal netto tratta l'imposta come")
     print("  annua ed è il più alto compatibile col profilo: favorisce i contenitori esenti (PIR e")
     print("  fondo pensione); la variante con l'imposta alla vendita è lo scenario prudente.")
-    print("\nNON è consulenza. Calcoli illustrativi, parametri editabili in cima allo script.")
+    print("\nNON è consulenza. Calcoli illustrativi; i parametri si cambiano con --set (elenco in --help).")
     print("Vedi asset-location.md. Verificare con consulente abilitato e commercialista.")
 
 

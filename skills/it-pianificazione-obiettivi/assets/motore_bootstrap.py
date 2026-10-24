@@ -380,6 +380,7 @@ def leggi_pianificatore(path, avvisa=print):
       l'asset location sì, l'asset location perché il target non gli serve; Monte Carlo e allocatore
       no, e lo dicono)
     - riga con il nome ma senza orizzonte o profilo → scartata con un avviso che dice il motivo
+    - due obiettivi con lo stesso nome (maiuscole e spazi a parte) → ERRORE con le due righe
     - priorità e tipo in minuscolo; tipo mancante = terminante; coperto = il già accantonato copre il target
     - un avviso se il file è il modello dentro il plugin: i dati vanno in una copia nella cartella di lavoro
     profili: {nome: {"rendimento", "volatilita", "azionario"}}; obiettivi: lista di dizionari con nome,
@@ -421,6 +422,7 @@ def leggi_pianificatore(path, avvisa=print):
     canonici = {n.casefold(): n for n in profili}
 
     obiettivi = []
+    righe_dei_nomi = {}
     for r in range(OBIETTIVI_PRIMA_RIGA, OBIETTIVI_PRIMA_RIGA + OBIETTIVI_N):
         celle = {col: obj.cell(row=r, column=c).value for col, c in
                  (("nome", 1), ("target", 2), ("orizzonte", 3), ("profilo", 4), ("gia", 6), ("priorita", 7), ("tipo", 14))}
@@ -431,6 +433,11 @@ def leggi_pianificatore(path, avvisa=print):
         if not nome:
             avvisa(f"⚠️  Obiettivi!riga {r}: riga senza nome scartata (compilata solo in parte)")
             continue
+        # il nome identifica l'obiettivo negli output (calendari, JSON): due uguali si mescolerebbero
+        if nome.casefold() in righe_dei_nomi:
+            errore(f"obiettivo «{nome}» ripetuto in Obiettivi!A{r} (già in Obiettivi!A{righe_dei_nomi[nome.casefold()]}): "
+                   f"dai a ogni obiettivo un nome diverso")
+        righe_dei_nomi[nome.casefold()] = r
         mancanti = [c for c in ("orizzonte", "profilo") if celle[c] is None or str(celle[c]).strip() == ""]
         if mancanti:
             avvisa(f"⚠️  Obiettivi!riga {r}: «{nome}» scartato, manca {' e '.join(mancanti)}")
