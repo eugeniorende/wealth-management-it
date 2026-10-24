@@ -43,11 +43,9 @@ azzera il versamento e riporta la probabilità con €0/mese (la domanda giusta 
 import sys
 import os
 import numpy as np
-from openpyxl import load_workbook
 
-from motore_bootstrap import (blocchi_bootstrap, carica_storico, cli, errore, euro, finestra_nel_foglio, numero,
-                              frazioni_glide, indici_bootstrap, leggi_finestra_derisk, pmt_glide,
-                              scarti_dal_foglio, verifica_intestazioni_obiettivi)
+from motore_bootstrap import (blocchi_bootstrap, carica_storico, cli, euro, frazioni_glide, indici_bootstrap,
+                              leggi_pianificatore, numero, pmt_glide, scarti_dal_foglio)
 
 # ---- Parametri della simulazione ----
 N_SIM = 20000              # numero di percorsi simulati
@@ -84,57 +82,21 @@ _AZ_HIST = None            # caricati a runtime se MODELLO == "bootstrap"
 _OB_HIST = None
 
 # Posizioni note nel foglio (coerenti con build_obiettivi.py)
-CAP_ROW = 5                # Parametri!B5 = capacità di risparmio mensile
-INFL_ROW = 6               # Parametri!B6 = inflazione
-PROF_START = 10            # Parametri!A10:D15 = profili (nome, rendimento, volatilità, % azionario)
-PROF_N = 6
-GOAL_START = 5             # Obiettivi: prima riga dati
-GOAL_N = 10
 
 
 def leggi_excel(path):
-    wb = load_workbook(path, data_only=True)
-    verifica_intestazioni_obiettivi(wb["Obiettivi"])
-    par = wb["Parametri"]
-    obj = wb["Obiettivi"]
-
-    capacita = par.cell(row=CAP_ROW, column=2).value or 0
-    inflazione = par.cell(row=INFL_ROW, column=2).value or 0
-    finestra = leggi_finestra_derisk(par)
-    nel_foglio = finestra_nel_foglio(par)
-
-    profili = {}
-    for i in range(PROF_N):
-        r = PROF_START + i
-        nome = par.cell(row=r, column=1).value
-        rend = par.cell(row=r, column=2).value
-        vol = par.cell(row=r, column=3).value
-        peso = par.cell(row=r, column=4).value   # % azionario (per il bootstrap)
-        if nome:
-            profili[nome] = (float(rend), float(vol), float(peso) if peso is not None else 0.0)
-
+    """Parametri, profili (rendimento, volatilità, % azionario) e obiettivi dal lettore unico del motore.
+    Il Monte Carlo ha bisogno di un importo: gli obiettivi senza target restano fuori, e lo dice."""
+    d = leggi_pianificatore(path)
+    profili = {n: (p["rendimento"], p["volatilita"], p["azionario"]) for n, p in d["profili"].items()}
     obiettivi = []
-    for i in range(GOAL_N):
-        r = GOAL_START + i
-        nome = obj.cell(row=r, column=1).value
-        imp = obj.cell(row=r, column=2).value
-        oriz = obj.cell(row=r, column=3).value
-        prof = obj.cell(row=r, column=4).value
-        gia = obj.cell(row=r, column=6).value
-        prio = obj.cell(row=r, column=7).value
-        tipo = obj.cell(row=r, column=14).value
-        if nome and imp and oriz and prof:
-            obiettivi.append({
-                "nome": nome,
-                "target_oggi": float(imp),
-                "orizzonte": int(oriz),
-                "profilo": prof,
-                "gia": float(gia) if gia else 0.0,
-                "priorita": prio or "",
-                # default terminante (il caso comune), come glidepath-obiettivi.py
-                "permanente": str(tipo or "").strip().lower() == "permanente",
-            })
-    return capacita, inflazione, finestra, nel_foglio, profili, obiettivi
+    for g in d["obiettivi"]:
+        if g["target_oggi"] is None:
+            print(f"⚠️  {g['nome']}: senza importo target («il più possibile») non si simula una probabilità "
+                  f"di successo: escluso. Lo tratta glidepath-obiettivi.py.")
+            continue
+        obiettivi.append(g)
+    return d["capacita"], d["inflazione"], d["finestra"], d["finestra_nel_foglio"], profili, obiettivi
 
 
 def pmt_deterministico(target_nom, gia, rend_ann, anni):
@@ -306,9 +268,6 @@ def main():
     if SEED is not None:
         np.random.seed(SEED)
     path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
-    if not os.path.exists(path):
-        errore(f"file non trovato: {path}")
-
     capacita, inflazione, finestra_foglio, nel_foglio, profili, obiettivi = leggi_excel(path)
     finestra = finestra_foglio if FINESTRA_DERISK is None else int(FINESTRA_DERISK)
     rend_l, vol_l = interp_profilo(ATTERRAGGIO_AZ, profili)    # il portafoglio di atterraggio
@@ -353,10 +312,7 @@ def main():
     obiettivi_def = []   # raccolti per la simulazione congiunta (rischio sistemico)
 
     for g in obiettivi:
-        if g["profilo"] not in profili:
-            print(f"\n⚠️  {g['nome']}: profilo '{g['profilo']}' non in tabella. Salto.")
-            continue
-        rend, vol, peso_az = profili[g["profilo"]]
+        rend, vol, peso_az = profili[g["profilo"]]     # il lettore ha già respinto i profili ignoti
         anni = g["orizzonte"]
         target_nom = g["target_oggi"] * (1 + inflazione) ** anni
         # il glide path del piano: solo per i terminanti con quota sopra l'atterraggio

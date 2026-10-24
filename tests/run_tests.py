@@ -76,6 +76,8 @@ def test(nome):
                 RISULTATI.append((nome, True, ""))
             except Salta as e:
                 RISULTATI.append((nome, None, str(e)))
+            except SystemExit as e:  # errore() di uno script importato in-process: è un test fallito, non la fine della suite
+                RISULTATI.append((nome, False, f"SystemExit: {e}"))
             except Exception as e:  # noqa: BLE001 — un test fallito non ferma la suite
                 RISULTATI.append((nome, False, f"{type(e).__name__}: {e}"))
         wrapped.__test__ = True
@@ -1380,6 +1382,103 @@ def t_glidepath_senza_target():
     # il permanente senza target non de-riska: la sua colonna resta al 90% anche all'ultimo anno
     ultima = [r for r in out.splitlines() if re.match(r"\s*20\s\s", r)]
     assert ultima and "90%" in ultima[-1], "il permanente senza target deve restare al 90%"
+
+
+def _pianificatore_modificato(modifica):
+    """Copia del pianificatore d'esempio a cui `modifica(wb)` applica un caso limite; ritorna il path."""
+    from openpyxl import load_workbook
+    tmp = tempfile.mkdtemp()
+    dst = os.path.join(tmp, "p.xlsx")
+    shutil.copy(asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx"), dst)
+    wb = load_workbook(dst)
+    modifica(wb)
+    wb.save(dst)
+    return dst
+
+
+@test("T9 lettore unico del pianificatore: profilo minuscolo, target vuoto, 1,5 anni, foglio mancante, già coperto")
+def t_lettore_pianificatore():
+    # F028: quattro lettori con filtri diversi; «crescita» dava 0% al glide path, KeyError all'allocatore e
+    # «Salto» al Monte Carlo; il target vuoto spariva in silenzio; 1,5 anni diventava 1; la riserva già
+    # piena risultava «da versamenti». Ora un solo lettore con le stesse regole per i quattro script.
+    OB = "it-pianificazione-obiettivi"
+    script = {n: asset(OB, n) for n in ("glidepath-obiettivi.py", "montecarlo-obiettivi.py",
+                                        "allocatore-capitale.py", "asset-location-optimizer.py")}
+    motore = carica_modulo(asset(OB, "motore_bootstrap.py"))
+    avvisi = []
+    d = motore.leggi_pianificatore(asset(OB, "pianificatore-obiettivi.xlsx"), avvisa=avvisi.append)
+    assert [g["nome"] for g in d["obiettivi"]] == ["Fondo di emergenza", "Anticipo casa", "Lungo termine / libertà"]
+    assert d["capacita"] == 1200 and d["inflazione"] == 0.02 and d["finestra"] == 7 and d["finestra_nel_foglio"]
+    assert d["profili"]["Crescita"] == {"rendimento": 0.055, "volatilita": 0.13, "azionario": 0.65}
+    casa = d["obiettivi"][1]
+    assert casa == {"nome": "Anticipo casa", "target_oggi": 40000.0, "orizzonte": 6, "profilo": "Moderato",
+                    "gia": 5000.0, "priorita": "importante", "tipo": "terminante", "permanente": False, "coperto": False}
+    assert d["obiettivi"][0]["permanente"] and d["obiettivi"][0]["priorita"] == "essenziale"
+    assert any("dentro il plugin" in a for a in avvisi), "il modello dentro il plugin va segnalato"
+    # (a) profilo in minuscolo e con spazi: canonico della tabella, stessi numeri di «Crescita» in tutti e quattro
+    xlsx = _excel_test([("Lungo", 100000, 20, " crescita ", 0, "desiderabile", "terminante")])
+    d = motore.leggi_pianificatore(xlsx, avvisa=avvisi.append)
+    assert d["obiettivi"][0]["profilo"] == "Crescita", d["obiettivi"][0]
+    assert not any("dentro il plugin" in a for a in avvisi[1:]), "una copia fuori dal plugin non va segnalata"
+    for nome, path in script.items():
+        rc, out = run_script(path, xlsx)
+        assert rc == 0 and "Traceback" not in out and "Salto" not in out and "non in tabella" not in out, f"{nome}: {out[-300:]}"
+    rc, out = run_script(script["glidepath-obiettivi.py"], xlsx)
+    assert re.search(r"^\s+1\s+65%", out, re.M) and "Lungo: €384/mese" in out, \
+        f"glide path con «crescita»: attesi il 65% del profilo Crescita all'anno 1 e €384/mese (prima dava 0%): {out[:900]}"
+    rc, out = run_script(script["montecarlo-obiettivi.py"], xlsx)
+    assert "Rendimento 5,5% · volatilità 13,0%" in out, out[-600:]
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # (b) target vuoto: il glide path lo tiene (max); Monte Carlo e allocatore lo escludono dicendolo
+    xlsx = _excel_test([("Con target", 50000, 10, "Moderato", 10000, "importante", "terminante"),
+                        ("Senza target", None, 15, "Crescita", 20000, "desiderabile", "terminante")])
+    assert motore.leggi_pianificatore(xlsx)["obiettivi"][1]["target_oggi"] is None
+    rc, out = run_script(script["glidepath-obiettivi.py"], xlsx)
+    assert rc == 0 and "(max)" in out, out[-300:]
+    for nome in ("montecarlo-obiettivi.py", "allocatore-capitale.py"):
+        rc, out = run_script(script[nome], xlsx)
+        assert rc == 0 and "Senza target: senza importo target" in out and "escluso" in out, f"{nome}: {out[-400:]}"
+        assert "Con target" in out
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # (c) orizzonte 1,5 anni: errore esplicito, non «1 anni»; (f) profilo ignoto: errore con la tabella
+    for caso, atteso in ((("Casa", 40000, 1.5, "Moderato", 0, "importante", "terminante"), "anni interi"),
+                         (("Casa", 40000, 6, "Boh", 0, "importante", "terminante"), "non è nella tabella dei profili")):
+        xlsx = _excel_test([caso])
+        for nome, path in script.items():
+            rc, out = run_script(path, xlsx)
+            assert rc == 1 and "ERRORE:" in out and atteso in out and "Traceback" not in out, f"{nome} {caso[2:4]}: rc {rc}, {out[-300:]}"
+        shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # (d) riserva già coperta: «già coperto», non «da versamenti»
+    xlsx = _excel_test([("Fondo di emergenza", 12000, 2, "Preservazione", 12000, "essenziale", "permanente"),
+                        ("Casa", 40000, 6, "Moderato", 5000, "importante", "terminante")])
+    assert motore.leggi_pianificatore(xlsx)["obiettivi"][0]["coperto"] is True
+    rc, out = run_script(script["allocatore-capitale.py"], xlsx, "50000")
+    riga = next(r for r in out.splitlines() if r.strip().startswith("Fondo di emergenza"))
+    assert rc == 0 and "già coperto" in riga and "da versamenti" not in riga, riga
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # (e) foglio mancante: errore, non KeyError; importo scritto come testo: errore con la cella
+    xlsx = _pianificatore_modificato(lambda wb: wb.remove(wb["Parametri"]))
+    for nome, path in script.items():
+        rc, out = run_script(path, xlsx)
+        assert rc == 1 and "foglio «Parametri» mancante" in out and "KeyError" not in out, f"{nome}: {out[-300:]}"
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    xlsx = _pianificatore_modificato(lambda wb: wb["Obiettivi"].__setitem__("B6", "quarantamila"))
+    rc, out = run_script(script["glidepath-obiettivi.py"], xlsx)
+    assert rc == 1 and "Obiettivi!B6" in out and "testo" in out, out[-300:]
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # (h) riga col nome ma senza orizzonte: scartata con il motivo; riga senza nome: scartata
+    def incompleta(wb):
+        o = wb["Obiettivi"]
+        o["A8"], o["B8"], o["D8"] = "Monca", 1000, "Moderato"
+        o["B9"], o["C9"], o["D9"] = 5000, 3, "Moderato"
+    xlsx = _pianificatore_modificato(incompleta)
+    avvisi = []
+    d = motore.leggi_pianificatore(xlsx, avvisa=avvisi.append)
+    assert [g["nome"] for g in d["obiettivi"]] == ["Fondo di emergenza", "Anticipo casa", "Lungo termine / libertà"]
+    assert any("«Monca» scartato, manca orizzonte" in a for a in avvisi) and any("riga 9" in a and "senza nome" in a for a in avvisi), avvisi
+    rc, out = run_script(script["montecarlo-obiettivi.py"], xlsx)
+    assert rc == 0 and "«Monca» scartato" in out, out[-400:]
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
 
 
 @test("allocatore-capitale: invariante — la somma allocata è il capitale dato")
