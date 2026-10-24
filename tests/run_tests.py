@@ -200,7 +200,10 @@ def t_check_ruleset():
     assert {"suite", "test-windows", "test", "validate"} <= set(jobs), jobs
     test = ci.split("\n  test:\n")[1].split("\n\n")[0]
     assert "if: ${{ !cancelled() }}" in test and "needs: [suite, test-windows]" in test, test
-    assert '"${{ needs.suite.result }}" = success' in test and '"${{ needs.test-windows.result }}" = success' in test, test
+    righe = [r.strip() for r in test.split("run: |")[1].strip().splitlines()]
+    # l'ultimo comando decide l'esito: entrambi i job devono essere «success», in AND e senza vie d'uscita
+    assert righe[-1] == '[ "${{ needs.suite.result }}" = success ] && [ "${{ needs.test-windows.result }}" = success ]', righe
+    assert not any("||" in r or r == "true" for r in righe), righe
     suite = ci.split("\n  suite:\n")[1].split("\n\n  #")[0]
     assert "matrix:" in suite and "RICHIEDI_LIBREOFFICE" in suite, "la matrice con LibreOffice è il job suite"
 
@@ -3915,14 +3918,16 @@ def t_riscatto_laurea():
         assert r["onere_agevolato"] == 31033.2 and r["onere_ordinario"] == 59400.0, r      # 5 × 6.206,64; 5 × 36.000 × 33%
         assert r["rata_mensile"] == 258.61 and r["costo_netto"] == 20792.24, r              # 120 rate; deduzione al 33%
         assert r["delta_montante_al_pensionamento"] == 36403.28, r                          # × 1,005^32
-        assert r["delta_pensione_lorda_annua"] == 1751.36 and r["anni_per_rientrare"] == 15.8, r   # × 4,811%; netto/(× 0,75)
+        assert r["delta_pensione_lorda_annua"] == 1751.46 and r["anni_per_rientrare"] == 19.1, r   # × 4,8113%; netto/(× 0,62)
+        assert r["coefficiente_trasformazione"] == 0.04811 and r["eta_pensionamento"] == 69.0, r
         assert r["eta_anticipata_senza_riscatto"] == 68.33 and r["eta_anticipata_con_riscatto"] == 63.33, r
         assert r["montante_attuale"] == 85000 + 31033.2 and r["modalita"] == "agevolato", r
         for atteso in ("€ 6.206,64 (€ 18.808 × 33%)", "€ 31.033", "€ 59.400", "€ 258,61", "€ 20.792", "€ 1.751",
-                       "senza riscatto: a 68,3 anni", "con il riscatto: a 63,3 anni", "rendono allo stesso modo"):
+                       "senza riscatto: a 68,3 anni", "con il riscatto: a 63,3 anni", "rendono allo stesso modo",
+                       "Deduzione dell'anno con 120 rate: € 3.103", "requisito uomini dal 2028"):
             assert atteso in out, f"riscatto: manca «{atteso}»"
         # le due modalità rendono uguale per euro versato: stessi anni per rientrare
-        assert re.search(r"rientrare\s+15,8\s+15,8", out), out
+        assert re.search(r"rientrare\s+19,1\s+19,1", out), out
         # ordinario sotto il minimale: costa meno, e lo script lo dice
         rc, out = run_script(P, "--set", "RAL_ATTUALE=15_000")
         assert rc == 0 and "sotto il minimale" in out, out[-300:]
@@ -3930,20 +3935,35 @@ def t_riscatto_laurea():
         rc, out = run_script(P, "--set", "RATE_MENSILI=1", "--json", j)
         r = json.load(open(j, encoding="utf-8"))
         assert rc == 0 and r["rata_mensile"] == r["onere_riscatto"] == 31033.2 and "unica soluzione" in out, out[-300:]
+        # revisione T13: la deduzione di un anno esce dallo scaglione del 33% e lo script lo dice
+        assert "Deduzione dell'anno con l'unica soluzione: € 31.033" in out and "il costo netto vero è più alto" in out, out[-600:]
+        # le donne: requisito di 42 anni e 1 mese, l'anticipata un anno prima
+        rc, out = run_script(P, "--set", "SESSO='F'", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["eta_anticipata_senza_riscatto"] == 67.33 and r["eta_anticipata_con_riscatto"] == 62.33, r
+        assert "requisito donne" in out, out[-900:]
+        # anni di corso prima del 1996: l'onere conta solo gli anni dal 1996, l'anzianità tutti
+        rc, out = run_script(P, "--set", "ANNI_PRIMA_DEL_1996=2", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["onere_agevolato"] == 18619.92 and r["anzianita_con_riscatto"] == 17.0, r
+        assert "cadono prima del 1996" in out and "riserva matematica" in out and "3 anni nel contributivo" in out, out[:900]
         # modalità ordinaria nella catena: il montante porta l'onere ordinario
         rc, out = run_script(P, "--set", "MODALITA='ordinario'", "--json", j)
         r = json.load(open(j, encoding="utf-8"))
         assert rc == 0 and r["onere_riscatto"] == 59400.0 and r["montante_attuale"] == 85000 + 59400.0, r
         # posizione mista: l'agevolato solo per gli anni dal 1996, con l'avviso sull'opzione
         rc, out = run_script(P, "--set", "CONTRIBUTI_SOLO_DAL_1996=True")
-        assert rc == 0 and "posizione mista" in out and "art. 1 c. 23 L. 335/1995" in out, out[:500]
+        assert rc == 0 and "posizione mista" in out and "art. 1 c. 23 L. 335/1995" in out, out[:700]
+        # anche l'ordinario degli anni prima del 1996 non è stimabile qui (riserva matematica)
+        assert "art. 2 c. 4 D.Lgs. 184/1997, art. 13 L. 1338/1962" in out, out[:700]
         # chi senza riscatto arriverebbe alla vecchiaia sotto i 20 anni di contributi
         rc, out = run_script(P, "--set", "ANZIANITA_ATTUALE=0", "--set", "ETA_ATTUALE=52", "--set", "ETA_PENSIONAMENTO=67")
         assert rc == 0 and "sotto i 20 della vecchiaia" in out, out[-500:]
         # errori nei dati: rc 1 con ERRORE su stderr
         for espr, atteso in (("ANNI_RISCATTO=0", "ANNI_RISCATTO"), ("RATE_MENSILI=121", "RATE_MENSILI"),
                              ("MODALITA='gratis'", "MODALITA"), ("ALIQUOTA_MARGINALE_IRPEF=33", "frazione"),
-                             ("ETA_PENSIONAMENTO=30", "ETA_PENSIONAMENTO")):
+                             ("ETA_PENSIONAMENTO=30", "ETA_PENSIONAMENTO"), ("SESSO='X'", "SESSO"),
+                             ("ANNI_PRIMA_DEL_1996=6", "ANNI_PRIMA_DEL_1996")):
             rc, so, se = run_script_split(P, "--set", espr)
             assert rc == 1 and se.lstrip().startswith("ERRORE:") and atteso in se and "Traceback" not in se, (espr, rc, se[-200:])
     finally:
@@ -3959,6 +3979,13 @@ def t_riscatto_catena():
         rc, out = run_script(P("importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-test.xml"), "--json", imp)
         assert rc == 0 and "ANZIANITA_ATTUALE = 2.0" in out, out[-400:]
         assert json.load(open(imp, encoding="utf-8"))["anzianita_contributiva"] == 2.0     # 104 settimane / 52
+        # revisione T13: due rapporti nello stesso anno contano una volta per il diritto (al massimo 52 settimane)
+        xml = open(os.path.join(FIXTURES, "estratto-inps-test.xml"), encoding="utf-8").read()
+        riga = re.findall(r"      <RigaContributi>.*?</RigaContributi>\n", xml, re.S)[-1]
+        doppio = os.path.join(tmp, "doppio.xml")
+        open(doppio, "w", encoding="utf-8").write(xml.replace(riga, riga + riga.replace("AZIENDA TEST SRL", "SECONDO DATORE SRL")))
+        rc, out = run_script(P("importa-previdenza.py"), doppio, "--json", os.path.join(tmp, "doppio.json"))
+        assert rc == 0 and "settimane utili: 156" in out and "ANZIANITA_ATTUALE = 2.0" in out, out[-600:]
         rc, out = run_script(P("proiezione-inps.py"), "--from", imp, "--json", inps)
         assert rc == 0, out[-300:]
         base = json.load(open(inps, encoding="utf-8"))
@@ -3968,18 +3995,38 @@ def t_riscatto_catena():
         m0 = json.load(open(imp, encoding="utf-8"))["montante_attuale"]
         assert r["montante_attuale"] == round(m0 + r["onere_riscatto"], 2) and r["anzianita_con_riscatto"] == 7.0, r
         # l'anticipata arriva comunque dopo l'uscita ipotizzata: il riscatto non anticipa
-        assert "il riscatto non anticipa" in out, out[-900:]
+        assert "il riscatto non anticipa" in out and "posizione mista" not in out, out[-900:]
+        # revisione T13: la posizione mista attraversa la catena (importatore → riscatto → proiezione)
+        mista = os.path.join(tmp, "mista.json")
+        json.dump(dict(json.load(open(imp, encoding="utf-8")), contributi_solo_dal_1996=True), open(mista, "w", encoding="utf-8"))
+        rm = os.path.join(tmp, "ris-mista.json")
+        rc, out_m = run_script(P("riscatto-laurea.py"), "--from", mista, "--from", inps, "--json", rm)
+        assert rc == 0 and out_m.index("posizione mista") < out_m.index("Onere lordo"), out_m[:700]
+        assert json.load(open(rm, encoding="utf-8"))["contributi_solo_dal_1996"] is True
+        rc, out_m = run_script(P("proiezione-inps.py"), "--from", rm)
+        assert rc == 0 and out_m.index("posizione mista") < out_m.index("PENSIONE LORDA ANNUA"), out_m[:700]
+        # un --set di età dopo il JSON della proiezione: anni e coefficiente non valgono più, errore con il rimedio
+        for espr in ("ETA_PENSIONAMENTO=64", "ETA_ATTUALE=50"):
+            rc, so, se = run_script_split(P("riscatto-laurea.py"), "--from", imp, "--from", inps, "--set", espr)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and "proiezione-inps.py" in se and "Traceback" not in se, (espr, se[-300:])
         rc, out = run_script(P("proiezione-inps.py"), "--from", ris, "--json", inps)
         assert rc == 0, out[-300:]
         con = json.load(open(inps, encoding="utf-8"))
         # la proiezione completa con il riscatto e la pensione in più dello script coincidono (arrotondamenti)
         delta = con["pensione_inps_lorda_annua"] - base["pensione_inps_lorda_annua"]
         assert abs(delta - r["delta_pensione_lorda_annua"]) < 2, (delta, r["delta_pensione_lorda_annua"])
-        # il coefficiente di default dello script è quello di proiezione-inps.py sui suoi default
-        rc, out = run_script(P("proiezione-inps.py"), "--json", inps)
-        coeff = json.load(open(inps, encoding="utf-8"))["coefficiente_trasformazione"]
-        sorgente = open(P("riscatto-laurea.py"), encoding="utf-8").read()
-        assert re.search(r"^COEFF_TRASFORMAZIONE = " + re.escape(str(coeff)) + r"\b", sorgente, re.M), coeff
+        # senza il JSON della proiezione il coefficiente è quello di proiezione-inps.py alla stessa età di uscita,
+        # e la catena con un'uscita diversa dai default resta coerente (revisione T13: era fisso a 69 anni)
+        b64, r64, c64 = (os.path.join(tmp, f) for f in ("b64.json", "r64.json", "c64.json"))
+        rc, out = run_script(P("proiezione-inps.py"), "--from", imp, "--set", "ETA_PENSIONAMENTO=64", "--json", b64)
+        rc2, out2 = run_script(P("riscatto-laurea.py"), "--from", imp, "--set", "ETA_PENSIONAMENTO=64", "--json", r64)
+        assert rc == rc2 == 0, (out[-300:], out2[-300:])
+        r = json.load(open(r64, encoding="utf-8"))
+        assert r["coefficiente_trasformazione"] == json.load(open(b64, encoding="utf-8"))["coefficiente_trasformazione"], r
+        rc, out = run_script(P("proiezione-inps.py"), "--from", r64, "--json", c64)
+        assert rc == 0 and "ETA_PENSIONAMENTO=64" in out, out[:400]      # l'età di uscita viaggia nel JSON
+        delta = json.load(open(c64, encoding="utf-8"))["pensione_inps_lorda_annua"] - json.load(open(b64, encoding="utf-8"))["pensione_inps_lorda_annua"]
+        assert abs(delta - r["delta_pensione_lorda_annua"]) < 2, (delta, r["delta_pensione_lorda_annua"])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3991,7 +4038,9 @@ def t_riscatto_testi():
     for atteso in ("€18.808 × 33% = **€6.206,64**", "120 rate mensili senza interessi", "art. 10 c. 1 lett. e TUIR",
                    "dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026", "c. 5-quater", "art. 20 c. 6 DL 4/2019",
                    "riserva matematica", "art. 1 c. 23 L. 335/1995", "€31.033", "€20.792", "€258,61", "€1.751",
-                   "Circ. INPS 14/2026", "Verificato: 2026-10"):
+                   "circa 19 anni", "del 38%", "Circ. INPS 14/2026", "Verificato: 2026-10", "(c. 5-ter) e, poiché",
+                   "dal 2027 art. 10 c. 1 lett. u e art. 14 c. 1 lett. i D.Lgs. 117/2026", "per le donne 42 anni e 1 mese",
+                   "ripetuti"):
         assert atteso in sezione, f"previdenza-obbligatoria.md, Riscatto della laurea: manca «{atteso}»"
     # lo stesso minimale nella reference, nello script e nella Gestione Separata degli autonomi
     sorgente = open(asset("it-pianificazione", "riscatto-laurea.py"), encoding="utf-8").read()
@@ -4001,6 +4050,12 @@ def t_riscatto_testi():
     skill = open(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"), encoding="utf-8").read()
     assert "Pattern P7 — Riscattare la laurea" in skill and "assets/riscatto-laurea.py" in skill
     assert "Non gestisce ricongiunzione, totalizzazione, riscatto laurea" not in skill
+    p7 = skill.split("**Pattern P7")[1].split("\n")[0]
+    for atteso in ("ANNI_RISCATTO", "ANNI_PRIMA_DEL_1996", "SESSO='F'", "RATE_MENSILI", "ANZIANITA_ATTUALE"):
+        assert atteso in p7, f"Pattern P7: manca «{atteso}» tra i dati da chiedere"
+    assert 'riscatto-laurea.py"     --from dati.json --from inps.json' in skill, "Step 1: il riscatto nella catena"
+    mappa = open(os.path.join(SKILLS, "it-tax-optimization", "references", "mappa-nuovo-tuir.md"), encoding="utf-8").read()
+    assert "art. 2 c. 5-bis D.Lgs. 184/1997, ultimo periodo" in mappa and "art. 10 c. 1 lett. u e art. 14 c. 1 lett. i" in mappa
 
 
 def _it(x, dec=2):
@@ -4058,6 +4113,9 @@ def t_freelance_flussi():
     for atteso in (f"€{_it(totali[0.05])}", f"€{_it(totali[0.15])}", "1,9 volte", "44%", "rivalsa del 4%"):
         assert atteso in a6, f"Pattern A6: manca «{atteso}»"
     assert "pattern A1-A6" in skill and "rigo LM49" in skill and "Trattare la rivalsa INPS del 4% come un contributo" in skill
+    # revisione T13: i contributi si versano nella sezione INPS dell'F24 con le causali PXX o P10, non con il 1299
+    for testo, nome in ((skill, "SKILL.md"), (gs, "previdenza-gestione-separata.md")):
+        assert "PXX" in testo and "P10" in testo and "1299" not in testo, f"{nome}: causali F24 della Gestione Separata"
 
 # ══════════════════════ T11: testi unici dal 2027 ══════════════════════
 
@@ -4075,7 +4133,8 @@ _NORME_2027 = re.compile(
     r"|L\.\s?232/2016,?\s?c\.\s?(?:153 e )?158\b|\bc\.\s?158\b[^;\n]{0,10}L\.\s?232/2016"
     r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?(?:24|6) L\.\s?207/2024"
     r"|" + _ART + r"\s?11 c\.\s?3 D\.\s?Lgs\.\s?47/2000|D\.\s?Lgs\.\s?47/2000,? art\.\s?11 c\.\s?3\b"
-    r"|lett(?:era|\.)\s?c-(?:bis|ter|quater|quinquies|sexies)")
+    r"|lett(?:era|\.)\s?c-(?:bis|ter|quater|quinquies|sexies)"
+    r"|c\.\s?5-bis,?(?: ultimo periodo,?)? D\.\s?Lgs\.\s?184/1997")
 # il riferimento dal 2027: «dal 2027», una freccia o il numero di uno dei testi unici (non l'anno nudo,
 # che è anche una data)
 _SUCCESSORE_2027 = re.compile(r"(?i:dal (?:1/1/|1° gennaio )?2027)|→|TU 2027|117/2026|141/2026|173/2024|174/2024"

@@ -33,7 +33,7 @@ I **forfettari senza cassa** si iscrivono alla Gestione Separata e versano con l
 - **Massimale 2026**: €122.295 (era €120.607 nel 2025; cresce ogni anno con ISTAT). Oltre questa soglia di reddito non si versano contributi e non si matura ulteriore montante.
 - **Minimale 2026**: €18.808. Sotto questa soglia di reddito non si accredita l'intero anno contributivo, ma un numero di mesi proporzionale ai contributi versati.
 - **Nessun contributo minimo fisso**: si paga solo sul reddito effettivo. Se il reddito è zero, i contributi sono zero. Questa è una differenza fondamentale rispetto ad artigiani e commercianti (che hanno contributi fissi dovuti a prescindere).
-- **Codice tributo F24**: 1299 (professionisti senza cassa)
+- **Versamento con F24, sezione INPS**: causale contributo PXX per chi non ha altra copertura né pensione (26,07%), P10 per i pensionati o i già coperti da altra forma obbligatoria (24%) (istruzioni Redditi PF 2026, Fascicolo 2, quadro RR — Verificato: 2026-10)
 - **Versamento**: integralmente a carico del professionista, con saldo e acconti alle scadenze delle imposte sui redditi: vedi «Flussi di cassa» qui sotto, anche per il secondo anno di attività
 
 ### Base di calcolo dei contributi

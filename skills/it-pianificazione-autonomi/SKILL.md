@@ -59,7 +59,7 @@ Per i professionisti **senza un albo con cassa propria**: consulenti, freelance,
 - **Minimale: €18.808** (sotto questa soglia di reddito non si accredita l'intero anno, ma mesi proporzionali)
 - **Nessun contributo minimo fisso**: si paga solo sul reddito effettivo (differenza chiave rispetto ad artigiani/commercianti). Se il reddito è zero, i contributi sono zero.
 - Base di calcolo: reddito professionale (per i forfettari, ricavi × coefficiente di redditività)
-- Versamento: a carico del professionista, alle scadenze delle imposte sui redditi (saldo dell'anno prima e due acconti del 40%), codice tributo F24 1299. Nel secondo anno di attività saldo e acconti arrivano insieme: vedi il Pattern A6
+- Versamento: a carico del professionista, alle scadenze delle imposte sui redditi (saldo dell'anno prima e due acconti del 40%), con F24 nella sezione INPS: causale PXX (26,07%) o P10 (24%, pensionati o già coperti). Nel secondo anno di attività saldo e acconti arrivano insieme: vedi il Pattern A6
 - **Rivalsa del 4%**: il professionista può addebitarla ai clienti (art. 1 c. 212 L. 662/1996); è un compenso, non un contributo, quindi conta per il limite del forfettario e paga contributi e imposta
 
 Il sistema è **contributivo puro**, identico a quello dei dipendenti: montante × coefficiente di trasformazione. La differenza sta nell'aliquota di computo, cioè quella che va a montante (25% di IVS sul 26,07% versato, contro il 33% dei dipendenti) e nell'assenza del TFR.

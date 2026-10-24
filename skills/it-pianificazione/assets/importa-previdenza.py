@@ -305,6 +305,9 @@ def main():
         retrib[r["al"].year] += r["retribuzione"]
         sett[r["al"].year] += r["settimane"]
     tot_sett = sum(sett.values())
+    # per il diritto (anzianità) i periodi coincidenti contano una volta: al massimo 52 settimane per anno,
+    # anche con due rapporti nello stesso anno (due part-time, dipendente e P.IVA)
+    anzianita = round(sum(min(v, 52) for v in sett.values()) / 52, 2)
     primo = min(r["dal"] for r in righe)
 
     print(f"Prima contribuzione: {primo.strftime('%m/%Y')} | "
@@ -389,7 +392,7 @@ def main():
     if "nascita" in anag:
         print(f"  ETA_ATTUALE      = {eta_stampata((oggi - anag['nascita']).days / 365.25, anonimo)}")
     print("per riscatto-laurea.py:")
-    print(f"  ANZIANITA_ATTUALE = {round(tot_sett / 52, 2)}   # settimane utili / 52")
+    print(f"  ANZIANITA_ATTUALE = {anzianita}   # settimane utili / 52, al massimo 52 per anno")
     if fp_montante is not None:
         print("per montecarlo-pensione.py:")
         print(f"  FP_POT_ATTUALE      = {fp_montante:_.0f}")
@@ -400,7 +403,7 @@ def main():
 
     if args.json:   # mai nomi né date: solo i parametri (l'età come nei parametri pronti)
         dati = {"montante_attuale": round(montante, 2), "ral_attuale": round(ral_rif, 2),
-                "anzianita_contributiva": round(tot_sett / 52, 2), "contributi_solo_dal_1996": bool(prima)}
+                "anzianita_contributiva": anzianita, "contributi_solo_dal_1996": bool(prima)}
         if "nascita" in anag:
             dati["eta_attuale"] = eta_stampata((oggi - anag["nascita"]).days / 365.25, anonimo)
         if fp_montante is not None:

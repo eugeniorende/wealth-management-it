@@ -96,7 +96,8 @@ def main():
                "sensibilità a PIL reale e coefficienti di trasformazione.", globals(), json=True,
                da_json={"montante_attuale": "MONTANTE_ATTUALE", "ral_attuale": "RAL_ATTUALE",
                         "eta_attuale": "ETA_ATTUALE",    # il JSON di importa-previdenza.py
-                        "contributi_solo_dal_1996": "CONTRIBUTI_SOLO_DAL_1996"})
+                        "contributi_solo_dal_1996": "CONTRIBUTI_SOLO_DAL_1996",
+                        "eta_pensionamento": "ETA_PENSIONAMENTO"})   # il JSON di riscatto-laurea.py
     json_out = args.json
     if CONTRIBUTI_SOLO_DAL_1996:
         # l'avviso dell'importatore non deve perdersi lungo la catena --json → --from
