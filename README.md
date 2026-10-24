@@ -24,7 +24,7 @@ Un overlay/extension avrebbe creato conflitti dove Claude pesca dalla skill sbag
 
 ## Stato del progetto (v0.10.0)
 
-> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. La 0.10.0 chiude l'ondata 0 e i temi T1-T8, T10, T11 e parte di T13: tra gli altri l'importatore broker (F001), il ribilanciamento con i versamenti (F004), il plafond del fondo pensione nell'Excel (F007), la certificazione delle minus alla chiusura del rapporto (F011) e il costo medio in amministrato (F012). Restano aperti l'interfaccia comune degli script (T9), i test strutturali sugli Excel (T12), il riscatto della laurea e i casi del freelance (T13), la documentazione e il packaging (T14), e le corrispondenze del 2027 ancora «da verificare» nella mappa dei testi unici. Il piano è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
+> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. La 0.10.0 chiude l'ondata 0 e i temi T1-T8, T10, T11 e parte di T13: tra gli altri l'importatore broker (F001), il ribilanciamento con i versamenti (F004), il plafond del fondo pensione nell'Excel (F007), la certificazione delle minus alla chiusura del rapporto (F011) e il costo medio in amministrato (F012). Dopo il tag, su `develop` e non ancora rilasciate, sono entrate le correzioni della sezione «Non rilasciato» del changelog; le corrispondenze del 2027 nella mappa dei testi unici sono verificate su Normattiva (PR #38) salvo due punti, i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6 del D.Lgs. 117/2026, che restano «da verificare» finché non escono correttivi. Restano aperti l'interfaccia comune degli script (T9), i test strutturali sugli Excel (T12), il riscatto della laurea e i casi del freelance (T13, da decidere), la documentazione e il packaging (T14). Il piano è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
 
 Sei skill operative: `it-pianificazione-obiettivi` (pianificazione goals-based — il pezzo a monte), `it-tax-optimization` (ottimizzazione minus/plus, titoli e cripto), `it-pianificazione` (pensione dipendenti), `it-pianificazione-autonomi` (pensione autonomi/forfettari), `it-rebalance` (ribilanciamento tax-aware), e `it-revisione` (revisione periodica di sintesi — il livello che tiene insieme tutto).
 
@@ -65,13 +65,13 @@ Il flusso end-to-end: `it-pianificazione-obiettivi` definisce obiettivi e alloca
 
 ## Test
 
-La suite di smoke test protegge la meccanica di calcolo di tutti gli script:
+La suite di test protegge la meccanica di calcolo di tutti gli script:
 
 ```bash
 python tests/run_tests.py
 ```
 
-107 test in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 110 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Freshness fiscale
 
@@ -123,7 +123,13 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 
 ### Changelog
 
-**v0.10.0** (corrente):
+**Non rilasciato** (su `develop` dopo il tag `v0.10.0`, destinato alla 0.11.0):
+- **Verifiche su fonte primaria** (PR #37): in `netto-pensione.py` l'ulteriore detrazione della L. 207/2024 (art. 1 c. 6) cita la norma che la sostituisce dal 2027, l'art. 13 c. 10 del D.Lgs. 117/2026 (abrogazione e decorrenza lette in GU n. 152 del 3/7/2026); la riga Inarcassa di `casse-professionali.md` riporta le condizioni dell'agevolazione under 35 dal regolamento (soglia di reddito, reiscrizione, integrazione figurativa a 25 anni).
+- **Testi unici 2027 verificati su Normattiva** (PR #38): le corrispondenze «da verificare» di `mappa-nuovo-tuir.md` sono chiuse per TUIR, registro, successioni e versamenti, con i verbali in `docs/sviluppo/t11/verifica-2026-10-22-*.md`; i riferimenti dal 2027 in `aliquote-12-5-26.md`, `regime-dichiarativo.md`, `successione-donazione.md`, `dividendi-esteri.md` e `criptovalute-casi-speciali.md` sono allineati. Restano «da verificare» i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6.
+- **CI** (PR #39): LibreOffice si installa dai `.deb` in cache tra un run e l'altro (`scripts/installa-libreoffice.sh`, hash controllati contro l'indice firmato), con un timeout di 10 minuti sullo step: su alcuni runner il mirror serviva i pacchetti a 70 KB/s.
+- **Ribilanciamento, aliquota mista** (T7, PR #40): nel portafoglio del ribilanciamento il campo `quota_titoli_stato` dichiara la quota di titoli di Stato white list di un ETF o fondo; l'aliquota della posizione diventa la media pesata 12,5%/26% (DM 13/12/2011, circ. 19/E/2014), usata nella Leva 4 e nella conversione delle minus nello zainetto. Sui default nessun numero cambia.
+
+**v0.10.0** (22/10/2026):
 - **Freshness**: il workflow mensile gira con `shell: bash` (pipefail). Prima l'exit code era quello di `tee`, quindi lo step restava verde anche con i dati scaduti e la issue non si apriva mai. Nuovo test di igiene sulle pipe nei workflow.
 - **Ricalcolo degli Excel in CI**: `scripts/ricalcola-excel.py` ricalcola gli xlsx con LibreOffice headless in locale it-IT e segnala le celle in errore. Tre test nuovi: ricalcolo forzato e locale italiano (validati per mutazione), nessuna cella in errore, cache consegnate uguali al ricalcolo. Il runner distingue i test saltati.
 - **Bug trovati dal ricalcolo in italiano**: in `proiezione-pensione.xlsx` le otto ipotesi di `Scenari!B5:B8` e `D5:D8` erano testo ("0.022"). Con il punto come separatore delle migliaia diventavano 22 e la pensione degli scenari usciva a −1,7·10¹⁹; ora sono numeri. Nel cruscotto e nell'IPS, `TEXT(x;"0.0%")` dipendeva dal locale e perdeva il decimale; ora è `FIXED(x*100;1)&"%"`, quindi "10,0%" in italiano.
@@ -434,7 +440,7 @@ Python 3.11 o successivo (la CI prova 3.11 e 3.14) con le dipendenze degli scrip
 
 ### Claude Code
 
-Il repository include `.claude-plugin/marketplace.json`, quindi è esso stesso un marketplace installabile. Tre vie (procedura verificata sulla documentazione ufficiale, luglio 2026):
+Il repository include `.claude-plugin/marketplace.json`, quindi è esso stesso un marketplace installabile. Tre vie (procedura verificata con la prova di installazione locale del 21/10/2026, su un profilo Claude Code vuoto):
 
 ```bash
 # A) Uso quotidiano — da GitHub (consigliata: aggiornamenti con un comando)
@@ -467,11 +473,11 @@ Cosa conviene sapere:
 
 ### Verifica
 
-Dal repository: `python tests/run_tests.py` (40 test, circa 15 secondi, richiede le dipendenze dei Prerequisiti). Tre test ricalcolano gli Excel con LibreOffice headless in locale italiano (`scripts/ricalcola-excel.py`): verificano che nessuna cella vada in errore e che le cache salvate nei file coincidano col ricalcolo. Senza LibreOffice risultano saltati; nella CI è installato e obbligatorio (`RICHIEDI_LIBREOFFICE=1`). Dopo aver modificato un Excel, `python scripts/ricalcola-excel.py FILE --in-place` ne aggiorna le cache. `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
+Dal repository: `python tests/run_tests.py` (tutta la suite in meno di un minuto, richiede le dipendenze dei Prerequisiti; il numero dei test è nella sezione «Test»). Tre test ricalcolano gli Excel con LibreOffice headless in locale italiano (`scripts/ricalcola-excel.py`): verificano che nessuna cella vada in errore e che le cache salvate nei file coincidano col ricalcolo. Senza LibreOffice risultano saltati; nella CI è installato e obbligatorio (`RICHIEDI_LIBREOFFICE=1`). Dopo aver modificato un Excel, `python scripts/ricalcola-excel.py FILE --in-place` ne aggiorna le cache. `--only NOME` e `--skip NOME` filtrano i test per sottostringa del nome. La stessa suite gira come GitHub Action (`.github/workflows/tests.yml`) a ogni push su `main`/`develop` e su ogni pull request, escluso il test di freshness fiscale (vedi sotto): il badge in cima al README ne riporta lo stato.
 
 ### Cowork
 
-Settings → Plugins → Add plugin → Upload a zip. Lo zip pronto (`wealth-management-it-vX.Y.Z.zip`) è allegato a ogni [GitHub Release](https://github.com/eugeniorende/wealth-management-it/releases); in alternativa si costruisce dal repository con `python scripts/pacchetto.py` (finisce in `dist/`). Contiene solo manifest, comandi, skill e README, sotto la cartella `wealth-management-it/`.
+Settings → Plugins → Add plugin → Upload a zip. Lo zip pronto (`wealth-management-it-vX.Y.Z.zip`) è allegato a ogni [GitHub Release](https://github.com/eugeniorende/wealth-management-it/releases); in alternativa si costruisce dal repository con `python scripts/pacchetto.py` (finisce in `dist/`). Contiene manifest, comandi, skill, README, LICENSE e NOTICE, sotto la cartella `wealth-management-it/`; fuori restano test, workflow e script di build.
 
 ## Uso
 
@@ -542,7 +548,7 @@ Le regole fiscali italiane cambiano a ogni legge di bilancio: il calendario dei 
 
 Il repository segue il gitflow: le feature chiudono su `develop`, su `main` arrivano solo i release branch. Per pubblicare una versione:
 
-1. Da `develop`, aprire un release branch e allineare la versione in `.claude-plugin/plugin.json` e `marketplace.json` (il test di igiene e lo script di packaging la verificano) con la voce di changelog qui sopra.
+1. Da `develop`, aprire un release branch e allineare la versione in `.claude-plugin/plugin.json` e `marketplace.json` (il test di igiene verifica che i due manifest coincidano, lo script di packaging che il tag coincida con `plugin.json`) con la voce di changelog qui sopra.
 2. Pull request del release branch su `main`; la CI (`tests` + `validate`) deve essere verde.
 3. Dopo il merge, tag `vX.Y.Z` su `main` e push del tag. Il workflow `release.yml` rifiuta un tag diverso dalla versione del manifest, esegue la suite **completa, freshness inclusa** (non si rilascia con dati normativi scaduti), costruisce lo zip e crea la GitHub Release con le note generate dai commit.
 4. Merge back di `main` su `develop`.

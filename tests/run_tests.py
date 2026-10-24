@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-run_tests.py — smoke test suite del plugin wealth-management-it.
+run_tests.py — test suite del plugin wealth-management-it.
 
 Uso (dalla radice del plugin o da qualunque directory):
     python tests/run_tests.py
@@ -88,6 +88,8 @@ def t_marketplace():
     voce = mk["plugins"][0]
     assert voce["name"] == pl["name"], "marketplace e plugin.json dichiarano nomi diversi"
     assert voce.get("source") == "./", "il plugin del marketplace deve puntare a './'"
+    assert voce.get("version") == pl["version"], \
+        f"versioni diverse: marketplace {voce.get('version')!r}, plugin.json {pl['version']!r}"
 
 
 @test("igiene: plugin.json valido, SKILL.md < 500 righe, nessun tag cite nei deliverable")
@@ -138,6 +140,39 @@ def t_pipefail():
             testo = "\n".join(righe)
             assert re.search(r"^defaults:\s*\n\s+run:\s*\n\s+shell:\s*bash\s*$", testo, re.M), \
                 f"{nome}: pipe senza pipefail ({con_pipe[0]!r}); aggiungere defaults.run.shell: bash"
+
+
+@test("igiene: il README dichiara un solo conteggio dei test, uguale ai decoratori @test del runner")
+def t_conteggio_test():
+    # Lo storico del changelog cita i conteggi di allora («Suite: 24 test»): si legge
+    # tutto il README tranne quella sezione, e ogni «N test» trovato deve essere il
+    # numero dei decoratori @test di questo file. Il conteggio vive in «## Test».
+    sorgente = open(os.path.abspath(__file__), encoding="utf-8").read()
+    decoratori = len(re.findall(r"^@test\(", sorgente, re.M))
+    registrati = sum(1 for v in globals().values() if getattr(v, "__test__", False))
+    assert decoratori == registrati, f"decoratori {decoratori} ≠ test registrati {registrati}"
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    inizio = readme.index("### Changelog")
+    fine = readme.index("\n## ", inizio)
+    fuori_changelog = readme[:inizio] + readme[fine:]
+    conteggi = [int(n) for n in re.findall(r"\b(\d+) test\b", fuori_changelog)]
+    assert conteggi, "il README deve dichiarare il numero dei test (sezione «Test»)"
+    assert all(n == decoratori for n in conteggi), \
+        f"il README dice {sorted(set(conteggi))} test, i decoratori @test sono {decoratori}"
+    assert len(conteggi) == 1, f"un solo conteggio dei test nel README, trovati {len(conteggi)}"
+
+
+@test("igiene CI: i workflow mensile e di release usano una versione di Python della matrice di tests.yml")
+def t_python_workflow():
+    cartella = os.path.join(ROOT, ".github", "workflows")
+    testi = {n: open(os.path.join(cartella, n), encoding="utf-8").read() for n in sorted(os.listdir(cartella))}
+    m = re.search(r"python-version:\s*\[([^\]]+)\]", testi["tests.yml"])
+    assert m, "tests.yml: matrice python-version non trovata"
+    matrice = set(re.findall(r"[\d.]+", m.group(1)))
+    assert "3.11" in matrice, "la matrice deve includere il minimo dichiarato nel README (3.11)"
+    for nome, testo in testi.items():
+        for v in re.findall(r'python-version:\s*"([\d.]+)"', testo):
+            assert v in matrice, f"{nome}: Python {v} fuori dalla matrice {sorted(matrice)} di tests.yml"
 
 
 @test("igiene CI: le action dei workflow sono fissate per SHA completo")
@@ -3958,7 +3993,9 @@ def t_filtro():
     assert "freshness fiscale" in r.stdout
     r = subprocess.run([sys.executable, me, "--skip", "freshness", "--only", "igiene"],
                        capture_output=True, text=True, timeout=120)
-    assert "4/4 test passati" in r.stdout, r.stdout[-400:]
+    attesi = sum(1 for v in globals().values() if getattr(v, "__test__", False)
+                 and "igiene" in v.__nome__.lower() and "freshness" not in v.__nome__.lower())
+    assert f"{attesi}/{attesi} test passati" in r.stdout, r.stdout[-400:]
     assert "freshness" not in r.stdout
     r = subprocess.run([sys.executable, me, "--only", "nome-inesistente"],
                        capture_output=True, text=True, timeout=120)
@@ -4020,7 +4057,7 @@ def seleziona(tests, only, skip):
 
 def main():
     import argparse
-    ap = argparse.ArgumentParser(description="Smoke test suite del plugin wealth-management-it.")
+    ap = argparse.ArgumentParser(description="Test suite del plugin wealth-management-it.")
     ap.add_argument("--only", action="append", metavar="NOME",
                     help="esegui solo i test il cui nome contiene NOME (ripetibile)")
     ap.add_argument("--skip", action="append", metavar="NOME",
@@ -4033,7 +4070,7 @@ def main():
         sys.exit(0)
 
     print("=" * 74)
-    print("SMOKE TEST SUITE — wealth-management-it")
+    print("TEST SUITE — wealth-management-it")
     print("=" * 74)
     tests = [v for v in globals().values() if getattr(v, "__test__", False)]
     tests = seleziona(tests, args.only, args.skip)
