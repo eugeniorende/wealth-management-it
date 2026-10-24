@@ -190,6 +190,21 @@ def t_python_workflow():
             assert v in matrice, f"{nome}: Python {v} fuori dalla matrice {sorted(matrice)} di tests.yml"
 
 
+@test("igiene CI: il check «test» chiesto dal ruleset riassume la matrice e Windows e fallisce se uno fallisce")
+def t_check_ruleset():
+    # Il ruleset di main e develop (24/10/2026) chiede i check «test» e «validate». I job della matrice si chiamano
+    # «suite (3.11)» e «suite (3.14)»: senza un job che si chiami esattamente «test» la PR resterebbe bloccata
+    # anche con la CI verde, e con un «test» saltato (needs falliti, senza !cancelled()) passerebbe con la CI rossa.
+    ci = open(os.path.join(ROOT, ".github", "workflows", "tests.yml"), encoding="utf-8").read()
+    jobs = re.findall(r"^  ([\w-]+):\n", ci.split("\njobs:\n")[1], re.M)
+    assert {"suite", "test-windows", "test", "validate"} <= set(jobs), jobs
+    test = ci.split("\n  test:\n")[1].split("\n\n")[0]
+    assert "if: ${{ !cancelled() }}" in test and "needs: [suite, test-windows]" in test, test
+    assert '"${{ needs.suite.result }}" = success' in test and '"${{ needs.test-windows.result }}" = success' in test, test
+    suite = ci.split("\n  suite:\n")[1].split("\n\n  #")[0]
+    assert "matrix:" in suite and "RICHIEDI_LIBREOFFICE" in suite, "la matrice con LibreOffice è il job suite"
+
+
 @test("igiene CI: le action dei workflow sono fissate per SHA completo")
 def t_action_sha():
     # Supply chain: un tag (@v4) può essere spostato da chi controlla l'action, uno SHA no.

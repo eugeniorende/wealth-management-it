@@ -86,7 +86,7 @@ I passi dell'ordine di lavoro fino alla 0.11.0 sono fatti, e con la PR #54 anche
 - **Propagazione**: ogni correzione in tutte le copie (`git grep` su `skills/`, `commands/`, README, manifest).
 - **Excel**: mai salvare con openpyxl i file con convalide o strutture delicate; modificare l'XML nello zip e poi `python scripts/ricalcola-excel.py FILE --in-place` (ricalcolo in locale it-IT). Confrontare la struttura prima e dopo.
 - **Revisione avversariale prima di ogni merge di tema**: `docs/sviluppo/workflows/review-tema-roadmap.js` (Workflow tool, args `{repo, scratch, python, branch, base, tema, finding}`); il modello per applicare le correzioni è `correzioni-temi-roadmap.js`. Esito in `docs/sviluppo/revisioni/esito-<tema>.json`.
-- **CI verde prima del merge**: `tests` (3.11 e 3.14, LibreOffice obbligatorio), `validate` (con `--strict`), `test-windows` e `freshness`.
+- **CI verde prima del merge**: `suite` (3.11 e 3.14, LibreOffice obbligatorio), `test-windows`, `validate` (con `--strict`) e `freshness`. Il job `test` le riassume per il ruleset di `main` e `develop`, che chiede i check `test` e `validate`.
 
 ## 5. Ambiente
 
