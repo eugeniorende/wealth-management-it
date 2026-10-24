@@ -4,13 +4,10 @@ Documento per riprendere lo sviluppo in un'altra sessione (Claude Code in cloud 
 
 ## 1. Dove siamo
 
-- **0.10.0 rilasciata il 22/10/2026**: tag `v0.10.0`, release con lo zip, merge back su develop (PR #35 e #36). Dentro: ondata 0, T1-T8, T10, T11 e parte di T13. Le sessioni cloud del 21-23/10 hanno chiuso T2, T3, T13, T8, T7, T11 (sessione A) e T5, T4, T6 con le note previdenziali (sessione B).
-- **Dopo il tag, su develop** (e9d804c, CI verde su 3.11 e 3.14): PR #37 (art. 13 c. 10 del TUIR 2027 in `netto-pensione.py`, Inarcassa under 35), PR #38 (corrispondenze 2027 verificate su Normattiva, verbali in `t11/verifica-2026-10-22-*.md`), PR #39 (LibreOffice in CI con i `.deb` in cache, `scripts/installa-libreoffice.sh`), PR #40 (T7: campo `quota_titoli_stato` e aliquota mista per ETF e fondi su titoli di Stato). Nessuna delle quattro è nel changelog del README né nello «Stato al» di `ROADMAP.md`. La prossima versione è la **0.11.0**: la #40 è una funzionalità nuova, quindi niente 0.10.1.
-- PR #41 (questo documento), #42 «stato dopo la 0.10.0» e #43 T9 (a) mergiate il 24/10/2026. **Aperte in catena**, ognuna sul branch della precedente, da mergiare in ordine dopo la CI verde: #44 T9 (b), #45 T9 (c), #46 T9 (d), #47 T12, #48 T14, #49 pre-pubblicazione (§ 2.6-2.7). Branch remoti già mergiati e **da cancellare dal proprietario**: `claude/kind-meitner-crztg2`, `claude/vigilant-cannon-1otexq`, `feature/verifiche-fonti`, `feature/handoff-0.11` e i `feature/*` delle PR di questa sessione. Dalla sessione cloud la cancellazione è negata: il proxy GitHub risponde 403 sia a `git push origin --delete` sia a `DELETE /git/refs` (`delete_branch_on_merge` è spento sul repository e non si può accendere da qui).
-- Suite: 132 test (`@test` in `tests/run_tests.py`; il conteggio nel README è vincolato da un test di igiene). Freshness: nessun marcatore scade prima del 2027-06.
+- **0.11.0 rilasciata il 24/10/2026**: tag `v0.11.0`, release con lo zip, merge back su develop. Dentro, dopo la 0.10.0 del 22/10/2026: PR #37-#40 (verifiche alle fonti, LibreOffice in CI, aliquota mista), PR #42 (stato dopo la 0.10.0), T9 in quattro PR (#43-#46: interfaccia comune degli script, lettore unico del pianificatore, catena `--json` → `--from`, input da file, «Dove lavorare», vocabolario), T12 (#47: test che vincolano i numeri), T14 (#48: description, CHANGELOG.md, comandi alias, manifest `--strict`, indici) e la pre-pubblicazione (#49: rilettura degli output, prove di installazione, verifiche alle fonti). Ogni tema ha la sua revisione avversariale, con gli esiti in `docs/sviluppo/revisioni/` (esito-t9a, esito-t9bcd, esito-t12, esito-t14).
+- Suite: 134 test (`@test` in `tests/run_tests.py`; il conteggio nel README è vincolato da un test di igiene). Freshness: nessun marcatore scade prima del 2027-06.
 - Il repository è **privato** e resta tale: la visibilità la decide il proprietario (decisione 2 di `ROADMAP.md`).
-
-Questo documento nasce da una ricognizione del 23/10/2026 su develop e9d804c: cinque lettori, uno per fetta della roadmap, e due verificatori avversariali per ogni voce (lenti «stato» ed «evidenza»). Le righe citate valgono a quel commit. Delle 11 note fuori perimetro del passaggio precedente 10 sono chiuse (PR #27, #28, #30, #31, #32, #38 e i commit dei temi); le revisioni avversariali di T7, T11 e T13 non hanno rilievi non applicati.
+- **Branch remoti da cancellare dal proprietario**: `claude/kind-meitner-crztg2`, `claude/vigilant-cannon-1otexq`, `feature/verifiche-fonti`, `feature/handoff-0.11`, `feature/stato-dopo-0.10.0`, `feature/t9a-cli-encoding-formati`, `feature/t9b-lettore-pianificatore`, `feature/t9c-from-json-catena`, `feature/t9d-input-esterno-dove-lavorare`, `feature/t12-test-vincolanti`, `feature/t14-authoring-packaging`, `feature/prepubblicazione-verifiche`, `release/0.11.0`. Dalla sessione cloud la cancellazione è negata: il proxy GitHub risponde 403 sia a `git push origin --delete` sia a `DELETE /git/refs` (`delete_branch_on_merge` è spento sul repository e non si può accendere da qui). In alternativa: Settings → General → «Automatically delete head branches».
 
 ## 2. Cosa resta: le voci verificate
 
@@ -62,19 +59,18 @@ Fatte nella PR #49:
 ### 2.8 Da decidere dal proprietario: non toccare senza decisione
 
 - Visibilità del repository (decisione 2) e branch protection (richiede repository pubblico o GitHub Pro).
-- T13: riscatto della laurea (F055) e casi del freelance (F063), `ROADMAP.md` § «Dopo». La pulizia della description di it-pianificazione si fa comunque con F023.
+- T13: riscatto della laurea (F055) e casi del freelance (F063), `ROADMAP.md` § «Dopo». La pulizia della description di it-pianificazione (F023) è fatta: riscatto, ricongiunzione e totalizzazione sono fuori dai trigger e dichiarati fuori perimetro.
 - Icona del plugin.
 
-## 3. Ordine di lavoro consigliato
+## 3. Prossimi passi
 
-1. Mergiare la PR di questo documento (CI verde → merge commit → elimina il branch), `git pull`, cancellare i tre branch remoti del § 1.
-2. PR «stato dopo la 0.10.0»: § 2.1 per intero.
-3. T9 in più PR, ognuna con revisione avversariale prima del merge: (a) helper CLI, UTF-8, formati italiani, CSV con `;`, `windows-latest` (F056 e § 2.3); (b) lettore unico del pianificatore (F028); (c) `--from`, `--json` su glidepath e montecarlo-obiettivi, test «catena», contratto di input di it-revisione (F027, F031); (d) input esterno, «Dove lavorare», vocabolario e glossario (F033, F059, F026, insieme a F058).
-4. T12 (§ 2.4), in una o due PR.
-5. T14 (§ 2.5): description e YAML, CHANGELOG.md, command come alias, manifest e `--strict`, indici, aggiornamenti nel README.
-6. § 2.6 e § 2.7: rilettura degli output con verbale, verbale delle prove di installazione, verifiche alle fonti.
-7. **Rilascio 0.11.0**: versione in `plugin.json` e `marketplace.json`, changelog, ROADMAP spuntata con il nuovo «Stato al», README (conteggio dei test, tabella freshness rigenerata con `--tabella-freshness`), questo file aggiornato; `release/0.11.0` da develop → PR su main (merge commit) → tag `v0.11.0` → verifica di `release.yml` (suite completa con freshness, zip con LICENSE, NOTICE e CHANGELOG.md) → merge back su develop. Finestra: i marcatori più vecchi sono del 2026-06 e scadono a giugno 2027; `release.yml` esegue anche la freshness, quindi il tag va dato prima, oppure dopo una riverifica alle fonti.
-8. Al termine, lasciare in questo file ciò che resta al proprietario (§ 2.8 e le prove di installazione).
+I passi 1-7 dell'ordine di lavoro precedente (PR del documento, stato dopo la 0.10.0, T9, T12, T14, § 2.6-2.7, rilascio 0.11.0) sono fatti. Restano:
+
+1. **Al proprietario**: le decisioni del § 2.8 (visibilità, branch protection, T13, icona); la cancellazione dei branch remoti del § 1, oppure Settings → General → «Automatically delete head branches»; le due prove di installazione del § 2.6 (account senza accesso dopo la pubblicazione, upload dello zip in Cowork), con i passi nel verbale delle prove di installazione.
+2. **Con la legge di bilancio 2027 e i correttivi del D.Lgs. 117/2026**: rivedere i due punti «Da verificare» della mappa dei testi unici (rinvii del DM 21/02/2013, art. 306 c. 6) e le soglie annuali (massimale contributivo, coefficienti, tassi di rivalutazione), seguendo il calendario dei parametri nel README.
+3. **Dal 1/1/2027** entrano in vigore i testi unici: le doppie citazioni di `mappa-nuovo-tuir.md` restano valide, ma la citazione principale va girata sul testo nuovo quando le prassi dell'AdE lo seguono.
+4. **Entro giugno 2027**: riverifica alle fonti dei marcatori del 2026-06, prima che la freshness mensile apra la issue e prima di un nuovo tag (`release.yml` esegue anche la freshness).
+5. **T13**, se il proprietario lo decide: riscatto della laurea (F055) e casi del freelance (F063), `ROADMAP.md` § «Dopo», con una revisione avversariale prima del merge.
 
 ## 4. Regole di lavoro
 
@@ -85,7 +81,7 @@ Fatte nella PR #49:
 - **Propagazione**: ogni correzione in tutte le copie (`git grep` su `skills/`, `commands/`, README, manifest).
 - **Excel**: mai salvare con openpyxl i file con convalide o strutture delicate; modificare l'XML nello zip e poi `python scripts/ricalcola-excel.py FILE --in-place` (ricalcolo in locale it-IT). Confrontare la struttura prima e dopo.
 - **Revisione avversariale prima di ogni merge di tema**: `docs/sviluppo/workflows/review-tema-roadmap.js` (Workflow tool, args `{repo, scratch, python, branch, base, tema, finding}`); il modello per applicare le correzioni è `correzioni-temi-roadmap.js`. Esito in `docs/sviluppo/revisioni/esito-<tema>.json`.
-- **CI verde prima del merge**: `tests` (3.11 e 3.14, LibreOffice obbligatorio) e `validate`.
+- **CI verde prima del merge**: `tests` (3.11 e 3.14, LibreOffice obbligatorio), `validate` (con `--strict`), `test-windows` e `freshness`.
 
 ## 5. Ambiente
 
@@ -102,6 +98,6 @@ In CI: `RICHIEDI_LIBREOFFICE=1` rende obbligatori i test Excel; matrice Python 3
 ## 6. Storico e materiale
 
 - Passaggio del 21/10/2026: stato prima della 0.10.0, temi su branch separati, note fuori perimetro (§ 4 di allora): tutto chiuso tranne il conteggio dei test del README (§ 2.1).
-- `docs/sviluppo/revisioni/`: `review-<tema>.json` (esiti delle revisioni avversariali: `confermati`, `contesi`, `non_verificati`) ed `esito-<tema>.json` (cosa è stato applicato), uno per tema; esito-t2, esito-t3 ed esito-t13 ricostruiti con la PR #47.
+- `docs/sviluppo/revisioni/`: `review-<tema>.json` (esiti delle revisioni avversariali: `confermati`, `contesi`, `non_verificati`) ed `esito-<tema>.json` (cosa è stato applicato), uno per tema; esito-t2, esito-t3 ed esito-t13 ricostruiti con la PR #47. Per la 0.11.0: esito-t9a, esito-t9bcd, esito-t12 ed esito-t14 (quest'ultimo copre anche la PR #49).
 - `docs/sviluppo/t11/`: `mappa-nuovo-tuir.md` e `doppie-citazioni.md` sono bozze storiche, già integrate nella reference; i verbali `verifica-2026-10-22-*.md` sono la fonte delle corrispondenze 2027.
 - Circ. AdE 30/E/2023: il PDF sul sito AdE dà 404; copia integrale su dirittobancario.it.
