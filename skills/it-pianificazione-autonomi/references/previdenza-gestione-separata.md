@@ -3,6 +3,7 @@
 ## Indice
 
 - La Gestione Separata INPS
+- Flussi di cassa: rivalsa del 4%, saldo e acconti
 - Le casse professionali (cenni)
 - Il caso del doppio reddito (P.IVA + dipendente)
 - Heuristic per la skill
@@ -33,7 +34,7 @@ I **forfettari senza cassa** si iscrivono alla Gestione Separata e versano con l
 - **Minimale 2026**: €18.808. Sotto questa soglia di reddito non si accredita l'intero anno contributivo, ma un numero di mesi proporzionale ai contributi versati.
 - **Nessun contributo minimo fisso**: si paga solo sul reddito effettivo. Se il reddito è zero, i contributi sono zero. Questa è una differenza fondamentale rispetto ad artigiani e commercianti (che hanno contributi fissi dovuti a prescindere).
 - **Codice tributo F24**: 1299 (professionisti senza cassa)
-- **Versamento**: integralmente a carico del professionista, con saldo e acconti alle scadenze fiscali (per il 2026 prorogate al 20 luglio con D.L. 89/2026)
+- **Versamento**: integralmente a carico del professionista, con saldo e acconti alle scadenze delle imposte sui redditi: vedi «Flussi di cassa» qui sotto, anche per il secondo anno di attività
 
 ### Base di calcolo dei contributi
 
@@ -85,6 +86,32 @@ Gli stessi dei dipendenti contributivi puri:
 
 ⚠️ Per i contributivi puri (tutti gli autonomi iscritti dal 1996) l'anticipata a 64 anni richiede che la pensione maturata superi 3 volte l'assegno sociale. La L. 207/2024 aveva permesso di contare anche la rendita della previdenza complementare per raggiungere la soglia, ma la L. 199/2025 ha abrogato questa possibilità (Circ. INPS 19/2026): non è più un argomento a favore del fondo pensione. *(Requisiti 2026-2028 — Verificato: 2026-10.)*
 
+## Flussi di cassa: rivalsa del 4%, saldo e acconti
+
+**La rivalsa del 4%.** Il professionista in Gestione Separata può addebitare ai committenti il 4% dei compensi lordi (art. 1 c. 212 L. 662/1996). È una facoltà, e una volta addebitata è un compenso a tutti gli effetti, non un contributo: le istruzioni del modello Redditi PF 2026 (quadro RE) dicono che «costituisce parte integrante dei compensi», e nel forfettario sta tra i compensi percepiti del rigo LM22. Quindi conta per il limite di €85.000, entra nel reddito con il coefficiente e su quel reddito si pagano contributi e imposta sostitutiva. Il contributo integrativo delle casse (per esempio il 4% di Inarcassa) è un'altra cosa: lo pone la legge a carico del cliente e resta fuori dai compensi.
+
+**Saldo e acconti dei contributi.** I contributi si versano alle scadenze delle imposte sui redditi (Circ. INPS 8/2026): entro il 30 giugno il saldo dell'anno prima e il primo acconto, entro il 30 novembre il secondo acconto. Gli acconti sono due rate del 40% dei contributi dovuti sul reddito dell'anno precedente, l'80% in tutto (art. 1 c. 212 L. 662/1996). Nel 2026 per i soggetti ISA e i forfettari il termine del 30 giugno è slittato al 20 luglio (art. 6 D.L. 89/2026, abrogato dalla L. 113/2026 che ne ha fatto salvi gli effetti): è stato un rinvio di quell'anno, non la regola.
+
+**Saldo e acconti dell'imposta sostitutiva.** Il forfettario versa con le regole dell'IRPEF (art. 1 c. 64 L. 190/2014; dal 2027 art. 235 c. 1 D.Lgs. 117/2026). L'acconto è il 100% dell'imposta dell'anno precedente (istruzioni Redditi PF 2026; dal 2027 art. 72 c. 1 TU versamenti e riscossione, D.Lgs. 33/2025), in due rate del 50% per forfettari e soggetti ISA (art. 58 DL 124/2019 e Ris. AdE 93/E/2019; dal 2027 art. 72 c. 4 D.Lgs. 33/2025) invece del 40% e 60% degli altri contribuenti.
+
+**Il secondo anno.** Nel primo anno di attività non si versa niente: non c'è un saldo dell'anno prima, e gli acconti si calcolano su un anno che non c'era. Nel secondo anno arrivano insieme il saldo del primo e gli acconti del secondo. Esempio: consulente IT forfettario, coefficiente 78%, aliquota del 5% di una nuova attività, €40.000 di compensi l'anno con la rivalsa (fatture per €38.462 più €1.538 di rivalsa):
+
+| | Primo anno | Secondo anno |
+|---|---|---|
+| Reddito lordo (€40.000 × 78%) | €31.200 | €31.200 |
+| Contributi dovuti sul reddito dell'anno (26,07%) | €8.133,84 | €8.133,84 |
+| Contributi versati nell'anno | — | €14.640,92 (saldo €8.133,84 + acconti 2 × €3.253,54) |
+| Reddito imponibile (lordo − contributi versati nell'anno) | €31.200 | €16.559,08 |
+| Imposta sostitutiva al 5% | €1.560 | €827,95 |
+| Imposta versata nell'anno | — | €3.120 (saldo €1.560 + acconti 2 × €780) |
+| **Totale versato nell'anno** | **€0** | **€17.760,92** |
+
+Entro il 30 giugno del secondo anno escono €13.727,38 (saldo dei contributi, primo acconto dei contributi, saldo e primo acconto dell'imposta), entro il 30 novembre altri €4.033,54. È circa 1,9 volte un anno «a regime» (€8.133,84 di contributi e €1.153,31 di imposta): il 44% dei compensi del primo anno. Con l'aliquota del 15% il secondo anno costa €24.000,92, il 60% dei compensi. Dal terzo anno il flusso si normalizza: un saldo piccolo più gli acconti, e la deduzione torna a circa un anno di contributi.
+
+La deduzione segue la cassa: i contributi si deducono nell'anno in cui si versano. Nel secondo anno l'imponibile quasi si dimezza, e gli acconti d'imposta calcolati sul primo anno (€1.560) superano l'imposta dovuta (€827,95): i €732,05 in più tornano come credito nella dichiarazione dell'anno dopo. Le istruzioni consentono di calcolare gli acconti su un'imposta prevista minore (metodo previsionale), ma se la previsione si rivela sbagliata l'acconto insufficiente è sanzionato. Se i contributi versati nell'anno superano il reddito lordo forfettario, l'eccedenza si deduce dagli altri redditi IRPEF (vedi `fiscalita-forfettario.md`).
+
+*Rivalsa del 4% e acconti dei contributi (art. 1 c. 212 L. 662/1996), scadenze dei contributi (Circ. INPS 8/2026), rivalsa nei compensi e acconti al 100% (istruzioni Redditi PF 2026, Fascicoli 1 e 3), rate del 50% per forfettari e ISA (art. 58 DL 124/2019; Ris. AdE 93/E/2019), versamento con le regole dell'IRPEF (art. 1 c. 64 L. 190/2014; dal 2027 art. 235 c. 1 D.Lgs. 117/2026), corrispondenze dal 2027 nell'art. 72 del D.Lgs. 33/2025 e rinvio del 2026 (art. 6 D.L. 89/2026, abrogato dalla L. 113/2026) — Verificato: 2026-10.*
+
 ## Le casse professionali (cenni)
 
 Per i professionisti **iscritti a un albo con cassa**: ingegneri/architetti (Inarcassa), avvocati (Cassa Forense), medici/odontoiatri (ENPAM), commercialisti (CNPADC), consulenti del lavoro (ENPACL), geometri (CIPAG), notai, veterinari, farmacisti, ecc.
@@ -121,4 +148,5 @@ Frequente nel mondo tech: dipendente che ha anche una P.IVA per attività extra 
 5. **Coefficienti di trasformazione**: stessi dei dipendenti (tabella DM 20/11/2024 in `it-pianificazione/references/previdenza-obbligatoria.md`). Non duplicare, rinviare.
 6. **Tasso di sostituzione più basso**: per via dell'aliquota di computo del 25%, evidenziare che l'autonomo ha una pensione pubblica più magra a parità di reddito → la complementare è più necessaria.
 7. **Anzianità contributiva**: l'autonomo la verifica sull'estratto conto INPS (www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo"). Se non disponibile, stimare ma flaggare.
-8. **Rinvio al patronato/consulente**: per ricostruzione posizione, cumulo, totalizzazione, casse, sempre rinviare a professionista abilitato (servizi spesso gratuiti via patronato).
+8. **Il secondo anno di attività**: avvisare che nel secondo anno si versano insieme il saldo del primo e gli acconti del secondo, circa 1,9-2,1 volte un anno a regime (esempio sopra), e che la rivalsa del 4% è un compenso, non un contributo.
+9. **Rinvio al patronato/consulente**: per ricostruzione posizione, cumulo, totalizzazione, casse, sempre rinviare a professionista abilitato (servizi spesso gratuiti via patronato).

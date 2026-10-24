@@ -2,7 +2,7 @@
 name: it-pianificazione-autonomi
 description: "Pianificazione pensionistica per lavoratori autonomi e partite IVA italiane (forfettario e ordinario), iscritti alla Gestione Separata INPS o a una cassa professionale (Inarcassa, Cassa Forense, ENPAM, CNPADC, ENPAP, CIPAG, ecc.). Usa questa skill quando un libero professionista o freelance con P.IVA parla di pensione da autonomo, Gestione Separata, contributo soggettivo e integrativo, minimali e massimale, deducibilità dei contributi, coefficiente di redditività, imposta sostitutiva 15% o 5%, fondo pensione per autonomi («conviene se sono forfettario?»), gap previdenziale, forfettario vs ordinario ai fini previdenziali. ATTENZIONE: per i forfettari il contributo volontario al fondo pensione NON è deducibile (imposta sostitutiva, non IRPEF), i contributi obbligatori sì: la logica dei dipendenti si inverte. NON copre dipendenti privati (`it-pianificazione`), dipendenti pubblici, né artigiani e commercianti delle gestioni IVS INPS. NON sostituisce un commercialista o un consulente previdenziale."
 metadata:
-  version: "0.4"
+  version: "0.5"
 ---
 
 # it-pianificazione-autonomi
@@ -59,7 +59,8 @@ Per i professionisti **senza un albo con cassa propria**: consulenti, freelance,
 - **Minimale: €18.808** (sotto questa soglia di reddito non si accredita l'intero anno, ma mesi proporzionali)
 - **Nessun contributo minimo fisso**: si paga solo sul reddito effettivo (differenza chiave rispetto ad artigiani/commercianti). Se il reddito è zero, i contributi sono zero.
 - Base di calcolo: reddito professionale (per i forfettari, ricavi × coefficiente di redditività)
-- Versamento: a carico del professionista, scadenze fiscali (saldo + acconti), codice tributo F24 1299
+- Versamento: a carico del professionista, alle scadenze delle imposte sui redditi (saldo dell'anno prima e due acconti del 40%), codice tributo F24 1299. Nel secondo anno di attività saldo e acconti arrivano insieme: vedi il Pattern A6
+- **Rivalsa del 4%**: il professionista può addebitarla ai clienti (art. 1 c. 212 L. 662/1996); è un compenso, non un contributo, quindi conta per il limite del forfettario e paga contributi e imposta
 
 Il sistema è **contributivo puro**, identico a quello dei dipendenti: montante × coefficiente di trasformazione. La differenza sta nell'aliquota di computo, cioè quella che va a montante (25% di IVS sul 26,07% versato, contro il 33% dei dipendenti) e nell'assenza del TFR.
 
@@ -109,6 +110,7 @@ Per un developer/consulente, il coefficiente tipico è **78%**: significa che il
 1. I **contributi INPS obbligatori sono deducibili** dal reddito forfettario (unica deduzione ammessa) → ridurre l'imposta sostitutiva. Dimenticarli costa il 15% del loro ammontare in imposta non risparmiata.
 2. Il **contributo volontario al fondo pensione NON è deducibile** (vedi sopra). Indicato erroneamente come deducibile è uno degli errori più comuni.
 3. Il reddito forfettario **rileva** per i requisiti pensionistici (anzianità contributiva matura normalmente).
+4. I contributi si deducono **per cassa**, nell'anno in cui si versano: quelli che superano il reddito forfettario vanno nel rigo LM49 e si deducono solo da altri redditi IRPEF (rigo RP21). Per il forfettario puro quella parte va persa.
 
 Vedi `references/fiscalita-forfettario.md` per esempi numerici completi e il confronto forfettario vs ordinario.
 
@@ -209,6 +211,7 @@ Pattern specifici per autonomi, presentati come scenari quantificati e non come 
 - **Pattern A3 — Sfruttare i redditi IRPEF collaterali per la deduzione**: se l'autonomo ha affitti o altri redditi IRPEF, il fondo pensione deduce fino a capienza di quelli.
 - **Pattern A4 — Considerare il passaggio a ordinario se conviene**: in alcuni casi (costi reali alti, necessità di dedurre), il regime ordinario può essere più efficiente — ma è una valutazione fiscale complessa, da fare con un commercialista.
 - **Pattern A5 — Più complementare perché la pubblica è più magra**: l'autonomo ha più bisogno della complementare del dipendente, anche senza il vantaggio deduzione.
+- **Pattern A6 — Preparare la cassa del secondo anno**: nel primo anno di attività non si versa niente, nel secondo si versano insieme il saldo del primo e gli acconti del secondo (contributi 40% + 40%, imposta sostitutiva 50% + 50%). Nell'esempio di `references/previdenza-gestione-separata.md` (€40.000 di compensi, 78%, aliquota del 5%) escono €17.760,92 nel secondo anno, circa 1,9 volte un anno a regime e il 44% dei compensi del primo; con il 15%, €24.000,92. Quantificare l'accantonamento con i numeri dell'utente, e ricordare che la rivalsa del 4% è un compenso che alza contributi e imposta.
 
 ## Strumento operativo: il foglio di proiezione
 
@@ -231,7 +234,7 @@ Report markdown in 5 sezioni (analogo a `it-pianificazione`):
 2. **Proiezione previdenza obbligatoria**: pensione lorda/netta attesa, tasso di sostituzione (evidenziare che è più basso per via dell'aliquota di computo del 25%)
 3. **Valutazione previdenza complementare**: con l'analisi corretta della deducibilità (zero per forfettario puro), confronto fondo vs ETF
 4. **Gap analysis tenore di vita**: con scenari conservativo/base/ottimistico
-5. **Leve da valutare**: pattern A1-A5 quantificati come scenari
+5. **Leve da valutare**: pattern A1-A6 quantificati come scenari
 
 ### Disclaimer (obbligatorio in fondo)
 
@@ -248,13 +251,15 @@ Report markdown in 5 sezioni (analogo a `it-pianificazione`):
 - ❌ Ignorare il massimale €122.295: oltre quella soglia non si versa né si matura montante. Per redditi alti, la pubblica si appiattisce e la complementare diventa critica.
 - ❌ Promettere pensioni in valore nominale a 30+ anni come certezze: vale lo stesso disclaimer dei dipendenti, con incertezza aggiuntiva sulla continuità del reddito autonomo.
 - ❌ Confondere ricavi e fatturato: i ricavi forfettari sono gli incassi effettivi (criterio di cassa), non il fatturato.
+- ❌ Trattare la rivalsa INPS del 4% come un contributo: è un compenso, conta per il limite di €85.000 e paga contributi e imposta. Il contributo integrativo delle casse, invece, resta fuori dai compensi.
+- ❌ Tarare l'accantonamento del primo anno su un anno «a regime»: nel secondo anno si versano insieme saldo e acconti, quasi il doppio.
 - ❌ Consigliare il regime ordinario o forfettario senza rinviare al commercialista: la scelta del regime è una valutazione fiscale complessa che dipende da costi reali, redditi collaterali, prospettive.
 
 ## Riferimenti
 
-- `references/previdenza-gestione-separata.md` — Gestione Separata INPS in dettaglio, confronto con casse professionali, requisiti pensionistici per autonomi
+- `references/previdenza-gestione-separata.md` — Gestione Separata INPS in dettaglio, flussi di cassa (rivalsa del 4%, saldo e acconti, l'esempio primo anno contro secondo), confronto con casse professionali, requisiti pensionistici per autonomi
 - `references/casse-professionali.md` — le casse di previdenza dei professionisti: le due cornici (509/1994, 103/1996), i due pilastri (soggettivo deducibile + integrativo pass-through), la deducibilità del soggettivo anche in forfettario, minimi/massimali/deroghe, il calcolo contributivo (montante + coefficiente), la tabella delle principali casse con dati 2026, e le leve di pianificazione
-- `references/fiscalita-forfettario.md` — regime forfettario, coefficienti, deducibilità contributi, la (non) deducibilità del fondo pensione, confronto fondo vs ETF per forfettari, esempi numerici
+- `references/fiscalita-forfettario.md` — regime forfettario, coefficienti, rivalsa nei compensi, deducibilità dei contributi per cassa ed eccedenza sugli altri redditi, la (non) deducibilità del fondo pensione, confronto fondo vs ETF per forfettari, esempi numerici
 - `assets/proiezione-pensione-autonomi.xlsx` — foglio di proiezione previdenziale per autonomi (6 fogli: Input, Coefficienti, Previdenza, Fiscalità, Complementare, Riepilogo); aliquota 26,07%/cassa, no TFR, confronto forfettario vs ordinario con la deducibilità corretta
 - **Riusa** (non duplica) le reference condivise di `it-pianificazione`:
   - `it-pianificazione/references/previdenza-complementare.md` — meccanica fondi pensione (forme, comparti, tassazione finale, anticipazioni): valida per tutti, autonomi inclusi

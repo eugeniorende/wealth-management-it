@@ -3987,6 +3987,63 @@ def t_riscatto_testi():
     assert "Pattern P7 — Riscattare la laurea" in skill and "assets/riscatto-laurea.py" in skill
     assert "Non gestisce ricongiunzione, totalizzazione, riscatto laurea" not in skill
 
+
+def _it(x, dec=2):
+    """Importo in formato italiano, come nelle reference: 17760.92 → «17.760,92»."""
+    return f"{x:,.{dec}f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+@test("T13 freelance: rivalsa del 4%, saldo e acconti, il secondo anno ricalcolato, eccedenza LM49 → RP21")
+def t_freelance_flussi():
+    # F063: rivalsa, shock del secondo anno ed eccedenza dei contributi non comparivano nella skill.
+    # L'esempio si ricalcola da capo: compensi €40.000, coefficiente 78%, Gestione Separata 26,07%,
+    # acconti dei contributi 40% + 40% (art. 1 c. 212 L. 662/1996), dell'imposta 50% + 50% (art. 58 DL 124/2019)
+    A = os.path.join(SKILLS, "it-pianificazione-autonomi")
+    gs = open(os.path.join(A, "references", "previdenza-gestione-separata.md"), encoding="utf-8").read()
+    sezione = gs.split("\n## Flussi di cassa: rivalsa del 4%, saldo e acconti\n")[1].split("\n## ")[0]
+    lordo = 40_000 * 0.78
+    contributi = round(lordo * 0.2607, 2)
+    rata_c = round(contributi * 0.40, 2)
+    versati_c = contributi + 2 * rata_c
+    imponibile2 = lordo - versati_c
+    attesi = {f"€{_it(contributi)}", f"€{_it(versati_c)}", f"2 × €{_it(rata_c)}", f"€{_it(imponibile2)}"}
+    totali = {}
+    for aliquota in (0.05, 0.15):
+        imposta1 = round(lordo * aliquota, 2)
+        giugno = contributi + rata_c + imposta1 * 1.5
+        novembre = rata_c + imposta1 * 0.5
+        totali[aliquota] = round(giugno + novembre, 2)
+        regime = contributi + round((lordo - contributi) * aliquota, 2)
+        if aliquota == 0.05:
+            imposta2 = round(imponibile2 * aliquota, 2)
+            attesi |= {f"€{_it(giugno)}", f"€{_it(novembre)}", f"€{_it(imposta2)}", f"€{_it(imposta1 - imposta2)}",
+                       f"€{_it(round((lordo - contributi) * aliquota, 2))}", f"**€{_it(totali[aliquota])}**",
+                       f"circa {_it(totali[aliquota] / regime, 1)} volte", f"il {round(totali[aliquota] / 40_000 * 100)}% dei compensi"}
+        else:
+            attesi |= {f"€{_it(totali[aliquota])}", f"il {round(totali[aliquota] / 40_000 * 100)}% dei compensi"}
+    for atteso in sorted(attesi):
+        assert atteso in sezione, f"previdenza-gestione-separata.md, Flussi di cassa: manca «{atteso}»"
+    for atteso in ("art. 1 c. 212 L. 662/1996", "due rate del 40%", "due rate del 50%", "Ris. AdE 93/E/2019",
+                   "dal 2027 art. 235 c. 1 D.Lgs. 117/2026", "dal 2027 art. 72 c. 4 D.Lgs. 33/2025", "100%",
+                   "Circ. INPS 8/2026", "abrogato dalla L. 113/2026", "parte integrante dei compensi",
+                   "integrativo delle casse", "metodo previsionale", "Verificato: 2026-10"):
+        assert atteso in sezione, f"previdenza-gestione-separata.md, Flussi di cassa: manca «{atteso}»"
+    assert "prorogate al 20 luglio con D.L. 89/2026" not in gs, "il rinvio del 2026 presentato come regola"
+    # nel testo, non solo nel marcatore delle fonti: il rinvio del 2026 è datato e il decreto abrogato
+    corpo = sezione.split("\n*Rivalsa del 4%")[0]
+    assert "abrogato dalla L. 113/2026 che ne ha fatto salvi gli effetti" in corpo and "non la regola" in corpo, corpo[-600:]
+    ff = open(os.path.join(A, "references", "fiscalita-forfettario.md"), encoding="utf-8").read()
+    for atteso in ("rivalsa INPS del 4%", "è un compenso, non un contributo", "integrativo", "**versati**",
+                   "rigo LM49", "rigo RP21", "art. 1 c. 64 L. 190/2014, dal 2027 art. 235 c. 1 D.Lgs. 117/2026",
+                   "per il forfettario puro quell'eccedenza va persa"):
+        assert atteso in ff, f"fiscalita-forfettario.md: manca «{atteso}»"
+    # la skill riporta gli stessi numeri della reference
+    skill = open(os.path.join(A, "SKILL.md"), encoding="utf-8").read()
+    a6 = skill.split("**Pattern A6")[1].split("\n")[0]
+    for atteso in (f"€{_it(totali[0.05])}", f"€{_it(totali[0.15])}", "1,9 volte", "44%", "rivalsa del 4%"):
+        assert atteso in a6, f"Pattern A6: manca «{atteso}»"
+    assert "pattern A1-A6" in skill and "rigo LM49" in skill and "Trattare la rivalsa INPS del 4% come un contributo" in skill
+
 # ══════════════════════ T11: testi unici dal 2027 ══════════════════════
 
 # Norme abrogate o rinumerate dal 1/1/2027 (mappa in it-tax-optimization/references/mappa-nuovo-tuir.md).

@@ -8,6 +8,7 @@ Ogni skill ha anche una versione propria (`metadata.version` nel frontmatter di 
 
 Su `develop` dopo il tag `v0.11.0`.
 
+- **Casi frequenti del freelance** (T13, F063): in it-pianificazione-autonomi la rivalsa INPS del 4% come compenso (art. 1 c. 212 L. 662/1996), saldo e acconti di contributi e imposta sostitutiva con l'esempio primo anno contro secondo (€0 contro €17.760,92 su €40.000 di compensi al 5%), deduzione dei contributi per cassa ed eccedenza nei righi LM49 e RP21, Pattern A6 sulla cassa del secondo anno; il rinvio del 2026 al 20 luglio datato e con l'abrogazione del D.L. 89/2026. Fonti: L. 662/1996, L. 190/2014 c. 64, art. 58 DL 124/2019 e Ris. AdE 93/E/2019, istruzioni Redditi PF 2026, Circ. INPS 8/2026, con le corrispondenze dal 2027 (art. 235 D.Lgs. 117/2026, art. 72 D.Lgs. 33/2025).
 - **Riscatto della laurea** (T13, F055): nuovo `riscatto-laurea.py` in it-pianificazione. Mette a confronto agevolato (€18.808 × 33% = €6.206,64 l'anno per le domande del 2026) e ordinario (33% della retribuzione), con costo netto dopo la deduzione, rata fino a 120 mesi, pensione lorda in più, anni di pensione per rientrare e anticipo sull'anticipata ordinaria. Legge con `--from` il JSON di `importa-previdenza.py`, che ora scrive anche l'anzianità contributiva, e di `proiezione-inps.py`; con `--json` passa il montante con il riscatto a `proiezione-inps.py --from`. Sezione «Riscatto della laurea» in `previdenza-obbligatoria.md` sulle fonti primarie (art. 2 D.Lgs. 184/1997, art. 20 c. 6 DL 4/2019, Circ. INPS 14/2026, scheda INPS); il riscatto torna tra i trigger della skill, ricongiunzione e totalizzazione restano escluse.
 
 ## v0.11.0 (24/10/2026)
@@ -526,6 +527,9 @@ Roadmap:
 - Ricongiunzione, totalizzazione, riscatto laurea (richiedono dati INPS reali)
 
 ### it-pianificazione-autonomi
+
+#### v0.5 (non rilasciata)
+- Casi frequenti del freelance: rivalsa del 4% come compenso, saldo e acconti con l'esempio primo anno contro secondo, deduzione per cassa ed eccedenza LM49 → RP21, Pattern A6.
 
 #### v0.4 (plugin 0.11.0)
 - Description più corta e quotata; sezione «Dove lavorare» con la copia dell'Excel nella cartella di lavoro.
