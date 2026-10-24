@@ -1,0 +1,17 @@
+{
+ "branch": "feature/t12-test-vincolanti (T12, F032 e F065)",
+ "data": "2026-10-24",
+ "applicati": [
+  "Test strutturali uniformi sui 6 xlsx (fogli nell'ordine, celle di ancoraggio, soglia minima di formule, nessun #REF!/#NAME? nelle formule): t_excel_struttura",
+  "Valori sentinella dal ricalcolo: Riepilogo del pianificatore ricostruito dai fogli a monte, Patrimonio del cruscotto (netto, quote che sommano a 1), tracker con cache uguali al ricalcolo escluse le sole celle volatili (139 formule confrontate): t_excel_valori_sentinella",
+  "--json dei tre script previdenziali con chiavi e valori chiusi sui default (mediana del montante 169.205 a seed 42, tasso netto mediano 0,9693, ponte 21,07% con capitale necessario 53.167 < 58.619, RITA 50.000): t_json_previdenziali; t_allocatore sul JSON (aggregato 50.000, allocato + surplus = capitale al centesimo)",
+  "Rami avanzati: curvatura 0,5 del glide path (frazione a metà finestra sqrt(0,5) > 0,5, anche dallo script), buffer del decumulo 0 contro 2 anni, coeff_vigente(67,5) = media dei coefficienti 67 e 68 con i limiti della tabella, tabella di sensibilità di proiezione-inps monotona nel PIL e nella riduzione dei coefficienti: t_rami_avanzati",
+  "Fixture realistiche: storico del fondo con BOM, unità «(EUR)» nelle intestazioni e una riga con segno «-» (importa-previdenza legge ora con utf-8-sig), estratto INPS con xmlns: t_fixture_realistiche",
+  "Tabella strumenti ↔ test nel README generata da run_tests.py --tabella-test, con un test che la confronta con il runner: t_tabella_test",
+  "Verbali mancanti esito-t2, esito-t3 ed esito-t13 ricostruiti dai messaggi di commit"
+ ],
+ "non_applicati": [
+  "F065 era già chiuso nella 0.10.0 (matrice 3.11/3.14, versioni minime, claude-code fissato): nessun intervento"
+ ],
+ "mutanti_f032": "I verificatori dell'audit avevano provato 4 mutanti sulle funzioni mai eseguite dalla suite e la suite era rimasta verde (22/22). Rieseguiti il 24/10/2026 su questo branch, equivalenti per area: (1) coeff_vigente senza interpolazione sui dodicesimi → t_rami_avanzati fallisce; (2) curvatura ignorata in quota_glide (entrambe le copie del motore) → t_rami_avanzati fallisce; (3) buffer del decumulo ignorato in monte_carlo → t_rami_avanzati fallisce; (4) mediana del montante nel JSON di montecarlo-pensione sostituita dal 60° percentile → t_json_previdenziali fallisce. 4 uccisi su 4. Attenzione ai __pycache__: un mutante della stessa lunghezza nello stesso secondo riusa il bytecode vecchio (cancellare le cache o usare python -B)."
+}

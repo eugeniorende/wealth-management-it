@@ -1487,13 +1487,23 @@ def t_allocatore():
         ("Emergenza", 10000, 5, "Preservazione", 0, "essenziale", "permanente"),
         ("Casa", 40000, 12, "Moderato", 0, "importante", "terminante"),
     ])
+    out_json = os.path.join(os.path.dirname(xlsx), "a.json")
     rc, out = run_script(asset("it-pianificazione-obiettivi", "allocatore-capitale.py"),
-                         xlsx, "50000")
-    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+                         xlsx, "50000", "--json", out_json)
     assert rc == 0, out[-400:]
+    d = json.load(open(out_json, encoding="utf-8"))
+    shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # F032: prima si parsava lo stdout con una regex; qui il JSON, al centesimo
+    agg = d["aggregato"]
+    assert agg["totale"] == 50000 and abs(agg["azioni"] + agg["obbligazioni"] + agg["liquidita"] - 50000) <= 0.01, agg
+    assert abs(sum(o["allocato"] for o in d["obiettivi"]) + d["surplus_capitale_libero"] - d["capitale"]) <= 0.01, d
+    assert d["capitale"] == 50000 and d["deficit"] == 0
+    emergenza = next(o for o in d["obiettivi"] if o["nome"] == "Emergenza")
+    assert emergenza["richiesto"] == 10000 and emergenza["allocato"] == 10000 and emergenza["pieno"], emergenza
+    # l'aggregato dello stdout coincide col JSON
     tot = sum(float(x.replace(".", "").replace(",", "."))
               for x in re.findall(r"€\s*([\d.]+,?\d*)\s", out.split("AGGREGATA")[-1])[:3])
-    assert abs(tot - 50000) < 50, f"somma aggregata {tot} != 50000"
+    assert abs(tot - 50000) < 3, f"somma aggregata stampata {tot} != 50000"
 
 
 def _prob_obiettivi(out):
@@ -4492,6 +4502,263 @@ def t_excel_cache():
                           "python scripts/ricalcola-excel.py FILE --in-place")
 
 
+# ═══════════════════════ T12: test che vincolano i numeri ═══════════════════════
+
+# Struttura attesa di ogni xlsx del plugin: fogli nell'ordine, celle di ancoraggio e soglia minima di
+# formule (il conteggio di oggi, arrotondato per difetto: un foglio svuotato per sbaglio emerge qui).
+STRUTTURA_XLSX = {
+    "it-pianificazione/assets/proiezione-pensione.xlsx": {
+        "fogli": ["Input", "Coefficienti", "Pubblica", "Complementare", "Scenari"], "formule": 1090,
+        "ancore": {("Input", "A5"): "Età corrente", ("Pubblica", "A57"): "RISULTATI FINALI A PENSIONAMENTO",
+                   ("Complementare", "A57"): "RISULTATI FINALI A PENSIONAMENTO", ("Scenari", "A4"): "Voce"}},
+    "it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx": {
+        "fogli": ["Input", "Coefficienti", "Previdenza", "Fiscalità", "Complementare", "Riepilogo"], "formule": 690,
+        "ancore": {("Input", "A5"): "Età attuale", ("Previdenza", "A57"): "RISULTATI A PENSIONAMENTO",
+                   ("Riepilogo", "A13"): "Tasso di sostituzione — totale"}},
+    "it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx": {
+        "fogli": ["Parametri", "Obiettivi", "Riepilogo"], "formule": 110,
+        "ancore": {("Parametri", "A9"): "Profilo", ("Obiettivi", "A4"): "Obiettivo",
+                   ("Obiettivi", "A16"): "TOTALE versamenti mensili", ("Riepilogo", "A4"): "RICONCILIAZIONE"}},
+    "it-revisione/assets/cruscotto-patrimoniale.xlsx": {
+        "fogli": ["Leggimi", "Patrimonio", "Allocazione", "Andamento", "Sintesi", "Azioni", "Rendimento TWR"], "formule": 415,
+        "ancore": {("Patrimonio", "A21"): "PATRIMONIO NETTO", ("Allocazione", "A4"): "Classe",
+                   ("Sintesi", "A12"): "Tasso di sostituzione proiettato", ("Rendimento TWR", "A5"): "Data"}},
+    "it-revisione/assets/investment-policy-statement.xlsx": {
+        "fogli": ["IPS"], "formule": 14,
+        "ancore": {("IPS", "A1"): "Investment Policy Statement (IPS)", ("IPS", "A25"): "Totale"}},
+    "it-revisione/assets/tracker-secchielli.xlsx": {
+        "fogli": ["Leggimi", "Impostazioni", "Glide", "Posizioni", "Controllo", "Versamenti"], "formule": 145,
+        "ancore": {("Impostazioni", "A2"): "Anno del piano (0 = partenza):", ("Posizioni", "A3"): "Strumento",
+                   ("Controllo", "A18"): "TOTALE", ("Versamenti", "A3"): "Data"}},
+}
+
+
+@test("T12 Excel: ogni xlsx ha i fogli attesi, le celle di ancoraggio e almeno le formule di oggi")
+def t_excel_struttura():
+    from openpyxl import load_workbook
+    for rel, attesa in STRUTTURA_XLSX.items():
+        wb = load_workbook(os.path.join(SKILLS, rel))
+        nome = os.path.basename(rel)
+        assert wb.sheetnames == attesa["fogli"], f"{nome}: fogli {wb.sheetnames} ≠ {attesa['fogli']}"
+        formule = sum(1 for ws in wb.worksheets for riga in ws.iter_rows() for c in riga
+                      if isinstance(c.value, str) and c.value.startswith("="))
+        assert formule >= attesa["formule"], f"{nome}: {formule} formule, attese almeno {attesa['formule']}"
+        for (foglio, cella), testo in attesa["ancore"].items():
+            assert str(wb[foglio][cella].value).strip() == testo, f"{nome}: {foglio}!{cella} = {wb[foglio][cella].value!r}, atteso {testo!r}"
+        for ws in wb.worksheets:
+            for riga in ws.iter_rows():
+                for c in riga:
+                    if isinstance(c.value, str) and c.value.startswith("="):
+                        assert "#REF!" not in c.value and "#NAME?" not in c.value, f"{nome}: {ws.title}!{c.coordinate} = {c.value}"
+    assert len(STRUTTURA_XLSX) == 6 == sum(1 for _ in __import__("glob").glob(os.path.join(SKILLS, "*", "assets", "*.xlsx"))), \
+        "un xlsx nuovo o rimosso: aggiornare STRUTTURA_XLSX"
+
+
+@test("T12 Excel: Riepilogo del pianificatore e Patrimonio del cruscotto letti dal ricalcolo, tracker con cache uguali al ricalcolo")
+def t_excel_valori_sentinella():
+    from openpyxl import load_workbook
+    ricalcolati = xlsx_ricalcolati()
+    # pianificatore: la riconciliazione del Riepilogo ricostruita dai fogli a monte
+    orig = asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx")
+    wb = load_workbook(ricalcolati[orig], data_only=True)
+    r, o, par = wb["Riepilogo"], wb["Obiettivi"], wb["Parametri"]
+    versamenti = sum(o[f"I{k}"].value or 0 for k in range(5, 15))
+    assert abs(r["B5"].value - versamenti) < 0.01 and abs(r["B5"].value - o["I16"].value) < 0.01, (r["B5"].value, versamenti)
+    assert r["B6"].value == par["B5"].value == 1200 and abs(r["B7"].value - (1200 - versamenti)) < 0.01
+    assert r["B8"].value == ("Sostenibile" if r["B7"].value >= 0 else "NON sostenibile")
+    per_priorita = {p: sum((o[f"I{k}"].value or 0) for k in range(5, 15) if o[f"G{k}"].value == p)
+                    for p in ("essenziale", "importante", "desiderabile")}
+    assert abs(r["B12"].value - per_priorita["essenziale"]) < 0.01 and abs(r["B14"].value - per_priorita["desiderabile"]) < 0.01
+    assert abs(r["B18"].value - sum(o[f"F{k}"].value or 0 for k in range(5, 15))) < 0.01 and r["B18"].value == 5000
+    # cruscotto: Patrimonio netto = attività − passività, quote sul netto che sommano a 1
+    orig = asset("it-revisione", "cruscotto-patrimoniale.xlsx")
+    pat = load_workbook(ricalcolati[orig], data_only=True)["Patrimonio"]
+    attivita = sum(pat[f"B{k}"].value or 0 for k in range(6, 14))
+    passivita = sum(pat[f"B{k}"].value or 0 for k in range(17, 19))
+    assert pat["B14"].value == attivita == 64000 and pat["B19"].value == passivita and pat["B21"].value == attivita - passivita
+    assert abs(sum(pat[f"C{k}"].value for k in range(6, 14)) - 1) < 1e-9, "le quote sul netto devono sommare a 1"
+    assert abs(pat["C6"].value - 40000 / 64000) < 1e-9
+    # tracker: le cache consegnate coincidono col ricalcolo, salvo le celle volatili (TODAY)
+    import math
+    orig = asset("it-revisione", "tracker-secchielli.xlsx")
+    formule = load_workbook(orig)
+    cache, nuovo = load_workbook(orig, data_only=True), load_workbook(ricalcolati[orig], data_only=True)
+    confrontate, diverse = 0, []
+    for ws in formule.worksheets:
+        for riga in ws.iter_rows():
+            for c in riga:
+                if not (isinstance(c.value, str) and c.value.startswith("=")) or any(v in c.value.upper() for v in VOLATILI):
+                    continue
+                a, b = cache[ws.title][c.coordinate].value, nuovo[ws.title][c.coordinate].value
+                confrontate += 1
+                numeri = all(isinstance(x, (int, float)) for x in (a, b))
+                if not (a == b or (numeri and math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9))):
+                    diverse.append(f"{ws.title}!{c.coordinate}: {a!r} → {b!r}")
+    assert confrontate >= 139 and not diverse, (confrontate, diverse[:3])
+
+
+# Valori chiusi sui default (seed 42): cambiano solo se cambia la meccanica, e allora va detto nel changelog.
+MC_PENSIONE_MEDIANA_DEFAULT = 169_205
+NETTO_TASSO_NETTO_MEDIANA_DEFAULT = 0.9693
+
+
+@test("T12 --json previdenziali: chiavi e valori chiusi di montecarlo-pensione, netto-pensione e ponte-pensione")
+def t_json_previdenziali():
+    P = lambda n: asset("it-pianificazione", n)
+    tmp = tempfile.mkdtemp()
+    try:
+        j = os.path.join(tmp, "x.json")
+        rc, out = run_script(P("montecarlo-pensione.py"), "--json", j)
+        assert rc == 0, out[-300:]
+        mc = json.load(open(j, encoding="utf-8"))
+        assert set(mc) >= {"montante_fp", "rendita_fp", "pensione_inps_lorda", "ral_finale", "anni", "tasso_sostituzione_lordo", "prob_target", "target"}, sorted(mc)
+        assert mc["montante_fp"]["mediana"] == MC_PENSIONE_MEDIANA_DEFAULT, mc["montante_fp"]
+        assert mc["montante_fp"]["p10"] < mc["montante_fp"]["mediana"] < mc["montante_fp"]["p90"]
+        assert mc["rendita_fp"]["mediana"] == round(mc["montante_fp"]["mediana"] * 0.05), mc["rendita_fp"]
+        assert abs(mc["tasso_sostituzione_lordo"]["mediana"] - (21000 + mc["rendita_fp"]["mediana"]) / 45000) < 1e-3
+        assert euro(out, "mediana simulata") == MC_PENSIONE_MEDIANA_DEFAULT, "lo stdout e il JSON devono dire la stessa mediana"
+        rc, out = run_script(P("netto-pensione.py"), "--json", j)
+        assert rc == 0, out[-300:]
+        ne = json.load(open(j, encoding="utf-8"))
+        mediana = next(s for s in ne["scenari"] if s["nome"] == "mediana")
+        assert mediana["tasso_sostituzione_netto"] == NETTO_TASSO_NETTO_MEDIANA_DEFAULT, mediana
+        assert abs(mediana["pensione_netta_totale"] - (ne["netto_pensione_inps"] + mediana["rendita_netta"])) < 0.01
+        assert mediana["tasso_sostituzione_netto"] > mediana["tasso_sostituzione_lordo"], "il netto batte il lordo"
+        rc, out = run_script(P("ponte-pensione.py"), "--json", j)
+        assert rc == 0, out[-300:]
+        po = json.load(open(j, encoding="utf-8"))
+        assert po["probabilita_successo"] == 0.2107 and round(po["probabilita_successo"] * 100, 1) == PROB_PONTE_DEFAULT, po
+        assert po["capitale_necessario"]["85%"] < po["capitale_necessario"]["95%"], po["capitale_necessario"]
+        assert po["capitale_necessario"] == {"85%": 53167.0, "95%": 58619.0}, po["capitale_necessario"]
+        assert po["rita"]["rata_lorda"] == 50000 and po["rita"]["aliquota"] == 0.105 and po["anni_ponte"] == 7
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T12 rami avanzati: curvatura del glide path, buffer del decumulo, coefficiente a età frazionaria, sensibilità al PIL")
+def t_rami_avanzati():
+    motore = _modulo_obiettivi("motore_bootstrap.py")
+    # CURVATURA 0,5: a metà finestra la frazione trattenuta supera quella lineare (sqrt(0,5) > 0,5)
+    lin, curva = motore.frazioni_glide(10, 10, 1.0), motore.frazioni_glide(10, 10, 0.5)
+    assert abs(lin[5] - 0.5) < 1e-9 and abs(curva[5] - 0.5 ** 0.5) < 1e-9 and curva[5] > lin[5], (lin[5], curva[5])
+    assert all(c >= l for c, l in zip(curva, lin)) and curva[0] == lin[0] == 1.0
+    gp = asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py")
+    tmp = tempfile.mkdtemp()
+    try:
+        g_lin = json.load(open(_json_di(gp, "--json", os.path.join(tmp, "l.json")), encoding="utf-8"))
+        g_cur = json.load(open(_json_di(gp, "--set", "CURVATURA=0.5", "--json", os.path.join(tmp, "c.json")), encoding="utf-8"))
+        lungo_l = next(o for o in g_lin["obiettivi"] if o["nome"].startswith("Lungo"))["quota_azionaria"]
+        lungo_c = next(o for o in g_cur["obiettivi"] if o["nome"].startswith("Lungo"))["quota_azionaria"]
+        # a 3,5 anni dalla scadenza (metà della finestra di 7): lineare 0,65 × 0,5, curva 0,65 × sqrt(0,5)
+        assert abs(lungo_l[17] - 0.65 * 3 / 7) < 1e-3 and lungo_c[17] > lungo_l[17] and abs(lungo_c[17] - 0.65 * (3 / 7) ** 0.5) < 1e-3
+        assert g_cur["curvatura"] == 0.5 and any("curvatura" in sc for sc in g_cur["scarti_dal_foglio"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    # decumulo: il buffer cambia davvero i percorsi (0 contro 2 anni), probabilità in [0, 1]
+    dec = _modulo_obiettivi("decumulo-obiettivi.py")
+    p0, f0, _ = dec.monte_carlo(dec.PRELIEVO_ANNUO_REALE, 0)
+    p2, f2, _ = dec.monte_carlo(dec.PRELIEVO_ANNUO_REALE, 2)
+    assert 0 < p0 <= 1 and 0 < p2 <= 1 and (p0, f0) != (p2, f2), (p0, p2)
+    # proiezione-inps: coefficiente interpolato sui dodicesimi e tabella di sensibilità monotona nel PIL
+    pi = _modulo_previdenza("proiezione-inps.py")
+    assert abs(pi.coeff_vigente(67.5) - (pi.COEFF_2025_2026[67] + pi.COEFF_2025_2026[68]) / 2) < 1e-12
+    assert pi.coeff_vigente(67) == pi.COEFF_2025_2026[67] and pi.coeff_vigente(80) == pi.COEFF_2025_2026[71] and pi.coeff_vigente(50) == pi.COEFF_2025_2026[57]
+    rc, out = run_script(asset("it-pianificazione", "proiezione-inps.py"))
+    assert rc == 0 and "COEFF_ESPLICITO impostato" not in out, out[-300:]
+    righe = [r for r in out.split("SENSIBILITÀ")[1].splitlines() if re.match(r"\s+\d+,\d%\s", r)]
+    tabella = [[_da_it(x) for x in re.findall(r"(\d+,\d)%", r)] for r in righe]
+    assert len(tabella) == 3 and all(len(r) == 4 for r in tabella), tabella
+    for col in range(1, 4):
+        assert tabella[0][col] < tabella[1][col] < tabella[2][col], f"colonna {col}: il tasso deve crescere col PIL {tabella}"
+    for r in tabella:
+        assert r[1] > r[2] > r[3], f"a parità di PIL, più riduzione dei coefficienti → tasso più basso {r}"
+
+
+def _json_di(script, *args):
+    """Lancia lo script e ritorna il percorso del JSON scritto (l'argomento dopo --json)."""
+    rc, out = run_script(script, *args)
+    assert rc == 0, out[-300:]
+    return args[list(args).index("--json") + 1]
+
+
+@test("T12 fixture realistiche: BOM, unità «(EUR)» e segno «-» nello storico del fondo, estratto INPS con xmlns")
+def t_fixture_realistiche():
+    m = carica_modulo(asset("it-pianificazione", "importa-previdenza.py"))
+    quote, nav, vers = m.leggi_storico_fondo(os.path.join(FIXTURES, "storico-fondo-bom-unita-segno.csv"))
+    assert quote == {"FONDO TEST COMPARTO AZIONARIO": 125.0, "FONDO TEST COMPARTO OBBLIGAZIONARIO": 150.0}, quote
+    assert nav["FONDO TEST COMPARTO AZIONARIO"][1] == 10.4 and nav["FONDO TEST COMPARTO OBBLIGAZIONARIO"][1] == 5.2, nav
+    assert vers[2025] == {"iscritto": 1000.0, "azienda": 0.0, "TFR": 1000.0}, dict(vers[2025])
+    anag, righe = m.leggi_estratto_inps(os.path.join(FIXTURES, "estratto-inps-xmlns.xml"))
+    assert anag["Cognome"] == "ROSSI" and len(righe) == 2 and sum(r["settimane"] for r in righe) == 104, (anag, righe)
+    rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-xmlns.xml"),
+                         os.path.join(FIXTURES, "storico-fondo-bom-unita-segno.csv"), "--anonimo")
+    assert rc == 0 and "MONTANTE FONDO: ≈ € 2.080" in out and "\ufeff" not in out, out[-500:]
+    # il BOM davanti alla prima intestazione non deve far perdere la colonna della data
+    assert "colonne non riconosciute" not in out
+
+
+def tabella_test():
+    """Tabella Markdown per il README: per ogni strumento del plugin (script, Excel, CSV) i test che lo
+    esercitano, cioè quelli che nominano il file, direttamente o tramite un helper o una costante."""
+    import ast
+    from collections import Counter
+    sorgente = open(os.path.abspath(__file__), encoding="utf-8").read()
+    albero = ast.parse(sorgente)
+    funzioni, costanti = {}, {}   # nome → (nome del test o None, sorgente); costante → sorgente
+    for nodo in albero.body:
+        if isinstance(nodo, ast.FunctionDef):
+            nome = next((d.args[0].value for d in nodo.decorator_list
+                         if isinstance(d, ast.Call) and getattr(d.func, "id", "") == "test" and d.args), None)
+            funzioni[nodo.name] = (nome, ast.get_source_segment(sorgente, nodo) or "")
+        elif isinstance(nodo, ast.Assign):
+            for t in nodo.targets:
+                if isinstance(t, ast.Name):
+                    costanti[t.id] = ast.get_source_segment(sorgente, nodo) or ""
+    strumenti = []
+    for skill in sorted(os.listdir(SKILLS)):
+        cartella = os.path.join(SKILLS, skill, "assets")
+        if os.path.isdir(cartella):
+            for f in sorted(os.listdir(cartella)):
+                if f.endswith((".py", ".xlsx", ".csv")) and (f != "motore_bootstrap.py" or skill == "it-pianificazione"):
+                    strumenti.append((f"{skill}/assets/{f}", f))
+
+    def nomina(src, simboli):
+        return any(re.search(rf"\b{re.escape(x)}\b", src) for x in simboli)
+
+    righe = ["| Strumento | Test che lo esercitano |", "|---|---|"]
+    for rel, base in strumenti:
+        simboli = {c for c, src in costanti.items() if base in src}
+        toccano = {fn for fn, (nome, src) in funzioni.items() if base in src or nomina(src, simboli)}
+        for _ in range(3):   # chiusura: chi chiama un helper che tocca il file tocca il file
+            helper = {fn for fn in toccano if funzioni[fn][0] is None}
+            toccano |= {fn for fn, (nome, src) in funzioni.items() if nomina(src, {h + "(" for h in helper}) or
+                        any(re.search(rf"\b{h}\(", src) for h in helper)}
+        nomi = Counter(funzioni[fn][0].split(":")[0] for fn in toccano if funzioni[fn][0])
+        totale = sum(nomi.values())
+        voci = [f"{n} ×{k}" if k > 1 else n for n, k in sorted(nomi.items())]
+        righe.append(f"| `{rel}` | {totale}: " + "; ".join(voci[:6]) + (" …" if len(voci) > 6 else "") + " |")
+    return "\n".join(righe)
+
+
+@test("T12 README: la tabella strumenti ↔ test è quella generata dal runner (--tabella-test)")
+def t_tabella_test():
+    r = subprocess.run([sys.executable, os.path.abspath(__file__), "--tabella-test"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+    assert r.returncode == 0, r.stderr[-300:]
+    generata = r.stdout.strip()
+    assert generata.startswith("| Strumento | Test che lo esercitano |"), generata[:200]
+    righe = generata.splitlines()[2:]
+    assert len(righe) >= 20, f"solo {len(righe)} strumenti"
+    senza = [r for r in righe if "| 0: " in r]
+    assert not senza, f"strumenti senza alcun test: {senza}"
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    marcatore = "<!-- generata con: python tests/run_tests.py --tabella-test -->"
+    assert marcatore in readme, "README senza la tabella strumenti ↔ test"
+    nel_readme = readme.split(marcatore)[1].strip().split("\n\n")[0].strip()
+    assert nel_readme == generata, ("la tabella del README è diversa da quella generata: "
+                                    "rigenerarla con python tests/run_tests.py --tabella-test")
+
+
 @test("runner: --only/--skip filtrano i test per sottostringa del nome")
 def t_filtro():
     me = os.path.abspath(__file__)
@@ -4577,9 +4844,14 @@ def main():
                     help="salta i test il cui nome contiene NOME (ripetibile)")
     ap.add_argument("--tabella-freshness", action="store_true",
                     help="stampa la tabella Markdown dello stato dei dati normativi (per il README) ed esce")
+    ap.add_argument("--tabella-test", action="store_true",
+                    help="stampa la tabella Markdown strumenti ↔ test (per il README) ed esce")
     args = ap.parse_args()
     if args.tabella_freshness:
         print(tabella_freshness())
+        sys.exit(0)
+    if args.tabella_test:
+        print(tabella_test())
         sys.exit(0)
 
     print("=" * 74)

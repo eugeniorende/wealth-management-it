@@ -183,11 +183,12 @@ def ricostruisci_montante(retrib_per_anno, anno_corrente):
 
 def leggi_storico_fondo(path):
     """Legge lo storico movimenti del fondo (formato tipico: sep ';', decimali con virgola)."""
-    with open(path, encoding="utf-8", errors="replace") as f:
+    # utf-8-sig: gli export con il BOM (Excel) non lasciano «\ufeff» davanti alla prima intestazione
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
         testa = f.read(4096)
     sep = ";" if testa.count(";") >= testa.count(",") else ","
 
-    with open(path, encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
         rows = [{(k or "").strip(): (v or "").strip() for k, v in r.items()}
                 for r in csv.DictReader(f, delimiter=sep)]
     if not rows:

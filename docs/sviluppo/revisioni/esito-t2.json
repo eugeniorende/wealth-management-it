@@ -1,0 +1,10 @@
+{
+ "branch": "feature/t2-importatore-broker (mergiato in develop con la PR #22)",
+ "fonte": "verbale ricostruito il 24/10/2026 (T12) dai messaggi dei commit ccdbc58 e 4d7872c: all'epoca l'esito restò solo lì",
+ "applicati": [
+  "Confermati di review-t2.json (commit ccdbc58): 12,5% anche a Bund, OAT, Bonos, Treasury, Gilt, JGB, BEI e banche multilaterali, enti territoriali italiani e BTP senza ISIN (art. 6 c. 1 D.Lgs. 461/97 → art. 306 c. 1 TU 2027), altre obbligazioni estere al 26% con avviso; ETC fisici da «physical», il solo nome dell'emittente non fa un OICR, mai IRPEF dal nome, forma societaria non vale come azione se c'è un indice; fondi immobiliari e «fund(s)» da classificare con nota; zainetto con colonna di scadenza (realizzo = scadenza − 4), residuo prima del lordo, lordo − utilizzato, segnaposto nell'aliquota, errori con file e riga; colonna tipo fiscale («divers» prima di «capital», alias «natura» ristretto, valore ignoto = vale la descrizione con avviso); numeri senza indizi decisi dal delimitatore, celle ambigue negli avvisi anche nello zainetto; OSError leggibile",
+  "Regressioni della seconda revisione (commit 4d7872c): residuo riconosciuto anche come «compensabili», «utilizzabili», «saldo»; due colonne candidate all'importo fermano l'import; «Esercizio/Annualità di scadenza» alla colonna di scadenza; «1.500» e «1,500» sono migliaia in ogni formato; emittente pubblico solo con un indizio di obbligazione; fornitori di indici o fasce di durata nel nome → da classificare; Bund e OAT a elenco chiuso; «ETFS» non è un ETF; ETC fisico prima degli OICR salvo ETF o UCITS; veto sulle azioni solo se l'indice segue il nome; fondi immobiliari solo se non UCITS; aliquota vuota nello zainetto con avviso per riga"
+ ],
+ "non_applicati": [],
+ "mutanti": "ccdbc58: tre test nuovi con dieci fixture, 19 mutanti uccisi; 4d7872c: fixture di falsi positivi e quattro varianti di zainetto, 34 mutanti uccisi, uno equivalente (il delimitatore non influisce sugli importi)"
+}
