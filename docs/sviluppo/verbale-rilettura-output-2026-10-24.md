@@ -48,3 +48,14 @@ Ogni test è stato visto fallire sul codice di prima e passare dopo la correzion
 ## Fuori da questa rilettura
 
 Restano da guardare con un utente vero, non con i dati d'esempio, la lunghezza e il tono dei report prodotti dalle skill in chat: dipendono dal modello e non da un output degli script.
+
+## Dopo la revisione avversariale di T14 e della pre-pubblicazione
+
+La revisione ha trovato che la rilettura si era fermata alle skill: le reference condivise dicevano ancora il contrario. Corretti:
+
+- `proiezione-tenore-vita.md`: P1 «Usare lo spazio deducibile (tetto fiscale, non importo consigliato)» con l'imposta in uscita sui contributi dedotti, al posto di «Massimizzare» e «Praticamente impossibile fare di meglio»; P2 con i numeri giusti; le leve «presentate come scenari»;
+- `previdenza-complementare.md`, «Heuristic per la skill»: niente «DEVE», «quasi sempre la scelta» e «opportunità prioritaria»;
+- `integrazione-fiscale-joint.md`: la colonna «Raccomandazione» diventa «Scenario fiscalmente più favorevole», «A: fondo, sempre» diventa «di solito il più efficiente, salvo liquidità e fondo di emergenza»;
+- `it-pianificazione/SKILL.md`: l'introduzione promette «leve da valutare, quantificate come scenari», il TFR è uno scenario con la scelta irrevocabile.
+
+Un test (`t_postura_fonti_t14`) vieta quelle frasi in tutte le skill e reference e controlla lo Step 5, il Pattern P1 e l'intestazione dell'importatore.
