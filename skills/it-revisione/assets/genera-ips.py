@@ -27,6 +27,7 @@ ONESTÀ METODOLOGICA
 Questo strumento è educativo e non costituisce consulenza finanziaria.
 """
 
+import argparse
 import datetime
 import re
 import sys
@@ -37,6 +38,13 @@ from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
+
+def numero(x, decimali=0):
+    """Numero in formato italiano: punto per le migliaia, virgola per i decimali (come
+    motore_bootstrap.numero nelle skill previdenziali: questa skill non ha il motore)."""
+    testo = f"{x:,.{decimali}f}"
+    return testo.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
 
 # ═══════════════════════════════ DATI ═══════════════════════════════
 # Compila questo blocco con i risultati del flusso (allocatore, glide path,
@@ -337,9 +345,9 @@ def nota_rischio(quota_azioni):
         giudizio = "dinamica"
     else:
         giudizio = "prudente"
-    return (f"**Onestà sul rischio.** Un'allocazione al {quota_azioni:.0f}% azionario è {giudizio}: "
+    return (f"**Onestà sul rischio.** Un'allocazione al {numero(quota_azioni)}% azionario è {giudizio}: "
             f"in un mercato orso tipico il portafoglio complessivo può perdere circa il "
-            f"{drawdown:.0f}% del valore. La strategia regge solo se non si vende nel panico "
+            f"{numero(drawdown)}% del valore. La strategia regge solo se non si vende nel panico "
             f"(vedi Guardrail).")
 
 
@@ -356,10 +364,10 @@ def genera(dati, path_out):
     # validazioni oneste (avvisano, non bloccano)
     tot_pct = sum(p for _, _, p in d["allocazione"])
     if abs(tot_pct - 100) > 0.6:
-        print(f"⚠ l'allocazione somma a {tot_pct:.1f}% (attesi 100%)")
+        print(f"⚠ l'allocazione somma a {numero(tot_pct, 1)}% (attesi 100%)")
     tot_cap = sum(o[4] for o in d["obiettivi"])
     if abs(tot_cap - d["capitale"]) > max(1, d["capitale"] * 0.005):
-        print(f"⚠ i capitali per obiettivo sommano a €{tot_cap:,.0f} vs capitale €{d['capitale']:,.0f}")
+        print(f"⚠ i capitali per obiettivo sommano a €{numero(tot_cap)} vs capitale €{numero(d['capitale'])}")
     # tutte le classi azionarie ("Azionario sviluppati", "ETF azionario globale", "Equity"),
     # non solo la prima; \b esclude "obbligazionario", che contiene "azion" a metà parola
     quota_az = sum(p for cl, _, p in d["allocazione"] if re.search(r"\b(azion|equity)", cl, re.I))
@@ -379,7 +387,7 @@ def genera(dati, path_out):
     runs_markup(p, "INVESTMENT POLICY STATEMENT", size=24, color=DARK)
     p.runs[0].bold = True
     bordo_sotto(p, spessore=14)
-    para(doc, f"Piano di dispiegamento e gestione di un capitale di €{d['capitale']:,.0f}".replace(",", "."),
+    para(doc, f"Piano di dispiegamento e gestione di un capitale di €{numero(d['capitale'])}",
          size=13, color=GREY)
     para(doc, d["sottotitolo"], size=12, color=GREY, italic=True)
     doc.add_paragraph()
@@ -405,15 +413,15 @@ def genera(dati, path_out):
     # 3
     h1(doc, "3. Obiettivi")
     tabella(doc, ["Obiettivo", "Orizzonte / tipo", "Profilo (% azioni)", "Target", "Capitale"],
-            [(n, o, pr, t, f"€{c:,.0f}".replace(",", ".")) for n, o, pr, t, c in d["obiettivi"]],
+            [(n, o, pr, t, f"€{numero(c)}") for n, o, pr, t, c in d["obiettivi"]],
             [3.6, 3.4, 3.6, 2.6, 3.3])
     if d.get("obiettivi_nota"):
         para(doc, d["obiettivi_nota"])
 
     # 4
     h1(doc, "4. Allocazione strategica target")
-    righe = [(cl, f"€{imp:,.0f}".replace(",", "."), f"{pct:.1f}%") for cl, imp, pct in d["allocazione"]]
-    righe.append(("Totale", f"€{sum(i for _, i, _ in d['allocazione']):,.0f}".replace(",", "."), f"{tot_pct:.0f}%"))
+    righe = [(cl, f"€{numero(imp)}", f"{numero(quota, 1)}%") for cl, imp, quota in d["allocazione"]]
+    righe.append(("Totale", f"€{numero(sum(i for _, i, _ in d['allocazione']))}", f"{numero(tot_pct)}%"))
     tabella(doc, ["Classe", "Importo", "Quota"], righe, [5.5, 5.5, 5.5])
     if d.get("allocazione_nota"):
         para(doc, "**Variabile dominante.** " + d["allocazione_nota"])
@@ -485,11 +493,30 @@ def genera(dati, path_out):
 
     doc.save(path_out)
     print(f"IPS generato: {path_out}")
-    print(f"  investitore: {d['investitore']} | capitale €{d['capitale']:,.0f} | "
-          f"azioni {quota_az:.0f}% | obiettivi: {len(d['obiettivi'])}"
+    print(f"  investitore: {d['investitore']} | capitale €{numero(d['capitale'])} | "
+          f"azioni {numero(quota_az)}% | obiettivi: {len(d['obiettivi'])}"
           + (f" | Appendice B: {d['broker']['nome']}" if d.get("broker") else ""))
 
 
+def main(argv=None):
+    for flusso in (sys.stdout, sys.stderr):   # UTF-8 anche su Windows (cp1252)
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+    ap = argparse.ArgumentParser(
+        allow_abbrev=False,
+        description="Genera l'Investment Policy Statement come documento Word dal blocco DATI in testa allo script. "
+                    "Codici d'uscita: 0 riuscito, 1 errore nei dati o nella scrittura, 2 riga di comando errata.")
+    ap.add_argument("output", nargs="?", default="IPS.docx",
+                    help="file .docx da scrivere (default: IPS.docx nella cartella corrente)")
+    args = ap.parse_args(argv)
+    try:
+        genera(None, args.output)
+    except OSError as e:
+        print(f"ERRORE: impossibile scrivere {args.output}: {e}", file=sys.stderr)
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else "IPS.docx"
-    genera(None, out)
+    main()

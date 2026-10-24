@@ -56,8 +56,10 @@ dove, con quale effetto fiscale), non ordini caricabili in un click. La colonna
 scegliere lo strumento specifico (quale ETF/fondo) da movimentare.
 """
 
+import argparse
 import csv
 import os
+import sys
 
 # ─────────────────────────── INPUT (editabili) ───────────────────────────
 # Per posizione: broker, asset_class (una delle chiavi di TARGET), tipo ("diverso" o
@@ -121,13 +123,13 @@ BROKER_VERSAMENTI = "Fineco"   # broker su cui atterrano versamenti/flussi in en
 
 
 class ErroreInput(Exception):
-    """Parametri in testa al file non validi: messaggio leggibile, uscita con codice 2."""
+    """Parametri non validi: messaggio «ERRORE: …» su stderr e uscita con codice 1 (il 2 è di argparse)."""
 
 
 def valida():
-    """Validazione minima dell'input (in attesa dell'interfaccia comune degli script)."""
+    """Validazione dell'input: le costanti in testa allo script (l'input da file arriva con T9d)."""
     if abs(sum(TARGET.values()) - 1) > 1e-6:
-        raise ErroreInput(f"TARGET somma a {sum(TARGET.values()):.4f}, non a 1")
+        raise ErroreInput(f"TARGET somma a {numero(sum(TARGET.values()), 4)}, non a 1")
     for n, p in enumerate(POSITIONS, start=1):
         if p.get("asset_class") not in TARGET:
             raise ErroreInput(f"posizione {n}: classe «{p.get('asset_class')}» assente da TARGET")
@@ -226,7 +228,7 @@ def quota_costo_zero(p, zain, residuo):
 
 def _etichetta_rientro():
     """Come si chiama il punto di rientro della parte tassata (target + MARGINE_RIENTRO × banda stretta)."""
-    return "a metà banda" if MARGINE_RIENTRO == 0.5 else f"al {MARGINE_RIENTRO:.0%} della banda stretta"
+    return "a metà banda" if MARGINE_RIENTRO == 0.5 else f"al {pct(MARGINE_RIENTRO, 0)} della banda stretta"
 
 
 def piano_quote(quote, zain, residuo, totale=None, solo_costo_zero=False):
@@ -371,7 +373,7 @@ def pianifica():
         netto = cassa_in + sum(e[1] - e[3] for e in eventi) - PRELIEVO
         if netto < -0.01:
             raise ErroreInput(f"prelievo non finanziabile: il netto massimo dopo l'imposta è "
-                              f"€{netto + PRELIEVO:,.0f} (vendendo tutto)")
+                              f"€{numero(netto + PRELIEVO)} (vendendo tutto)")
 
     # 4) sottopesate fuori banda: prima la cassa (pro-rata al fabbisogno), poi vendite a costo zero
     #    dalle classi sopra il target (anche in banda); con imposta solo se dopo cassa e costo zero il
@@ -477,26 +479,26 @@ def pianifica():
         etichetta, deriva = _etichetta_rientro(), d["drift_decisione"] * 100
         if d["esito"] == "scelta":
             d["motivo"] = (f"fermato {etichetta} per scelta (OBIETTIVO_RIENTRO «banda»): a target "
-                           f"costerebbe altri €{d['costo_a_target'] - pagata:,.0f}")
+                           f"costerebbe altri €{numero(d['costo_a_target'] - pagata)}")
         elif d["esito"] == "rinviata":
             costo = d["costo_in_banda"] if OBIETTIVO_RIENTRO == "banda" else d["costo_a_target"]
-            d["motivo"] = (f"vendita rinviata: imposta €{costo - pagata:,.0f} con drift {deriva:+.1f}% "
-                           f"entro la banda larga {d['wide']*100:.1f}%")
+            d["motivo"] = (f"vendita rinviata: imposta €{numero(costo - pagata)} con drift {numero(deriva, 1, segno=True)}% "
+                           f"entro la banda larga {numero(d['wide']*100, 1)}%")
             if OBIETTIVO_RIENTRO == "banda":
                 d["motivo"] += f"; tra il rientro {etichetta} e il target resta per scelta (OBIETTIVO_RIENTRO «banda»)"
         elif d["esito"] == "rientro" and OBIETTIVO_RIENTRO == "target":
-            d["motivo"] = (f"rientro a target con imposta €{pagata:,.0f} (drift {deriva:+.1f}% oltre la banda "
-                           f"larga {d['wide']*100:.1f}%): lo scostamento che resta viene dall'imposta pagata, "
+            d["motivo"] = (f"rientro a target con imposta €{numero(pagata)} (drift {numero(deriva, 1, segno=True)}% oltre la banda "
+                           f"larga {numero(d['wide']*100, 1)}%): lo scostamento che resta viene dall'imposta pagata, "
                            f"che esce dal portafoglio")
         elif d["esito"] == "rientro":
-            d["motivo"] = (f"rientro {etichetta} (drift {deriva:+.1f}% oltre la banda larga "
-                           f"{d['wide']*100:.1f}%): a target costerebbe €{d['costo_a_target']:,.0f}, "
-                           f"così €{d['costo_in_banda']:,.0f}")
+            d["motivo"] = (f"rientro {etichetta} (drift {numero(deriva, 1, segno=True)}% oltre la banda larga "
+                           f"{numero(d['wide']*100, 1)}%): a target costerebbe €{numero(d['costo_a_target'])}, "
+                           f"così €{numero(d['costo_in_banda'])}")
         else:
             d["motivo"] = "scostamento rimasto dopo il prelievo e l'imposta"
         per_prelievo = sum(s["prelievo"] for s in sells if s["classe"] == cl)
         if per_prelievo > 0.5:
-            d["motivo"] += f"; €{per_prelievo:,.0f} già venduti per il prelievo"
+            d["motivo"] += f"; €{numero(per_prelievo)} già venduti per il prelievo"
 
     liquidato = total_finale <= 0.005
     risultante = {cl: 0.0 if liquidato else valore(cl) / total_finale for cl in TARGET}
@@ -526,8 +528,19 @@ NOTA_CSV = ("Checklist educativa generata da ribilanciamento-multibroker.py: non
             "sul portale del broker prima di operare.")
 
 
+def numero(x, decimali=0, segno=False):
+    """Numero in formato italiano: punto per le migliaia, virgola per i decimali (come
+    motore_bootstrap.numero nelle skill previdenziali: questa skill non ha il motore)."""
+    testo = f"{x:{'+' if segno else ''},.{decimali}f}"
+    return testo.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def pct(frazione, decimali=1, segno=False):
+    return numero(frazione * 100, decimali, segno) + "%"
+
+
 def _percento(x, decimali=1):
-    return f"{x * 100:.{decimali}f}%".replace(".", ",")
+    return pct(x, decimali)
 
 
 def _mista(a):
@@ -546,23 +559,23 @@ def effetto_fiscale(s):
     ridotta = s["aliquota"] < 0.26
     computata = _percento(s["aliquota"] / 0.26, 2)
     if s["plus_real"] < 0:
-        testo = f"minus €{-s['plus_real']:,.0f} a zainetto {s['broker']}"
+        testo = f"minus €{numero(-s['plus_real'])} a zainetto {s['broker']}"
         if ridotta:
-            testo += (f" (vale €{s['zainetto']:,.0f} di zainetto: minus {_etichetta_aliquota(s['aliquota'])} "
+            testo += (f" (vale €{numero(s['zainetto'])} di zainetto: minus {_etichetta_aliquota(s['aliquota'])} "
                       f"computata al {computata})")
         return testo + ", da eseguire prima delle vendite in plus"
     if s["comp"] > 0:
-        testo = f"plus €{s['plus_real']:,.0f} compensata €{s['comp']:,.0f} dallo zainetto {s['broker']}"
+        testo = f"plus €{numero(s['plus_real'])} compensata €{numero(s['comp'])} dallo zainetto {s['broker']}"
         if ridotta:
-            testo += (f" (consuma €{-s['zainetto']:,.0f} di zainetto: plus {_etichetta_aliquota(s['aliquota'])} "
+            testo += (f" (consuma €{numero(-s['zainetto'])} di zainetto: plus {_etichetta_aliquota(s['aliquota'])} "
                       f"computata al {computata})")
         if s["plus_real"] - s["comp"] > 0.005:
-            testo += f", il resto €{s['plus_real'] - s['comp']:,.0f} TASSATO"
+            testo += f", il resto €{numero(s['plus_real'] - s['comp'])} TASSATO"
         return testo
     aliquota = "" if s["aliquota"] == 0.26 else f" {_etichetta_aliquota(s['aliquota'])}"
     if s["tipo"] == "capitale":
-        return f"plus €{s['plus_real']:,.0f} TASSATA{aliquota} (reddito di capitale: non si compensa con lo zainetto)"
-    return f"plus €{s['plus_real']:,.0f} TASSATA{aliquota} (no zainetto compensabile qui)"
+        return f"plus €{numero(s['plus_real'])} TASSATA{aliquota} (reddito di capitale: non si compensa con lo zainetto)"
+    return f"plus €{numero(s['plus_real'])} TASSATA{aliquota} (no zainetto compensabile qui)"
 
 
 def genera_ordini(plan):
@@ -579,7 +592,7 @@ def genera_ordini(plan):
         if s["forzata"]:
             motivo = "finanzia il prelievo"
         elif s["prelievo"] > 0.005:
-            motivo = f"riduce sovrappeso {s['classe']}; €{s['prelievo']:,.0f} finanziano il prelievo"
+            motivo = f"riduce sovrappeso {s['classe']}; €{numero(s['prelievo'])} finanziano il prelievo"
         else:
             motivo = f"riduce sovrappeso {s['classe']}"
         nota = f"{motivo}; {effetto_fiscale(s)}" if s["plus_real"] else motivo
@@ -631,6 +644,16 @@ def genera_ordini(plan):
     return ordini
 
 
+DELIMITATORE_CSV = ";"
+
+
+def _cella_csv(v):
+    """Importi con due decimali e la virgola (8000,00); il resto com'è."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return v
+    return f"{v:.2f}".replace(".", ",")
+
+
 def scrivi_csv_per_broker(ordini, cartella=None):
     """Scrive un CSV per broker nella cartella indicata. Ritorna la lista (path, n_righe)."""
     cartella = cartella or CARTELLA_OUTPUT
@@ -642,11 +665,13 @@ def scrivi_csv_per_broker(ordini, cartella=None):
         righe = [o for o in ordini if o["broker"] == b]
         slug = "".join(c if c.isalnum() else "_" for c in b)
         path = os.path.join(cartella, f"ordini_{slug}.csv")
-        with open(path, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=CAMPI_CSV, extrasaction="ignore")
+        # Apribile in Excel italiano con un doppio clic: «;» come separatore, virgola decimale,
+        # UTF-8 con BOM (senza BOM Excel legge il file in cp1252 e sporca «€»).
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=CAMPI_CSV, extrasaction="ignore", delimiter=DELIMITATORE_CSV)
             w.writeheader()
             for o in righe:
-                row = dict(o)
+                row = {k: _cella_csv(v) for k, v in o.items()}
                 row.setdefault("strumento_ISIN", "")   # colonna da compilare a mano
                 w.writerow(row)
             w.writerow({"broker": b, "operazione": "NOTA", "nota": NOTA_CSV})
@@ -656,10 +681,10 @@ def scrivi_csv_per_broker(ordini, cartella=None):
 
 def stampa(plan):
     drift = plan["drift"]
-    print(f"\n{'='*70}\nRIBILANCIAMENTO MULTI-BROKER  —  patrimonio €{plan['totale']:,.0f}\n{'='*70}")
+    print(f"\n{'='*70}\nRIBILANCIAMENTO MULTI-BROKER  —  patrimonio €{numero(plan['totale'])}\n{'='*70}")
     if plan["entrate"] or plan["prelievo"]:
-        print(f"   pesi e gap misurati su €{plan['totale_post']:,.0f}: versamenti e flussi "
-              f"+€{plan['entrate']:,.0f}, prelievo −€{plan['prelievo']:,.0f}")
+        print(f"   pesi e gap misurati su €{numero(plan['totale_post'])}: versamenti e flussi "
+              f"+€{numero(plan['entrate'])}, prelievo −€{numero(plan['prelievo'])}")
 
     etichetta = _etichetta_rientro()
     regola = {"misto": f"a target se costa zero, {etichetta} se tassato", "target": "a target",
@@ -671,8 +696,8 @@ def stampa(plan):
         dec = "in banda — non agire"
         if d["fuori_banda"]:
             dec = "FUORI banda — ribilanciare"
-        print(f"{cl:<18}{d['peso']*100:>7.1f}%{d['target']*100:>7.0f}%{d['drift']*100:>+7.1f}%"
-              f"{d['tight']*100:>10.1f}%{d['wide']*100:>9.1f}%  {dec}")
+        print(f"{cl:<18}{numero(d['peso']*100, 1):>7}%{numero(d['target']*100):>7}%{numero(d['drift']*100, 1, segno=True):>7}%"
+              f"{numero(d['tight']*100, 1):>10}%{numero(d['wide']*100, 1):>9}%  {dec}")
 
     print(f"\n2) PIANO — vendite (ottimizzate per broker e tipo fiscale; da eseguire nell'ordine "
           f"elencato, le minus prima delle plus)")
@@ -688,48 +713,65 @@ def stampa(plan):
         nota = f"  → {effetto_fiscale(s)}" if s["plus_real"] else ""
         aliq = "" if s["aliquota"] == 0.26 else (" (12,5%)" if s["aliquota"] == 0.125
                                                  else f" (aliquota mista {_mista(s['aliquota'])})")
-        motivo = "  [prelievo]" if s["forzata"] else (f"  [€{s['prelievo']:,.0f} per il prelievo]"
+        motivo = "  [prelievo]" if s["forzata"] else (f"  [€{numero(s['prelievo'])} per il prelievo]"
                                                        if s["prelievo"] > 0.005 else "")
-        print(f"   VENDI €{s['vendi']:,.0f} {s['classe']}/{s['tipo']}{aliq} @ {s['broker']}"
-              f"  | imposta €{s['tassa']:,.0f}{nota}{motivo}")
+        print(f"   VENDI €{numero(s['vendi'])} {s['classe']}/{s['tipo']}{aliq} @ {s['broker']}"
+              f"  | imposta €{numero(s['tassa'])}{nota}{motivo}")
     for cl, d in rinviati.items():
-        print(f"   {cl}: residuo non corretto €{d['residuo_non_corretto']:,.0f} — {d['motivo']}")
+        print(f"   {cl}: residuo non corretto €{numero(d['residuo_non_corretto'])} — {d['motivo']}")
     for cl, d in drift.items():
         if d["costo_a_target"] > 1e-6 or d["costo_in_banda"] > 1e-6:
-            print(f"   {cl}: costo fiscale della parte tassata a target €{d['costo_a_target']:,.0f}, "
-                  f"{etichetta} €{d['costo_in_banda']:,.0f}")
+            print(f"   {cl}: costo fiscale della parte tassata a target €{numero(d['costo_a_target'])}, "
+                  f"{etichetta} €{numero(d['costo_in_banda'])}")
 
     print(f"\n   acquisti (riempimento sottopesate; broker a scelta, neutro ai fini fiscali)")
     if not any(q > 0.5 for q in plan["acquisti"].values()):
         print("   nessun acquisto")
     for cl, q in plan["acquisti"].items():
         if q > 1e-6:
-            print(f"   COMPRA €{q:,.0f} {cl}")
+            print(f"   COMPRA €{numero(q)} {cl}")
 
-    print(f"\n3) COSTO FISCALE TOTALE: €{plan['imposta']:,.0f}")
+    print(f"\n3) COSTO FISCALE TOTALE: €{numero(plan['imposta'])}")
     print(f"   zainetto residuo per broker: " +
-          ", ".join(f"{b} €{v:,.0f}" for b, v in plan["zainetto"].items()))
+          ", ".join(f"{b} €{numero(v)}" for b, v in plan["zainetto"].items()))
     if plan["prelievo"]:
         lordo = sum(s["vendi"] for s in plan["vendite"])
         reinvestito = sum(plan["acquisti"].values())
-        print(f"   vendite lorde €{lordo:,.0f}, imposta €{plan['imposta']:,.0f}, "
-              f"netto prelevato €{plan['prelievo']:,.0f}"
-              + (f" (€{reinvestito:,.0f} reinvestiti)" if reinvestito > 0.5 else ""))
+        print(f"   vendite lorde €{numero(lordo)}, imposta €{numero(plan['imposta'])}, "
+              f"netto prelevato €{numero(plan['prelievo'])}"
+              + (f" (€{numero(reinvestito)} reinvestiti)" if reinvestito > 0.5 else ""))
 
     print(f"\n4) ALLOCAZIONE RISULTANTE vs TARGET")
     if plan["liquidato"]:
         print("   portafoglio interamente liquidato dal prelievo")
     for cl in TARGET:
-        print(f"   {cl:<18}{plan['risultante'][cl]*100:>6.1f}%  (target {TARGET[cl]*100:.0f}%)")
+        print(f"   {cl:<18}{numero(plan['risultante'][cl]*100, 1):>6}%  (target {numero(TARGET[cl]*100)}%)")
     print()
 
 
-def main():
+def _configura_stdout():
+    """UTF-8 su stdout e stderr anche su Windows (cp1252), come motore_bootstrap.configura_stdout."""
+    for flusso in (sys.stdout, sys.stderr):
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
+def main(argv=None):
+    _configura_stdout()
+    ap = argparse.ArgumentParser(
+        allow_abbrev=False,
+        description="Ribilanciamento tax-aware multi-broker: drift e bande 5/25, piano di vendite per broker e "
+                    "tipo fiscale nell'ordine di esecuzione, prelievo in decumulo, ordini in CSV per broker. "
+                    "I parametri (portafoglio, zainetto, target, versamenti, prelievo) sono le costanti in testa "
+                    "allo script. Codici d'uscita: 0 riuscito, 1 parametri incoerenti, 2 riga di comando errata.")
+    ap.parse_args(argv)
     try:
         plan = pianifica()
     except ErroreInput as e:
-        print(f"errore nei parametri: {e}")
-        raise SystemExit(2)
+        print(f"ERRORE: parametri: {e}", file=sys.stderr)
+        raise SystemExit(1)
     stampa(plan)
     if GENERA_CSV:
         esporta_ordini(plan)
@@ -754,7 +796,7 @@ def esporta_ordini(plan):
     print(f"\n   Anteprima:")
     print(f"   {'broker':<14}{'op.':<9}{'classe':<16}{'tipo':<10}{'importo':>10}  nota")
     for o in ordini:
-        imp = f"€{o['importo_eur']:,.0f}"
+        imp = f"€{numero(o['importo_eur'])}"
         print(f"   {o['broker']:<14}{o['operazione']:<9}{o['classe']:<16}{str(o['tipo_fiscale']):<10}{imp:>10}  {o['nota']}")
     print(f"\n   I broker italiani non importano ordini da CSV: questi file sono una checklist di")
     print(f"   esecuzione e una traccia. Compila la colonna strumento_ISIN con lo strumento scelto.")

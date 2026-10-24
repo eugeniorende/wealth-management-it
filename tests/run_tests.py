@@ -33,28 +33,43 @@ def asset(skill, nome):
 
 
 def carica_modulo(path):
-    """Importa uno script (anche con trattini nel nome) come modulo."""
+    """Importa uno script (anche con trattini nel nome) come modulo; la sua cartella entra nel path
+    per il tempo dell'import, così trova motore_bootstrap come quando viene lanciato."""
     spec = importlib.util.spec_from_file_location(
         os.path.basename(path).replace("-", "_").replace(".py", ""), path)
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    cartella = os.path.dirname(os.path.abspath(path))
+    sys.path.insert(0, cartella)
+    try:
+        spec.loader.exec_module(mod)
+    finally:
+        sys.path.remove(cartella)
     return mod
 
 
-def run_script(path, *args, cwd=None):
-    """Esegue uno script e ritorna (returncode, output)."""
+def run_script(path, *args, cwd=None, env=None):
+    """Esegue uno script e ritorna (returncode, output). L'output è letto come UTF-8 (gli script lo
+    forzano su stdout), così il test non dipende dalla console: su Windows sarebbe cp1252."""
     r = subprocess.run([sys.executable, path, *args],
-                       capture_output=True, text=True, timeout=180,
-                       cwd=cwd or os.path.dirname(path))
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
+                       cwd=cwd or os.path.dirname(path), env=env)
     return r.returncode, r.stdout + r.stderr
 
 
+def run_script_split(path, *args, cwd=None, env=None):
+    """Come run_script, ma con stdout e stderr separati: (returncode, stdout, stderr)."""
+    r = subprocess.run([sys.executable, path, *args],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
+                       cwd=cwd or os.path.dirname(path), env=env)
+    return r.returncode, r.stdout, r.stderr
+
+
 def euro(testo, etichetta):
-    """Estrae il primo importo '€ 1.234' (o '€ 1,234') che segue l'etichetta."""
+    """Estrae il primo importo in formato italiano ('€ 1.234' o '€ 1.234,56') che segue l'etichetta."""
     m = re.search(re.escape(etichetta) + r"[^€\n]*€\s*([\d.,]+)", testo)
     if not m:
         raise AssertionError(f"etichetta '{etichetta}' non trovata nell'output")
-    return float(m.group(1).replace(".", "").replace(",", ""))
+    return float(m.group(1).replace(".", "").replace(",", "."))
 
 
 class Salta(Exception):
@@ -81,8 +96,8 @@ def test(nome):
 
 @test("igiene: marketplace.json valido e coerente col plugin.json")
 def t_marketplace():
-    mk = json.load(open(os.path.join(ROOT, ".claude-plugin", "marketplace.json")))
-    pl = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json")))
+    mk = json.load(open(os.path.join(ROOT, ".claude-plugin", "marketplace.json"), encoding="utf-8"))
+    pl = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
     assert mk.get("name") and mk.get("owner", {}).get("name"), "marketplace: name/owner mancanti"
     assert len(mk.get("plugins", [])) >= 1, "marketplace: nessun plugin elencato"
     voce = mk["plugins"][0]
@@ -94,7 +109,7 @@ def t_marketplace():
 
 @test("igiene: plugin.json valido, SKILL.md < 500 righe, nessun tag cite nei deliverable")
 def t_igiene():
-    d = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json")))
+    d = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
     assert re.match(r"^\d+\.\d+\.\d+$", d.get("version", "")), "version non semver"
     assert isinstance(d.get("author"), dict) and d["author"].get("name"), \
         "author deve essere un oggetto {name, ...} (claude plugin validate lo richiede)"
@@ -287,6 +302,166 @@ def t_cwd_esterna():
             rc, out = run_script(asset(skill, nome), *args, cwd=tmp)
             assert rc == 0, f"{nome} da una cartella esterna: {out[-300:]}"
             assert "serie storica non trovata" not in out, f"{nome}: serie storica non trovata"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ═══════════════ T9: interfaccia comune degli script (F056, Windows, formati) ═══════════════
+
+SCRIPT_CLI = [
+    ("it-pianificazione", "proiezione-inps.py"),
+    ("it-pianificazione", "montecarlo-pensione.py"),
+    ("it-pianificazione", "netto-pensione.py"),
+    ("it-pianificazione", "ponte-pensione.py"),
+    ("it-pianificazione", "importa-previdenza.py"),
+    ("it-pianificazione-obiettivi", "allocatore-capitale.py"),
+    ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
+    ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
+    ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
+    ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
+    ("it-rebalance", "ribilanciamento-multibroker.py"),
+    ("it-revisione", "genera-ips.py"),
+    ("it-tax-optimization", "importa-estratto-broker.py"),
+]
+# argomenti con cui ogni script gira sui default (quelli con un input obbligatorio usano le fixture)
+ARGOMENTI_DEFAULT = {
+    "importa-previdenza.py": (os.path.join(FIXTURES, "estratto-inps-test.xml"),
+                              os.path.join(FIXTURES, "storico-fondo-test.csv")),
+    "importa-estratto-broker.py": (os.path.join(FIXTURES, "estratto-broker-test.csv"),),
+}
+_OUTPUT_CP1252 = {}
+
+
+def _tutti_gli_script_cp1252():
+    """Ogni script lanciato una volta da una cartella esterna con una console cp1252 (come Windows);
+    un solo giro per esecuzione della suite, riusato dai test sui formati."""
+    if not _OUTPUT_CP1252:
+        tmp = tempfile.mkdtemp()
+        env = dict(os.environ, PYTHONIOENCODING="cp1252", PYTHONUTF8="0")
+        try:
+            for skill, nome in SCRIPT_CLI:
+                rc, out = run_script(asset(skill, nome), *ARGOMENTI_DEFAULT.get(nome, ()), cwd=tmp, env=env)
+                _OUTPUT_CP1252[nome] = (rc, out)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return _OUTPUT_CP1252
+
+
+@test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
+def t_cli_help():
+    tutti = [asset(s, n) for s, n in SCRIPT_CLI]
+    assert len(tutti) == 13 and all(os.path.exists(p) for p in tutti), tutti
+    sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
+    for path in tutti:
+        nome = os.path.basename(path)
+        rc, out = run_script(path, "--help")
+        assert rc == 0 and "usage:" in out and "Traceback" not in out, f"{nome} --help: rc {rc}, {out[-300:]}"
+        assert "-h, --help" in out, f"{nome}: --help senza l'aiuto di argparse"
+        if "motore_bootstrap import" in sorgenti[nome] and "cli(" in sorgenti[nome]:
+            assert "--set NOME=VALORE" in out and "costanti sovrascrivibili" in out, f"{nome}: --help senza l'elenco delle costanti"
+        rc, out = run_script(path, "--argomento-ignoto", *ARGOMENTI_DEFAULT.get(nome, ()))
+        assert rc == 2 and "usage:" in out and "Traceback" not in out, f"{nome} con un flag ignoto: rc {rc}, {out[-300:]}"
+    # codice 1 per i dati, con «ERRORE:» su stderr e niente su stdout: file mancante (ogni script che legge un
+    # file), costante --set sconosciuta o non numerica, file di output non scrivibile, foglio senza obiettivi
+    def errore_pulito(path, *args, atteso="ERRORE:"):
+        rc, so, se = run_script_split(path, *args)
+        assert rc == 1, f"{os.path.basename(path)} {args}: rc {rc}, {so[-200:]} {se[-200:]}"
+        assert se.lstrip().startswith("ERRORE:") and "ERRORE:" not in so and "Traceback" not in se, \
+            f"{os.path.basename(path)} {args}: stdout «{so[-150:]}» stderr «{se[-300:]}»"
+        assert atteso in se, f"{os.path.basename(path)} {args}: manca «{atteso}» in «{se[-300:]}»"
+    OB = "it-pianificazione-obiettivi"
+    for nome in ("glidepath-obiettivi.py", "montecarlo-obiettivi.py", "allocatore-capitale.py", "asset-location-optimizer.py"):
+        errore_pulito(asset(OB, nome), "/non/esiste.xlsx", atteso="non trovato")
+    vuoto = _excel_test([])
+    for nome in ("glidepath-obiettivi.py", "montecarlo-obiettivi.py", "allocatore-capitale.py", "asset-location-optimizer.py"):
+        errore_pulito(asset(OB, nome), vuoto, atteso="nessun obiettivo")
+    shutil.rmtree(os.path.dirname(vuoto), ignore_errors=True)
+    errore_pulito(asset("it-pianificazione", "importa-previdenza.py"), "/non/esiste.xml", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione", "importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-test.xml"), "/non/esiste.csv", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione", "netto-pensione.py"), "--set", "NON_ESISTE=1", atteso="sconosciuta")
+    errore_pulito(asset("it-pianificazione", "proiezione-inps.py"), "--set", "RAL_ATTUALE=abc", atteso="non è un numero")
+    errore_pulito(asset("it-pianificazione", "proiezione-inps.py"), "--json", "/non/esiste/x.json", atteso="impossibile scrivere")
+    errore_pulito(asset("it-revisione", "genera-ips.py"), os.path.join(tempfile.gettempdir(), "cartella-inesistente", "x.docx"), atteso="impossibile scrivere")
+    errore_pulito(asset("it-tax-optimization", "importa-estratto-broker.py"), "/non/esiste.csv", atteso="non trovato")
+    # niente abbreviazioni dei flag: «--se» non è «--set»
+    rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--se", "RAL_FINALE_LORDA=1")
+    assert rc == 2 and "usage:" in out, (rc, out[-200:])
+
+
+@test("T9 interfaccia: tutti gli script girano da una cartella esterna con una console cp1252 (Windows)")
+def t_cli_utf8():
+    # Prima della 0.11 undici script su tredici andavano in UnicodeEncodeError su «€», «→» e «≈» su qualsiasi
+    # output, gli altri due (genera-ips, importa-estratto-broker) su percorsi specifici
+    # con stdout in cp1252: ogni script forza l'UTF-8 (sys.stdout.reconfigure) prima di stampare.
+    for nome, (rc, out) in _tutti_gli_script_cp1252().items():
+        assert rc == 0, f"{nome} da una cartella esterna con cp1252: rc {rc}, {out[-400:]}"
+        assert "UnicodeEncodeError" not in out and "Traceback" not in out, f"{nome}: {out[-400:]}"
+        assert "serie storica non trovata" not in out, f"{nome}: serie storica non trovata"
+        # lo stdout resta UTF-8: ogni script stampa almeno un «€», e senza reconfigure il simbolo
+        # uscirebbe in cp1252 (qui decodificato come «\ufffd») anche dove non va in crash
+        assert "€" in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
+    # nessuna open() senza encoding negli script e nel runner: su Windows leggerebbero in cp1252
+    cartelle = [os.path.join(SKILLS, s, "assets") for s in sorted(os.listdir(SKILLS))] + \
+               [os.path.join(ROOT, "scripts"), os.path.join(ROOT, "tests")]
+    senza = []
+    for cartella in cartelle:
+        for f in sorted(os.listdir(cartella)) if os.path.isdir(cartella) else []:
+            if f.endswith(".py"):
+                righe = open(os.path.join(cartella, f), encoding="utf-8").read().splitlines()
+                for n, riga in enumerate(righe, 1):
+                    chiamata = riga + " " + (righe[n] if n < len(righe) else "")   # argomenti anche a capo
+                    if re.search(r"\bopen\(", riga) and "encoding=" not in chiamata and "rb" not in chiamata \
+                            and "def " not in riga and not riga.strip().startswith(("#", "assert")):
+                        senza.append(f"{f}:{n}")
+    assert not senza, f"open() senza encoding (su Windows leggerebbero in cp1252): {senza}"
+
+
+@test("T9 formati: importi e percentuali in formato italiano in tutti gli script (punto migliaia, virgola decimali)")
+def t_formati_italiani():
+    # Nei sorgenti nessun format spec anglosassone («{x:,.0f}», «{x:.1%}»): si passa da numero()/pct()
+    # («{x:.1f}» con decimali è anglosassone anche senza «%»: «12.6 punti»; «.0f» non ha decimali e resta)
+    anglo = re.compile(r":[<>^]?\+?\d*,\.?\d*[fd]?\}|:[<>^]?\+?\d*\.\d%\}|:[<>^]?\+?\d*\.[1-9]\d*f\}")
+    for skill, nome in SCRIPT_CLI + [("it-pianificazione", "motore_bootstrap.py")]:
+        for n, riga in enumerate(open(asset(skill, nome), encoding="utf-8"), 1):
+            if anglo.search(riga) and ".replace(" not in riga and "--set" not in riga:
+                raise AssertionError(f"{nome}:{n}: format spec anglosassone: {riga.strip()[:100]}")
+    # Negli output nessun «€ 1,234» né «7.0%»; valori chiusi sui default
+    for nome, (rc, out) in _tutti_gli_script_cp1252().items():
+        assert rc == 0, nome
+        m = re.search(r"€\s?\d{1,3},\d{3}\b", out)
+        assert not m, f"{nome}: importo anglosassone «{m.group(0)}»"
+        m = re.search(r"\d\.\d+%", out)
+        assert not m, f"{nome}: percentuale col punto «{m.group(0)}»"
+    out = _tutti_gli_script_cp1252()["proiezione-inps.py"][1]
+    assert "RAL: € 36.000 oggi" in out and "+1,5%/anno" in out and "PIL reale +0,5%" in out, out[:600]
+    out = _tutti_gli_script_cp1252()["ribilanciamento-multibroker.py"][1]
+    assert "VENDI €8.000 azionario/diverso @ Fineco" in out and "68,0%" in out and "patrimonio €100.000" in out, out[:900]
+    out = _tutti_gli_script_cp1252()["decumulo-obiettivi.py"][1]
+    assert re.search(r"€\s*\d{1,3}\.\d{3}\s+\d+,\d%\s+\d+,\d%", out), "decumulo: tabella di sensibilità non in formato italiano"
+    motore = carica_modulo(asset("it-pianificazione", "motore_bootstrap.py"))
+    assert motore.numero(1234567.891, 2) == "1.234.567,89" and motore.numero(-0.5, 1) == "-0,5"
+    assert motore.euro(-1234.4) == "-€1.234" and motore.euro(999.5) == "€1.000" and motore.euro(0) == "€0"
+    assert motore.pct(0.125) == "12,5%" and motore.pct(0.0712, 1, segno=True) == "+7,1%" and motore.pct(1, 0) == "100%"
+
+
+@test("T9 formati: CSV degli ordini apribile in Excel italiano (BOM, «;», virgola decimale), importi invariati")
+def t_csv_italiano():
+    import csv
+    m, p = _ribilancia()
+    tmp = tempfile.mkdtemp()
+    try:
+        (path, n), = m.scrivi_csv_per_broker(m.genera_ordini(p), tmp)
+        grezzo = open(path, "rb").read()
+        assert grezzo.startswith(b"\xef\xbb\xbf"), "senza BOM Excel apre il CSV in cp1252 e sporca «€»"
+        testo = grezzo.decode("utf-8-sig")
+        assert testo.splitlines()[0] == ";".join(m.CAMPI_CSV), testo.splitlines()[0]
+        assert re.search(r"^Fineco;VENDITA;azionario;diverso;;8000,00;3200,00;0,00;3200,00;", testo, re.M), testo
+        assert not re.search(r"\d\.\d\d;", testo), "importi con il punto decimale"
+        with open(path, encoding="utf-8-sig", newline="") as f:
+            righe = list(csv.DictReader(f, delimiter=";"))
+        assert [r["operazione"] for r in righe] == ["VENDITA", "ACQUISTO", "ACQUISTO", "NOTA"], righe
+        assert sum(float(r["importo_eur"].replace(",", ".")) for r in righe[:-1]) == 16000, righe
+        assert "€3.200" in righe[0]["nota"], righe[0]["nota"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -570,7 +745,7 @@ def t_importa_anonimo():
     for args in ((xml, "--anonymous"), (xml, "-anonimo"), (xml, "—anonimo"), (xml, csv_fondo, "--anonimi"),
                  (xml, csv_fondo, "altro.csv")):
         rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), *args)
-        assert rc != 0 and "ROSSI" not in out and "15/03/1990" not in out and "Uso:" in out, \
+        assert rc == 2 and "ROSSI" not in out and "15/03/1990" not in out and "usage:" in out, \
             f"argomenti {args[1:]}: rc {rc}, output «{out.strip()[:120]}»"
 
 
@@ -613,7 +788,7 @@ def _file_testo(*basi):
             for f in sorted(files):
                 if f.endswith((".md", ".py")):
                     p = os.path.join(cartella, f)
-                    yield os.path.relpath(p, ROOT), open(p, encoding="utf-8").read()
+                    yield os.path.relpath(p, ROOT).replace(os.sep, "/"), open(p, encoding="utf-8").read()
 
 
 @test("coerenza tra skill: massimale, prima fascia, plafond e assegno sociale 2026 uguali in tutte le copie")
@@ -1355,8 +1530,8 @@ def t_disclaimer_csv():
         files = glob.glob(os.path.join(tmp, "ordini", "ordini_*.csv"))
         assert files, "nessun CSV degli ordini"
         for path in files:
-            with open(path, encoding="utf-8", newline="") as f:
-                righe = list(csv.DictReader(f))
+            with open(path, encoding="utf-8-sig", newline="") as f:
+                righe = list(csv.DictReader(f, delimiter=";"))
             assert righe and righe[-1]["operazione"] == "NOTA", f"{os.path.basename(path)}: manca la riga NOTA finale"
             assert "non costituisce consulenza" in righe[-1]["nota"], f"{os.path.basename(path)}: nota senza disclaimer"
             assert all(r["operazione"] in ("VENDITA", "ACQUISTO", "PRELIEVO") for r in righe[:-1]), "righe d'ordine alterate"
@@ -1413,8 +1588,8 @@ def t_t7_default():
     try:
         scritti = m.scrivi_csv_per_broker(ordini, tmp)
         assert [(os.path.basename(f), n) for f, n in scritti] == [("ordini_Fineco.csv", 3)], scritti
-        with open(scritti[0][0], encoding="utf-8", newline="") as f:
-            assert next(csv.reader(f)) == m.CAMPI_CSV
+        with open(scritti[0][0], encoding="utf-8-sig", newline="") as f:
+            assert next(csv.reader(f, delimiter=";")) == m.CAMPI_CSV
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     testo = _stampato(m, p)
@@ -1456,7 +1631,7 @@ def t_t7_gate_rientro():
     assert p["imposta"] == 0 and round(p["drift"]["azionario"]["residuo_non_corretto"]) == 3000, p["drift"]["azionario"]
     assert round(p["acquisti"]["obbligazionario"]) == 5000 and round(p["acquisti"]["monetario"]) == 0, p["acquisti"]
     testo = _stampato(m, p)
-    assert "nessuna vendita necessaria" not in testo and re.search(r"rinviat[^\n]*3,000|3,000[^\n]*rinviat", testo), testo[-800:]
+    assert "nessuna vendita necessaria" not in testo and re.search(r"rinviat[^\n]*3\.000|3\.000[^\n]*rinviat", testo), testo[-800:]
     # drift +18% oltre la banda larga, nessuna vendita gratis: si vende con imposta fino a metà banda
     target = {"azionario": 0.50, "obbligazionario": 0.40, "monetario": 0.10}
     m, p = _ribilancia(ZAINETTO={"Fineco": 0, "Directa": 0}, TARGET=target)
@@ -1483,7 +1658,7 @@ def t_t7_prelievo_input():
     assert all(v >= -0.01 for v in saldo.values()) and \
         round(sum(o["importo_eur"] for o in ordini if o["operazione"] == "PRELIEVO")) == 10000, ordini
     testo = _stampato(m, p)
-    assert re.search(r"netto prelevato[^\n]*10,000", testo), testo[-600:]
+    assert re.search(r"netto prelevato[^\n]*10\.000", testo), testo[-600:]
     # portafoglio già in banda: il prelievo da solo obbliga a vendere, imposta compresa
     target = {"azionario": 0.68, "obbligazionario": 0.24, "monetario": 0.08}
     m, p = _ribilancia(PRELIEVO=3000, TARGET=target)
@@ -1602,7 +1777,7 @@ def t_t7_sottopesata():
     assert abs(p["acquisti"]["monetario"] - 9500) < 0.01 and abs(sum(v["vendi"] for v in p["vendite"]) - lordo) < 0.01, p["vendite"]
     assert [v["classe"] for v in p["vendite"]][0] == "obbligazionario" and abs(p["imposta"] - (lordo - 9500)) < 0.01, p["vendite"]
     mon = p["drift"]["monetario"]
-    assert "rientro a metà banda" in mon["motivo"] and f"così €{p['imposta']:,.0f}" in mon["motivo"], mon["motivo"]
+    assert "rientro a metà banda" in mon["motivo"] and f"così €{m.numero(p['imposta'])}" in mon["motivo"], mon["motivo"]
     m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 0}, TARGET=target, OBIETTIVO_RIENTRO="target")
     assert round(sum(v["vendi"] for v in p["vendite"])) == 12000 and abs(p["imposta"] - 520) < 0.01, p["vendite"]
     assert "metà banda" not in p["drift"]["monetario"]["motivo"], p["drift"]["monetario"]
@@ -1624,8 +1799,8 @@ def t_t7_coefficiente():
     az = [v for v in p["vendite"] if v["classe"] == "azionario"][0]
     assert abs(az["comp"] - 2000 * 12.5 / 26) < 0.01, az
     testo = _stampato(m, p)
-    assert re.search(r"minus €2,000[^\n]*€962 di zainetto: minus al 12,5% computata al 48,08%", testo), testo
-    assert "VENDI €20,000 obbligazionario/diverso (12,5%) @ X" in testo, testo
+    assert re.search(r"minus €2\.000[^\n]*€962 di zainetto: minus al 12,5% computata al 48,08%", testo), testo
+    assert "VENDI €20.000 obbligazionario/diverso (12,5%) @ X" in testo, testo
     pos = [{"broker": "X", "asset_class": "obbligazionario", "tipo": "diverso", "valore": 38000, "plus": 3800, "aliquota": 0.125},
            {"broker": "X", "asset_class": "azionario", "tipo": "capitale", "valore": 62000, "plus": 0}]
     m, p = _ribilancia(POSITIONS=pos, ZAINETTO={"X": 300}, TARGET={"obbligazionario": 0.30, "azionario": 0.70})
@@ -1638,9 +1813,9 @@ def t_t7_coefficiente():
     assert p["drift"]["azionario"]["residuo_non_corretto"] == 0 and p["risultante"]["azionario"] == 1.0, p["drift"]["azionario"]
     m, p = _ribilancia(POSITIONS=btp, ZAINETTO={"X": 5000}, TARGET={"azionario": 1.0, "obbligazionario": 0.0})
     testo = _stampato(m, p)
-    assert re.search(r"compensata €3,000[^\n]*€1,442 di zainetto: plus al 12,5% computata al 48,08%", testo), testo
+    assert re.search(r"compensata €3\.000[^\n]*€1\.442 di zainetto: plus al 12,5% computata al 48,08%", testo), testo
     nota = [o for o in m.genera_ordini(p) if o["operazione"] == "VENDITA"][0]["nota"]
-    assert "1,442" in nota and "48,08%" in nota, nota
+    assert "1.442" in nota and "48,08%" in nota, nota
 
 
 @test("T7 ribilanciamento: OBIETTIVO_RIENTRO «banda» e residui dichiarati (nessuna vendita, sezione 5 senza ordini)")
@@ -1660,7 +1835,7 @@ def t_t7_rientro_banda_residui():
     assert p["vendite"] == [] and p["imposta"] == 0, (p["vendite"], p["imposta"])
     assert round(p["drift"]["azionario"]["residuo_non_corretto"]) == 8000, p["drift"]["azionario"]
     testo = _stampato(m, p)
-    assert "nessuna vendita necessaria" not in testo and re.search(r"rinviat[^\n]*8,000|8,000[^\n]*rinviat", testo), testo[-800:]
+    assert "nessuna vendita necessaria" not in testo and re.search(r"rinviat[^\n]*8\.000|8\.000[^\n]*rinviat", testo), testo[-800:]
     import contextlib
     import io
     tmp = tempfile.mkdtemp()
@@ -1713,7 +1888,7 @@ def t_t7_prelievo_imposta():
             az = p["drift"]["azionario"]
             atteso = 9200 - sum(v["vendi"] for v in p["vendite"] if v["classe"] == "azionario")
             assert abs(az["residuo_non_corretto"] - atteso) < 0.01, (az, atteso)
-            assert f"{atteso:,.0f}" in testo and "9,200" not in testo and "prelievo" in az["motivo"], testo
+            assert m.numero(atteso) in testo and "9.200" not in testo and "prelievo" in az["motivo"], testo
     # la quota a costo zero va per prima, il resto della posizione dopo le tassate più economiche
     imposte = []
     for z in (0, 200, 1000):
@@ -1750,7 +1925,7 @@ def t_t7_prelievo_imposta():
         m.pianifica()
         raise AssertionError("prelievo non finanziabile accettato")
     except m.ErroreInput as e:
-        assert "96,620" in str(e), e
+        assert "96.620" in str(e), e
     m, p = _ribilancia(PRELIEVO=96620)
     assert all(0 <= w <= 1 for w in p["risultante"].values()), p["risultante"]
     assert round(sum(o["importo_eur"] for o in m.genera_ordini(p) if o["operazione"] == "PRELIEVO"), 2) == 96620
@@ -1788,8 +1963,8 @@ def t_t7_aliquota_mista():
     az = [v for v in p["vendite"] if v["classe"] == "azionario"][0]
     assert abs(az["comp"] - credito) < 0.01 and abs(p["imposta"] - (5000 - credito) * 0.26) < 0.01, (az, p["imposta"])
     testo = _stampato(m, p)
-    assert re.search(r"VENDI €10,000 obbligazionario/capitale \(aliquota mista 17,9%\) @ X", testo), testo
-    assert re.search(r"minus €1,000[^\n]*€688 di zainetto: minus ad aliquota mista 17,9% computata al 68,85%",
+    assert re.search(r"VENDI €10\.000 obbligazionario/capitale \(aliquota mista 17,9%\) @ X", testo), testo
+    assert re.search(r"minus €1\.000[^\n]*€688 di zainetto: minus ad aliquota mista 17,9% computata al 68,85%",
                      testo), testo                                      # 12,5% × 0,6 + 26% × 0,4
     # in alternativa alla quota si può dare l'aliquota effettiva tra 12,5% e 26%
     pos[0] = dict(pos[0], aliquota=0.179)
@@ -1905,6 +2080,11 @@ def _pct_it(x, decimali=1):
     return f"{x:.{decimali}f}".replace(".", ",")
 
 
+def _da_it(testo):
+    """Numero da un testo in formato italiano: '1.234,5' → 1234.5."""
+    return float(testo.replace(".", "").replace(",", "."))
+
+
 def _pmt_anno_per_anno(target, gia, rend, rend_atterraggio, anni, finestra):
     """Replica indipendente del versamento col calendario annuale del glide path: la quota
     dell'anno y è quella del calendario a inizio anno (anni residui = anni − y), il rendimento
@@ -1984,7 +2164,7 @@ def t_versamento_glide():
         rc, out = run_script(asset("it-pianificazione-obiettivi", "allocatore-capitale.py"),
                              "--json", os.path.join(tmp, "a.json"))
         assert rc == 0, out[-400:]
-        righe = {r["nome"]: r for r in json.load(open(os.path.join(tmp, "a.json")))["obiettivi"]}
+        righe = {r["nome"]: r for r in json.load(open(os.path.join(tmp, "a.json"), encoding="utf-8"))["obiettivi"]}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     g = attesi["Lungo termine / libertà"][2]
@@ -2137,11 +2317,11 @@ def t_rischio_sistemico():
     assert rc == 0, out[-400:]
     sez = out.split("RISCHIO SISTEMICO")[-1]
     assert "essenziali): Casa, Università" in sez, sez[:300]
-    coda = re.search(r"falliscono.*?prodotto\):\s*([\d.]+)%.*?congiunta\):\s*([\d.]+)%", sez, re.S)
-    insieme = re.search(r"riescono insieme.*?prodotto\):\s*([\d.]+)%.*?congiunta\):\s*([\d.]+)%", sez, re.S)
-    ind, cong = float(coda.group(1)), float(coda.group(2))
+    coda = re.search(r"falliscono.*?prodotto\):\s*([\d,]+)%.*?congiunta\):\s*([\d,]+)%", sez, re.S)
+    insieme = re.search(r"riescono insieme.*?prodotto\):\s*([\d,]+)%.*?congiunta\):\s*([\d,]+)%", sez, re.S)
+    ind, cong = _da_it(coda.group(1)), _da_it(coda.group(2))
     assert cong >= ind + 2, f"P(falliscono insieme): congiunta {cong}% vs prodotto {ind}%: shock non condivisi?"
-    assert float(insieme.group(2)) >= float(insieme.group(1)), "P(riescono insieme) congiunta < prodotto"
+    assert _da_it(insieme.group(2)) >= _da_it(insieme.group(1)), "P(riescono insieme) congiunta < prodotto"
 
 
 @test("montecarlo-obiettivi: accanto all'OPZIONE la probabilità sul percorso glide, più bassa che a quota fissa")
@@ -2183,8 +2363,8 @@ def t_rendimento_lordo():
     lo = pareggio(lordo)
     rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"))
     assert rc == 0, out[-400:]
-    m = re.search(r"TER di pareggio del PIR: ([\d.]+)%", out)
-    assert m and abs(float(m.group(1)) - lo * 100) <= 0.006, \
+    m = re.search(r"TER di pareggio del PIR: ([\d,]+)%", out)
+    assert m and abs(_da_it(m.group(1)) - lo * 100) <= 0.006, \
         f"TER di pareggio {m and m.group(1)}%, atteso {lo*100:.2f}% col lordo {lordo:.2%}"
     assert abs(mod.lordo_da_netto(0.055) - lordo) < 1e-12
     assert re.search(r"lordo[^\n]*7[.,]8%", out), "l'output deve dichiarare il rendimento lordo usato"
@@ -2192,10 +2372,10 @@ def t_rendimento_lordo():
     # col netto e favorisce i contenitori esenti. Con l'imposta alla vendita (ETF ad accumulazione) il
     # lordo equivalente è più basso e il pareggio del PIR scende: verso e variante vanno detti.
     differito = ((1.055 ** 15 - 0.26) / 0.74) ** (1 / 15) - 1 + 0.004
-    m = re.search(r"lordo equivalente a 15 anni è ([\d.]+)%.*?pareggio scende a ([\d.]+)%", out, re.S)
+    m = re.search(r"lordo equivalente a 15 anni è ([\d,]+)%.*?pareggio scende a ([\d,]+)%", out, re.S)
     assert m, "l'output deve dare la variante con l'imposta alla vendita (lordo equivalente e pareggio)"
-    assert abs(float(m.group(1)) - differito * 100) <= 0.006, f"lordo con imposta differita {m.group(1)}%, atteso {differito:.2%}"
-    assert abs(float(m.group(2)) - pareggio(differito) * 100) <= 0.006, \
+    assert abs(_da_it(m.group(1)) - differito * 100) <= 0.006, f"lordo con imposta differita {m.group(1)}%, atteso {differito:.2%}"
+    assert abs(_da_it(m.group(2)) - pareggio(differito) * 100) <= 0.006, \
         f"pareggio con imposta differita {m.group(2)}%, atteso {pareggio(differito):.2%}"
     assert "Prudente:" not in (mod.lordo_da_netto.__doc__ or ""), "lordo_da_netto: nell'ottimizzatore non è prudente"
     skill = _testo_obiettivi("SKILL.md")
@@ -2203,7 +2383,7 @@ def t_rendimento_lordo():
         assert cifra in skill, f"SKILL.md (asset location): manca «{cifra}»"
     rc, out = run_script(asset("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
                          "--set", "RENDIMENTO_LORDO=0.07")
-    assert rc == 0 and "@ 7.0%" in out, "RENDIMENTO_LORDO esplicito non usato nello scenario pensione"
+    assert rc == 0 and "@ 7,0%" in out, "RENDIMENTO_LORDO esplicito non usato nello scenario pensione"
     par, _, _ = _obiettivi_foglio()
     note = " ".join(str(par[f"A{r}"].value or "") for r in range(1, 30))
     formula = "(lordo − costi) × (1 − 26%)"
@@ -2241,7 +2421,7 @@ def t_cifre_documentate():
         rc, out = run_script(asset("it-pianificazione-obiettivi", "allocatore-capitale.py"),
                              "--json", os.path.join(tmp, "a.json"))
         assert rc == 0, out[-400:]
-        righe = {r["nome"]: r for r in json.load(open(os.path.join(tmp, "a.json")))["obiettivi"]}
+        righe = {r["nome"]: r for r in json.load(open(os.path.join(tmp, "a.json"), encoding="utf-8"))["obiettivi"]}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     richiesto = _euro_it(righe["Lungo termine / libertà"]["richiesto"])
@@ -2304,7 +2484,7 @@ def t_cifre_documentate():
     assert rc == 0, out[-400:]
     vant = re.search(r"VANTAGGIO FONDO PENSIONE: (€[\d.]+)\s+\(\+(\d+)% vs dossier\)", out)
     pir = re.search(r"(VANTAGGIO|SVANTAGGIO) PIR: (-?€[\d.]+)", out)
-    par = re.search(r"TER di pareggio del PIR: ([\d.]+)%", out)
+    par = re.search(r"TER di pareggio del PIR: ([\d,]+)%", out)
     for cifra in (vant.group(1), f"+{vant.group(2)}% vs dossier", pir.group(2).replace("-", "−"),
                   par.group(1).replace(".", ",") + "%"):
         assert cifra in skill, f"SKILL.md non cita {cifra} dell'ottimizzatore sui default"
@@ -2316,14 +2496,14 @@ def t_cifre_documentate():
     # decumulo sui default
     rc, out = run_script(asset("it-pianificazione-obiettivi", "decumulo-obiettivi.py"))
     assert rc == 0, out[-400:]
-    sens = dict(re.findall(r"^\s+€\s*[\d,]+\s+([\d.]+)%\s+([\d.]+)%$", out, re.M))
-    for tasso in ("3.0", "4.0", "5.0", "6.0"):
-        assert f"{_pct_it(float(sens[tasso]))}% al {tasso[0]}%" in dec, \
-            f"decumulo.md: manca «{_pct_it(float(sens[tasso]))}% al {tasso[0]}%» (output sui default)"
+    sens = dict(re.findall(r"^\s+€\s*[\d.]+\s+([\d,]+)%\s+([\d,]+)%$", out, re.M))
+    for tasso in ("3,0", "4,0", "5,0", "6,0"):
+        assert f"{sens[tasso]}% al {tasso[0]}%" in dec, \
+            f"decumulo.md: manca «{sens[tasso]}% al {tasso[0]}%» (output sui default)"
     anno = re.search(r"peggiori rendimenti PRIMA:\s+ESAURITO all'anno (\d+)", out).group(1)
     assert f"all'anno {anno}" in dec, f"decumulo.md: la sequenza peggiore esaurisce all'anno {anno}"
-    iniziale = float(re.search(r"capitale €([\d,]+)", out).group(1).replace(",", ""))
-    finale = float(re.search(r"migliori rendimenti PRIMA:\s+capitale finale €([\d,]+)", out).group(1).replace(",", ""))
+    iniziale = _da_it(re.search(r"capitale €([\d.]+)", out).group(1))
+    finale = _da_it(re.search(r"migliori rendimenti PRIMA:\s+capitale finale €([\d.]+)", out).group(1))
     assert 1.75 <= finale / iniziale <= 2.25 and "circa il doppio" in dec, \
         f"decumulo.md: «circa il doppio» con i migliori prima, l'output dà {finale / iniziale:.2f} volte"
     # rendimento reale storico dell'azionario USA (dalla serie, deflazionata con la CPI)
@@ -2510,7 +2690,7 @@ def _testi_regole():
             for f in files:
                 if f.endswith((".md", ".py")):
                     p = os.path.join(cartella, f)
-                    testi[os.path.relpath(p, ROOT)] = open(p, encoding="utf-8").read()
+                    testi[os.path.relpath(p, ROOT).replace(os.sep, "/")] = open(p, encoding="utf-8").read()
     readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
     testi["README.md"] = re.sub(r"\n### Changelog\n.*?(?=\n## )", "\n", readme, flags=re.S)
     plugin = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
@@ -2836,10 +3016,10 @@ def t_t2_broker_json_errori():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     rc, out = run_script(IMPORTATORE, os.path.join(FIXTURES, "non-esiste.csv"))
-    assert rc == 2 and "Traceback" not in out and "non trovato" in out, out[-300:]
+    assert rc == 1 and "Traceback" not in out and "non trovato" in out, out[-300:]
     rc, out = run_script(IMPORTATORE, os.path.join(FIXTURES, "estratto-multibroker.csv"),
                          os.path.join(TAX, "assets", "esempio-zainetto.csv"))
-    assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
+    assert rc == 1 and "Traceback" not in out and "broker" in out, out[-300:]
 
 
 @test("T3: quadro RW senza soglia per i titoli, stato dei broker esteri con data di verifica")
@@ -3101,7 +3281,7 @@ def t_t2_numeri_colonne():
     rc, d, out = _importa(_fx("estratto-migliaia-it.csv"), _fx("zainetto-un-broker.csv"), "--anno", "2026")
     assert rc == 0 and d["analisi"]["plus_realizzabili_a_costo_zero"] == 1_000, out[-400:]
     rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), _fx("zainetto-multibroker.csv"))
-    assert rc == 2 and "Traceback" not in out and "broker" in out, out[-300:]
+    assert rc == 1 and "Traceback" not in out and "broker" in out, out[-300:]
     tmp = tempfile.mkdtemp()
     try:
         natura = os.path.join(tmp, "natura.csv")
@@ -3116,7 +3296,7 @@ def t_t2_numeri_colonne():
         with open(ambiguo, "w", encoding="utf-8") as f:
             f.write("Anno realizzo;Importo;Ammontare;Aliquota\n2024;5.000,00;500,00;26%\n")
         rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), ambiguo)
-        assert rc == 2 and "Traceback" not in out and "ambigu" in out, out[-300:]
+        assert rc == 1 and "Traceback" not in out and "ambigu" in out, out[-300:]
         vuota = os.path.join(tmp, "vuota.csv")
         with open(vuota, "w", encoding="utf-8") as f:
             f.write("Anno realizzo;Minusvalenza residua;Aliquota\n2024;1.000,00;\n")
@@ -3126,9 +3306,9 @@ def t_t2_numeri_colonne():
         with open(zain, "w", encoding="utf-8") as f:
             f.write("Anno realizzo;Minusvalenza residua;Aliquota\n2024;1.000,00;30%\n")
         rc, out = run_script(IMPORTATORE, _fx("estratto-migliaia-it.csv"), zain)
-        assert rc == 2 and "Traceback" not in out and "zainetto.csv" in out and "riga 2" in out, out[-300:]
+        assert rc == 1 and "Traceback" not in out and "zainetto.csv" in out and "riga 2" in out, out[-300:]
         rc, out = run_script(IMPORTATORE, tmp)
-        assert rc == 2 and "Traceback" not in out, out[-300:]
+        assert rc == 1 and "Traceback" not in out, out[-300:]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3526,7 +3706,7 @@ def t_parametri_superati():
                 if f.endswith((".md", ".py")):
                     testo = open(os.path.join(cartella, f), encoding="utf-8").read()
                     for v in vietati:
-                        assert v not in testo, f"{os.path.relpath(os.path.join(cartella, f), ROOT)}: «{v}»"
+                        assert v not in testo, f"{os.path.relpath(os.path.join(cartella, f), ROOT).replace(os.sep, '/')}: «{v}»"
 
 
 @test("tracker-secchielli: fogli, formule vive, semaforo demo funzionante")
@@ -3550,8 +3730,8 @@ def t_ponte():
     def prob(*sets):
         rc, out = run_script(sc, *sets)
         assert rc == 0, out[-300:]
-        m = re.search(r"PROBABILITÀ di coprire il ponte: ([\d.]+)%", out)
-        return float(m.group(1))
+        m = re.search(r"PROBABILITÀ di coprire il ponte: ([\d,]+)%", out)
+        return _da_it(m.group(1))
     assert prob("--set", "CAPITALE_PONTE=10_000_000.0") == 100.0
     assert prob("--set", "SPESA_ANNUA_PONTE=0.0", "--set", "CAPITALE_PONTE=0.0") == 100.0
     # RITA dall'uscita con rata netta > spesa: il capitale non serve
@@ -3615,7 +3795,7 @@ def t_ponte_reale():
     # valore chiuso sui default (seed 42): la serie reale, non quella nominale
     rc, out = run_script(asset("it-pianificazione", "ponte-pensione.py"))
     assert rc == 0, out[-300:]
-    prob = float(re.search(r"PROBABILITÀ di coprire il ponte: ([\d.]+)%", out).group(1))
+    prob = _da_it(re.search(r"PROBABILITÀ di coprire il ponte: ([\d,]+)%", out).group(1))
     assert prob == PROB_PONTE_DEFAULT, f"probabilità sui default {prob}% ≠ {PROB_PONTE_DEFAULT}%"
     assert "CPI" in out, "lo stdout deve dire con quale inflazione è deflazionata la serie"
 
@@ -3826,7 +4006,7 @@ def marcatori_freshness():
     for base, _, files in os.walk(SKILLS):
         for f in sorted(files):
             if f.endswith((".py", ".md")):
-                rel = os.path.relpath(os.path.join(base, f), SKILLS)
+                rel = os.path.relpath(os.path.join(base, f), SKILLS).replace(os.sep, "/")
                 testo = open(os.path.join(base, f), encoding="utf-8", errors="replace").read()
                 for m in re.finditer(r"Verificato: (\d{4})-(\d{2})", testo):
                     trovati.append((rel, int(m.group(1)), int(m.group(2))))
@@ -3871,7 +4051,7 @@ def t_json():
                          "--set", "CRESCITA_REALE_RAL=0.0", "--set", "PIL_REALE=0.02",
                          "--set", "COEFF_ESPLICITO=0.05", "--json", out)
     assert rc == 0, log[-300:]
-    d = _json.load(open(out))
+    d = _json.load(open(out, encoding="utf-8"))
     shutil.rmtree(tmp, ignore_errors=True)
     atteso = (100_000 * 1.02 ** 30 + 30_000 * 0.33 * ((1.02 ** 30 - 1) / 0.02)) * 0.05
     assert abs(d["pensione_inps_lorda_annua"] - atteso) <= 2
@@ -3988,24 +4168,24 @@ def t_excel_cache():
 def t_filtro():
     me = os.path.abspath(__file__)
     r = subprocess.run([sys.executable, me, "--only", "freshness"],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     assert "1/1 test passati" in r.stdout, r.stdout[-400:]
     assert "freshness fiscale" in r.stdout
     r = subprocess.run([sys.executable, me, "--skip", "freshness", "--only", "igiene"],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     attesi = sum(1 for v in globals().values() if getattr(v, "__test__", False)
                  and "igiene" in v.__nome__.lower() and "freshness" not in v.__nome__.lower())
     assert f"{attesi}/{attesi} test passati" in r.stdout, r.stdout[-400:]
     assert "freshness" not in r.stdout
     r = subprocess.run([sys.executable, me, "--only", "nome-inesistente"],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     assert r.returncode != 0, "nessun test selezionato deve essere un errore, non un verde vuoto"
 
 
 @test("runner: la tabella dello stato dei dati normativi elenca i file obbligati con la scadenza")
 def t_tabella_dati_normativi():
     r = subprocess.run([sys.executable, os.path.abspath(__file__), "--tabella-freshness"],
-                       capture_output=True, text=True, timeout=60)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     assert r.returncode == 0, r.stderr[-300:]
     assert r.stdout.startswith("| File | Verificato | Valido fino a |"), r.stdout[:200]
     for rel in OBBLIGATI_FRESHNESS:
@@ -4016,7 +4196,7 @@ def t_tabella_dati_normativi():
 def t_pacchetto():
     import zipfile
     script = os.path.join(ROOT, "scripts", "pacchetto.py")
-    ver = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json")))["version"]
+    ver = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
     tmp = tempfile.mkdtemp()
     try:
         rc, out = run_script(script, "--out", tmp, "--tag", f"v{ver}", cwd=ROOT)
@@ -4057,6 +4237,11 @@ def seleziona(tests, only, skip):
 
 def main():
     import argparse
+    for flusso in (sys.stdout, sys.stderr):   # ✅ e ❌ anche su una console Windows in cp1252
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(description="Test suite del plugin wealth-management-it.")
     ap.add_argument("--only", action="append", metavar="NOME",
                     help="esegui solo i test il cui nome contiene NOME (ripetibile)")

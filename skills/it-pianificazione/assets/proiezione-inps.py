@@ -11,7 +11,8 @@ e la rivalutazione del montante usa il PIL REALE (il montante per legge cresce c
 cioè PIL reale + inflazione; deflazionando, resta il PIL reale).
 
 Uso:
-    python proiezione-inps.py          # modifica le costanti qui sotto, poi esegui
+    python proiezione-inps.py [--set NOME=VALORE ...] [--json FILE]
+    (--help elenca le costanti sovrascrivibili; senza --set valgono i default qui sotto)
 
 ONESTÀ METODOLOGICA
 - Una RAL crescente ABBASSA il tasso di sostituzione: la pensione contributiva si basa sulla
@@ -25,7 +26,7 @@ ONESTÀ METODOLOGICA
   alte la pensione pubblica smette di crescere col reddito.
 """
 
-from motore_bootstrap import applica_override, percorso_json, scrivi_json
+from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 
 # ============================== PARAMETRI ==============================
 
@@ -90,11 +91,12 @@ def proietta(montante0, ral0, g_ral, pil, anni, coeff):
 
 
 def main():
-    applica_override(globals())
-    json_out = percorso_json()
+    args = cli("Proiezione parametrica della pensione INPS in euro di oggi (metodo contributivo), con la "
+               "sensibilità a PIL reale e coefficienti di trasformazione.", globals(), json=True)
+    json_out = args.json
     anni = ETA_PENSIONAMENTO - ETA_ATTUALE
     if anni <= 0:
-        raise SystemExit("ETA_PENSIONAMENTO deve superare ETA_ATTUALE.")
+        errore("ETA_PENSIONAMENTO deve superare ETA_ATTUALE.")
     n = round(anni)
     ral_fin = RAL_ATTUALE * (1 + CRESCITA_REALE_RAL) ** n
 
@@ -103,8 +105,8 @@ def main():
         coeff, origine = COEFF_ESPLICITO, "esplicito (da parametro)"
     else:
         coeff = c_vig * (1 - RIDUZIONE_COEFF_ANNUA) ** n
-        origine = (f"tabella 2025-26 a {ETA_PENSIONAMENTO:.0f} anni ({c_vig:.3%}) "
-                   f"ridotto del {RIDUZIONE_COEFF_ANNUA:.1%}/anno per {n} anni")
+        origine = (f"tabella 2025-26 a {ETA_PENSIONAMENTO:.0f} anni ({pct(c_vig, 3)}) "
+                   f"ridotto del {pct(RIDUZIONE_COEFF_ANNUA)}/anno per {n} anni")
 
     m_fin, fv_att, fv_fut, pensione = proietta(
         MONTANTE_ATTUALE, RAL_ATTUALE, CRESCITA_REALE_RAL, PIL_REALE, n, coeff)
@@ -113,16 +115,16 @@ def main():
     print("PROIEZIONE PENSIONE INPS — metodo contributivo, valori reali (€ di oggi)")
     print("=" * 72)
     print(f"Orizzonte: {n} anni (da {ETA_ATTUALE:.0f} a {ETA_PENSIONAMENTO:.0f} anni)")
-    print(f"RAL: € {RAL_ATTUALE:,.0f} oggi → € {ral_fin:,.0f} finale "
-          f"(crescita reale {CRESCITA_REALE_RAL:+.1%}/anno)")
-    print(f"\nMontante contributivo a {ETA_PENSIONAMENTO:.0f} anni: € {m_fin:,.0f}")
-    print(f"  di cui montante attuale rivalutato:  € {fv_att:,.0f}  (PIL reale {PIL_REALE:+.1%})")
-    print(f"  di cui contributi futuri rivalutati: € {fv_fut:,.0f}")
-    print(f"\nCoefficiente di trasformazione: {coeff:.3%}")
+    print(f"RAL: € {numero(RAL_ATTUALE)} oggi → € {numero(ral_fin)} finale "
+          f"(crescita reale {pct(CRESCITA_REALE_RAL, 1, segno=True)}/anno)")
+    print(f"\nMontante contributivo a {ETA_PENSIONAMENTO:.0f} anni: € {numero(m_fin)}")
+    print(f"  di cui montante attuale rivalutato:  € {numero(fv_att)}  (PIL reale {pct(PIL_REALE, 1, segno=True)})")
+    print(f"  di cui contributi futuri rivalutati: € {numero(fv_fut)}")
+    print(f"\nCoefficiente di trasformazione: {pct(coeff, 3)}")
     print(f"  origine: {origine}")
-    print(f"\nPENSIONE LORDA ANNUA: ≈ € {pensione:,.0f}   (≈ € {pensione/13:,.0f} × 13 mensilità)")
-    print(f"TASSO DI SOSTITUZIONE LORDO: {pensione/ral_fin:.1%} della RAL finale"
-          f"   ({pensione/RAL_ATTUALE:.1%} della RAL di oggi)")
+    print(f"\nPENSIONE LORDA ANNUA: ≈ € {numero(pensione)}   (≈ € {numero(pensione/13)} × 13 mensilità)")
+    print(f"TASSO DI SOSTITUZIONE LORDO: {pct(pensione/ral_fin)} della RAL finale"
+          f"   ({pct(pensione/RAL_ATTUALE)} della RAL di oggi)")
 
     # ------------------------- sensibilità -------------------------
     print("\n" + "-" * 72)
@@ -130,15 +132,15 @@ def main():
     print("ai due parametri fuori dal tuo controllo:")
     riduzioni = [0.0, 0.007, 0.010]
     pil_scenari = [0.0, 0.005, 0.010]
-    intest = "".join(f"{'coeff. vigenti' if r == 0 else f'riduz. {r:.1%}/a':>18}" for r in riduzioni)
+    intest = "".join(f"{'coeff. vigenti' if r == 0 else f'riduz. {pct(r)}/a':>18}" for r in riduzioni)
     print(f"  {'PIL reale':<12}{intest}")
     for p in pil_scenari:
-        riga = f"  {p:>9.1%}   "
+        riga = f"  {pct(p):>9}   "
         for r in riduzioni:
             c = (COEFF_ESPLICITO if COEFF_ESPLICITO is not None
                  else coeff_vigente(ETA_PENSIONAMENTO) * (1 - r) ** n)
             _, _, _, pens = proietta(MONTANTE_ATTUALE, RAL_ATTUALE, CRESCITA_REALE_RAL, p, n, c)
-            riga += f"{pens/ral_fin:>18.1%}"
+            riga += f"{pct(pens/ral_fin):>18}"
         print(riga)
     if COEFF_ESPLICITO is not None:
         print("  (COEFF_ESPLICITO impostato: le colonne coincidono; azzeralo per la sensibilità piena)")

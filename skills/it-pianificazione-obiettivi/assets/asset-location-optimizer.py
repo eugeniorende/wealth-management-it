@@ -38,7 +38,7 @@ import sys
 import os
 from openpyxl import load_workbook
 
-from motore_bootstrap import applica_override, verifica_intestazioni_obiettivi
+from motore_bootstrap import cli, errore, euro, numero, verifica_intestazioni_obiettivi
 
 # ============================================================
 # PARAMETRI EDITABILI
@@ -185,22 +185,16 @@ def ter_pareggio_pir(gia, anni, r):
     return (lo + hi) / 2
 
 
-def euro(x):
-    s = "-" if x < 0 else ""
-    return f"{s}€{abs(x):,.0f}".replace(",", ".")
-
-
 def main():
-    applica_override(globals())
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-    else:
-        here = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.join(here, "pianificatore-obiettivi.xlsx")
-
-    inflazione, profili, obiettivi = (0.02, {}, [])
-    if os.path.exists(path):
-        inflazione, profili, obiettivi = leggi_excel(path)
+    args = cli("Asset location: valore finale netto di tasse e costi per contenitore (fondo pensione contro dossier, "
+               "PIR contro dossier) sugli obiettivi del pianificatore.", globals(), argomenti=(
+                   (("excel",), {"nargs": "?", "help": "pianificatore-obiettivi.xlsx compilato (default: il modello del plugin)"}),))
+    path = args.excel or os.path.join(os.path.dirname(os.path.abspath(__file__)), "pianificatore-obiettivi.xlsx")
+    if not os.path.exists(path):
+        errore(f"file non trovato: {path}")
+    inflazione, profili, obiettivi = leggi_excel(path)
+    if not obiettivi:
+        errore("nessun obiettivo nel foglio: compila il pianificatore prima.")
     # rendimento di riferimento per lo scenario pensione: profilo Crescita se presente, portato
     # al LORDO (i profili sono netti di costi e imposte, qui si tolgono contenitore per contenitore)
     netto_crescita = profili.get("Crescita", 0.055)
@@ -209,26 +203,26 @@ def main():
     print("=" * 80)
     print("OTTIMIZZATORE ASSET LOCATION — beneficio fiscale netto per contenitore")
     print("=" * 80)
-    print(f"Aliquota IRPEF marginale: {ALIQUOTA_IRPEF_MARGINALE*100:.0f}%  |  "
-          f"TER dossier {TER_DOSSIER*100:.1f}%  ·  ISC fondo pensione {ISC_FONDO_PENSIONE*100:.1f}%  ·  TER PIR {TER_PIR*100:.1f}%")
+    print(f"Aliquota IRPEF marginale: {numero(ALIQUOTA_IRPEF_MARGINALE*100)}%  |  "
+          f"TER dossier {numero(TER_DOSSIER*100, 1)}%  ·  ISC fondo pensione {numero(ISC_FONDO_PENSIONE*100, 1)}%  ·  TER PIR {numero(TER_PIR*100, 1)}%")
     if RENDIMENTO_LORDO is None:
-        print(f"Rendimento lordo di mercato {r_pensione*100:.1f}% = netto del profilo Crescita "
-              f"{netto_crescita*100:.1f}% / (1 − {TASSA_PLUS_DOSSIER*100:.0f}%) + TER {TER_DOSSIER*100:.1f}% "
-              f"+ bollo {BOLLO*100:.1f}%")
+        print(f"Rendimento lordo di mercato {numero(r_pensione*100, 1)}% = netto del profilo Crescita "
+              f"{numero(netto_crescita*100, 1)}% / (1 − {numero(TASSA_PLUS_DOSSIER*100)}%) + TER {numero(TER_DOSSIER*100, 1)}% "
+              f"+ bollo {numero(BOLLO*100, 1)}%")
         print("  (i profili sono netti di costi e imposte; qui si tolgono contenitore per contenitore)")
     else:
-        print(f"Rendimento lordo di mercato {r_pensione*100:.1f}% (RENDIMENTO_LORDO esplicito)")
+        print(f"Rendimento lordo di mercato {numero(r_pensione*100, 1)}% (RENDIMENTO_LORDO esplicito)")
 
     # ---------------------------------------------------------
     # 1) FONDO PENSIONE vs DOSSIER (pensione)
     # ---------------------------------------------------------
     print("\n" + "-" * 80)
-    print(f"1) FONDO PENSIONE vs DOSSIER  —  €{CONTRIBUTO_ANNUO_FP:,}/anno per {ANNI_A_PENSIONE} anni "
-          f"@ {r_pensione*100:.1f}% lordo".replace(",", "."))
+    print(f"1) FONDO PENSIONE vs DOSSIER  —  €{numero(CONTRIBUTO_ANNUO_FP)}/anno per {ANNI_A_PENSIONE} anni "
+          f"@ {numero(r_pensione*100, 1)}% lordo")
     if CONTRIBUTO_ANNUO_FP > PLAFOND_FP:
-        print(f"   dedotti solo €{PLAFOND_FP:,}/anno (plafond): l'eccedenza non dà risparmio IRPEF".replace(",", "."))
-    print(f"   dedotto per intero solo se il datore non versa: il plafond di €{PLAFOND_FP:,} è condiviso col datore, "
-          f"quindi con un datore qui va lo spazio residuo".replace(",", "."))
+        print(f"   dedotti solo €{numero(PLAFOND_FP)}/anno (plafond): l'eccedenza non dà risparmio IRPEF")
+    print(f"   dedotto per intero solo se il datore non versa: il plafond di €{numero(PLAFOND_FP)} è condiviso col datore, "
+          f"quindi con un datore qui va lo spazio residuo")
     print("-" * 80)
 
     c = CONTRIBUTO_ANNUO_FP
@@ -244,24 +238,24 @@ def main():
     if REINVESTI_RISPARMIO_IRPEF:
         # il risparmio IRPEF annuo viene reinvestito nel dossier (cresce, plus 26% alla fine)
         risparmio_irpef = dossier_netto(risparmio_annuo, H, r_pensione)
-        etichetta_irpef = f"risparmio IRPEF reinvestito nel dossier ({ALIQUOTA_IRPEF_MARGINALE*100:.0f}% della deduzione)"
+        etichetta_irpef = f"risparmio IRPEF reinvestito nel dossier ({numero(ALIQUOTA_IRPEF_MARGINALE*100)}% della deduzione)"
     else:
         risparmio_irpef = risparmio_annuo * H   # cassa nominale non reinvestita
-        etichetta_irpef = f"risparmio IRPEF cumulato ({ALIQUOTA_IRPEF_MARGINALE*100:.0f}% della deduzione)"
+        etichetta_irpef = f"risparmio IRPEF cumulato ({numero(ALIQUOTA_IRPEF_MARGINALE*100)}% della deduzione)"
     fp_totale = fp_netto + risparmio_irpef
 
     doss = dossier_netto(c, H, r_pensione)
 
     print(f"  Versato nominale: {euro(versato)}  ({euro(c)}/anno)")
     print(f"  FONDO PENSIONE:")
-    print(f"    montante lordo (rend. tassati 20%/anno, ISC {ISC_FONDO_PENSIONE*100:.1f}%): {euro(m_fp)}")
-    print(f"    − tassa finale {aliq_fin*100:.1f}% sui contributi dedotti:               −{euro(tassa_finale_fp)}")
+    print(f"    montante lordo (rend. tassati 20%/anno, ISC {numero(ISC_FONDO_PENSIONE*100, 1)}%): {euro(m_fp)}")
+    print(f"    − tassa finale {numero(aliq_fin*100, 1)}% sui contributi dedotti:               −{euro(tassa_finale_fp)}")
     print(f"    + {etichetta_irpef}:")
     print(f"      {' '*54}+{euro(risparmio_irpef)}")
     print(f"    = TOTALE netto fondo pensione:                              {euro(fp_totale)}")
     print(f"  DOSSIER (ETF accumulazione, plus 26% alla fine, bollo 0,2%):  {euro(doss)}")
     vantaggio = fp_totale - doss
-    print(f"  → VANTAGGIO FONDO PENSIONE: {euro(vantaggio)}  ({vantaggio/doss*100:+.0f}% vs dossier)")
+    print(f"  → VANTAGGIO FONDO PENSIONE: {euro(vantaggio)}  ({numero(vantaggio/doss*100, 0, segno=True)}% vs dossier)")
     print(f"  Driver: la deduzione IRPEF ({euro(risparmio_irpef)}). ⚠️ Capitale VINCOLATO fino alla pensione.")
     nota_reinv = "reinvestito nel dossier" if REINVESTI_RISPARMIO_IRPEF else "contato come cassa non reinvestita (reinvestendolo il vantaggio cresce)"
     print(f"  Nota: il risparmio IRPEF è {nota_reinv}.")
@@ -287,19 +281,19 @@ def main():
         pir = pir_netto(gia, H, r, TER_PIR)
         netto = pir - doss
         ter_par = ter_pareggio_pir(gia, H, r)
-        print(f"\n  ▸ {g['nome']}  ({euro(gia)} di capitale, {H} anni @ {r*100:.1f}% lordo, profilo {g['profilo']})")
-        print(f"      DOSSIER (plus 26%, TER {TER_DOSSIER*100:.1f}%):      {euro(doss)}")
-        print(f"      PIR (plus 0%, TER {TER_PIR*100:.1f}%):           {euro(pir)}")
+        print(f"\n  ▸ {g['nome']}  ({euro(gia)} di capitale, {H} anni @ {numero(r*100, 1)}% lordo, profilo {g['profilo']})")
+        print(f"      DOSSIER (plus 26%, TER {numero(TER_DOSSIER*100, 1)}%):      {euro(doss)}")
+        print(f"      PIR (plus 0%, TER {numero(TER_PIR*100, 1)}%):           {euro(pir)}")
         segno = "VANTAGGIO PIR" if netto >= 0 else "SVANTAGGIO PIR"
         print(f"      → {segno}: {euro(netto)}")
-        print(f"      TER di pareggio del PIR: {ter_par*100:.2f}%  "
+        print(f"      TER di pareggio del PIR: {numero(ter_par*100, 2)}%  "
               f"(sotto questo costo il PIR conviene, sopra no — TER tipici PIR: 1,2-1,35%)")
         if RENDIMENTO_LORDO is None:
             r_diff = lordo_da_netto_differito(profili.get(g["profilo"], 0.055), H)
             ter_par_diff = ter_pareggio_pir(gia, H, r_diff)
             print(f"      Con l'imposta alla vendita (ETF ad accumulazione) il lordo equivalente a {H} anni "
-                  f"è {r_diff*100:.2f}%:")
-            print(f"      il pareggio scende a {ter_par_diff*100:.2f}% (la conversione annua favorisce "
+                  f"è {numero(r_diff*100, 2)}%:")
+            print(f"      il pareggio scende a {numero(ter_par_diff*100, 2)}% (la conversione annua favorisce "
                   f"il PIR; scenario prudente: --set RENDIMENTO_LORDO={r_diff:.4f})")
 
     print("\n" + "-" * 80)

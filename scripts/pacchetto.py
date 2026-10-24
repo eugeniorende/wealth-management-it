@@ -64,6 +64,11 @@ def costruisci(out_dir, versione):
 
 
 def main():
+    for flusso in (sys.stdout, sys.stderr):   # UTF-8 anche su Windows (cp1252)
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"), metavar="DIR",
                     help="cartella di destinazione (default: dist/)")

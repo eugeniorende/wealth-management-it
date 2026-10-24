@@ -140,7 +140,7 @@ Prese il 20/10/2026.
   - [x] Matrice Python 3.11 e 3.14, con versioni minime delle dipendenze (PR #17).
   - [x] Versione fissata di claude-code nel job validate (PR #15).
 - [ ] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059.
-  - Helper `cli()` comune: `--help`, `--set`, `--json`, `--from`.
+  - Helper `cli()` comune: `--help`, `--set`, `--json`, `--from` (`--help`, codici 0/1/2, UTF-8 e formati italiani in (a); `--from` in (c)).
   - Lettore unico del pianificatore.
   - `--dati` per genera-ips e per il ribilanciamento.
   - Catena `--json` → `--from` tra gli script.
@@ -167,10 +167,10 @@ Prese il 20/10/2026.
   - [x] inventario dei campi che ogni script stampa: nessuna chiamata di rete; solo importa-previdenza stampa dati identificativi (intestatario e data di nascita);
   - [x] flag `--anonimo` in importa-previdenza (PR #27): omette intestatario e data di nascita, stampa solo l'età;
   - [x] sezione «Dove vanno i tuoi dati» nel README.
-- [ ] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: oggi 6 script su 7 vanno in crash con cp1252.
-- [ ] **Formati italiani:**
-  - punto per le migliaia in tutti gli script;
-  - CSV degli ordini apribile in Excel italiano, con `;` come separatore e la virgola decimale.
+- [x] **Windows ed encoding.** UTF-8 forzato su stdout e in tutte le `open()`, più `windows-latest` nella CI: prima 11 script su 13 andavano in crash con cp1252 su qualsiasi output e gli altri 2 su percorsi specifici (T9a).
+- [x] **Formati italiani** (T9a):
+  - [x] punto per le migliaia e virgola per i decimali in tutti gli script, via `numero()`, `euro()` e `pct()`;
+  - [x] CSV degli ordini apribile in Excel italiano, con `;` come separatore, la virgola decimale e il BOM.
 - [ ] **T14 Authoring, documentazione e packaging** (P2, M): F023, F025, F051, F057, F058, F061, F066.
   - description entro i 1.024 caratteri;
   - CHANGELOG.md;

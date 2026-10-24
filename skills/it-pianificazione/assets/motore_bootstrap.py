@@ -17,8 +17,11 @@ Contenuto:
   - indici_bootstrap(n_hist, n_sim, anni, blocco): campionamento a blocchi circolari
   - blocchi_bootstrap(port, n_sim, anni, blocco): rendimenti di portafoglio campionati
   - pctl(a, p): percentile come float
+  - cli(descrizione, spazio, argomenti, json): riga di comando comune (--help, argomenti dichiarati,
+    --set, --json, codici d'uscita 0/1/2), UTF-8 su stdout; errore(msg, codice) per uscire pulito
+  - numero / euro / pct: numeri in formato italiano (punto per le migliaia, virgola per i decimali)
   - applica_override(spazio): override '--set NOME=VALORE' delle costanti da riga di comando
-  - percorso_json / scrivi_json: flag '--json <file>' per l'output machine-readable (pipeline)
+  - scrivi_json: i risultati chiave su file JSON (il flag --json lo dà cli())
   - verifica_intestazioni_obiettivi(ws): guardia sul layout del pianificatore Excel
   - quota_glide / frazioni_glide / pmt_glide / crescita_glide / leggi_finestra_derisk /
     finestra_nel_foglio / scarti_dal_foglio: il glide path del pianificatore obiettivi, unica
@@ -42,11 +45,99 @@ unificarla cambierebbe i suoi percorsi simulati, quindi resta deliberatamente fu
 Le funzioni del glide path non usano numeri casuali: non toccano l'invariante sopra.
 """
 
+import argparse
 import ast
 import os
 import sys
 
 import numpy as np
+
+
+# ── Riga di comando comune ──────────────────────────────────────────────────
+# Convenzione dei codici d'uscita di tutti gli script del plugin:
+#   0  riuscito
+#   1  errore nei dati o nei parametri: file mancante o illeggibile, valori incoerenti,
+#      costante --set sconosciuta (il messaggio inizia con «ERRORE:» su stderr)
+#   2  riga di comando non riconosciuta: flag ignoto, argomento obbligatorio mancante (argparse)
+
+def configura_stdout():
+    """UTF-8 su stdout e stderr qualunque sia la console: su Windows con cp1252 i simboli €, →, ≈
+    farebbero crashare la stampa; i caratteri che la console non sa mostrare diventano «?»."""
+    for flusso in (sys.stdout, sys.stderr):
+        try:
+            flusso.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):   # flusso sostituito (test, pipe chiusa): si lascia com'è
+            pass
+
+
+def errore(messaggio, codice=1):
+    """Stampa «ERRORE: …» su stderr ed esce con il codice indicato (1 = dati, 2 = riga di comando)."""
+    print(f"ERRORE: {messaggio}", file=sys.stderr)
+    raise SystemExit(codice)
+
+
+def costanti_sovrascrivibili(spazio):
+    """Le costanti in testa allo script che --set può sovrascrivere: nomi MAIUSCOLI non callable, escluse le
+    coordinate del foglio Excel (…_ROW, …_START, …_N) e le tabelle (dict), che non sono parametri di scenario."""
+    return [k for k, v in spazio.items()
+            if k.isupper() and not k.startswith("_") and not callable(v) and not hasattr(v, "__file__")
+            and not k.endswith(("_ROW", "_START", "_N")) and not isinstance(v, dict)]
+
+
+def cli(descrizione, spazio=None, argomenti=(), json=False, argv=None, epilogo=None):
+    """Riga di comando comune degli script del plugin.
+
+    - `--help` con descrizione, argomenti e, se `spazio` è dato, l'elenco delle costanti sovrascrivibili
+    - `argomenti`: sequenza di (nomi, opzioni) passati a ArgumentParser.add_argument, per esempio
+      (("excel",), {"nargs": "?", "help": "pianificatore compilato"})
+    - `spazio` (di norma globals()): abilita `--set NOME=VALORE`, ripetibile, applicato con applica_override
+      (refuso → rc 1); gli override applicati vengono stampati
+    - `json=True`: aggiunge `--json FILE`; il percorso è in `.json` (None se assente)
+    - argomento o flag non riconosciuto → usage su stderr e rc 2 (argparse)
+    Ritorna il Namespace di argparse, con `.parser` per segnalare errori d'uso (`args.parser.error(...)`).
+    Chiama configura_stdout(), quindi va invocata prima di qualsiasi stampa.
+    """
+    configura_stdout()
+    if spazio is not None and epilogo is None:
+        epilogo = ("costanti sovrascrivibili con --set NOME=VALORE (valori Python: 0.02, 10_000, None, "
+                   "'bootstrap'):\n  " + ", ".join(costanti_sovrascrivibili(spazio)))
+    ap = argparse.ArgumentParser(description=descrizione, epilog=epilogo, allow_abbrev=False,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    for nomi, opzioni in argomenti:
+        ap.add_argument(*nomi, **opzioni)
+    if spazio is not None:
+        ap.add_argument("--set", action="append", default=[], metavar="NOME=VALORE",
+                        help="sovrascrive una costante in testa allo script (ripetibile, vedi in fondo)")
+    if json:
+        ap.add_argument("--json", metavar="FILE", help="scrive i risultati chiave anche in un file JSON")
+    args = ap.parse_args(argv)
+    args.parser = ap
+    if spazio is not None:
+        finti_argv = [ap.prog]
+        for espr in args.set:
+            finti_argv += ["--set", espr]
+        applica_override(spazio, finti_argv)
+    return args
+
+
+# ── Formati italiani ────────────────────────────────────────────────────────
+
+def numero(x, decimali=0, segno=False):
+    """Numero in formato italiano: punto per le migliaia, virgola per i decimali (1.234,5).
+    Con segno=True il «+» compare anche sui positivi."""
+    testo = f"{x:{'+' if segno else ''},.{decimali}f}"
+    return testo.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def euro(x, decimali=0):
+    """Importo in euro in formato italiano, col segno davanti al simbolo: €1.234 oppure -€1.234."""
+    testo = numero(abs(x), decimali)
+    return f"-€{testo}" if x < 0 and testo.strip("0.,") else f"€{testo}"
+
+
+def pct(frazione, decimali=1, segno=False):
+    """Percentuale in formato italiano da una frazione: pct(0.125) → «12,5%»."""
+    return numero(frazione * 100, decimali, segno) + "%"
 
 
 def _righe_storico(path_csv):
@@ -130,9 +221,10 @@ def applica_override(spazio, argv=None):
         python script.py --set N_SIM=2000 --set MODELLO=bootstrap [altri argomenti]
     - NOME deve già esistere nello script (protegge dai refusi)
     - VALORE è interpretato con ast.literal_eval (numeri, liste, None, True/False);
-      se non interpretabile resta stringa (comodo per MODELLO=bootstrap)
-    - gli argomenti --set vengono RIMOSSI da sys.argv: il resto del parsing
-      (es. il path dell'Excel) non cambia
+      se non interpretabile resta stringa (comodo per MODELLO=bootstrap), ma una
+      costante numerica non accetta una stringa (RAL_ATTUALE=abc → ERRORE, rc 1)
+    - dagli script si usa tramite cli(), che raccoglie i --set con argparse e li passa
+      qui; chiamato da solo legge e RIMUOVE i --set da argv
     Gli override applicati vengono stampati: il run resta documentato e ripetibile.
     """
     if argv is None:
@@ -152,44 +244,30 @@ def applica_override(spazio, argv=None):
         nome, sep, val = espr.partition("=")
         nome = nome.strip()
         if not sep or nome not in spazio:
-            raise SystemExit(f"--set: costante sconosciuta o malformata '{espr}' "
+            raise SystemExit(f"ERRORE: --set: costante sconosciuta o malformata '{espr}' "
                              f"(i nomi validi sono le costanti in testa allo script)")
         try:
-            spazio[nome] = ast.literal_eval(val)
+            nuovo = ast.literal_eval(val)
         except (ValueError, SyntaxError):
-            spazio[nome] = val
+            nuovo = val
+        vecchio = spazio[nome]
+        if isinstance(vecchio, (int, float)) and not isinstance(vecchio, bool) and isinstance(nuovo, str):
+            raise SystemExit(f"ERRORE: --set {nome}={val}: non è un numero (il default è {vecchio!r})")
+        spazio[nome] = nuovo
         applicati.append(f"{nome}={spazio[nome]!r}")
     if applicati:
         print("[override] " + ", ".join(applicati))
     return applicati
 
 
-def percorso_json(argv=None):
-    """Estrae '--json <file>' (o '--json=<file>') da argv; ritorna il path o None.
-
-    Con questo flag gli script scrivono i risultati chiave anche in JSON, così i
-    numeri passano da uno script all'altro (pipeline) senza travasi a mano."""
-    if argv is None:
-        argv = sys.argv
-    i = 1
-    while i < len(argv):
-        if argv[i] == "--json" and i + 1 < len(argv):
-            path = argv[i + 1]
-            del argv[i:i + 2]
-            return path
-        if argv[i].startswith("--json="):
-            path = argv[i][len("--json="):]
-            del argv[i]
-            return path
-        i += 1
-    return None
-
-
 def scrivi_json(path, dati):
-    """Scrive i risultati chiave su file JSON (UTF-8, leggibile)."""
+    """Scrive i risultati chiave su file JSON (UTF-8, leggibile); percorso non scrivibile → ERRORE, rc 1."""
     import json
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(dati, f, ensure_ascii=False, indent=2)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(dati, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        errore(f"impossibile scrivere {path}: {e.strerror}")
     print(f"[json] risultati scritti in {path}")
 
 

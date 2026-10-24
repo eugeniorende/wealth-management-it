@@ -35,7 +35,7 @@ Uso:        python decumulo-obiettivi.py
 
 import numpy as np
 
-from motore_bootstrap import applica_override, carica_inflazione, carica_storico, deflaziona
+from motore_bootstrap import carica_inflazione, carica_storico, cli, deflaziona, numero
 
 # ─────────────────────────── INPUT (editabili) ───────────────────────────
 CAPITALE_INIZIALE     = 500000     # capitale a inizio decumulo (€)
@@ -63,10 +63,10 @@ def inflazione_usata():
     """Inflazione per deflazionare la serie: l'array storico, o una costante (INFLAZIONE o il
     ripiego se la serie non ha la colonna). Ritorna (inflazione, descrizione)."""
     if INFLAZIONE is not None:
-        return INFLAZIONE, f"inflazione costante {INFLAZIONE*100:.1f}%"
+        return INFLAZIONE, f"inflazione costante {numero(INFLAZIONE*100, 1)}%"
     storica = carica_inflazione(FILE_STORICO)
     if storica is None:
-        return INFLAZIONE_RIPIEGO, (f"inflazione costante {INFLAZIONE_RIPIEGO*100:.1f}% "
+        return INFLAZIONE_RIPIEGO, (f"inflazione costante {numero(INFLAZIONE_RIPIEGO*100, 1)}% "
                                     "(la serie non ha la colonna inflazione)")
     return storica, "inflazione USA storica anno per anno (CPI dicembre su dicembre)"
 
@@ -151,7 +151,7 @@ def demo_sequenza():
 
 def stampa():
     print(f"\n{'='*72}")
-    print(f"DECUMULO — capitale €{CAPITALE_INIZIALE:,.0f}, orizzonte {ORIZZONTE_ANNI} anni, "
+    print(f"DECUMULO — capitale €{numero(CAPITALE_INIZIALE)}, orizzonte {ORIZZONTE_ANNI} anni, "
           f"{PESO_AZIONARIO*100:.0f}/{(1-PESO_AZIONARIO)*100:.0f}")
     print(f"{'='*72}")
     print("Dati: S&P 500 + US T-Bond (Damodaran), nominali in dollari, bootstrap a blocchi. "
@@ -161,10 +161,10 @@ def stampa():
     # 1) tasso sostenibile (base)
     p, fin_med, _ = monte_carlo(PRELIEVO_ANNUO_REALE, BUFFER_ANNI)
     tasso = PRELIEVO_ANNUO_REALE / CAPITALE_INIZIALE
-    print(f"\n1) PRELIEVO BASE: €{PRELIEVO_ANNUO_REALE:,.0f}/anno reali ({tasso*100:.1f}% del capitale), "
+    print(f"\n1) PRELIEVO BASE: €{numero(PRELIEVO_ANNUO_REALE)}/anno reali ({numero(tasso*100, 1)}% del capitale), "
           f"buffer {BUFFER_ANNI} anni")
-    print(f"   probabilità che il capitale duri {ORIZZONTE_ANNI} anni: {p*100:.1f}%")
-    print(f"   capitale finale mediano (nei successi): €{fin_med:,.0f}")
+    print(f"   probabilità che il capitale duri {ORIZZONTE_ANNI} anni: {numero(p*100, 1)}%")
+    print(f"   capitale finale mediano (nei successi): €{numero(fin_med)}")
 
     # 1b) sensibilità sul tasso
     print(f"\n   Sensibilità (buffer {BUFFER_ANNI} anni):")
@@ -172,48 +172,49 @@ def stampa():
     for t in TASSI_SENSIBILITA:
         prel = round(CAPITALE_INIZIALE * t)
         pp, _, _ = monte_carlo(prel, BUFFER_ANNI)
-        print(f"   €{prel:>8,.0f}{t*100:>10.1f}%{pp*100:>14.1f}%")
+        print(f"   €{numero(prel):>8}{numero(t*100, 1):>10}%{numero(pp*100, 1):>14}%")
 
     # 2) rischio di sequenza
     prelievo, media, r_pp, r_mp = demo_sequenza()
     print(f"\n2) RISCHIO DI SEQUENZA — stesso insieme di rendimenti, due ordini opposti")
-    print(f"   (prelievo {prelievo/CAPITALE_INIZIALE*100:.0f}% = €{prelievo:,.0f}/anno; "
-          f"rendimento medio reale identico nei due casi: {media*100:+.1f}%)")
+    print(f"   (prelievo {numero(prelievo/CAPITALE_INIZIALE*100)}% = €{numero(prelievo)}/anno; "
+          f"rendimento medio reale identico nei due casi: {numero(media*100, 1, segno=True)}%)")
     def descrivi(r):
         ok, anno, fin = r
-        return (f"capitale finale €{fin:,.0f}" if ok
+        return (f"capitale finale €{numero(fin)}" if ok
                 else f"ESAURITO all'anno {anno}")
     print(f"   • peggiori rendimenti PRIMA:  {descrivi(r_pp)}")
     print(f"   • migliori rendimenti PRIMA:  {descrivi(r_mp)}")
     print(f"   → stessa media, esiti opposti: è il rischio di sequenza. In prelievo l'ordine conta.")
 
     # 3) effetto del buffer di liquidità
-    print(f"\n3) BUFFER DI LIQUIDITÀ — confronto a parità di prelievo (€{PRELIEVO_ANNUO_REALE:,.0f}/anno)")
+    print(f"\n3) BUFFER DI LIQUIDITÀ — confronto a parità di prelievo (€{numero(PRELIEVO_ANNUO_REALE)}/anno)")
     p0, fin0, _ = monte_carlo(PRELIEVO_ANNUO_REALE, 0)
     pB, finB, _ = monte_carlo(PRELIEVO_ANNUO_REALE, BUFFER_ANNI)
-    print(f"   senza buffer:           successo {p0*100:.1f}%  | finale mediano €{fin0:,.0f}")
-    print(f"   buffer {BUFFER_ANNI} anni:           successo {pB*100:.1f}%  | finale mediano €{finB:,.0f}")
+    print(f"   senza buffer:           successo {numero(p0*100, 1)}%  | finale mediano €{numero(fin0)}")
+    print(f"   buffer {BUFFER_ANNI} anni:           successo {numero(pB*100, 1)}%  | finale mediano €{numero(finB)}")
     verso = "alza" if pB > p0 else "abbassa"
-    print(f"   → su questi dati il buffer {verso} il successo di {abs(pB-p0)*100:.1f} punti: la liquidità")
+    print(f"   → su questi dati il buffer {verso} il successo di {numero(abs(pB-p0)*100, 1)} punti: la liquidità")
     print(f"     rende ~0 e il mercato USA recupera in fretta, quindi il costo-rendimento supera la")
     print(f"     protezione. È il consenso accademico (Estrada, Kitces): il buffer NON è un free lunch.")
     print(f"     Il suo valore vero è (1) non essere COSTRETTI a vendere in un crollo — beneficio")
     print(f"     comportamentale — e (2) coprire bear market PROLUNGATI, che la media USA sottostima.")
 
     # 4) lente USA vs globale (de-rating dell'azionario)
-    print(f"\n4) LENTE USA vs GLOBALE — de-rating dell'azionario (€{PRELIEVO_ANNUO_REALE:,.0f}/anno, buffer {BUFFER_ANNI})")
+    print(f"\n4) LENTE USA vs GLOBALE — de-rating dell'azionario (€{numero(PRELIEVO_ANNUO_REALE)}/anno, buffer {BUFFER_ANNI})")
     p_usa, _, _ = monte_carlo(PRELIEVO_ANNUO_REALE, BUFFER_ANNI, derating=0.0)
     p_glob, _, _ = monte_carlo(PRELIEVO_ANNUO_REALE, BUFFER_ANNI, derating=DERATING_AZIONARIO)
-    print(f"   lente USA (derating 0):                 successo {p_usa*100:.1f}%   ← ottimistica")
-    print(f"   scenario globale (derating −{DERATING_AZIONARIO*100:.1f}%):       successo {p_glob*100:.1f}%   ← prudente")
-    print(f"   → la sola fortuna storica USA vale ~{(p_usa-p_glob)*100:.1f} punti di probabilità di successo.")
+    print(f"   lente USA (derating 0):                 successo {numero(p_usa*100, 1)}%   ← ottimistica")
+    print(f"   scenario globale (derating −{numero(DERATING_AZIONARIO*100, 1)}%):       successo {numero(p_glob*100, 1)}%   ← prudente")
+    print(f"   → la sola fortuna storica USA vale ~{numero((p_usa-p_glob)*100, 1)} punti di probabilità di successo.")
     print(f"     L'azionario mondiale ha reso ~5,2% reale dal 1900 (DMS), gli USA di più: pianificare")
     print(f"     sullo scenario globale, non sulla serie americana. Vedi mercati-e-correlazione.md.")
     print()
 
 
 if __name__ == "__main__":
-    applica_override(globals())
+    cli("Simulazione del decumulo: probabilità che il capitale duri, sensibilità al tasso di prelievo, rischio "
+        "di sequenza, buffer di liquidità, lente USA contro scenario globale.", globals())
     stampa()
 
 # ─────────────────────────── ATTESO (validazione) ───────────────────────────
