@@ -1,6 +1,6 @@
 # Roadmap
 
-Stato al 24/10/2026: 0.10.0 rilasciata il 22/10/2026 (ondata 0, T1-T8, T10, T11 e parte di T13); su `develop`, non ancora rilasciate, le PR #37 (art. 13 c. 10 TUIR 2027, Inarcassa under 35), #38 (corrispondenze 2027 verificate su Normattiva), #39 (LibreOffice in cache nella CI) e #40 (aliquota mista di T7), raccolte nella sezione «Non rilasciato» del changelog del README. La prossima versione è la 0.11.0. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 24/10/2026: 0.11.0 rilasciata il 24/10/2026 (T9, T12, T14 e le voci di pre-pubblicazione non riservate al proprietario), dopo la 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11 e parte di T13). Restano T13 (da decidere) e le voci del proprietario: visibilità, branch protection, icona, prove di installazione da un account esterno e in Cowork. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
@@ -156,6 +156,7 @@ Prese il 20/10/2026.
 - Criteri: T9 e T12 chiusi, le voci di «Pre-pubblicazione» spuntate o motivate come riservate al proprietario (visibilità, branch protection, icona, prove di installazione da account esterno e in Cowork).
 - `release/0.11.0` parte da `develop` → PR su `main` con merge commit → tag `v0.11.0` → `release.yml` (suite completa con freshness, zip con LICENSE e NOTICE) → merge back di `main` su `develop`.
 - Finestra: i marcatori più vecchi sono del 2026-06 e scadono a giugno 2027; `release.yml` esegue anche la freshness, quindi il tag va dato prima, oppure dopo una riverifica alle fonti.
+- [x] Rilasciata il 24/10/2026: T9 (PR #43-#46), T12 (#47), T14 (#48), pre-pubblicazione (#49).
 
 ## Pre-pubblicazione — prima di rendere pubblico il repository
 

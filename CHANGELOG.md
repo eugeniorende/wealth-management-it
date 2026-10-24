@@ -4,9 +4,9 @@ Le versioni del plugin `wealth-management-it`, dalla più recente. Le modifiche 
 
 Ogni skill ha anche una versione propria (`metadata.version` nel frontmatter di `SKILL.md`): la sua storia è in fondo, in «Storia delle skill».
 
-## Non rilasciato
+## v0.11.0 (24/10/2026)
 
-Su `develop` dopo il tag `v0.10.0`, destinato alla 0.11.0.
+Script con un'interfaccia comune e una catena di dati senza travasi a mano, test che vincolano i numeri, packaging e verifiche di pre-pubblicazione. Le voci sono in ordine di PR.
 
 - **Interfaccia comune degli script** (T9a, PR #43): `cli()` ed `errore()` in `motore_bootstrap.py`, adottati da tutti gli script: `--help` con le costanti sovrascrivibili, `--set` e abbreviazioni respinte, codici d'uscita 0/1/2 con `ERRORE:` su stderr; output UTF-8 anche su una console Windows cp1252, job della CI su `windows-latest`; numeri all'italiana (`numero()`, `euro()`, `pct()`) e CSV degli ordini con `;`, virgola decimale e BOM.
 - **Lettore unico del pianificatore** (T9b, PR #44): `leggi_pianificatore()` legge capacità, inflazione, profili e obiettivi per i quattro script degli obiettivi, con errori espliciti su foglio mancante, importi come testo, profilo ignoto, orizzonte non intero e file che non è un xlsx.
@@ -370,6 +370,7 @@ Le note di ogni iterazione, fino alla 0.10.0 tenute in fondo a ciascun `SKILL.md
 
 #### v0.20 (plugin 0.11.0)
 - Lettore unico del pianificatore con errori espliciti; numeri all'italiana negli script; sezione «Dove lavorare».
+- Celle numeriche scritte come testo e nomi d'obiettivo duplicati sono errori che indicano cella e righe; l'asset location tiene anche gli obiettivi senza target.
 
 Fino alla 0.10.0 del plugin la skill era alla versione 0.19 (introdotta in v0.7 del plugin, estesa fino a v0.9.4).
 
@@ -420,6 +421,7 @@ Roadmap:
 
 #### v0.11 (plugin 0.11.0)
 - Description più corta e quotata; importatore con i codici d'uscita 0/1/2 e l'output UTF-8; `categoria_fiscale` come nome del campo; sezione «Dove lavorare».
+- Redditi diversi con le cinque lettere dell'art. 67 TUIR (lett. c, c-bis, c-ter, c-quater, c-quinquies) e la compensazione tra loro (art. 68 c. 4 e 5; dal 2027 art. 77 c. 6); certificati a capitale protetto come eccezione, tra i redditi di capitale.
 
 Fino alla 0.10.0 del plugin la skill era alla versione 0.10.
 
@@ -464,6 +466,7 @@ Da estendere in iterazioni successive:
 
 #### v0.12 (plugin 0.11.0)
 - Catena `--from`/`--json` tra importa-previdenza, proiezione-inps, montecarlo-pensione, netto-pensione e ponte-pensione; `--help` e `--set` su tutti gli script; storico del fondo con BOM e unità nelle intestazioni; riscatto della laurea, ricongiunzione e totalizzazione tolti dai trigger e dichiarati fuori perimetro nella description.
+- Leve come scenari, non raccomandazioni: lo spazio deducibile è un tetto fiscale, non un importo consigliato; nuovo Pattern P6 e paragrafo «Uscita anticipata e RITA»; il ponte controlla che l'età del montante coincida con l'età d'uscita; proiezione-inps avvisa sulle posizioni miste; vincoli della delibera COVIP del 25/6/2026 letti in Gazzetta Ufficiale.
 
 Fino alla 0.10.0 del plugin la skill era alla versione 0.11 (introdotta in v0.4 del plugin, estesa in v0.8.11).
 
@@ -517,6 +520,7 @@ Roadmap:
 
 #### v0.4 (plugin 0.11.0)
 - Description più corta e quotata; sezione «Dove lavorare» con la copia dell'Excel nella cartella di lavoro.
+- Leve come scenari, non raccomandazioni.
 
 Fino alla 0.10.0 del plugin la skill era alla versione 0.3 (introdotta in v0.6 del plugin, estesa in v0.7.13).
 
@@ -536,6 +540,7 @@ Roadmap:
 
 #### v0.7 (plugin 0.11.0)
 - Input da file (`--dati`, `--zainetto`, `--out`) invece delle costanti in testa allo script; CSV degli ordini con `;` e la colonna `categoria_fiscale`; sinonimi del vocabolario accettati.
+- `--dati` con chiavi e tipi controllati (niente completamenti dai dati d'esempio), aliquota in percentuale convertita con un avviso, zainetto allineato ai nomi delle posizioni; la riga NOTA del CSV dichiara i dati d'esempio.
 
 Fino alla 0.10.0 del plugin la skill era alla versione 0.6 (introdotta in v0.5 del plugin, estesa in v0.8.12 e nella 0.10.0).
 
@@ -566,6 +571,7 @@ Roadmap:
 
 #### v0.7 (plugin 0.11.0)
 - `genera-ips.py --dati`; contratto di input del cruscotto (script `--json` → campo → cella); IPS in Word con titolo e lingua italiana nelle proprietà del documento.
+- Chiavi obbligatorie dell'IPS da file e «DATI DI ESEMPIO» in copertina quando i dati sono quelli d'esempio; tracker dei secchielli e generatore dell'IPS nei Riferimenti.
 
 Fino alla 0.10.0 del plugin la skill era alla versione 0.6 (introdotta in v0.8 del plugin, estesa in v0.9.2).
 

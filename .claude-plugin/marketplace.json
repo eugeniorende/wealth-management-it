@@ -12,7 +12,7 @@
       "name": "wealth-management-it",
       "source": "./",
       "description": "Wealth management per la fiscalità italiana: obiettivi, minusvalenze, pensione dipendenti e autonomi, ribilanciamento tax-aware, revisione periodica. NON COSTITUISCE CONSULENZA FISCALE.",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "category": "finance",
       "keywords": ["finanza", "fisco", "pensione", "minusvalenze", "ribilanciamento", "italia"]
     }
