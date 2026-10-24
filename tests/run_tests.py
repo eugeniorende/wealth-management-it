@@ -455,7 +455,7 @@ def t_csv_italiano():
         assert grezzo.startswith(b"\xef\xbb\xbf"), "senza BOM Excel apre il CSV in cp1252 e sporca «€»"
         testo = grezzo.decode("utf-8-sig")
         assert testo.splitlines()[0] == ";".join(m.CAMPI_CSV), testo.splitlines()[0]
-        assert re.search(r"^Fineco;VENDITA;azionario;diverso;;8000,00;3200,00;0,00;3200,00;", testo, re.M), testo
+        assert re.search(r"^Fineco;VENDITA;azionario;reddito_diverso;;8000,00;3200,00;0,00;3200,00;", testo, re.M), testo
         assert not re.search(r"\d\.\d\d;", testo), "importi con il punto decimale"
         with open(path, encoding="utf-8-sig", newline="") as f:
             righe = list(csv.DictReader(f, delimiter=";"))
@@ -1104,6 +1104,22 @@ def t_testi_fondo():
     nuove = pc[pc.index("### Nuove forme di erogazione"):pc.index("## Heuristic per la skill")]
     for atteso in ("rate maturate", "irrevocabil", "RITA", "31/12/2026", "3-quinquies"):
         assert atteso in nuove, f"nuove forme di erogazione: manca il vincolo «{atteso}»"
+    # § 2.7: vincoli di legge riletti su Normattiva e vincoli della delibera COVIP 25/6/2026 letti in
+    # GU n. 155 del 7/7/2026 (revisione T14: il testo è in Gazzetta), separati per fonte
+    legge, covip = nuove.split("Vincoli delle istruzioni COVIP")
+    assert "in luogo della rendita vitalizia" in legge and "rate maturate e non riscosse" in legge, "vincoli di legge"
+    for solo_covip in ("irrevocabil", "RITA", "non si combinano", "revoca", "non si versa", "transitorio"):
+        assert solo_covip not in legge, f"vincolo della delibera COVIP presentato come vincolo di legge: «{solo_covip}»"
+    assert "GU n. 155 del 7/7/2026" in covip and "non riletti" not in covip, "vincoli COVIP senza la fonte in Gazzetta"
+    assert "nuovo rapporto di lavoro" in covip, "durante l'erogazione si versa ancora il TFR di un nuovo rapporto (par. 4)"
+    assert "art. 258 c. 5" in legge, "c. 6-bis senza la corrispondenza 2027"
+    marcatore = next(r for r in pc.splitlines() if "201-204" in r and "Verificato: 2026-10" in r)
+    verificato = marcatore.split("— Verificato")[0]
+    assert "delibera del 25/6/2026, letta in GU n. 155" in verificato and "restano fuori" not in marcatore, marcatore[-300:]
+    # la copia in it-rebalance (sequenza-liquidazione.md) cita la stessa fonte
+    sl_testo = open(os.path.join(SKILLS, "it-rebalance", "references", "sequenza-liquidazione.md"), encoding="utf-8").read()
+    riga_sl = next(r for r in sl_testo.splitlines() if "irrevocabil" in r)
+    assert "COVIP" in riga_sl and "GU n. 155" in riga_sl, riga_sl[:200]
     assert "mix 50/50" not in pc, "regola pratica capitale/rendita come default consulenziale"
     # esempio RAL 60k: gli ultimi ~850 € della deduzione cadono nello scaglione al 33%
     netto = _modulo_previdenza("netto-pensione.py")
@@ -1727,10 +1743,17 @@ def t_dati_ribilanciamento():
         assert os.path.exists(os.path.join(tmp, "csv", "ordini_Fineco.csv")) and not os.path.exists(os.path.join(tmp, "ordini")), os.listdir(tmp)
         with open(os.path.join(tmp, "csv", "ordini_Fineco.csv"), encoding="utf-8-sig", newline="") as f:
             righe = list(csv.DictReader(f, delimiter=";"))
-        assert righe[0]["categoria_fiscale"] == "diverso" and "tipo_fiscale" not in righe[0], righe[0]
-        # senza --dati: dati di esempio dichiarati
+        # rilettura degli output (§ 2.6): nel CSV il valore canonico del vocabolario, non la forma breve interna
+        assert righe[0]["categoria_fiscale"] == "reddito_diverso" and "tipo_fiscale" not in righe[0], righe[0]
+        assert "esempio" not in righe[-1]["nota"].lower(), righe[-1]
+        assert "un CSV per broker in " + os.path.join(tmp, "csv") + os.sep in out and "./" + tmp not in out, \
+            "intestazione della sezione 5 con il percorso di --out così com'è"
+        # senza --dati: dati di esempio dichiarati, anche nella riga NOTA del CSV
         rc, out = run_script(script, cwd=tmp)
         assert rc == 0 and "Dati di esempio" in out, out[:300]
+        with open(os.path.join(tmp, "ordini", "ordini_Fineco.csv"), encoding="utf-8-sig", newline="") as f:
+            nota = list(csv.DictReader(f, delimiter=";"))[-1]["nota"]
+        assert nota.startswith("DATI DI ESEMPIO") and "non costituisce consulenza" in nota, nota
         # chiave ignota, posizione fuori perimetro, tipo sconosciuto, target sbagliato → rc 1 con il motivo
         for dati, atteso in (({"posizioni": pos, "zainetto": {}, "target": {"azionario": 1.0}, "prelievi": 1}, "non riconosciute"),
                              ({"posizioni": [dict(pos[0], categoria_fiscale="da_classificare")], "zainetto": {}, "target": {"azionario": 1.0}}, "classifica prima"),
@@ -1783,6 +1806,16 @@ def t_dati_ribilanciamento():
         rc, out = run_script(script, "--dati", piano, "--out", os.path.join(tmp, "z3"), cwd=tmp)
         assert rc == 0 and "«FINECO» → «Fineco»" in out and "compensata €3.200 dallo zainetto Fineco" in out, out[-900:]
         assert "(broker non indicato)" in out and "non usato" in out and "--broker" in out, out[-900:]
+        # revisione T14: un --dati senza zainetto o senza target usava in silenzio quelli d'esempio
+        # (e il CSV si dichiarava dato reale); lo zainetto può arrivare anche da --zainetto
+        base = {"posizioni": pos, "zainetto": {"Fineco": 5000}, "target": {"azionario": 0.6, "obbligazionario": 0.3, "monetario": 0.1}}
+        for manca in ("zainetto", "target", "posizioni"):
+            json.dump({k: v for k, v in base.items() if k != manca}, open(piano, "w", encoding="utf-8"))
+            rc, out = run_script(script, "--dati", piano, cwd=tmp)
+            assert rc == 1 and "ERRORE" in out and f"«{manca}»" in out and "Traceback" not in out, (manca, rc, out[-300:])
+        json.dump({k: v for k, v in base.items() if k != "zainetto"}, open(piano, "w", encoding="utf-8"))
+        rc, out = run_script(script, "--dati", piano, "--zainetto", os.path.join(tmp, "imp.json"), "--out", os.path.join(tmp, "z4"), cwd=tmp)
+        assert rc == 0, out[-300:]
         # numeri scritti come testo nel JSON: ERRORE con rc 1, mai un Traceback
         for chiave, valore in (("target", {"azionario": "0.6", "obbligazionario": 0.3, "monetario": 0.1}),
                                ("nuovi_versamenti", "1000"), ("zainetto", {"Fineco": "5.000"})):
@@ -1829,6 +1862,7 @@ def t_dati_ips():
         assert "Giulia Test" in testo and "Mario Rossi" not in testo and "€50.000" in testo, testo[:600]
         m = re.search(r"perdere circa il (\d+)%", testo)
         assert m and int(m.group(1)) == 16, "nota di rischio dalla quota azionaria del JSON (32% → 16%)"
+        assert "DATI DI ESEMPIO" not in testo, "IPS con i dati del JSON marcato come esempio"
         # revisione T9: con --dati nulla viene dall'esempio di Mario Rossi (prima: note, profilo e
         # glide path dell'esempio riempivano in silenzio le chiavi mancanti)
         for estraneo in ("fondo emergenza è tenuto", "35 anni", "€32.000", "lungo termine\u201d) guida"):
@@ -1843,6 +1877,9 @@ def t_dati_ips():
         json.dump(completo, open(dati, "w", encoding="utf-8"))
         rc, out = run_script(script, os.path.join(tmp, "demo.docx"), cwd=tmp)
         assert rc == 0 and "Dati di esempio" in out and "Mario Rossi" in out, out[-300:]
+        # rilettura degli output (§ 2.6): il documento può circolare da solo, lo dice anche lui
+        demo = "\n".join(p.text for p in Document(os.path.join(tmp, "demo.docx")).paragraphs)
+        assert "DATI DI ESEMPIO" in demo.split("INVESTMENT POLICY STATEMENT")[1][:600], "copertina senza l'avviso dei dati di esempio"
         assert not os.path.exists(os.path.join(tmp, "--dati")), "«--dati» non è un nome di file di output"
         json.dump({"capitale": 1}, open(dati, "w", encoding="utf-8"))
         rc, out = run_script(script, "--dati", dati, cwd=tmp)
@@ -1874,13 +1911,14 @@ def t_dove_lavorare():
             assert "copiano" in sez, f"{skill}: i modelli Excel vanno copiati nella cartella di lavoro"
         m = nudo.search(testo)
         assert not m, f"{skill}/SKILL.md: invocazione a nome nudo «{m.group(0)}»: usare python \"${{CLAUDE_SKILL_DIR}}/assets/…\""
-        assert "${CLAUDE_PLUGIN_ROOT}/skills/" + skill in sez, f"{skill}: il percorso per i command"
+        # T14: i comandi sono alias della skill, quindi niente percorso «per i command» (revisione T14)
+        assert "nei command vale" not in sez, f"{skill}: i comandi non lanciano script"
+        assert not re.search(r"python3? scripts/", testo), f"{skill}: scripts/ si lancia con ${{CLAUDE_PLUGIN_ROOT}}"
     for nome in sorted(os.listdir(os.path.join(ROOT, "commands"))):
         testo = open(os.path.join(ROOT, "commands", nome), encoding="utf-8").read()
         m = nudo.search(testo)
         assert not m, f"commands/{nome}: invocazione a nome nudo «{m.group(0)}»"
-        if ".py" in testo:
-            assert "${CLAUDE_PLUGIN_ROOT}/skills/" in testo, f"commands/{nome}: gli script si invocano con ${{CLAUDE_PLUGIN_ROOT}}"
+        assert ".py" not in testo, f"commands/{nome}: un alias non lancia script, lo fa la skill"
     manifest = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))
     cfg = manifest["userConfig"]["cartella_lavoro"]
     assert cfg["type"] == "directory" and cfg.get("default") and set(cfg) <= {"type", "title", "description", "default", "required"}, cfg
@@ -5060,6 +5098,10 @@ def _yaml_stretto(fm, nome):
         else:
             assert ": " not in valore and " #" not in valore and not re.match(r"[\[\]{}>|*&!%@`'\"]", valore), \
                 f"{nome}: il valore di {chiave} va tra virgolette doppie (YAML stretto)"
+            # revisione T14: senza PyYAML in CI, «version: 0.20» passava come stringa; YAML la legge 0.2
+            assert valore.lower() not in ("null", "~", "yes", "no", "on", "off"), f"{nome}: {chiave}: {valore!r} è ambiguo in YAML"
+            if re.fullmatch(r"[-+]?\d+(\.\d*)?([eE][-+]?\d+)?", valore):
+                valore = float(valore) if any(c in valore for c in ".eE") else int(valore)
             valore = {"true": True, "false": False}.get(valore, valore)
         if rientro:
             assert padre, f"{nome}: {chiave} indentato senza una mappa"
@@ -5095,7 +5137,16 @@ def t_frontmatter_skill():
         assert tabella.get(skill) == ver, f"{skill}: README dice v{tabella.get(skill)}, il frontmatter {ver}"
         sezione = changelog.split(f"\n### {skill}\n")[1]
         assert re.match(r"\s*#### v" + re.escape(ver) + r"\b", sezione), f"{skill}: CHANGELOG senza la voce v{ver} in testa"
-        assert not re.search(r"^## Note per|^In quest'iterazione", corpo, re.M), f"{skill}: note d'iterazione nel SKILL.md"
+        assert not re.search(r"^#{2,4} Note per|In quest'iterazione|Questa è la versione|^- \*?\*?v0\.\d+", corpo, re.M), \
+            f"{skill}: note d'iterazione nel SKILL.md"
+        # revisione T14: ogni asset della skill è spiegato nei Riferimenti (le note spostate in CHANGELOG
+        # erano l'unico posto che descriveva ponte-pensione, netto-pensione, tracker e generatore dell'IPS)
+        riferimenti = corpo.split("\n## Riferimenti")[1] if "\n## Riferimenti" in corpo else ""
+        cartella_assets = os.path.join(SKILLS, skill, "assets")
+        if os.path.isdir(cartella_assets):
+            for f in sorted(os.listdir(cartella_assets)):
+                if f.endswith((".py", ".xlsx")) and f != "motore_bootstrap.py":
+                    assert f"assets/{f}" in riferimenti, f"{skill}: assets/{f} non è nei Riferimenti"
     # riscatto, ricongiunzione e totalizzazione non sono gestiti: fuori dai trigger, dichiarati esclusi
     d = _yaml_stretto(_frontmatter(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"))[0], "it-pianificazione")
     trigger, esclusioni = d["description"].split("NON copre")
@@ -5181,6 +5232,44 @@ def t_indici_reference():
         voci = re.findall(r"^- (.+)$", testo.split("\n## Indice\n")[1].split("\n## ")[0], re.M)
         assert voci == h2, f"{rel}: l'indice non corrisponde alle sezioni ({len(voci)} voci, {len(h2)} sezioni)"
         assert testo.index("\n## Indice\n") < testo.index("\n## " + h2[0] + "\n"), f"{rel}: l'indice va prima delle sezioni"
+
+
+@test("T14 postura e fonti: leve come scenari in skill e reference, certificati e compensazione come nella norma")
+def t_postura_fonti_t14():
+    # Revisione T14: la rilettura del § 2.6 aveva corretto le skill ma non le reference condivise, e
+    # nessun test ne vincolava l'esito; idem la verifica del § 2.7 sui certificati.
+    pian = open(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"), encoding="utf-8").read()
+    auto = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "SKILL.md"), encoding="utf-8").read()
+    for nome, testo in (("it-pianificazione", pian), ("it-pianificazione-autonomi", auto)):
+        passo5 = testo.split("### Step 5")[1].split("\n## ")[0]
+        assert "scenari" in passo5 and "Raccomandazioni" not in passo5.split("\n")[0], f"{nome}: Step 5 come scenari"
+        assert "raccomandazioni d'azione" not in testo.lower() and "Raccomandazioni d'azione" not in testo, nome
+    p1 = next(r for r in pian.splitlines() if "Pattern P1" in r)
+    assert "non un importo consigliato" in p1, p1
+    vietate = ("Massimizzare contributo deducibile", "fino a saturarlo", "Praticamente impossibile fare di meglio",
+               "DEVE versare", "A: fondo, sempre", "quasi sempre la scelta", "opportunità prioritaria",
+               "prima di raccomandare", "raddoppia tipicamente")
+    for cartella, _, files in os.walk(SKILLS):
+        for f in files:
+            if f.endswith(".md"):
+                testo = open(os.path.join(cartella, f), encoding="utf-8").read()
+                for v in vietate:
+                    assert v not in testo, f"{os.path.relpath(os.path.join(cartella, f), SKILLS)}: «{v}»"
+                assert not re.search(r"skill v0\.\d|\bv0\.\d+ non ", testo), f"{f}: versione di skill superata nel testo"
+    imp = open(asset("it-tax-optimization", "importa-estratto-broker.py"), encoding="utf-8").read()
+    assert "vendere per caricare" not in imp and "venderle caricherebbe lo zainetto" in imp
+    assert "ponte-pensione.py" in pian.split("### Step 5")[1] and "4-bis" in pian and "Uscita anticipata e RITA" in pian
+    # § 2.7 e revisione T14: le cinque lettere dell'art. 68 c. 5 e l'eccezione dei certificati protetti
+    tax = open(os.path.join(SKILLS, "it-tax-optimization", "SKILL.md"), encoding="utf-8").read()
+    riga = next(r for r in tax.splitlines() if r.startswith("| **Reddito diverso**"))
+    for atteso in ("lett. c, c-bis, c-ter, c-quater, c-quinquies", "art. 68 c. 4 e 5", "capitale protetto", "art. 44 c. 2 lett. c n. 2",
+                   "dal 2027 art. 46 c. 2 lett. b n. 2"):
+        assert atteso in riga, f"riga dei redditi diversi senza «{atteso}»"
+    ips = open(asset("it-revisione", "genera-ips.py"), encoding="utf-8").read()
+    marcatore = ips.split("# Verificato: 2026-10 — plus ETF")[1].split("POLICY_FISCALITA = [")[0]
+    verificato, fuori = marcatore.split("# Fuori dal marcatore")
+    assert "certificat" not in verificato and "Non verificata" not in ips, "certificati dentro il marcatore"
+    assert "capitale protetto" in fuori and "c, c-bis, c-ter, c-quater e" in verificato, marcatore
 
 
 @test("pacchetto: lo zip per Cowork contiene solo il plugin, nome = versione del manifest")

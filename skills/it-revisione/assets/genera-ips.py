@@ -151,13 +151,19 @@ POLICY_RIBILANCIAMENTO = [
 
 # Verificato: 2026-10 — plus ETF/fondi = redditi di capitale (art. 44 c. 1 lett. g TUIR, dal 2027 art. 46 c. 1 lett. h; circ. 33/E/2011),
 # aliquote 26%/12,5% (art. 3 DL 66/2014), fondo pensione 20%/12,5% (art. 17 D.Lgs. 252/2005, dal 2027 art. 257 D.Lgs. 117/2026; L. 190/2014
-# c. 622, dal 2027 art. 257 c. 10), riporto delle minus 4 anni (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6), comunicazione dei non dedotti (art. 8 c. 4
-# D.Lgs. 252/2005). Non verificata su fonte primaria la compensabilità dei certificati.
+# c. 622, dal 2027 art. 257 c. 10), riporto delle minus 4 anni e compensazione tra le lettere c, c-bis, c-ter, c-quater e
+# c-quinquies dell'art. 67 (art. 68 c. 5 TUIR, dal 2027 art. 77 c. 6; riletto su Normattiva il 24/10/2026), comunicazione dei non
+# dedotti (art. 8 c. 4 D.Lgs. 252/2005).
+# Fuori dal marcatore, interpretazione: i certificati stanno di norma nella lett. c-quater (dal 2027 art. 76 c. 1 lett. g; nessuna risoluzione AdE specifica
+# trovata); quelli a capitale protetto al 100% possono essere titoli similari alle obbligazioni, con proventi di capitale non
+# compensabili (art. 44 c. 2 lett. c n. 2 TUIR, dal 2027 art. 46 c. 2 lett. b n. 2 D.Lgs. 117/2026).
 POLICY_FISCALITA = [
     ("**La \u201ctrappola degli ETF\u201d.** In Italia le plusvalenze da ETF e fondi sono redditi di "
      "capitale: NON compensabili con le minusvalenze dello zainetto fiscale. Le minusvalenze "
      "(redditi diversi) si compensano con le plus da azioni singole, certificati e obbligazioni "
-     "(per queste solo la differenza di prezzo: cedole e scarto di emissione sono redditi di capitale)."),
+     "(per queste solo la differenza di prezzo: cedole e scarto di emissione sono redditi di capitale). "
+     "Un certificato a capitale protetto al 100% può invece dare redditi di capitale: va verificato "
+     "sul prospetto."),
     ("**Aliquote.** 26% sulla generalità delle rendite finanziarie; 12,5% sui titoli di Stato "
      "italiani e white-list."),
     ("**Asset location.** Il fondo pensione tassa i rendimenti al 20% (12,5% sulla quota in titoli "
@@ -497,6 +503,10 @@ def genera(dati, path_out):
         doc.add_paragraph()
     para(doc, "Documento di pianificazione personale. Non costituisce consulenza finanziaria "
               "o di investimento (vedi nota finale).", size=9, color=GREY, italic=True)
+    if dati is None:
+        # il documento può circolare da solo: chi lo apre deve sapere che non è un caso reale
+        para(doc, "DATI DI ESEMPIO: questo IPS è generato con i dati dimostrativi dello script, non con "
+                  "quelli di un investitore reale.", size=9, color=GREY, italic=True)
     doc.add_page_break()
 
     # 1–2

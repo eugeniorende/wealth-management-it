@@ -29,7 +29,7 @@ I dati personali e i file compilati vivono nella **cartella di lavoro** dell'ute
 - gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
 
-`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-revisione`). Dipendenze dello script: Python 3.11 o successivo con python-docx (`pip install python-docx`).
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze dello script: Python 3.11 o successivo con python-docx (`pip install python-docx`).
 
 ## Il workflow della revisione
 
@@ -43,7 +43,7 @@ Versamenti effettuati vs pianificati; andamento del periodo **separando il rendi
 
 ### 3. Avanzamento per dominio (richiamando le altre skill)
 - **Pensione** → `it-pianificazione` (dipendenti) o `it-pianificazione-autonomi` (P.IVA): il tasso di sostituzione proiettato è ancora in linea con l'obiettivo? C'è un **gap previdenziale**? Va aumentato il versamento al fondo pensione (verificando la deducibilità nel proprio regime)? Per il dipendente, qual è lo **spazio deducibile residuo** dell'anno: max(0, €5.300 − datore − dovuto − volontari già versati nell'anno), con il contributo del datore e quello minimo del lavoratore (il TFR non conta)? È il tetto fiscale dei volontari da versare ancora entro il 31/12, non un importo consigliato (foglio Complementare dell'Excel di `it-pianificazione`); per il forfettario la deduzione arriva solo fino agli altri redditi IRPEF (`it-pianificazione-autonomi`). Ciò che supera il plafond, o che il forfettario non deduce, va comunicato al fondo come non dedotto entro il 31/12 dell'anno dopo: senza comunicazione in uscita è tassato di nuovo, con una perdita del 9-15% su quella parte (23% se la posizione esce con un'anticipazione non sanitaria o un riscatto per altre cause).
-- **Obiettivi** → `it-pianificazione-obiettivi`: ogni obiettivo è **on track**? La **probabilità di successo** (Monte Carlo) è ancora adeguata? Il **glide path** richiede de-risking quest'anno? Va aggiustato il versamento mensile?
+- **Obiettivi** → `it-pianificazione-obiettivi`: ogni obiettivo è **on track**? La **probabilità di successo** (Monte Carlo) è ancora adeguata? Il **glide path** richiede de-risking quest'anno? Va aggiustato il versamento mensile? La deriva per obiettivo si legge nel `tracker-secchielli.xlsx`, se l'utente lo tiene.
 - **Fiscalità** → `it-tax-optimization`: ci sono **minusvalenze in scadenza** (finestra 4 anni) da usare entro il 31/12? Plusvalenze da compensare? Opportunità di **harvesting**? (A fine anno questo passo ha priorità per via delle scadenze.)
 - **Allocazione** → `it-rebalance`: quanto è il **drift** rispetto al target? Va ribilanciato? Si può ribilanciare sfruttando le **minus in scadenza** per compensare le plus da vendita (coordinamento fiscale)?
 
@@ -83,7 +83,7 @@ Report in markdown, cinque sezioni che ricalcano il workflow. C'è un **template
 - **Azioni**: il tracker delle azioni emerse dalla revisione (azione, dominio, priorità, scadenza, stato), con la legenda della logica di prioritizzazione. È il ponte tra il report e l'esecuzione.
 - **Rendimento TWR**: il **time-weighted return** della strategia (rendimenti dei sotto-periodi tra un flusso e l'altro, incatenati), affiancato al **money-weighted esatto** (XIRR) sugli stessi dati. La differenza tra i due è l'effetto del timing dei versamenti; il TWR è il numero da confrontare con un benchmark. Si compila una riga per data di rilevazione (valore + flusso netto), dall'alto e senza righe vuote, fino a 120 righe: il riepilogo legge da solo l'ultima.
 
-Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo e cercare celle in errore (`#RIF!`, `#VALORE!`). Solo chi ha il repository del plugin (non lo zip per Cowork, che non contiene `scripts/`) può anche ricalcolarlo da riga di comando con `python scripts/ricalcola-excel.py <file>`, in locale italiano e con l'elenco delle celle in errore. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
+Excel e LibreOffice ricalcolano all'apertura: per controllare un file compilato basta aprirlo e cercare celle in errore (`#RIF!`, `#VALORE!`). Chi ha installato il plugin da marketplace o dal repository (non lo zip per Cowork, che non contiene `scripts/`) può anche ricalcolarlo da riga di comando con `python "${CLAUDE_PLUGIN_ROOT}/scripts/ricalcola-excel.py" <file>`, in locale italiano e con l'elenco delle celle in errore; serve LibreOffice. Il cruscotto **non ricalcola** le proiezioni: le sintetizza in un quadro unico.
 
 ### I dati dell'IPS: `--dati ips.json`
 
@@ -135,6 +135,8 @@ Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione
 - `references/investment-policy-statement.md` — l'**IPS personale**: la "costituzione" del portafoglio (obiettivi, profilo di rischio, allocazione target, bande di ribilanciamento, **regole nei drawdown**, politica di versamento e prelievo, vincoli fiscali, cadenza), con scheletro compilabile. È il riferimento da cui la revisione misura gli scostamenti
 - `assets/investment-policy-statement.xlsx` — l'IPS come **foglio compilabile**: le nove sezioni con celle da riempire, le **bande di ribilanciamento calcolate da sé** dai target con la regola 5/25, il controllo che i target sommino a 100%, e drawdown/vincoli fiscali precompilati con default
 - `assets/cruscotto-patrimoniale.xlsx` — il cruscotto quantitativo (Patrimonio, Allocazione, Andamento, Sintesi, Azioni, Rendimento TWR)
+- `assets/tracker-secchielli.xlsx` — il monitoraggio goals-based: secchielli e anno del piano (Impostazioni), calendario del glide path incollato da `glidepath-obiettivi.py` (Glide), posizioni assegnate a secchiello e classe con tendine (Posizioni), effettivo contro target per secchiello e aggregato con semaforo sulle bande 5/25 (Controllo), registro dei versamenti; si compila nella cartella di lavoro e si rilegge al passo 3
+- `assets/genera-ips.py` — l'IPS in Word: copertina, 12 sezioni, appendici con la checklist e il broker; la nota di rischio viene dalla quota azionaria; i dati del caso arrivano da `--dati ips.json` (vedi «I dati dell'IPS»), senza il documento è l'esempio e lo dice in copertina
 - `assets/template-revisione.md` — il **template del report** di revisione, scheletro markdown precompilato da riempire (le cinque sezioni + disclaimer)
 - **Orchestra** (non duplica) le altre skill del plugin:
   - `it-pianificazione` / `it-pianificazione-autonomi` — il gap previdenziale e il fondo pensione

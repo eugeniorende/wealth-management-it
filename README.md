@@ -24,7 +24,7 @@ Un overlay/extension avrebbe creato conflitti dove Claude pesca dalla skill sbag
 
 ## Stato del progetto (v0.10.0)
 
-> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. La 0.10.0 chiude l'ondata 0 e i temi T1-T8, T10, T11 e parte di T13: tra gli altri l'importatore broker (F001), il ribilanciamento con i versamenti (F004), il plafond del fondo pensione nell'Excel (F007), la certificazione delle minus alla chiusura del rapporto (F011) e il costo medio in amministrato (F012). Dopo il tag, su `develop` e non ancora rilasciate, sono entrate le correzioni della sezione «Non rilasciato» del changelog; le corrispondenze del 2027 nella mappa dei testi unici sono verificate su Normattiva (PR #38) salvo due punti, i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6 del D.Lgs. 117/2026, che restano «da verificare» finché non escono correttivi. Restano aperti l'interfaccia comune degli script (T9), i test strutturali sugli Excel (T12), il riscatto della laurea e i casi del freelance (T13, da decidere), la documentazione e il packaging (T14). Il piano è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
+> **Errori noti.** L'audit del 20/10/2026 ha confermato 65 problemi, alcuni dei quali producevano numeri sbagliati sui percorsi principali. La 0.10.0 chiude l'ondata 0 e i temi T1-T8, T10, T11 e parte di T13: tra gli altri l'importatore broker (F001), il ribilanciamento con i versamenti (F004), il plafond del fondo pensione nell'Excel (F007), la certificazione delle minus alla chiusura del rapporto (F011) e il costo medio in amministrato (F012). Dopo il tag, su `develop` e non ancora rilasciate, sono entrate le correzioni della sezione «Non rilasciato» del changelog; le corrispondenze del 2027 nella mappa dei testi unici sono verificate su Normattiva (PR #38) salvo due punti, i rinvii del DM 21/02/2013 e il probabile refuso dell'art. 306 c. 6 del D.Lgs. 117/2026, che restano «da verificare» finché non escono correttivi. Su `develop`, destinati alla 0.11.0, sono chiusi anche T9 (interfaccia comune degli script, catena `--json` → `--from`, input da file), T12 (test che vincolano i numeri) e T14 (documentazione e packaging); restano aperti il riscatto della laurea e i casi del freelance (T13, da decidere). Il piano è in [ROADMAP.md](ROADMAP.md); il dettaglio è in [docs/audit-2026-10.md](docs/audit-2026-10.md).
 
 Sei skill operative: `it-pianificazione-obiettivi` (pianificazione goals-based — il pezzo a monte), `it-tax-optimization` (ottimizzazione minus/plus, titoli e cripto), `it-pianificazione` (pensione dipendenti), `it-pianificazione-autonomi` (pensione autonomi/forfettari), `it-rebalance` (ribilanciamento tax-aware), e `it-revisione` (revisione periodica di sintesi — il livello che tiene insieme tutto).
 
@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 133 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 134 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -82,9 +82,9 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 |---|---|
 | `it-pianificazione/assets/importa-previdenza.py` | 13: T12 fixture realistiche; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale; importa-previdenza ×5 … |
 | `it-pianificazione/assets/montecarlo-pensione.py` | 10: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; montecarlo-pensione … |
-| `it-pianificazione/assets/motore_bootstrap.py` | 11: T12 rami avanzati; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap; obiettivi ×4 … |
+| `it-pianificazione/assets/motore_bootstrap.py` | 12: T12 rami avanzati; T14 skill; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap … |
 | `it-pianificazione/assets/netto-pensione.py` | 19: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
-| `it-pianificazione/assets/ponte-pensione.py` | 11: T12 --json previdenziali; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale; ponte-pensione ×2 … |
+| `it-pianificazione/assets/ponte-pensione.py` | 12: T12 --json previdenziali; T14 postura e fonti; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale … |
 | `it-pianificazione/assets/proiezione-inps.py` | 15: T12 rami avanzati; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill; freshness fiscale … |
 | `it-pianificazione/assets/proiezione-pensione.xlsx` | 11: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
 | `it-pianificazione/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
@@ -98,12 +98,12 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-rebalance/assets/ribilanciamento-multibroker.py` | 19: T1; T7 ribilanciamento ×10; T9 formati ×2; T9 input esterno; T9 interfaccia ×2; T9 vocabolario … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |
-| `it-revisione/assets/genera-ips.py` | 9: T9 formati; T9 input esterno; T9 interfaccia ×2; freshness fiscale; genera-ips ×2; runner … |
+| `it-revisione/assets/genera-ips.py` | 10: T14 postura e fonti; T9 formati; T9 input esterno; T9 interfaccia ×2; freshness fiscale; genera-ips ×2 … |
 | `it-revisione/assets/investment-policy-statement.xlsx` | 3: T12 Excel; bande di ribilanciamento; scadenze di fine anno |
 | `it-revisione/assets/tracker-secchielli.xlsx` | 4: T12 Excel ×2; bande di ribilanciamento; tracker-secchielli |
 | `it-tax-optimization/assets/esempio-estratto.csv` | 2: T2 importatore ×2 |
 | `it-tax-optimization/assets/esempio-zainetto.csv` | 2: T2 importatore ×2 |
-| `it-tax-optimization/assets/importa-estratto-broker.py` | 14: T2 importatore ×6; T3; T9 contratto di input della revisione; T9 formati; T9 input esterno; T9 interfaccia ×2 … |
+| `it-tax-optimization/assets/importa-estratto-broker.py` | 15: T14 postura e fonti; T2 importatore ×6; T3; T9 contratto di input della revisione; T9 formati; T9 input esterno … |
 
 ### Freshness fiscale
 
@@ -198,7 +198,7 @@ claude --plugin-dir /percorso/assoluto/wealth-management-it
 
 Da una shell, senza aprire una sessione, gli stessi passi sono `claude plugin marketplace add eugeniorende/wealth-management-it` e `claude plugin install wealth-management-it@wm-it`. L'installazione vale per l'utente in tutti i progetti; con `--scope project` vale per chi lavora nel repository corrente (la voce va in `.claude/settings.json`), con `--scope local` solo per te e solo lì.
 
-**Aggiornamenti.** L'installazione copia il plugin nella cache di Claude Code (`~/.claude/plugins/`): non modificare quella copia, che a ogni aggiornamento si sostituisce. Il manifest fissa la versione, quindi un'installazione resta sulla sua versione finché non esce una release. Per i marketplace di terze parti come questo l'aggiornamento automatico è spento di default. Due modi per aggiornare:
+**Aggiornamenti.** Con la via A l'installazione copia il plugin nella cache di Claude Code (`~/.claude/plugins/cache/`): non modificare quella copia, che a ogni aggiornamento si sostituisce. Con la via B il plugin si legge direttamente dalla cartella indicata. Il manifest fissa la versione, quindi un'installazione resta sulla sua versione finché non esce una release. Per i marketplace di terze parti come questo l'aggiornamento automatico è spento di default. Due modi per aggiornare:
 
 ```bash
 # a mano, da una shell (dentro una sessione: /plugin → Installed → wealth-management-it → Update now)
@@ -212,7 +212,7 @@ Dopo un aggiornamento, `/reload-plugins` lo carica nella sessione aperta; le ses
 
 ### Cartella di lavoro (importante)
 
-Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cartella dedicata al piano (es. `~/piano-finanziario/`) e lavora sempre da lì: metti lì i file reali (estratto conto INPS, storico del fondo, CSV dei broker), **copia** lì gli Excel da compilare (`pianificatore-obiettivi.xlsx`, `tracker-secchielli.xlsx`, `cruscotto-patrimoniale.xlsx`, `investment-policy-statement.xlsx`, `proiezione-pensione.xlsx` o `proiezione-pensione-autonomi.xlsx` — mai editare quelli dentro il plugin), e lì finiranno gli output degli script (JSON della pipeline, CSV degli ordini, l'IPS generato). Il plugin resta immutabile e aggiornabile; la cartella di lavoro è la tua.
+Il plugin fornisce skill e script; i **tuoi dati vivono altrove**. Crea una cartella dedicata al piano (es. `~/piano-finanziario/`) e lavora sempre da lì: metti lì i file reali (estratto conto INPS, storico del fondo, CSV dei broker), **copia** lì gli Excel da compilare (`pianificatore-obiettivi.xlsx`, `tracker-secchielli.xlsx`, `cruscotto-patrimoniale.xlsx`, `investment-policy-statement.xlsx`, `proiezione-pensione.xlsx` o `proiezione-pensione-autonomi.xlsx` — mai editare quelli dentro il plugin), e lì finiranno gli output degli script (JSON della pipeline, CSV degli ordini, l'IPS generato). Il plugin resta immutabile e aggiornabile; la cartella di lavoro è la tua. In Claude Code la si indica al plugin come opzione `cartella_lavoro`: all'installazione con `claude plugin install wealth-management-it@wm-it --config cartella_lavoro=/percorso/della/cartella`, oppure dopo con `/plugin configure wealth-management-it@wm-it` in una sessione. Se resta vuota, le skill la chiedono.
 
 ### Dove vanno i tuoi dati
 
@@ -244,7 +244,7 @@ Comandi espliciti: sono scorciatoie che caricano la skill corrispondente, con gl
 /revisione         → it-revisione (revisione periodica: stato, scostamenti, azioni)
 ```
 
-Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazione-obiettivi` su obiettivi/pianificare investimenti/fondo emergenza/quanto risparmiare; `it-tax-optimization` su minusvalenze/plusvalenze/zainetto/Tobin tax; `it-pianificazione` su pensione/fondo pensione/TFR per dipendenti; `it-pianificazione-autonomi` su pensione/Gestione Separata/forfettario per P.IVA; `it-rebalance` su ribilanciamento/drift/allocazione target.
+Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazione-obiettivi` su obiettivi/pianificare investimenti/fondo emergenza/quanto risparmiare; `it-tax-optimization` su minusvalenze/plusvalenze/zainetto/Tobin tax; `it-pianificazione` su pensione/fondo pensione/TFR per dipendenti; `it-pianificazione-autonomi` su pensione/Gestione Separata/forfettario per P.IVA; `it-rebalance` su ribilanciamento/drift/allocazione target; `it-revisione` su fare il punto, revisione annuale o di fine anno, IPS e cruscotto.
 
 ### Convenzioni degli script
 
@@ -279,12 +279,12 @@ L'utente deve fornire:
 
 ### Output
 
-Report markdown in tre sezioni:
+Ogni skill descrive il suo report nella sezione «Formato output» di `SKILL.md`; tutti chiudono con il disclaimer. Per esempio `/minusvalenze` produce un report markdown in tre sezioni:
 1. **Stato attuale** — tabella portafoglio + zainetto
 2. **Opportunità identificate** — trade candidati con razionale fiscale
 3. **Calendario d'azione** — scadenze ordinate cronologicamente
 
-Più disclaimer obbligatorio.
+Gli script scrivono i loro output (JSON, CSV degli ordini, IPS in Word) nella cartella di lavoro.
 
 ## Cosa il plugin NON fa
 
