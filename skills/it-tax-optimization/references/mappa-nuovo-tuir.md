@@ -59,6 +59,7 @@ Dal **1° gennaio 2027** si applicano i testi unici della riforma fiscale, che a
 | art. 17 D.Lgs. 252/2005 (20% sul risultato) e art. 1 c. 622 L. 190/2014 | art. 257 (c. 1 e c. 10) |
 | art. 11 c. 4-ter, 4-quater, 4-quinquies D.Lgs. 252/2005 (tassazione RITA) | art. 258 c. 1-3 |
 | art. 11 c. 6 D.Lgs. 252/2005 (prestazioni: 15%→9%, al netto dei redditi già tassati) | art. 258 c. 4 |
+| art. 11 c. 6-bis D.Lgs. 252/2005 (durata definita, prelievi, riscatto del residuo per decesso) | art. 258 c. 5 |
 | art. 11 c. 6-ter D.Lgs. 252/2005 (erogazione frazionata) | art. 258 c. 6 |
 | art. 8 c. 4, 7, 7-quater; art. 11 c. 4 (requisiti RITA); art. 14 c. 6 D.Lgs. 252/2005 | invariati (restano nel D.Lgs. 252/2005) |
 

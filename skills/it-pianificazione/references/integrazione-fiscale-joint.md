@@ -48,9 +48,9 @@ Deducibili:
 
 **Decisione**:
 
-| Aliquota marginale IRPEF utente | Orizzonte | Raccomandazione |
+| Aliquota marginale IRPEF utente | Orizzonte | Scenario fiscalmente più favorevole |
 |---|---|---|
-| 43% (RAL > €50k) | ≥10 anni | A: fondo, sempre |
+| 43% (RAL > €50k) | ≥10 anni | A: fondo, di solito il più efficiente, salvo liquidità e fondo di emergenza |
 | 33% (RAL €28k-€50k) | ≥10 anni | A: fondo, salvo necessità liquidità |
 | 33% | <10 anni | B: dossier, perché aliquota finale fondo non scende sotto ~12% |
 | 23% (RAL < €28k) | qualsiasi | B: dossier, vantaggio fondo si assottiglia |
@@ -132,7 +132,7 @@ Doing entrambe le cose nello stesso anno:
 - Lo stesso soggetto, con €100.000 di plus finanziarie nell'anno, **non viene ulteriormente penalizzato** (sostitutiva resta 26% indipendentemente)
 - Anche le pensioni alte (>€200k lordi annui) ricadono nella sterilizzazione
 
-**Decisione joint**: per redditi vicini alla soglia €200k, **massimizzare le deducibilità IRPEF** (fondo pensione fino a €5.300, contributi obbligatori, ecc.) può portare sotto soglia e recuperare il beneficio €440. Il calcolo si fa nell'anno: se reddito stimato = €203k, versare €3.500 al fondo riduce il reddito a €199.500 (under threshold) e si recupera €440 + risparmio IRPEF marginale 43% × €3.500 = €1.505. Beneficio totale operazione = **€1.945**.
+**Decisione joint**: per redditi vicini alla soglia €200k, **usare lo spazio deducibile** (fondo pensione fino a €5.300, un tetto fiscale e non un importo consigliato; contributi obbligatori, ecc.) può portare sotto soglia e recuperare il beneficio €440. Il calcolo si fa nell'anno: se reddito stimato = €203k, versare €3.500 al fondo riduce il reddito a €199.500 (under threshold) e si recupera €440 + risparmio IRPEF marginale 43% × €3.500 = €1.505. Beneficio totale operazione = **€1.945**.
 
 ## Protocollo di handoff tra le due skill
 
@@ -147,7 +147,7 @@ Quando una conversazione tocca **entrambi** i domini:
    - L'aliquota marginale IRPEF stimata (`Input!aliquota_irpef_marginale` nel template Excel) è il parametro chiave per quantificare il pattern J1.
 
 3. **Anno fiscale di fine periodo (novembre-dicembre)**:
-   - Coordinare le due decisioni nello stesso ciclo: prima massimizzare deducibili (fondo, contributi volontari) e comunicare al fondo quelli eccedenti il plafond, poi gestire le minus in scadenza (entro 31/12 del 4° anno).
+   - Coordinare le due decisioni nello stesso ciclo: prima lo spazio deducibile (fondo, contributi volontari: un tetto fiscale, non un importo consigliato) e la comunicazione al fondo di quelli eccedenti il plafond, poi gestire le minus in scadenza (entro 31/12 del 4° anno).
    - Le due operazioni sono fiscalmente indipendenti ma operativamente da fare prima di Capodanno.
 
 ## Anti-pattern (NON FARE)
@@ -156,11 +156,11 @@ Quando una conversazione tocca **entrambi** i domini:
 - ❌ Evitare di realizzare plus per "non salire di scaglione IRPEF". In regime amministrato la plus è separata.
 - ❌ Considerare i redditi finanziari nel calcolo della soglia €200k di sterilizzazione. Non concorrono.
 - ❌ Versare al fondo pensione una somma > aliquota_marginale × beneficio_atteso per "saturare il deducibile" — il vantaggio è proporzionale all'aliquota marginale, oltre soglia non c'è più beneficio fiscale.
-- ❌ Coordinare le due skill su un cliente con cassa professionale (Inarcassa, Cassa Forense): le regole IRPEF interagiscono diversamente con i contributi obbligatori della cassa. v0.3 non lo copre.
+- ❌ Coordinare le due skill su un cliente con cassa professionale (Inarcassa, Cassa Forense): le regole IRPEF interagiscono diversamente con i contributi obbligatori della cassa. Questa skill non lo copre: vedi `it-pianificazione-autonomi`.
 
 ## Heuristic operative per la skill
 
-1. **Sempre stimare l'aliquota marginale IRPEF prima di raccomandare**: una raccomandazione "versa al fondo pensione" senza l'aliquota marginale è incompleta.
+1. **Sempre stimare l'aliquota marginale IRPEF prima di presentare lo scenario**: uno scenario "versa al fondo pensione" senza l'aliquota marginale è incompleto.
 2. **Mai cumulare i risparmi cross-regime nel "beneficio totale"** se non chiaramente etichettati (`risparmio IRPEF su fondo` vs `imposta su plus realizzate` sono linee separate).
 3. **Per redditi vicini a soglia di scaglione**, calcolare il "ritorno marginale" del versamento al fondo: il primo €1 deduce all'aliquota più alta, ma man mano che la deduzione fa scendere lo scaglione, il ritorno scende. Esempio: chi guadagna €30k versare €2.000 deduce primi €2.000 al 33%; chi guadagna €52k versare €2.000 deduce primi €2.000 al 43% — quindi più conviene.
 4. **Documentare l'anno fiscale di riferimento**: queste regole sono per il 2026 (Legge di Bilancio L. 199/2025). Saranno potenzialmente diverse dal 2027 in poi.

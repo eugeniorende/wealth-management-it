@@ -7,7 +7,7 @@ metadata:
 
 # it-pianificazione
 
-Skill per la pianificazione pensionistica integrata di un lavoratore dipendente privato italiano. Coordina tre sottosistemi (obbligatoria, complementare, tenore di vita) per produrre proiezioni multi-anno e raccomandazioni d'azione.
+Skill per la pianificazione pensionistica integrata di un lavoratore dipendente privato italiano. Coordina tre sottosistemi (obbligatoria, complementare, tenore di vita) per produrre proiezioni multi-anno e le leve da valutare, quantificate come scenari.
 
 ## Scope esplicito
 
@@ -66,7 +66,7 @@ Strategie di copertura del gap (vedi `references/proiezione-tenore-vita.md`):
 - Cambiare comparto (più rischio → più rendimento atteso, se orizzonte lungo)
 - Ritardare pensionamento (più anni contribuzione + coefficiente più alto)
 - Risparmio non previdenziale extra (PAC ETF, immobiliare, ecc.)
-- Conferire TFR se ancora in azienda (decisione fiscalmente quasi sempre conveniente)
+- Conferire TFR se ancora in azienda (scenario: vantaggio fiscale certo, rendimento incerto, scelta irrevocabile)
 
 ## Regole fiscali e contributive fondamentali (2026)
 
@@ -304,8 +304,11 @@ Per ciascun pattern di copertura, quantificare l'impatto come scenario, con cost
 - **Pattern P3 — Ritardare pensionamento**: confronto 64/67/70 anni — più anni contributi + coefficiente migliore + meno anni di pensione (ma tenore di vita)
 - **Pattern P4 — Conferire TFR**: se ancora in azienda, simulare il delta cumulato sulle quote future di TFR (il maturato resta in azienda), come scenario: la scelta è irrevocabile
 - **Pattern P5 — Risparmio non previdenziale**: copertura del residuo gap via PAC ETF (rinviare a competenze separate)
+- **Pattern P6 — Uscita anticipata con capitale-ponte** («posso smettere a X anni?»): `ponte-pensione.py` simula il capitale che copre gli anni dall'uscita alla vecchiaia, in euro di oggi, con la probabilità di farcela e il capitale necessario per confidenza; vedi «Uscita anticipata e RITA» qui sotto
 
 Per ogni pattern: pro, contro, vincoli (es. €5.300 cap, rischio comparto), orizzonte temporale.
+
+**Uscita anticipata e RITA.** La RITA (Rendita integrativa temporanea anticipata, art. 11 c. 4-4-quater D.Lgs. 252/2005; dal 2027 la tassazione è all'art. 258 c. 1 D.Lgs. 117/2026) eroga il montante del fondo, tutto o in parte, a rate fino all'età di vecchiaia. Requisiti di legge: cessazione dell'attività, vecchiaia entro 5 anni e almeno 20 anni di contributi nei regimi obbligatori (c. 4); oppure inoccupazione da oltre 24 mesi e vecchiaia entro 10 anni (c. 4-bis); la prassi della COVIP chiede anche 5 anni di partecipazione alla complementare. La parte imponibile è tassata al 15%, ridotto di 0,30 punti per anno oltre il 15° di partecipazione, fino al 9% (c. 4-ter). `ponte-pensione.py` la integra nel capitale-ponte e quantifica i **costi permanenti** dell'uscita: contributi INPS che non si versano, versamenti al fondo che si fermano, montante consumato in RITA che non sarà rendita a 67 anni. Il montante da usare è quello del fondo **all'uscita** (secondo Monte Carlo, Step 1). Si presenta come scenario: la scelta di smettere prima resta all'utente.
 
 ## Formato output
 
@@ -394,5 +397,9 @@ Il template usa convenzioni industry-standard (blu = input, nero = formule, verd
 - `references/montecarlo-pensione.md` — la dimensione **stocastica** della proiezione: perché i due pilastri hanno rischi opposti (il pubblico INPS è rivalutato al PIL, non al mercato → àncora deterministica; il fondo pensione è esposto al mercato → Monte Carlo), e la lettura onesta che ne segue (tutta la dispersione del tasso di sostituzione viene dal complementare)
 - `references/integrazione-fiscale-joint.md` — pattern fiscali joint con `it-tax-optimization`: allocazione risparmio extra, realizzo plus + deduzione fondo, sterilizzazione redditi alti
 - `assets/proiezione-pensione.xlsx` — template Excel editabile con 5 fogli (Input, Coefficienti, Pubblica, Complementare, Scenari), in euro di oggi, deterministico, con coefficiente proiettato all'anno di pensionamento e cella dedicata per il **montante INPS reale da estratto conto** (con stima di ripiego migliorata se assente)
+- `assets/importa-previdenza.py` — legge l'estratto conto INPS (XML) e lo storico del fondo pensione (CSV): anzianità, retribuzioni, montante ricostruito, mix del fondo; `--anonimo` per non stampare i dati personali, `--json` per la catena dello Step 1
+- `assets/proiezione-inps.py` — proiezione parametrica della pensione INPS in euro di oggi, con il coefficiente proiettato all'età di pensionamento e la sensibilità a PIL reale e coefficienti; avvisa se la posizione è mista (retribuzioni prima del 1996)
+- `assets/netto-pensione.py` — dal lordo al netto: IRPEF da pensionato, detrazioni e addizionali sulla pensione INPS, tassazione agevolata della rendita del fondo; il tasso di sostituzione **netto** è quello che misura il tenore di vita
+- `assets/ponte-pensione.py` — «posso smettere a X anni?»: Monte Carlo del capitale-ponte dall'uscita alla vecchiaia, RITA integrata, costi permanenti dell'uscita (vedi «Uscita anticipata e RITA»)
 - `assets/montecarlo-pensione.py` — il **Monte Carlo** del tasso di sostituzione: àncora l'INPS al valore deterministico del foglio e simula solo il fondo pensione via block bootstrap sulla serie storica USA nominale in dollari (Damodaran), di cui di default usa solo la forma: la media è ricentrata sul rendimento reale del comparto; con `RICENTRA_MEDIA = False` la serie si deflaziona anno per anno (stesso motore di obiettivi). Restituisce i percentili del tasso di sostituzione, la probabilità di una soglia obiettivo, e la decomposizione àncora-pubblica / banda-di-mercato-complementare. Richiede numpy; usa `rendimenti-storici.csv`
 - `assets/rendimenti-storici.csv` — serie annuale azionario/obbligazionario (Damodaran/NYU Stern, 1928–2025) per il bootstrap; sostituibile con una propria serie

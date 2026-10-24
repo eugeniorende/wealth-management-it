@@ -95,7 +95,7 @@ Ogni cassa ha struttura propria, ma in genere:
 - **Contributo di maternità** e altri contributi minori
 - **Sistema di calcolo della pensione**: variabile per cassa. Alcune sono passate al contributivo, altre mantengono quote retributive o sistemi misti/reddituali. NON è automaticamente il contributivo INPS.
 
-⚠️ **La skill v0.1 non modella le singole casse in dettaglio.** Le regole, i minimi, i coefficienti e i sistemi di calcolo sono specifici di ogni cassa e cambiano nel tempo. Per un iscritto a cassa:
+⚠️ **La skill non sostituisce il regolamento della singola cassa.** I dati 2026 delle principali sono in `casse-professionali.md`, ma le regole, i minimi, i coefficienti e i sistemi di calcolo sono specifici di ogni cassa e cambiano nel tempo. Per un iscritto a cassa:
 1. Fornire i principi generali (soggettivo + integrativo + sistema di calcolo proprio)
 2. Rinviare al regolamento della cassa specifica e al sito della cassa
 3. Suggerire una simulazione sul portale della cassa (molte offrono simulatori)
