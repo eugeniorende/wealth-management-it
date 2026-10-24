@@ -5,12 +5,14 @@ genera-ips.py — genera l'Investment Policy Statement (IPS) come documento Word
 
 L'IPS è il deliverable finale del flusso: traduce l'analisi (obiettivi, allocazione,
 glide path, pensione) nel documento operativo che l'investitore esegue e rilegge.
-Questo script lo produce da un unico blocco DATI qui sotto, con testi di policy
-standard (ribilanciamento, guardrail, fiscalità italiana, checklist) come default
-sovrascrivibili: compila i dati del TUO caso e il documento esce completo.
+Lo script compone il documento dai dati del TUO caso, passati con --dati ips.json (un JSON
+nella cartella di lavoro, con le chiavi del blocco DATI, schema in SKILL.md). Il blocco DATI qui
+sotto è l'esempio e non va modificato. I testi di policy standard (ribilanciamento, guardrail,
+fiscalità italiana, revisione, checklist) sono default sovrascrivibili.
 
 Uso:
-    python genera-ips.py [output.docx]        # default: IPS.docx nella directory corrente
+    python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json
+    # senza --dati: l'IPS d'esempio, dichiarato come tale; output di default IPS.docx
 
 Dipendenze: python-docx  (pip install python-docx)
 
@@ -47,8 +49,9 @@ def numero(x, decimali=0):
 
 
 # ═══════════════════════════════ DATI ═══════════════════════════════
-# Compila questo blocco con i risultati del flusso (allocatore, glide path,
-# proiezione pensione). Le chiavi assenti usano i default di policy più sotto.
+# Dati d'ESEMPIO (Mario Rossi): non modificarli qui. I dati del caso arrivano da --dati ips.json
+# con le stesse chiavi: quelle del caso sono obbligatorie (CHIAVI_OBBLIGATORIE), le note e il
+# broker facoltativi, e solo i testi di policy hanno un default (POLICY_* più sotto).
 
 DATI = {
     "investitore": "Mario Rossi",
@@ -357,8 +360,75 @@ MESI = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
         "agosto", "settembre", "ottobre", "novembre", "dicembre")  # strftime("%B") dipende dal locale
 
 
+CHIAVI_DATI = set(DATI) | {"ribilanciamento", "guardrail", "revisione", "fiscalita", "checklist"}
+# Con --dati queste vengono tutte dal JSON: nessuna si riempie con l'esempio di Mario Rossi.
+CHIAVI_OBBLIGATORIE = ("investitore", "capitale", "profilo", "obiettivi", "allocazione", "glide_path",
+                       "versamenti", "strumenti", "previdenza")
+# Base di partenza con --dati: le chiavi facoltative che non sono testi di policy.
+BASE_DATI = {"data": "", "sottotitolo": "Piano personale su base obiettivi", "broker": None}
+
+
+def _forma_errata(dati):
+    """Il primo campo di forma sbagliata nel JSON di --dati (nome e motivo), o None: i numeri devono
+    essere numeri, le tabelle liste di righe della lunghezza attesa."""
+    def numero_vero(x):
+        return isinstance(x, (int, float)) and not isinstance(x, bool)
+    if not numero_vero(dati["capitale"]) or dati["capitale"] <= 0:
+        return "capitale", "un numero positivo (es. 50000, non «50.000» o «€50.000»)"
+    righe = {"profilo": 2, "obiettivi": 5, "allocazione": 3, "glide_path": 4, "strumenti": 2}
+    for chiave, n in righe.items():
+        v = dati[chiave]
+        if not isinstance(v, list) or not v or any(not isinstance(r, (list, tuple)) or len(r) != n for r in v):
+            return chiave, f"una lista non vuota di righe da {n} elementi"
+    if any(not numero_vero(r[4]) for r in dati["obiettivi"]):
+        return "obiettivi", "il capitale assegnato (quinto elemento) come numero"
+    if any(not numero_vero(r[1]) or not numero_vero(r[2]) for r in dati["allocazione"]):
+        return "allocazione", "importo e quota % (secondo e terzo elemento) come numeri"
+    for chiave in ("versamenti", "previdenza"):
+        if not isinstance(dati[chiave], list) or any(not isinstance(r, str) for r in dati[chiave]):
+            return chiave, "una lista di testi"
+    return None
+
+
+def carica_dati(path):
+    """I dati del caso dal JSON di --dati: un oggetto con le chiavi del blocco DATI (le liste prendono il
+    posto delle tuple). Le chiavi del caso (CHIAVI_OBBLIGATORIE) devono esserci tutte e avere la forma
+    giusta; le note e il broker sono facoltativi; i testi di policy assenti usano i default POLICY_*.
+    Una chiave ignota, mancante o di forma errata è un errore (rc 1)."""
+    import json
+    try:
+        with open(path, encoding="utf-8") as f:
+            dati = json.load(f)
+    except OSError as e:
+        print(f"ERRORE: --dati: impossibile leggere {path}: {e.strerror}", file=sys.stderr)
+        raise SystemExit(1)
+    except ValueError as e:
+        print(f"ERRORE: --dati: {path} non è un JSON valido ({e})", file=sys.stderr)
+        raise SystemExit(1)
+    if not isinstance(dati, dict) or "investitore" not in dati:
+        print(f"ERRORE: --dati: {path} deve essere un oggetto JSON con almeno «investitore» (schema in SKILL.md)",
+              file=sys.stderr)
+        raise SystemExit(1)
+    ignote = sorted(set(dati) - CHIAVI_DATI)
+    if ignote:
+        print(f"ERRORE: --dati: chiavi non riconosciute {ignote}; attese: {', '.join(sorted(CHIAVI_DATI))}",
+              file=sys.stderr)
+        raise SystemExit(1)
+    mancanti = [k for k in CHIAVI_OBBLIGATORIE if k not in dati]
+    if mancanti:
+        print(f"ERRORE: --dati: chiavi mancanti {mancanti}: i dati del caso vanno tutti nel JSON "
+              f"(solo le note, il broker e i testi di policy sono facoltativi; schema in SKILL.md)", file=sys.stderr)
+        raise SystemExit(1)
+    errata = _forma_errata(dati)
+    if errata:
+        print(f"ERRORE: --dati: «{errata[0]}» deve essere {errata[1]}", file=sys.stderr)
+        raise SystemExit(1)
+    return dati
+
+
 def genera(dati, path_out):
-    d = dict(DATI)
+    # senza --dati l'esempio; con --dati solo il JSON, sopra una base senza dati personali
+    d = dict(DATI) if dati is None else dict(BASE_DATI)
     d.update(dati or {})
 
     # validazioni oneste (avvisano, non bloccano)
@@ -506,13 +576,23 @@ def main(argv=None):
             pass
     ap = argparse.ArgumentParser(
         allow_abbrev=False,
-        description="Genera l'Investment Policy Statement come documento Word dal blocco DATI in testa allo script. "
+        description="Genera l'Investment Policy Statement come documento Word dai dati del JSON passato con --dati "
+                    "(senza, l'IPS d'esempio del blocco DATI, dichiarato come tale). "
                     "Codici d'uscita: 0 riuscito, 1 errore nei dati o nella scrittura, 2 riga di comando errata.")
     ap.add_argument("output", nargs="?", default="IPS.docx",
                     help="file .docx da scrivere (default: IPS.docx nella cartella corrente)")
+    ap.add_argument("--dati", metavar="FILE",
+                    help="JSON con i dati del tuo caso, le stesse chiavi del blocco DATI (schema in SKILL.md); "
+                         "senza, l'IPS d'esempio")
     args = ap.parse_args(argv)
+    dati = None
+    if args.dati:
+        dati = carica_dati(args.dati)
+    else:
+        print(f"⚠️  Dati di esempio: l'IPS è quello di «{DATI['investitore']}». Passa --dati ips.json con i tuoi "
+              f"dati (schema in SKILL.md).")
     try:
-        genera(None, args.output)
+        genera(dati, args.output)
     except OSError as e:
         print(f"ERRORE: impossibile scrivere {args.output}: {e}", file=sys.stderr)
         raise SystemExit(1)

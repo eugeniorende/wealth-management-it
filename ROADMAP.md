@@ -139,10 +139,10 @@ Prese il 20/10/2026.
   - Fixture realistiche.
   - [x] Matrice Python 3.11 e 3.14, con versioni minime delle dipendenze (PR #17).
   - [x] Versione fissata di claude-code nel job validate (PR #15).
-- [ ] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059.
-  - [x] Helper `cli()` comune: `--help`, `--set`, `--json`, `--from` (PR #43 e T9c).
+- [x] **T9 Interfaccia degli script e flusso dati** (P1, XL): F005, F026, F027, F028, F031, F033, F056, F059 (PR #43, #44, #45 e T9d).
+  - [x] Helper `cli()` comune: `--help`, `--set`, `--json`, `--from` (PR #43 e #45).
   - [x] Lettore unico del pianificatore (PR #44).
-  - [ ] `--dati` per genera-ips e per il ribilanciamento.
+  - [x] `--dati` per genera-ips e per il ribilanciamento (con `--zainetto` dal JSON dell'importatore e `--out`), sezione «Dove lavorare» in ogni skill con `${CLAUDE_SKILL_DIR}` e `userConfig.cartella_lavoro`, vocabolario unico della categoria fiscale e glossario nel README (T9d).
   - [x] Catena `--json` → `--from` tra gli script (T9c): importa-previdenza → proiezione INPS → Monte Carlo → netto e ponte, con `--json` anche su glide path e Monte Carlo degli obiettivi.
 - [x] **T10 Revisione annuale** (P1, M): F049, F050, F060, F064 (PR #12, #18). Anticipato: non dipendeva davvero da T4 e T7.
   - [x] TWR con 120 righe e ultima riga dinamica, Leggimi con i limiti.

@@ -76,6 +76,10 @@ DRAG_FISCALE_ANNUO = 0.004    # attrito fiscale sui prelievi (26% sui gain reali
 # RITA — rendita-ponte dal fondo pensione
 RITA_ATTIVA = True
 MONTANTE_FP_ALL_USCITA = 250_000.0  # montante del fondo pensione all'uscita (dal Monte Carlo pensione)
+# Da --from: gli anni del Monte Carlo (mc.json) e quelli alla vecchiaia (inps.json) dicono a che età
+# è il montante letto; None = non noti (il valore viene da qui o da --set).
+ANNI_MONTANTE_FP = None
+ANNI_AL_PENSIONAMENTO = None
 QUOTA_MONTANTE_IN_RITA = 1.0        # quota del montante destinata alla RITA (0–1)
 ANNI_MAX_RITA = 5                   # 5 = ordinaria; 10 = con inoccupazione >24 mesi
 ANNI_ISCRIZIONE_FP = 30             # anni di partecipazione alla complementare all'avvio RITA
@@ -154,9 +158,22 @@ def main():
     args = cli("Ponte pensionistico: Monte Carlo del capitale che copre l'uscita anticipata, RITA e costi "
                "permanenti sulla pensione.", globals(), json=True,
                da_json={"montante_fp.mediana": "MONTANTE_FP_ALL_USCITA",        # da montecarlo-pensione.py
+                        "anni": "ANNI_MONTANTE_FP",                             # da montecarlo-pensione.py
                         "eta_pensionamento": "ETA_PENSIONE_VECCHIAIA",         # da proiezione-inps.py
+                        "anni_al_pensionamento": "ANNI_AL_PENSIONAMENTO",      # da proiezione-inps.py
                         "coefficiente_trasformazione": "COEFF_TRASFORMAZIONE"})
     json_out = args.json
+    # Il montante del Monte Carlo è a «oggi + ANNI»: se quell'età non è l'uscita (tipico: il mc.json
+    # della catena è alla vecchiaia), la RITA e i versamenti persi sarebbero sbagliati in silenzio.
+    forzato = any(v.split("=")[0].strip() == "MONTANTE_FP_ALL_USCITA" for v in (args.set or []))
+    if ANNI_MONTANTE_FP is not None and ANNI_AL_PENSIONAMENTO is not None and not forzato:
+        eta_oggi = ETA_PENSIONE_VECCHIAIA - ANNI_AL_PENSIONAMENTO
+        eta_montante = eta_oggi + ANNI_MONTANTE_FP
+        if abs(eta_montante - ETA_USCITA) > 0.5:
+            errore(f"il montante del fondo letto da --from è a {numero(eta_montante)} anni, non all'uscita "
+                   f"({numero(ETA_USCITA)}): rigenera il Monte Carlo fino all'uscita con montecarlo-pensione.py "
+                   f"--from inps.json --set ANNI={int(round(ETA_USCITA - eta_oggi))} --json mc-uscita.json e passa "
+                   f"quel file al ponte (oppure indica il montante con --set MONTANTE_FP_ALL_USCITA=…)")
     if SEED is not None:
         np.random.seed(SEED)
 

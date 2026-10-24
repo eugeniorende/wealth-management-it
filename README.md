@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 117 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 122 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Freshness fiscale
 
@@ -501,7 +501,7 @@ Tutti i 13 script del plugin seguono la stessa interfaccia, verificata dalla sui
 - `--help` descrive argomenti e opzioni; un argomento o un flag non riconosciuto ferma lo script con l'usage.
 - Codici d'uscita: **0** riuscito; **1** errore nei dati o nei parametri (file mancante o illeggibile, valori incoerenti, costante `--set` sconosciuta), con un messaggio che inizia per `ERRORE:` su stderr; **2** riga di comando non riconosciuta.
 - Output in UTF-8 su qualunque console, anche Windows in cp1252: i simboli `€`, `→` e `≈` non fanno crashare lo script.
-- Numeri in formato italiano: punto per le migliaia e virgola per i decimali (`€ 36.000`, `51,4%`). Le uniche eccezioni sono i «parametri pronti» di `importa-previdenza.py`, scritti come letterali Python (`36_000`) perché vanno incollati negli altri script.
+- Numeri in formato italiano: punto per le migliaia e virgola per i decimali (`€ 36.000`, `51,4%`). Le uniche eccezioni sono i «parametri pronti» di `importa-previdenza.py`, scritti come letterali Python (`36_000`), validi anche come valori di `--set`; con `--json` gli script a valle li leggono con `--from`.
 - `--set NOME=VALORE` (ripetibile) sovrascrive le costanti in testa agli script di `it-pianificazione` e `it-pianificazione-obiettivi`; `--help` ne elenca i nomi. `--json FILE` scrive i risultati chiave in JSON dove indicato nelle skill; nella catena previdenziale `--from FILE` (ripetibile) legge quel JSON a valle, con la precedenza `--set` > `--from` > default.
 - I CSV degli ordini del ribilanciamento si aprono in Excel italiano con un doppio clic: separatore `;`, virgola decimale, UTF-8 con BOM.
 
@@ -509,18 +509,18 @@ Tutti i 13 script del plugin seguono la stessa interfaccia, verificata dalla sui
 
 L'utente deve fornire:
 
-1. **Snapshot portafoglio** in CSV o testo (l'estratto CSV del broker si legge con `skills/it-tax-optimization/assets/importa-estratto-broker.py`, che classifica le posizioni, esclude le minus scadute e incrocia lo zainetto broker per broker). Schema:
+1. **Snapshot portafoglio** in CSV o testo (l'estratto CSV del broker si legge con `skills/it-tax-optimization/assets/importa-estratto-broker.py`, che classifica le posizioni, esclude le minus scadute e incrocia lo zainetto broker per broker; accetta i formati di export dei broker, con sinonimi delle colonne e numeri italiani o inglesi). Schema di riferimento, `broker` compreso perché lo zainetto è per intermediario:
    ```
-   isin,descrizione,quantita,pmc,prezzo_corrente,categoria_fiscale
-   IE00B4L5Y983,iShares Core MSCI World,100,75.20,89.50,reddito_capitale
-   IT0003132476,ENI,500,12.40,14.80,reddito_diverso
+   broker,isin,descrizione,quantita,pmc,prezzo_corrente,categoria_fiscale
+   Fineco,IE00B4L5Y983,iShares Core MSCI World,100,75.20,89.50,reddito_capitale
+   Fineco,IT0003132476,ENI,500,12.40,14.80,reddito_diverso
    ```
 
-2. **Stato zainetto fiscale** (scaricabile da quasi tutti i broker italiani come "rendiconto fiscale annuale"):
+2. **Stato zainetto fiscale** (scaricabile da quasi tutti i broker italiani come "rendiconto fiscale annuale"), per broker:
    ```
-   anno_realizzo,importo_residuo,aliquota
-   2022,4500,26
-   2023,1200,26
+   broker,anno_realizzo,importo_residuo,aliquota
+   Fineco,2022,4500,26
+   Fineco,2023,1200,26
    ```
 
 3. **Intermediario** (per cut-off operativi specifici).
@@ -542,6 +542,23 @@ Più disclaimer obbligatorio.
 - Non compila il Modello Redditi e non sostituisce un commercialista o un consulente abilitato
 - Non dà consigli su quale azione o ETF comprare per ragioni di rendimento
 - Non si connette ai broker via API: un MCP server sui broker è stato valutato ed escluso (le API non espongono lo zainetto e richiederebbero credenziali); i dati si forniscono con gli estratti CSV
+
+## Glossario
+
+I termini usati allo stesso modo in skill, script, Excel e README. Gli script accettano i sinonimi indicati e li normalizzano: l'importatore per le colonne dell'estratto, il ribilanciamento per le chiavi delle posizioni.
+
+| Termine | Significato | Sinonimi accettati |
+|---|---|---|
+| **Zainetto fiscale** | Le minusvalenze pregresse che l'intermediario custodisce in regime amministrato, compensabili con le plus dei redditi diversi entro 4 anni; è per broker. In euro al 26% («26%-equivalenti»): una minus al 12,5% vale il 48,08% | «minus pregresse», «credito fiscale» |
+| **Categoria fiscale** | La natura del reddito di una posizione: `reddito_diverso` (azioni, obbligazioni, certificates, ETC: plus e minus compensabili tra loro), `reddito_capitale` (ETF e fondi: plus mai compensabile, minus reddito diverso), `reddito_capitale_irpef` (fondi non armonizzati fuori UE/SEE: plus a IRPEF), `da_classificare` | nell'estratto CSV dell'importatore la colonna «tipo fiscale», «categoria fiscale» o «natura fiscale»; nel JSON del ribilanciamento anche `tipo_fiscale`, `tipo` e le forme brevi `diverso`, `capitale` |
+| **PMC** | Prezzo medio di carico, per unità: in amministrato è la base fiscale (costo medio ponderato), non si sceglie il lotto. Da non confondere con il costo totale della posizione (quantità × PMC), che l'importatore legge dalle colonne «costo» o «valore di carico» | `pmc`, «prezzo di carico», «prezzo medio di carico», «costo medio» |
+| **Asset class** | La classe di un ribilanciamento (azionario, obbligazionario, monetario…): la assegna l'utente, non è la categoria fiscale | `classe` |
+| **Secchiello** | Il capitale destinato a un obiettivo, con il suo profilo e il suo glide path (goals-based) | «bucket» |
+| **Profilo** | Un'allocazione tipo del pianificatore (Preservazione … Azionario totale) con rendimento atteso, volatilità e quota azionaria | — |
+| **Glide path** | Il calendario con cui la quota azionaria di un obiettivo terminante scende verso la scadenza, negli ultimi anni della finestra di de-risking | «de-risking» |
+| **Drift e banda 5/25** | Lo scostamento di una classe dal peso target; si ribilancia oltre la banda, la minore tra 5 punti assoluti e il 25% del target | — |
+| **Regime amministrato / dichiarativo** | Chi calcola e versa l'imposta: l'intermediario (amministrato, il perimetro del motore) oppure il contribuente in dichiarazione (dichiarativo, solo principi) | — |
+| **Tasso di sostituzione** | Pensione / ultimo reddito, lordo o netto; il netto misura il tenore di vita | — |
 
 ## Differenza chiave: zainetto fiscale
 

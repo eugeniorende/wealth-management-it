@@ -12,5 +12,13 @@
     "repo": "anthropics/financial-services",
     "path": "plugins/vertical-plugins/wealth-management",
     "rationale": "L'upstream è cablato sul fisco USA (wash sale, HIFO, Roth/401k). Le regole italiane sono strutturalmente diverse: questa versione le riscrive da zero invece di estenderle."
+  },
+  "userConfig": {
+    "cartella_lavoro": {
+      "type": "directory",
+      "title": "Cartella di lavoro del piano",
+      "description": "Dove vivono i tuoi dati, gli Excel compilati e gli output degli script (mai dentro il plugin)",
+      "default": "~/piano-finanziario"
+    }
   }
 }

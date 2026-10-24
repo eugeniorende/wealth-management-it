@@ -99,6 +99,15 @@ Sono costi del dossier che NON entrano nel calcolo minus/plus ma incidono sul re
 
 ⚠️ **Implicazione per il retail**: un portafoglio diversificato basato su **ETF è sostanzialmente esente** da Tobin tax (ETF, fondi, obbligazioni, titoli di Stato sono tutti esclusi). La Tobin tax morde solo su **azioni italiane large-cap detenute direttamente**. Non sovrastimarne l'impatto: per il tipico investitore in ETF UCITS l'imposta è zero. Il raddoppio 2026 è rilevante solo per chi fa stock picking su singole azioni italiane di grandi società (es. Enel, Eni, Generali, Intesa, UniCredit, Ferrari, ecc.).
 
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/importa-estratto-broker.py" estratto.csv zainetto.csv --anno 2026 --json minus.json`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-tax-optimization`). Dipendenze dello script: Python 3.11 o successivo, solo libreria standard.
+
 ## Workflow operativo
 
 ### Step 1: Ingestion

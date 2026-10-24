@@ -124,7 +124,7 @@ pip install numpy openpyxl
 python montecarlo-obiettivi.py [percorso/pianificatore-obiettivi.xlsx]
 ```
 
-Lo script legge gli obiettivi e i parametri dal foglio Excel (singola fonte di verità: si compila l'Excel, si lancia lo script). Senza argomenti, cerca `pianificatore-obiettivi.xlsx` nella stessa cartella. I parametri della simulazione (numero di percorsi, confidenza-obiettivo, seed, glide path) sono in cima allo script, editabili o sovrascrivibili con `--set` (es. `--set MODELLO=bootstrap`, `--set GLIDE=False`).
+Lo script legge gli obiettivi e i parametri dal foglio Excel (singola fonte di verità: si compila l'Excel, si lancia lo script). Senza argomenti, cerca `pianificatore-obiettivi.xlsx` nella stessa cartella. I parametri della simulazione (numero di percorsi, confidenza-obiettivo, seed, glide path) sono in cima allo script e si cambiano con `--set`, senza toccare il file (es. `--set MODELLO=bootstrap`, `--set GLIDE=False`).
 
 ## Heuristic per la skill
 

@@ -83,6 +83,15 @@ Ogni vendita/acquisto di ribilanciamento comporta:
 
 Per un portafoglio tipico in ETF UCITS, il costo di transazione del ribilanciamento è essenzialmente solo le commissioni del broker.
 
+## Dove lavorare
+
+I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
+
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/ribilanciamento-multibroker.py" --dati piano.json --zainetto importatore.json --out ordini`;
+- gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (nei command vale `${CLAUDE_PLUGIN_ROOT}/skills/it-rebalance`). Dipendenze dello script: Python 3.11 o successivo, solo libreria standard.
+
 ## Workflow operativo
 
 ### Step 1: Ingestion
@@ -94,7 +103,7 @@ Raccogliere:
 - `isin` / `ticker`
 - `descrizione` — es. "iShares Core MSCI World UCITS ETF"
 - `asset_class` — es. azionario_globale, azionario_EU, obbligazionario_governativo, obbligazionario_corporate, monetario, oro/commodity, ecc.
-- `tipo_fiscale` — `reddito_diverso` (azioni dirette, certificates, ETC, obbligazioni e titoli di Stato) o `reddito_capitale` (ETF e fondi, UCITS e non armonizzati). Se non noto, dedurre da descrizione (ETF o fondo → capitale)
+- `categoria_fiscale` — `reddito_diverso` (azioni dirette, certificates, ETC, obbligazioni e titoli di Stato) o `reddito_capitale` (ETF e fondi UCITS, e i non armonizzati istituiti in UE/SEE white list con gestore vigilato); è il vocabolario del plugin (README, «Glossario»), lo script accetta anche le forme brevi `diverso` e `capitale`. Gli OICR non armonizzati fuori UE/SEE o senza gestore vigilato (per esempio gli ETF domiciliati negli USA) sono `reddito_capitale_irpef`: la plus va a IRPEF progressiva, lo script li rifiuta e si trattano a parte. Se la categoria non è nota, dedurla dalla descrizione con le regole di `it-tax-optimization` (ETF o fondo UCITS → capitale; non UCITS → verificare domicilio e gestore; nessun indizio → `da_classificare`, e chiedere)
 - `aliquota` — 26% di default; 12,5% per titoli di Stato italiani e white list, enti territoriali e organismi internazionali (la loro plus consuma lo zainetto al 48,08%, vedi `it-tax-optimization/references/aliquote-12-5-26.md`). ETF e fondi su titoli di Stato (reddito di capitale) hanno un'aliquota mista: si indica `quota_titoli_stato`, la quota media dell'attivo in titoli di Stato e white list che l'emittente certifica ogni semestre (non è nel KID; vale quella del semestre della vendita), e lo script applica 12,5% × quota + 26% × (1 − quota); in alternativa si dà direttamente l'`aliquota` effettiva, tra 12,5% e 26%. Le minus di questi fondi entrano nello zainetto per aliquota / 26%, cioè ridotte del 51,92% per la parte in titoli di Stato (DM 13/12/2011, art. 1; circ. AdE 19/E/2014, par. 5.1)
 - `quantita`
 - `pmc` (prezzo medio di carico), che in amministrato è la base fiscale delle vendite
@@ -199,7 +208,25 @@ per posizione in (sovrappesate AND plus_latente > 0):
 # ancora la banda larga, e solo fino a metà banda
 ```
 
-Per il caso multi-broker, lo script `assets/ribilanciamento-multibroker.py` esegue questa ottimizzazione automaticamente: dato il portafoglio (con broker, tipo fiscale, aliquota e plus/minus per posizione), lo zainetto per broker e il target, produce il piano di vendite ottimizzato, una riga per posizione nell'ordine di esecuzione (le minus prima delle plus), il costo fiscale, lo zainetto residuo e, per ogni classe non corretta del tutto, il residuo con il motivo e il costo. È il modo più affidabile di gestire la Leva 4 quando i conti sono più di uno.
+Per il caso multi-broker, lo script `assets/ribilanciamento-multibroker.py` esegue questa ottimizzazione automaticamente: dato il portafoglio (con broker, categoria fiscale, aliquota e plus/minus per posizione), lo zainetto per broker e il target, produce il piano di vendite ottimizzato, una riga per posizione nell'ordine di esecuzione (le minus prima delle plus), il costo fiscale, lo zainetto residuo e, per ogni classe non corretta del tutto, il residuo con il motivo e il costo. È il modo più affidabile di gestire la Leva 4 quando i conti sono più di uno.
+
+**I dati dello script** arrivano da un JSON nella cartella di lavoro (`--dati piano.json`); senza, lo script usa l'esempio cablato in testa e lo dice. Lo zainetto può venire dal JSON dell'importatore di `it-tax-optimization` (`--zainetto importatore.json`: legge `analisi.per_broker[].zainetto_26_equivalente`, cioè le minus valide in euro al 26%, con quelle al 12,5% già computate al 48,08%); `--out cartella` sceglie dove scrivere i CSV. Schema di `piano.json`:
+
+```json
+{
+  "posizioni": [
+    {"broker": "Fineco", "asset_class": "azionario", "categoria_fiscale": "reddito_capitale", "valore": 40000, "plus": 10000},
+    {"broker": "Fineco", "asset_class": "azionario", "categoria_fiscale": "reddito_diverso", "valore": 10000, "plus": 4000},
+    {"broker": "Directa", "asset_class": "obbligazionario", "categoria_fiscale": "reddito_diverso", "valore": 9000, "plus": 0, "aliquota": 0.125}
+  ],
+  "zainetto": {"Fineco": 5000, "Directa": 0},
+  "target": {"azionario": 0.60, "obbligazionario": 0.30, "monetario": 0.10},
+  "nuovi_versamenti": 0, "flussi_attesi": 0, "prelievo": 0,
+  "obiettivo_rientro": "misto", "broker_versamenti": "Fineco"
+}
+```
+
+Per posizione: `broker`, `asset_class` (una delle chiavi di `target`), `categoria_fiscale` (`reddito_diverso` o `reddito_capitale`; accettate anche `tipo_fiscale`/`tipo` e le forme brevi), `valore` e `plus` in euro (la minus è una plus negativa), facoltativi `aliquota` (0,125 per i titoli di Stato) o `quota_titoli_stato` per ETF e fondi su titoli di Stato. Dal JSON dell'importatore le posizioni si copiano così come sono, aggiungendo solo la classe (`asset_class` o `classe`, la assegna l'utente): `valore` è `posizioni[].valore`, `plus` è `posizioni[].plus_minus`, la categoria è `categoria_fiscale` e l'aliquota è `posizioni[].aliquota`. L'importatore la scrive in percento (26 o 12,5) e lo script la converte in frazione dicendolo: non va tolta, perché senza il campo un titolo di Stato sarebbe tassato al 26% e consumerebbe lo zainetto per intero invece che al 48,08%. Le chiavi dello zainetto si allineano ai nomi dei broker delle posizioni (maiuscole e spazi a parte), e uno zainetto senza posizioni dello stesso broker viene segnalato come non usato. Le posizioni `reddito_capitale_irpef` e `da_classificare` vanno risolte prima: lo script le rifiuta. Le chiavi facoltative (`nuovi_versamenti`, `flussi_attesi`, `prelievo`, `aliquota_default`, `obiettivo_rientro`, `margine_rientro`, `modula_volatilita`, `genera_csv`, `cartella_output`, `broker_versamenti`) sostituiscono le costanti omonime dello script.
 
 Lo stesso script **genera anche gli ordini da eseguire**, un **CSV per broker** (parametro `GENERA_CSV`), apribile in Excel italiano con un doppio clic: separatore `;`, virgola decimale, UTF-8 con BOM. La parte interessante è l'**instradamento della cassa**: gli acquisti delle classi sottopesate vengono finanziati dalla liquidità presente su ciascun broker — le vendite realizzate lì più gli eventuali versamenti che vi atterrano — così ogni broker resta a saldo e i suoi ordini sono eseguibili senza spostare cassa tra intermediari (operazione che richiederebbe giorni). Ogni riga porta con sé l'annotazione fiscale (plus/minus realizzata, imposta, compensazione da zainetto) e una colonna `strumento_ISIN` da compilare a mano: il piano ragiona per classe, è l'utente a scegliere lo strumento specifico. ⚠️ I broker italiani non hanno un formato standard di import ordini, quindi i CSV sono una **checklist di esecuzione** e una traccia di audit, non file caricabili in un click.
 
@@ -284,7 +311,7 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 - `references/ribilanciamento-multibroker.md` — l'ottimizzazione globale dello zainetto quando il portafoglio è su più broker: il vincolo che la compensazione non attraversa i broker, e la doppia ottimizzazione broker × tipo fiscale per scegliere DOVE realizzare le plus
 - `references/bande-dinamiche.md` — le bande di tolleranza dinamiche (regola 5/25 + allargamento cost-aware ×2 + rientro misto; modulazione per volatilità opzionale e spenta di default): quando ribilanciare, fin dove, perché non pagare imposta per correggere un drift troppo piccolo, e la tensione teorica sulla modulazione per volatilità
 - `references/sequenza-liquidazione.md` — la sequenza di liquidazione fiscalmente efficiente in **decumulo**: da dove prelevare per pagare meno imposta (liquidità → flussi → vendite tax-aware → fondo pensione agevolato 9-15%), e come il prelievo annuo diventa anche l'occasione per ribilanciare
-- `assets/ribilanciamento-multibroker.py` — strumento che esegue l'ottimizzazione multi-broker, le bande dinamiche, la regola di rientro e il prelievo in decumulo (`PRELIEVO`) su un portafoglio reale, e **genera gli ordini come CSV per broker** con instradamento della cassa (parametri editabili in testa; output: drift, piano di vendite ottimizzato per broker/tipo/aliquota nell'ordine di esecuzione, residui non corretti con motivo e costo, costo fiscale, zainetto residuo, allocazione risultante, e un CSV di ordini eseguibili per ciascun broker, solo se ci sono ordini)
+- `assets/ribilanciamento-multibroker.py` — strumento che esegue l'ottimizzazione multi-broker, le bande dinamiche, la regola di rientro e il prelievo in decumulo (chiave `prelievo` del JSON) su un portafoglio reale, e **genera gli ordini come CSV per broker** con instradamento della cassa (dati da `--dati piano.json`, zainetto anche da `--zainetto`, CSV in `--out`; output: drift, piano di vendite ottimizzato per broker/tipo/aliquota nell'ordine di esecuzione, residui non corretti con motivo e costo, costo fiscale, zainetto residuo, allocazione risultante, e un CSV di ordini eseguibili per ciascun broker, solo se ci sono ordini)
 - **Vedi anche** `it-tax-optimization/SKILL.md` per le regole di compensazione minus/plus e `it-tax-optimization/references/multi-intermediario.md` per la frammentazione su più broker, e `it-pianificazione/references/integrazione-fiscale-joint.md` per l'interazione con l'IRPEF
 - **A monte** c'è `it-pianificazione-obiettivi`: definisce l'allocazione-target **aggregando i secchielli per obiettivo** (ciascuno pesato per il suo capitale) nell'asset allocation complessiva del portafoglio, più il **calendario di glide path** generato da `glidepath-obiettivi.py` (la quota azionaria target di ogni secchiello anno per anno). È quell'aggregato e quel calendario — non target scelti a mano — la fonte delle allocazioni che questa skill riceve in input, mantiene nel tempo, e de-riska progressivamente eseguendo gli spostamenti annuali (con attenzione agli eventi fiscali di ogni vendita).
 

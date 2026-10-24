@@ -13,7 +13,8 @@ e produce:
     con i tassi di capitalizzazione ufficiali ISTAT — variazione media quinquennale del PIL nominale)
   - montante del fondo pensione per comparto (quote nette × ultimo NAV), stima del mix azionario,
     versamenti per anno e per fonte (iscritto / azienda / TFR)
-  - un blocco di PARAMETRI PRONTI da incollare in proiezione-inps.py e montecarlo-pensione.py
+  - un blocco di PARAMETRI PRONTI per proiezione-inps.py e montecarlo-pensione.py: con --json li leggono
+    con --from, oppure si passano con --set
 
 Uso:
     python importa-previdenza.py estratto_inps.xml [storico_fondo.csv] [--anonimo] [--set NOME=VALORE] [--json FILE]
@@ -260,7 +261,7 @@ def quota_azionaria(nome_comparto):
 # ================================ MAIN ================================
 
 def eta_stampata(eta, anonimo):
-    """Età da incollare in ETA_ATTUALE: con --anonimo in anni interi ARROTONDATI (proiezione-inps.py
+    """Età per ETA_ATTUALE (via --from o --set): con --anonimo in anni interi ARROTONDATI (proiezione-inps.py
     usa round(ETA_PENSIONAMENTO − ETA_ATTUALE): troncare allungherebbe l'orizzonte di un anno)."""
     return round(eta) if anonimo else round(eta, 1)
 
@@ -377,7 +378,7 @@ def main():
 
     # -------------------------- PARAMETRI PRONTI --------------------------
     print("\n" + "=" * 72)
-    print("PARAMETRI PRONTI (da incollare negli script della skill)")
+    print("PARAMETRI PRONTI (per --set, oppure --json qui e --from negli script a valle)")
     print("=" * 72)
     print("per proiezione-inps.py:")
     print(f"  MONTANTE_ATTUALE = {montante:_.0f}" +
