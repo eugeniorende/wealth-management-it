@@ -338,7 +338,10 @@ def leggi_pianificatore(path, avvisa=print):
     if os.path.dirname(os.path.abspath(path)) == os.path.dirname(os.path.abspath(__file__)):
         avvisa("⚠️  Stai leggendo il pianificatore d'esempio dentro il plugin: copia il file nella tua cartella "
                "di lavoro, compilalo lì e passane il percorso allo script.")
-    wb = load_workbook(path, data_only=True)
+    try:
+        wb = load_workbook(path, data_only=True)
+    except Exception as e:   # zipfile.BadZipFile, InvalidFileException, OSError: non è un xlsx leggibile
+        errore(f"{path} non è un pianificatore xlsx leggibile ({type(e).__name__}: {e})")
     for foglio in ("Parametri", "Obiettivi"):
         if foglio not in wb.sheetnames:
             errore(f"foglio «{foglio}» mancante in {os.path.basename(path)} (fogli presenti: "

@@ -1490,6 +1490,13 @@ def t_lettore_pianificatore():
         rc, out = run_script(path, xlsx)
         assert rc == 1 and "foglio «Parametri» mancante" in out and "KeyError" not in out, f"{nome}: {out[-300:]}"
     shutil.rmtree(os.path.dirname(xlsx), ignore_errors=True)
+    # file esistente ma non xlsx (revisione T9a, codice-test 3): ERRORE, non BadZipFile
+    finto = os.path.join(tempfile.mkdtemp(), "finto.xlsx")
+    open(finto, "w", encoding="utf-8").write("non sono un foglio")
+    for nome, path in script.items():
+        rc, out = run_script(path, finto)
+        assert rc == 1 and "ERRORE:" in out and "non è un pianificatore xlsx leggibile" in out and "Traceback" not in out, f"{nome}: {out[-300:]}"
+    shutil.rmtree(os.path.dirname(finto), ignore_errors=True)
     xlsx = _pianificatore_modificato(lambda wb: wb["Obiettivi"].__setitem__("B6", "quarantamila"))
     rc, out = run_script(script["glidepath-obiettivi.py"], xlsx)
     assert rc == 1 and "Obiettivi!B6" in out and "testo" in out, out[-300:]

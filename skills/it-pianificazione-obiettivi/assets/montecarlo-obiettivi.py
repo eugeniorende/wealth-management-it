@@ -44,7 +44,7 @@ import sys
 import os
 import numpy as np
 
-from motore_bootstrap import (blocchi_bootstrap, carica_storico, cli, euro, frazioni_glide, indici_bootstrap,
+from motore_bootstrap import (blocchi_bootstrap, carica_storico, cli, errore, euro, frazioni_glide, indici_bootstrap,
                               leggi_pianificatore, numero, pmt_glide, scarti_dal_foglio)
 
 # ---- Parametri della simulazione ----

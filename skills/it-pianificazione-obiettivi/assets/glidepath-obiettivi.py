@@ -37,7 +37,7 @@ modella la volatilità). Vedi glide-path.md per i limiti e l'interpretazione.
 import sys
 import os
 
-from motore_bootstrap import (cli, euro, frazioni_glide, leggi_pianificatore, numero, pmt_glide, quota_glide,
+from motore_bootstrap import (cli, errore, euro, frazioni_glide, leggi_pianificatore, numero, pmt_glide, quota_glide,
                               scarti_dal_foglio)
 
 # ---- Parametri del glide path (editabili) ----

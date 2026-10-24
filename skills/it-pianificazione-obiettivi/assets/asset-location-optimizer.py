@@ -37,7 +37,7 @@ Vedi asset-location.md.
 import sys
 import os
 
-from motore_bootstrap import cli, euro, leggi_pianificatore, numero
+from motore_bootstrap import cli, errore, euro, leggi_pianificatore, numero
 
 # ============================================================
 # PARAMETRI EDITABILI
