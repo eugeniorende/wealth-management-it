@@ -5098,6 +5098,10 @@ def _yaml_stretto(fm, nome):
         else:
             assert ": " not in valore and " #" not in valore and not re.match(r"[\[\]{}>|*&!%@`'\"]", valore), \
                 f"{nome}: il valore di {chiave} va tra virgolette doppie (YAML stretto)"
+            # revisione T14: senza PyYAML in CI, «version: 0.20» passava come stringa; YAML la legge 0.2
+            assert valore.lower() not in ("null", "~", "yes", "no", "on", "off"), f"{nome}: {chiave}: {valore!r} è ambiguo in YAML"
+            if re.fullmatch(r"[-+]?\d+(\.\d*)?([eE][-+]?\d+)?", valore):
+                valore = float(valore) if any(c in valore for c in ".eE") else int(valore)
             valore = {"true": True, "false": False}.get(valore, valore)
         if rientro:
             assert padre, f"{nome}: {chiave} indentato senza una mappa"
@@ -5133,7 +5137,16 @@ def t_frontmatter_skill():
         assert tabella.get(skill) == ver, f"{skill}: README dice v{tabella.get(skill)}, il frontmatter {ver}"
         sezione = changelog.split(f"\n### {skill}\n")[1]
         assert re.match(r"\s*#### v" + re.escape(ver) + r"\b", sezione), f"{skill}: CHANGELOG senza la voce v{ver} in testa"
-        assert not re.search(r"^## Note per|^In quest'iterazione", corpo, re.M), f"{skill}: note d'iterazione nel SKILL.md"
+        assert not re.search(r"^#{2,4} Note per|In quest'iterazione|Questa è la versione|^- \*?\*?v0\.\d+", corpo, re.M), \
+            f"{skill}: note d'iterazione nel SKILL.md"
+        # revisione T14: ogni asset della skill è spiegato nei Riferimenti (le note spostate in CHANGELOG
+        # erano l'unico posto che descriveva ponte-pensione, netto-pensione, tracker e generatore dell'IPS)
+        riferimenti = corpo.split("\n## Riferimenti")[1] if "\n## Riferimenti" in corpo else ""
+        cartella_assets = os.path.join(SKILLS, skill, "assets")
+        if os.path.isdir(cartella_assets):
+            for f in sorted(os.listdir(cartella_assets)):
+                if f.endswith((".py", ".xlsx")) and f != "motore_bootstrap.py":
+                    assert f"assets/{f}" in riferimenti, f"{skill}: assets/{f} non è nei Riferimenti"
     # riscatto, ricongiunzione e totalizzazione non sono gestiti: fuori dai trigger, dichiarati esclusi
     d = _yaml_stretto(_frontmatter(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"))[0], "it-pianificazione")
     trigger, esclusioni = d["description"].split("NON copre")
@@ -5219,6 +5232,44 @@ def t_indici_reference():
         voci = re.findall(r"^- (.+)$", testo.split("\n## Indice\n")[1].split("\n## ")[0], re.M)
         assert voci == h2, f"{rel}: l'indice non corrisponde alle sezioni ({len(voci)} voci, {len(h2)} sezioni)"
         assert testo.index("\n## Indice\n") < testo.index("\n## " + h2[0] + "\n"), f"{rel}: l'indice va prima delle sezioni"
+
+
+@test("T14 postura e fonti: leve come scenari in skill e reference, certificati e compensazione come nella norma")
+def t_postura_fonti_t14():
+    # Revisione T14: la rilettura del § 2.6 aveva corretto le skill ma non le reference condivise, e
+    # nessun test ne vincolava l'esito; idem la verifica del § 2.7 sui certificati.
+    pian = open(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"), encoding="utf-8").read()
+    auto = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "SKILL.md"), encoding="utf-8").read()
+    for nome, testo in (("it-pianificazione", pian), ("it-pianificazione-autonomi", auto)):
+        passo5 = testo.split("### Step 5")[1].split("\n## ")[0]
+        assert "scenari" in passo5 and "Raccomandazioni" not in passo5.split("\n")[0], f"{nome}: Step 5 come scenari"
+        assert "raccomandazioni d'azione" not in testo.lower() and "Raccomandazioni d'azione" not in testo, nome
+    p1 = next(r for r in pian.splitlines() if "Pattern P1" in r)
+    assert "non un importo consigliato" in p1, p1
+    vietate = ("Massimizzare contributo deducibile", "fino a saturarlo", "Praticamente impossibile fare di meglio",
+               "DEVE versare", "A: fondo, sempre", "quasi sempre la scelta", "opportunità prioritaria",
+               "prima di raccomandare", "raddoppia tipicamente")
+    for cartella, _, files in os.walk(SKILLS):
+        for f in files:
+            if f.endswith(".md"):
+                testo = open(os.path.join(cartella, f), encoding="utf-8").read()
+                for v in vietate:
+                    assert v not in testo, f"{os.path.relpath(os.path.join(cartella, f), SKILLS)}: «{v}»"
+                assert not re.search(r"skill v0\.\d|\bv0\.\d+ non ", testo), f"{f}: versione di skill superata nel testo"
+    imp = open(asset("it-tax-optimization", "importa-estratto-broker.py"), encoding="utf-8").read()
+    assert "vendere per caricare" not in imp and "venderle caricherebbe lo zainetto" in imp
+    assert "ponte-pensione.py" in pian.split("### Step 5")[1] and "4-bis" in pian and "Uscita anticipata e RITA" in pian
+    # § 2.7 e revisione T14: le cinque lettere dell'art. 68 c. 5 e l'eccezione dei certificati protetti
+    tax = open(os.path.join(SKILLS, "it-tax-optimization", "SKILL.md"), encoding="utf-8").read()
+    riga = next(r for r in tax.splitlines() if r.startswith("| **Reddito diverso**"))
+    for atteso in ("lett. c, c-bis, c-ter, c-quater, c-quinquies", "art. 68 c. 4 e 5", "capitale protetto", "art. 44 c. 2 lett. c n. 2",
+                   "dal 2027 art. 46 c. 2 lett. b n. 2"):
+        assert atteso in riga, f"riga dei redditi diversi senza «{atteso}»"
+    ips = open(asset("it-revisione", "genera-ips.py"), encoding="utf-8").read()
+    marcatore = ips.split("# Verificato: 2026-10 — plus ETF")[1].split("POLICY_FISCALITA = [")[0]
+    verificato, fuori = marcatore.split("# Fuori dal marcatore")
+    assert "certificat" not in verificato and "Non verificata" not in ips, "certificati dentro il marcatore"
+    assert "capitale protetto" in fuori and "c, c-bis, c-ter, c-quater e" in verificato, marcatore
 
 
 @test("pacchetto: lo zip per Cowork contiene solo il plugin, nome = versione del manifest")
