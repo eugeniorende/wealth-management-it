@@ -36,6 +36,7 @@ RAL_ATTUALE      = 36_000.0   # retribuzione annua lorda attuale (€)
 ALIQUOTA_COMPUTO = 0.33       # computo IVS dipendenti (artigiani e commercianti 0,24; gestione separata 0,25, sul 26,07% versato)
 
 ETA_ATTUALE        = 37.0     # età attuale (anche frazionaria)
+CONTRIBUTI_SOLO_DAL_1996 = False  # True dal JSON di importa-previdenza.py se ci sono retribuzioni prima del 1996
 ETA_PENSIONAMENTO  = 69.0     # età di uscita ipotizzata (la vecchiaia è indicizzata alla
                               # speranza di vita: per chi è giovane oggi, ~68-70 è realistico)
 
@@ -94,8 +95,15 @@ def main():
     args = cli("Proiezione parametrica della pensione INPS in euro di oggi (metodo contributivo), con la "
                "sensibilità a PIL reale e coefficienti di trasformazione.", globals(), json=True,
                da_json={"montante_attuale": "MONTANTE_ATTUALE", "ral_attuale": "RAL_ATTUALE",
-                        "eta_attuale": "ETA_ATTUALE"})   # il JSON di importa-previdenza.py
+                        "eta_attuale": "ETA_ATTUALE",    # il JSON di importa-previdenza.py
+                        "contributi_solo_dal_1996": "CONTRIBUTI_SOLO_DAL_1996"})
     json_out = args.json
+    if CONTRIBUTI_SOLO_DAL_1996:
+        # l'avviso dell'importatore non deve perdersi lungo la catena --json → --from
+        print("⚠ posizione mista: ci sono retribuzioni prima del 1996, che seguono il calcolo retributivo. Il montante")
+        print("  qui sotto conta solo i contributi dal 1996, quindi la pensione è sottostimata: per il valore usa")
+        print("  \"La mia pensione futura\" sul portale INPS, e questa proiezione solo per la sensibilità.")
+        print()
     anni = ETA_PENSIONAMENTO - ETA_ATTUALE
     if anni <= 0:
         errore("ETA_PENSIONAMENTO deve superare ETA_ATTUALE.")

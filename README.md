@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 127 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 128 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -81,20 +81,20 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | Strumento | Test che lo esercitano |
 |---|---|
 | `it-pianificazione/assets/importa-previdenza.py` | 13: T12 fixture realistiche; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale; importa-previdenza ×5 … |
-| `it-pianificazione/assets/montecarlo-pensione.py` | 9: T12 --json previdenziali; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; montecarlo-pensione; pensione … |
-| `it-pianificazione/assets/motore_bootstrap.py` | 10: T12 rami avanzati; T9 formati; T9 lettore unico del pianificatore; motore bootstrap; obiettivi ×4; serie storica … |
-| `it-pianificazione/assets/netto-pensione.py` | 18: T12 --json previdenziali; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill; freshness fiscale … |
+| `it-pianificazione/assets/montecarlo-pensione.py` | 10: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; montecarlo-pensione … |
+| `it-pianificazione/assets/motore_bootstrap.py` | 11: T12 rami avanzati; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap; obiettivi ×4 … |
+| `it-pianificazione/assets/netto-pensione.py` | 19: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
 | `it-pianificazione/assets/ponte-pensione.py` | 11: T12 --json previdenziali; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale; ponte-pensione ×2 … |
 | `it-pianificazione/assets/proiezione-inps.py` | 15: T12 rami avanzati; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill; freshness fiscale … |
 | `it-pianificazione/assets/proiezione-pensione.xlsx` | 11: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
 | `it-pianificazione/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 6: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
-| `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 8: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; allocatore-capitale; glidepath e Monte Carlo; obiettivi ×2 |
+| `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 9: T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; allocatore-capitale; glidepath e Monte Carlo … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
 | `it-pianificazione-obiettivi/assets/decumulo-obiettivi.py` | 9: T12 rami avanzati; T9 formati; T9 interfaccia ×2; decumulo-obiettivi; obiettivi; serie storica ×2 … |
-| `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 11: T12 rami avanzati; T9 --json di glide path e Monte Carlo degli obiettivi; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; glidepath … |
-| `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 15: T9 --json di glide path e Monte Carlo degli obiettivi; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; glidepath e Monte Carlo; montecarlo-obiettivi ×4 … |
-| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 17: T12 Excel ×2; T9 interfaccia; T9 lettore unico del pianificatore; allocatore-capitale; asset-location; glidepath … |
+| `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 12: T12 rami avanzati; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore … |
+| `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 16: T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; glidepath e Monte Carlo … |
+| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 18: T12 Excel ×2; T9 contratto di input della revisione; T9 interfaccia; T9 lettore unico del pianificatore; allocatore-capitale; asset-location … |
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-rebalance/assets/ribilanciamento-multibroker.py` | 19: T1; T7 ribilanciamento ×10; T9 formati ×2; T9 input esterno; T9 interfaccia ×2; T9 vocabolario … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |
@@ -103,7 +103,7 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-revisione/assets/tracker-secchielli.xlsx` | 4: T12 Excel ×2; bande di ribilanciamento; tracker-secchielli |
 | `it-tax-optimization/assets/esempio-estratto.csv` | 2: T2 importatore ×2 |
 | `it-tax-optimization/assets/esempio-zainetto.csv` | 2: T2 importatore ×2 |
-| `it-tax-optimization/assets/importa-estratto-broker.py` | 13: T2 importatore ×6; T3; T9 formati; T9 input esterno; T9 interfaccia ×2; T9 vocabolario … |
+| `it-tax-optimization/assets/importa-estratto-broker.py` | 14: T2 importatore ×6; T3; T9 contratto di input della revisione; T9 formati; T9 input esterno; T9 interfaccia ×2 … |
 
 ### Freshness fiscale
 
@@ -533,7 +533,7 @@ Tutti i 13 script del plugin seguono la stessa interfaccia, verificata dalla sui
 - `--help` descrive argomenti e opzioni; un argomento o un flag non riconosciuto ferma lo script con l'usage.
 - Codici d'uscita: **0** riuscito; **1** errore nei dati o nei parametri (file mancante o illeggibile, valori incoerenti, costante `--set` sconosciuta), con un messaggio che inizia per `ERRORE:` su stderr; **2** riga di comando non riconosciuta.
 - Output in UTF-8 su qualunque console, anche Windows in cp1252: i simboli `€`, `→` e `≈` non fanno crashare lo script.
-- Numeri in formato italiano: punto per le migliaia e virgola per i decimali (`€ 36.000`, `51,4%`). Le uniche eccezioni sono i «parametri pronti» di `importa-previdenza.py`, scritti come letterali Python (`36_000`) perché vanno incollati negli altri script.
+- Numeri in formato italiano: punto per le migliaia e virgola per i decimali (`€ 36.000`, `51,4%`). Le uniche eccezioni sono i «parametri pronti» di `importa-previdenza.py`, scritti come letterali Python (`36_000`), validi anche come valori di `--set`; con `--json` gli script a valle li leggono con `--from`.
 - `--set NOME=VALORE` (ripetibile) sovrascrive le costanti in testa agli script di `it-pianificazione` e `it-pianificazione-obiettivi`; `--help` ne elenca i nomi. `--json FILE` scrive i risultati chiave in JSON dove indicato nelle skill; nella catena previdenziale `--from FILE` (ripetibile) legge quel JSON a valle, con la precedenza `--set` > `--from` > default.
 - I CSV degli ordini del ribilanciamento si aprono in Excel italiano con un doppio clic: separatore `;`, virgola decimale, UTF-8 con BOM.
 
@@ -577,13 +577,13 @@ Più disclaimer obbligatorio.
 
 ## Glossario
 
-I termini usati allo stesso modo in skill, script, Excel e README. Gli script accettano i sinonimi indicati e li normalizzano.
+I termini usati allo stesso modo in skill, script, Excel e README. Gli script accettano i sinonimi indicati e li normalizzano: l'importatore per le colonne dell'estratto, il ribilanciamento per le chiavi delle posizioni.
 
 | Termine | Significato | Sinonimi accettati |
 |---|---|---|
 | **Zainetto fiscale** | Le minusvalenze pregresse che l'intermediario custodisce in regime amministrato, compensabili con le plus dei redditi diversi entro 4 anni; è per broker. In euro al 26% («26%-equivalenti»): una minus al 12,5% vale il 48,08% | «minus pregresse», «credito fiscale» |
-| **Categoria fiscale** | La natura del reddito di una posizione: `reddito_diverso` (azioni, obbligazioni, certificates, ETC: plus e minus compensabili tra loro), `reddito_capitale` (ETF e fondi: plus mai compensabile, minus reddito diverso), `reddito_capitale_irpef` (fondi non armonizzati fuori UE/SEE: plus a IRPEF), `da_classificare` | `tipo_fiscale`, `tipo`; forme brevi `diverso`, `capitale` |
-| **PMC** | Prezzo medio di carico: in amministrato è la base fiscale (costo medio ponderato), non si sceglie il lotto | «prezzo di carico», `costo` |
+| **Categoria fiscale** | La natura del reddito di una posizione: `reddito_diverso` (azioni, obbligazioni, certificates, ETC: plus e minus compensabili tra loro), `reddito_capitale` (ETF e fondi: plus mai compensabile, minus reddito diverso), `reddito_capitale_irpef` (fondi non armonizzati fuori UE/SEE: plus a IRPEF), `da_classificare` | nell'estratto CSV dell'importatore la colonna «tipo fiscale», «categoria fiscale» o «natura fiscale»; nel JSON del ribilanciamento anche `tipo_fiscale`, `tipo` e le forme brevi `diverso`, `capitale` |
+| **PMC** | Prezzo medio di carico, per unità: in amministrato è la base fiscale (costo medio ponderato), non si sceglie il lotto. Da non confondere con il costo totale della posizione (quantità × PMC), che l'importatore legge dalle colonne «costo» o «valore di carico» | `pmc`, «prezzo di carico», «prezzo medio di carico», «costo medio» |
 | **Asset class** | La classe di un ribilanciamento (azionario, obbligazionario, monetario…): la assegna l'utente, non è la categoria fiscale | `classe` |
 | **Secchiello** | Il capitale destinato a un obiettivo, con il suo profilo e il suo glide path (goals-based) | «bucket» |
 | **Profilo** | Un'allocazione tipo del pianificatore (Preservazione … Azionario totale) con rendimento atteso, volatilità e quota azionaria | — |
