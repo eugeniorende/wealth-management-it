@@ -4806,6 +4806,47 @@ def t_cu_settore():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T15 capitale umano: sensibilità ordinata e catena --from dagli script previdenziali")
+def t_cu_sensibilita_catena():
+    m = carica_modulo(asset(*CU))
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    righe = m.sensibilita(dati, prof, c)
+    assert {r["parametro"] for r in righe} == {"s", "nu", "g", "p_u", "r_f"} and len(righe) == 9, righe
+    ampiezze = []
+    for r in righe:
+        if not ampiezze or ampiezze[-1][0] != r["parametro"]:
+            ampiezze.append([r["parametro"], 0])
+        ampiezze[-1][1] = max(ampiezze[-1][1], abs(r["delta"]))
+    assert [a[1] for a in ampiezze] == sorted((a[1] for a in ampiezze), reverse=True), ampiezze
+    assert len(ampiezze) == 5, "le varianti dello stesso parametro devono essere adiacenti"
+    assert next(r for r in righe if r["parametro"] == "nu" and r["variante"] == "+0,015")["HC"] < m.bilancio(dati, prof, c)["HC"]
+    tmp = tempfile.mkdtemp()
+    try:
+        A = "it-pianificazione"
+        assert run_script(asset(A, "proiezione-inps.py"), "--json", os.path.join(tmp, "inps.json"), cwd=tmp)[0] == 0
+        assert run_script(asset(A, "netto-pensione.py"), "--json", os.path.join(tmp, "netto.json"), cwd=tmp)[0] == 0
+        senza = _cu_esempio()
+        senza["persona"].pop("eta_pensione")
+        senza.pop("pensione")
+        p = _scrivi_json(os.path.join(tmp, "d.json"), senza)
+        rc, so, se = run_script_split(asset(*CU), "--dati", p, "--from", os.path.join(tmp, "inps.json"),
+                                      "--from", os.path.join(tmp, "netto.json"), "--json", os.path.join(tmp, "cu.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        j = json.load(open(os.path.join(tmp, "cu.json"), encoding="utf-8"))
+        inps = json.load(open(os.path.join(tmp, "inps.json"), encoding="utf-8"))
+        netto = json.load(open(os.path.join(tmp, "netto.json"), encoding="utf-8"))
+        assert j["profilo_usato"]["eta_pensione"] == int(inps["eta_pensionamento"]), j["profilo_usato"]
+        assert j["profilo_usato"]["pensione_netta"] == netto["netto_pensione_inps"]
+        assert j["sensibilita"] and len(j["sensibilita"]) == 9
+        # --set prevale su --dati
+        rc, so, se = run_script_split(asset(*CU), "--set", "ETA_PENSIONE=70", "--json", os.path.join(tmp, "cu.json"), cwd=tmp)
+        assert rc == 0 and json.load(open(os.path.join(tmp, "cu.json"), encoding="utf-8"))["profilo_usato"]["eta_pensione"] == 70
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:

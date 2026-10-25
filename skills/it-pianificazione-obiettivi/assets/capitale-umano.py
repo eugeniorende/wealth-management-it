@@ -447,6 +447,52 @@ def stampa_settore(z):
     print("   Il fondo pensione non entra nel calcolo: la sua composizione non è disponibile.")
 
 
+NOMI_PARAMETRI = {"s": "quota azionaria del capitale umano", "nu": "premio ν del profilo", "g": "crescita reale del reddito",
+                  "p_u": "probabilità di perdere il lavoro", "r_f": "tasso reale privo di rischio"}
+
+
+def sensibilita(dati, profilo, c):
+    """Diagnosi 5: un parametro alla volta, capitale umano ed esposizione totale rispetto al caso base.
+    Ordinate per l'effetto più ampio sull'esposizione totale, con le varianti dello stesso parametro vicine."""
+    import copy
+    base = bilancio(dati, profilo, c)["esposizione_totale"]
+
+    def con_g(g):
+        d = copy.deepcopy(dati)
+        d["persona"]["crescita_reale"] = g
+        return d
+
+    varianti = [
+        ("s", numero(0.10, 3, segno=True), dati, dict(profilo, quota_azionaria_hc=min(profilo["quota_azionaria_hc"] + 0.10, 1)), c),
+        ("s", numero(-0.10, 3, segno=True), dati, dict(profilo, quota_azionaria_hc=max(profilo["quota_azionaria_hc"] - 0.10, 0)), c),
+        ("nu", numero(0.015, 3, segno=True), dati, dict(profilo, nu=profilo["nu"] + 0.015), c),
+        ("nu", numero(-0.015, 3, segno=True), dati, dict(profilo, nu=max(profilo["nu"] - 0.015, 0)), c),
+        ("g", pct(0, 0), con_g(0.0), profilo, c),
+        ("g", pct(0.02, 0), con_g(0.02), profilo, c),
+        ("p_u", "× 2", dati, dict(profilo, p_u=min(profilo["p_u"] * 2, 1)), c),
+        ("r_f", numero(0.01, 3, segno=True), dati, profilo, dict(c, R_F=c["R_F"] + 0.01)),
+        ("r_f", numero(-0.01, 3, segno=True), dati, profilo, dict(c, R_F=c["R_F"] - 0.01)),
+    ]
+    righe = []
+    for parametro, variante, d, prof, cc in varianti:
+        b = bilancio(d, prof, cc)
+        righe.append({"parametro": parametro, "variante": variante, "HC": b["HC"],
+                      "esposizione_totale": b["esposizione_totale"], "delta": b["esposizione_totale"] - base})
+    ampiezza = {}
+    for r in righe:
+        ampiezza[r["parametro"]] = max(ampiezza.get(r["parametro"], 0), abs(r["delta"]))
+    ordine = sorted(ampiezza, key=lambda k: -ampiezza[k])
+    return sorted(righe, key=lambda r: ordine.index(r["parametro"]))
+
+
+def stampa_sensibilita(righe):
+    print("\n5. SENSIBILITÀ (un parametro alla volta, dal più influente)")
+    print(f"   {'Parametro':<38}{'Variante':>10}{'Cap. umano':>14}{'Esposizione':>13}{'Differenza':>14}")
+    for r in righe:
+        print(f"   {NOMI_PARAMETRI[r['parametro']]:<38}{r['variante']:>10}{euro(r['HC']):>14}"
+              f"{pct(r['esposizione_totale']):>13}{numero(r['delta'] * 100, 1, segno=True) + ' punti':>14}")
+
+
 def risolvi_costanti(dati, nomi_set):
     """Età di pensione, pensione netta ed età finale con la precedenza --set > --dati > --from > default."""
     global ETA_PENSIONE, PENSIONE_NETTA, ETA_FINE
@@ -541,6 +587,9 @@ def main():
         F_az_comp = sum(q["valore"] for q in posizioni if q["asset_class"] == "azionario" and q.get("strumento") in comp)
         z = sovrapposizione(posizioni, comp, settore, F_az_comp, b["HC_az"], PESI_MONDO)
         stampa_settore(z)
+    sens = sensibilita(dati, profilo, c)
+    stampa_sensibilita(sens)
+    print("\nNon è consulenza: è una lente per ragionare sul rischio complessivo, non un'allocazione da adottare.")
 
     if args.json:
         scrivi_json(args.json, {
@@ -551,7 +600,7 @@ def main():
             "proiezione": p["anni"],
             "eta_sorpasso": p["eta_sorpasso"],
             "settore": z,
-            "sensibilita": None,
+            "sensibilita": sens,
             "profilo_usato": {**{k: v for k, v in profilo.items() if k not in ("fonte", "natura")},
                               "eta_pensione": c["ETA_PENSIONE"], "pensione_netta": c["PENSIONE_NETTA"],
                               "eta_fine": c["ETA_FINE"], "origine": origine},
