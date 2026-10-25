@@ -206,6 +206,9 @@ def t_check_ruleset():
     assert not any("||" in r or r == "true" for r in righe), righe
     suite = ci.split("\n  suite:\n")[1].split("\n\n  #")[0]
     assert "matrix:" in suite and "RICHIEDI_LIBREOFFICE" in suite, "la matrice con LibreOffice è il job suite"
+    # T17: il cruscotto si verifica in Chromium, obbligatorio nel job suite
+    assert "RICHIEDI_BROWSER" in suite and "playwright==1.55.0" in suite, "Playwright fissato e obbligatorio nel job suite"
+    assert "playwright install --with-deps chromium" in suite, "Chromium installato da Playwright nel job suite"
 
 
 @test("igiene CI: le action dei workflow sono fissate per SHA completo")
