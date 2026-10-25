@@ -4622,6 +4622,44 @@ def t_autonomi_perimetro():
         assert superato not in gs, f"previdenza-gestione-separata.md: «{superato}»"
 
 
+# ═══════════════════════════ T15: capitale umano ═══════════════════════════
+
+CU = ("it-pianificazione-obiettivi", "capitale-umano.py")
+
+
+@test("T15 capitale umano: valori chiusi della valutazione")
+def t_cu_valutazione():
+    m = carica_modulo(asset(*CU))
+    # rendita: g = 0, frazione 1, ν = 0 → formula chiusa
+    assert abs(m.valore_capitale_umano(32000, 0, 32, 0.01, 0, 1) - 32000 * (1 - 1.01 ** -32) / 0.01) < 0.01
+    assert m.valore_capitale_umano(32000, 0.01, 0, 0.01, 0.03, 1) == 0
+    assert abs(m.frazione_lavorata(0.08, 0.5, 0.6) - 0.984) < 1e-12
+    assert abs(m.valore_pensione(18000, 32, 55, 0.01, 0.0075) - 194248.56) < 0.01
+    assert m.quota_azionaria_effettiva(0.3, 1) == 1 and abs(m.quota_azionaria_effettiva(0.3, 0.5) - 0.65) < 1e-12
+    # invarianti: il capitale umano decresce con ν e con p_u, cresce con g
+    base = m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.03, 0.984)
+    assert abs(base - 705036.01) < 0.01, base
+    assert m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.04, 0.984) < base
+    assert m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.03, m.frazione_lavorata(0.16, 0.5, 0.6)) < base
+    assert m.valore_capitale_umano(35000, 0.02, 32, 0.01, 0.03, 0.984) > base
+
+
+@test("T15 capitale umano: profili con fonte, natura e valori plausibili")
+def t_cu_profili():
+    m = carica_modulo(asset(*CU))
+    p = m.carica_profili()
+    assert set(p) == {"pubblico", "privato_stabile", "privato_ciclico", "finanza", "autonomo", "imprenditore"}, set(p)
+    assert p["privato_ciclico"]["quota_azionaria_hc"] == 0.30 and p["privato_ciclico"]["nu"] == 0.03
+    assert p["finanza"]["settore_default"] == "Financials"
+    for nome, r in p.items():
+        assert r["fonte"].strip() and r["natura"].strip(), nome
+        assert 0 <= r["quota_azionaria_hc"] <= 1 and 0 <= r["nu"] <= 0.10 and -1 <= r["rho"] <= 1, nome
+        assert 0 <= r["sigma_h"] <= 0.5 and 0 <= r["p_u"] <= 0.5 and 0 <= r["sostituzione_naspi"] <= 1, nome
+        assert r["settore_default"] in (None, *m.SETTORI_GICS), nome
+    e = m.profilo_effettivo({"profilo": "privato_ciclico", "override": {"p_u": 0.08}}, p)
+    assert e["p_u"] == 0.08 and p["privato_ciclico"]["p_u"] == 0.05   # l'override non tocca la tabella
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:
