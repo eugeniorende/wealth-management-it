@@ -5304,6 +5304,44 @@ def t_ce_uscita():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T16 composizione ETF: capitale-umano legge i due formati, catena dall'importatore")
+def t_ce_capitale_umano():
+    cu = carica_modulo(asset(*CU))
+    vecchio = cu.leggi_composizione(asset("it-pianificazione-obiettivi", "esempio-composizione.csv"))
+    assert abs(vecchio["ETF MSCI World"]["Information Technology"] - 0.27) < 1e-12, vecchio   # invariato
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--strumento", "ETF MSCI World", "--file", _xlsx_emittente("vanguard", tmp),
+                                      "--strumento", "ETF FTSE", "--out", out, cwd=tmp)
+        assert rc == 0, se[-300:]
+        comp = cu.leggi_composizione(out)
+        assert set(comp) == {"ETF MSCI World"}, comp                             # il Vanguard in ICB non ha settori
+        assert abs(comp["ETF MSCI World"]["Information Technology"] - 0.4040) < 1e-9, comp
+        dati = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+        dati["persona"]["settore"] = "Information Technology"
+        dati["posizioni"] = [{"asset_class": "azionario", "valore": 60000, "strumento": "ETF MSCI World"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "ETF FTSE"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "etf msci world"}]
+        pd_ = os.path.join(tmp, "cu.json")
+        with open(pd_, "w", encoding="utf-8") as f:
+            json.dump(dati, f)
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out,
+                                      "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        z = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))["settore"]
+        assert abs(z["quota_settore_fin"] - 0.4040) < 1e-4, z                   # solo la posizione con la composizione
+        assert z["mancanti"] == ["ETF FTSE", "etf msci world"], z["mancanti"]  # il refuso di maiuscole è visibile
+        assert "etf msci world" in so
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("ETF MSCI World;valuta;USD;100\n")
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out, cwd=tmp)
+        assert rc == 1 and "valuta" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
 
 def _righe_csv_ordini(cartella):

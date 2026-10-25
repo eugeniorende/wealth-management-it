@@ -446,7 +446,9 @@ def stampa_proiezione(p):
 
 
 def leggi_composizione(path):
-    """Composizione settoriale degli strumenti: CSV strumento;settore;peso (righe «#» saltate, BOM ammesso).
+    """Composizione settoriale degli strumenti, da un CSV in uno dei due formati (righe «#» saltate, BOM ammesso):
+    strumento;dimensione;voce;peso scritto da importa-composizione-etf.py, di cui contano le righe «settore»
+    (le righe «paese» servono ad altro), oppure strumento;settore;peso compilato a mano.
     Pesi in frazione o in percento (se quelli di uno strumento sommano più di 1,5), virgola o punto."""
     if not os.path.exists(path):
         errore(f"--composizione: file non trovato: {path}")
@@ -458,13 +460,23 @@ def leggi_composizione(path):
         testo = grezzo.decode("cp1252", errors="replace")   # «CSV» semplice di Excel italiano
     righe = [r for r in testo.splitlines() if r.strip(" ;\t") and not r.lstrip().startswith("#")]
     lettore = csv.DictReader(righe, delimiter=";")
-    if not lettore.fieldnames or not {"strumento", "settore", "peso"} <= {c.strip() for c in lettore.fieldnames}:
-        errore("--composizione: servono le colonne strumento;settore;peso")
+    colonne = {c.strip() for c in lettore.fieldnames or ()}
+    importato = {"strumento", "dimensione", "voce", "peso"} <= colonne
+    if not importato and not {"strumento", "settore", "peso"} <= colonne:
+        errore("--composizione: servono le colonne strumento;dimensione;voce;peso (da importa-composizione-etf.py) "
+               "o strumento;settore;peso")
     comp = {}
     for r in lettore:
         r = {k.strip(): (v or "").strip() for k, v in r.items() if k is not None}   # «;» in fondo alle righe
         if not any(r.values()):
             continue
+        if importato:
+            if r["dimensione"] not in ("settore", "paese"):
+                errore(f"--composizione: dimensione {r['dimensione']!r} sconosciuta ({r['strumento']}): "
+                       "attese «settore» o «paese»")
+            if r["dimensione"] != "settore":
+                continue
+            r["settore"] = r["voce"]
         if r["settore"] not in SETTORI_GICS:
             errore(f"--composizione: settore {r['settore']!r} non GICS: usa uno di {', '.join(SETTORI_GICS)}")
         try:
@@ -665,7 +677,8 @@ def main():
     args = cli(__doc__.strip().splitlines()[0].split("— ", 1)[1], spazio=globals(), json=True, da_json=DA_JSON,
                argomenti=[(("--dati",), {"metavar": "FILE", "help": "JSON di persona e patrimonio (default: l'esempio)"}),
                           (("--composizione",), {"metavar": "FILE",
-                                                 "help": "CSV strumento;settore;peso per la sovrapposizione settoriale"})])
+                                                 "help": "CSV della composizione per la sovrapposizione settoriale (strumento;dimensione;voce;peso da "
+                                                         "importa-composizione-etf.py, o strumento;settore;peso compilato a mano)"})])
     esempio = args.dati is None
     dati = leggi_dati(ESEMPIO if esempio else args.dati)
     persona = dati["persona"]
