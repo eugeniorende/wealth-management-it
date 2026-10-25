@@ -335,6 +335,7 @@ SCRIPT_CLI = [
     ("it-pianificazione", "riscatto-laurea.py"),
     ("it-pianificazione-obiettivi", "allocatore-capitale.py"),
     ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
+    ("it-pianificazione-obiettivi", "capitale-umano.py"),
     ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
@@ -369,7 +370,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 14 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 15 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -4648,6 +4649,7 @@ def t_cu_valutazione():
 def t_cu_profili():
     m = carica_modulo(asset(*CU))
     p = m.carica_profili()
+    assert p == m.carica_profili(asset("it-pianificazione-obiettivi", "profili-capitale-umano.csv"))
     assert set(p) == {"pubblico", "privato_stabile", "privato_ciclico", "finanza", "autonomo", "imprenditore"}, set(p)
     assert p["privato_ciclico"]["quota_azionaria_hc"] == 0.30 and p["privato_ciclico"]["nu"] == 0.03
     assert p["finanza"]["settore_default"] == "Financials"
@@ -4658,6 +4660,79 @@ def t_cu_profili():
         assert r["settore_default"] in (None, *m.SETTORI_GICS), nome
     e = m.profilo_effettivo({"profilo": "privato_ciclico", "override": {"p_u": 0.08}}, p)
     assert e["p_u"] == 0.08 and p["privato_ciclico"]["p_u"] == 0.05   # l'override non tocca la tabella
+
+
+def _cu(*args, cwd=None):
+    return run_script_split(asset(*CU), *args, cwd=cwd)
+
+
+def _cu_esempio():
+    return json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+
+
+def _scrivi_json(path, dati):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dati, f)
+    return path
+
+
+@test("T15 capitale umano: bilancio, esposizione ed equivalenza sull'esempio")
+def t_cu_bilancio():
+    tmp = tempfile.mkdtemp()
+    try:
+        out_json = os.path.join(tmp, "cu.json")
+        rc, so, se = _cu("--json", out_json, cwd=tmp)
+        assert rc == 0 and "dati d'esempio" in so, se[-300:]
+        j = json.load(open(out_json, encoding="utf-8"))
+        b = j["bilancio"]
+        assert abs(b["HC"] - 705036.01) < 0.01 and abs(b["PP"] - 194248.56) < 0.01 and b["F"] == 113000, b
+        assert abs(j["esposizione_finanziaria"] - 0.610619) < 1e-5 and abs(j["esposizione_totale"] - 0.277107) < 1e-5
+        assert j["equivalenza"] is None
+        m = carica_modulo(asset(*CU))
+        assert m.equivalenza(0.5, b)["limite"] == "max" and m.equivalenza(0.5, b)["x"] == 1
+        assert m.equivalenza(0.1, b)["limite"] == "min" and m.equivalenza(0.1, b)["x"] == 0
+        assert abs(m.equivalenza(0.25, b)["x"] - 0.361781) < 1e-5
+        assert "calcolo, non target" in m.equivalenza(0.25, b)["messaggio"]
+        # s = 0 con un portafoglio azionario: esposizione totale < finanziaria
+        dati = _cu_esempio()
+        dati["persona"]["override"]["quota_azionaria_hc"] = 0
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "s0.json"), dati), "--json", out_json, cwd=tmp)
+        j = json.load(open(out_json, encoding="utf-8"))
+        assert rc == 0 and j["esposizione_totale"] < j["esposizione_finanziaria"], se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: dati incoerenti respinti con rc 1, casi limite gestiti")
+def t_cu_errori():
+    tmp = tempfile.mkdtemp()
+    def con(modifica):
+        d = _cu_esempio()
+        modifica(d)
+        return _scrivi_json(os.path.join(tmp, "d.json"), d)
+    try:
+        for modifica, atteso in [
+            (lambda d: d["persona"].update(profilo="astronauta"), "profilo"),
+            (lambda d: d["persona"].update(eta=95), "eta_fine"),
+            (lambda d: d["persona"].update(eta_pensione=30), "eta_pensione"),
+            (lambda d: d["fondo_pensione"].update(quota_azionaria=60), "quota"),
+            (lambda d: d.update(liquidita=-1), "negativ"),
+            (lambda d: d.update(persone=[d.pop("persona")]), "persona"),
+        ]:
+            rc, so, se = _cu("--dati", con(modifica), cwd=tmp)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and atteso in se, (atteso, rc, se[-200:])
+        # portafoglio vuoto con l'equivalenza richiesta: niente divisione per zero
+        def vuoto(d):
+            d.update(posizioni=[], liquidita=0, esposizione_totale_desiderata=0.3)
+        rc, so, se = _cu("--dati", con(vuoto), "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        j = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))
+        assert j["equivalenza"]["x"] is None and "nessun portafoglio" in j["equivalenza"]["messaggio"]
+        # asset_class sconosciuta: non azionaria, con un avviso che la nomina
+        rc, so, se = _cu("--dati", con(lambda d: d["posizioni"].append({"asset_class": "oro", "valore": 5000})), cwd=tmp)
+        assert rc == 0 and "oro" in so and "non azionari" in so, so[-400:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 # ══════════════════════ freshness · json · guardia ══════════════════════
