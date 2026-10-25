@@ -2,7 +2,7 @@
 name: it-pianificazione-obiettivi
 description: "Pianificazione finanziaria per obiettivi (goals-based) per investitori privati italiani: più obiettivi (fondo di emergenza, casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte, importo e priorità, profilo di allocazione e piano di accumulo. Usa questa skill quando l'utente parla di pianificare gli investimenti, da dove iniziare, quanto mettere da parte al mese, fondo di emergenza, risparmiare per la casa o per i figli, asset allocation per obiettivo, orizzonte e rischio, «ho X € e non so come allocarli», PAC, bucket strategy, probabilità di raggiungere un obiettivo, Monte Carlo del piano, glide path, capitale umano (reddito da lavoro nella ricchezza totale, «sono un'azione o un'obbligazione?»). È il passo a monte di `it-rebalance`: definisce l'allocazione target che quella mantiene. Postura educativa e metodologica: mostra allocazioni-tipo come esempi, NON raccomanda titoli specifici, NON sceglie l'allocazione al posto dell'utente e NON è consulenza di investimento."
 metadata:
-  version: "0.21"
+  version: "0.22"
 ---
 
 # it-pianificazione-obiettivi
@@ -227,7 +227,7 @@ Il JSON ha la forma di `assets/esempio-capitale-umano.json` (persona, pensione, 
 
 1. **bilancio patrimoniale totale**: finanziario, capitale umano (parte azionaria e obbligazionaria, dal profilo di lavoro) e capitale pensionistico;
 2. **esposizione azionaria** del patrimonio finanziario contro quella della ricchezza totale, con la riga di equivalenza facoltativa (`esposizione_totale_desiderata`);
-3. **proiezione** fino alla pensione con la fascia Monte Carlo: a parità di allocazione l'esposizione totale sale con l'età;
+3. **proiezione** fino alla pensione con i percentili del Monte Carlo, con portafoglio, fondo pensione e TFR separati e i trasferimenti di ogni anno: a parità di allocazione l'esposizione totale sale con l'età;
 4. **sovrapposizione settoriale** tra il settore del proprio lavoro e il portafoglio, contro il peso del settore nel mercato mondiale;
 5. **sensibilità** ai parametri del profilo.
 

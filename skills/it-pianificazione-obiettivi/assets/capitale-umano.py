@@ -189,6 +189,8 @@ def leggi_dati(path):
     if "eta_pensione" in persona:
         _non_negativo("persona.eta_pensione", persona["eta_pensione"])
     _quota("persona.quota_reddito_azioni_datore", persona.get("quota_reddito_azioni_datore", 0))
+    if not isinstance(persona.get("tfr_nel_fondo", False), bool):
+        errore(f"persona.tfr_nel_fondo = {persona['tfr_nel_fondo']!r}: serve true o false")
     for k, v in (persona.get("override") or {}).items():
         if k in ("quota_azionaria_hc", "p_u", "sostituzione_naspi"):
             _quota(f"persona.override.{k}", v)
@@ -215,6 +217,31 @@ def leggi_dati(path):
     if d.get("esposizione_totale_desiderata") is not None:
         _quota("esposizione_totale_desiderata", d["esposizione_totale_desiderata"])
     return d
+
+
+CHIAVI_NOTE = {
+    "": {"persona", "pensione", "posizioni", "fondo_pensione", "tfr_maturato_azienda", "liquidita", "risparmio_annuo",
+         "esposizione_totale_desiderata", "altri_attivi"},
+    "persona": {"profilo", "settore", "eta", "eta_pensione", "netto_annuo", "crescita_reale", "tfr_annuo", "tfr_nel_fondo",
+                "contributo_datore_fp", "quota_reddito_azioni_datore", "override"},
+    "pensione": {"netta_annua", "eta_fine"},
+    "fondo_pensione": {"valore", "quota_azionaria"},
+}
+
+
+def chiavi_sconosciute(dati):
+    """Le chiavi del JSON che lo script non legge (un refuso vale zero in silenzio). Le chiavi che iniziano con
+    «_» sono note libere; le posizioni non si controllano, perché si copiano dal JSON di it-rebalance con
+    campi in più (broker, categoria fiscale, plus)."""
+    ignote = []
+    for sezione, note in CHIAVI_NOTE.items():
+        blocco = dati if not sezione else dati.get(sezione)
+        if not isinstance(blocco, dict):
+            continue
+        for k in blocco:
+            if k not in note and not k.startswith("_"):
+                ignote.append(f"{sezione}.{k}" if sezione else k)
+    return ignote
 
 
 def verifica_eta(persona, c):
@@ -303,77 +330,117 @@ def equivalenza(T, b):
 
 
 def proiezione(dati, profilo, c, quote_glide, n_sim, seed):
-    """Diagnosi 3: anno per anno fino a 5 anni dopo la pensione. Percorso atteso (rendimenti e crescita ai
-    valori centrali) e fascia P10-P90 dell'esposizione totale da un Monte Carlo con shock di borsa e di
-    reddito correlati (Ibbotson et al. 2007, eq. A.6-A.9). Il patrimonio finanziario è un solo contenitore
-    con la quota azionaria di oggi o quella del glide path dell'anno."""
+    """Diagnosi 3: anno per anno fino a 5 anni dopo la pensione (o dopo l'età attuale, se è più alta), senza
+    superare l'età finale. Percorso atteso (rendimenti e crescita ai valori centrali) e fascia P10-P50-P90
+    dell'esposizione totale da un Monte Carlo con shock di borsa e di reddito correlati (Ibbotson et al.
+    2007, eq. A.6-A.9).
+    Il patrimonio è in tre contenitori: portafoglio (posizioni e liquidità, con la quota azionaria di oggi o
+    quella del glide path dall'anno 1), fondo pensione (con la sua quota) e TFR in azienda (obbligazionario).
+    Ogni anno di lavoro il risparmio entra nel portafoglio, il contributo del datore nel fondo pensione e il
+    TFR nel contenitore TFR, o nel fondo con persona.tfr_nel_fondo: quello che esce dal capitale umano entra
+    nel patrimonio. L'anno 0 è la fotografia di oggi e coincide con la diagnosi 2."""
     persona = dati["persona"]
     eta0, ep = persona["eta"], c["ETA_PENSIONE"]
     g = persona.get("crescita_reale", 0.01)
-    reddito0 = persona.get("netto_annuo", 0) + persona.get("tfr_annuo", 0) + persona.get("contributo_datore_fp", 0)
+    tfr_annuo, contributo = persona.get("tfr_annuo", 0), persona.get("contributo_datore_fp", 0)
+    nel_fondo = bool(persona.get("tfr_nel_fondo", False))
+    reddito0 = persona.get("netto_annuo", 0) + tfr_annuo + contributo
     frazione = frazione_lavorata(profilo["p_u"], profilo["durata_anni"], profilo["sostituzione_naspi"])
     s = quota_azionaria_effettiva(profilo["quota_azionaria_hc"], persona.get("quota_reddito_azioni_datore", 0))
     b0 = bilancio(dati, profilo, c)
-    q0 = b0["esposizione_finanziaria"] or 0.0
+    fp = dati.get("fondo_pensione") or {}
+    q_fondo = fp.get("quota_azionaria", 0)
+    P0, FP0, TFR0 = b0["F_portafoglio"], fp.get("valore", 0), dati.get("tfr_maturato_azienda", 0)
+    q0 = (b0["F_az"] - b0["F_az_fondo"]) / P0 if P0 > 0 else 0.0
     risparmio = dati.get("risparmio_annuo", 0)
-    anni = max(int(ep) + 5, eta0) - eta0 + 1
+    ultimo = max(min(max(int(ep), eta0) + 5, int(c["ETA_FINE"]) - 1), eta0)
+    anni = ultimo - eta0 + 1
     avvisi = []
     if quote_glide is not None and len(quote_glide) < anni:
         avvisi.append(f"glide path più corto della proiezione ({len(quote_glide)} anni su {anni}): "
                       "tenuta l'ultima quota per gli anni successivi")
 
     def quota(t):
-        if quote_glide is None or not len(quote_glide):
+        if t == 0 or quote_glide is None or not len(quote_glide):
             return q0
         return quote_glide[min(t, len(quote_glide) - 1)]
 
     rng = np.random.default_rng(seed)
     rho, sigma_h = profilo["rho"], profilo["sigma_h"]
-    F_det, h_sim, F_sim = b0["F"], np.full(n_sim, float(reddito0)), np.full(n_sim, float(b0["F"]))
-    righe, sorpasso, prima = [], None, None
+    P, FP, TFR = float(P0), float(FP0), float(TFR0)
+    h_sim = np.full(n_sim, float(reddito0))
+    P_sim, FP_sim, TFR_sim = np.full(n_sim, P), np.full(n_sim, FP), np.full(n_sim, TFR)
+    righe, sorpasso, sopra_prima = [], None, None
     for t in range(anni):
         eta = eta0 + t
         anni_lavoro = max(int(ep - eta), 0)
         fattore_hc = valore_capitale_umano(1.0, g, anni_lavoro, c["R_F"], profilo["nu"], frazione)
-        h_det = reddito0 * (1 + g) ** t if anni_lavoro > 0 else 0.0
-        HC = h_det * fattore_hc
+        HC = reddito0 * (1 + g) ** t * fattore_hc if anni_lavoro > 0 else 0.0
         PP = valore_pensione(c["PENSIONE_NETTA"], int(ep - eta), int(c["ETA_FINE"] - eta), c["R_F"], c["NU_PENSIONE"])
         q = quota(t)
-        esposizione = (q * F_det + s * HC) / (F_det + HC + PP)
+        F = P + FP + TFR
+        W = F + HC + PP
+        esposizione = (q * P + q_fondo * FP + s * HC) / W
         HC_sim = h_sim * fattore_hc if anni_lavoro > 0 else np.zeros(n_sim)
-        esp_sim = (q * F_sim + s * HC_sim) / (F_sim + HC_sim + PP)
-        righe.append({"eta": eta, "F": float(F_det), "HC": float(HC), "PP": float(PP), "quota_hc": float(HC / (F_det + HC + PP)),
-                      "esposizione": float(esposizione), "p10": float(np.percentile(esp_sim, 10)),
-                      "p50": float(np.percentile(esp_sim, 50)), "p90": float(np.percentile(esp_sim, 90))})
-        if prima is not None and prima and F_det >= HC and sorpasso is None:
+        esp_sim = (q * P_sim + q_fondo * FP_sim + s * HC_sim) / (P_sim + FP_sim + TFR_sim + HC_sim + PP)
+        righe.append({"eta": eta, "F": F, "portafoglio": P, "fondo": FP, "tfr": TFR,
+                      "az_portafoglio": q * P, "az_fondo": q_fondo * FP, "HC": float(HC), "PP": float(PP),
+                      "quota_hc": float(HC / W), "esposizione": float(esposizione),
+                      "p10": float(np.percentile(esp_sim, 10)), "p50": float(np.percentile(esp_sim, 50)),
+                      "p90": float(np.percentile(esp_sim, 90))})
+        sopra = F > HC
+        if sopra_prima is False and sopra and sorpasso is None:
             sorpasso = eta
-        prima = F_det < HC
-        # anno successivo
+        sopra_prima = sopra
+        # anno successivo: rendimenti, poi i flussi di chi lavora ancora
         lavora = eta < ep and reddito0 > 0
-        F_det = F_det * (1 + q * REND_AZ_REALE + (1 - q) * REND_OBB_REALE) + (risparmio * (1 + g) ** t if lavora else 0)
+        crescita = (1 + g) ** t
+        P = P * (1 + q * REND_AZ_REALE + (1 - q) * REND_OBB_REALE)
+        FP = FP * (1 + q_fondo * REND_AZ_REALE + (1 - q_fondo) * REND_OBB_REALE)
+        TFR = TFR * (1 + REND_OBB_REALE)
+        if lavora:
+            P += risparmio * crescita
+            FP += (contributo + (tfr_annuo if nel_fondo else 0)) * crescita
+            TFR += (0 if nel_fondo else tfr_annuo) * crescita
         z_s, z = rng.standard_normal(n_sim), rng.standard_normal(n_sim)
         z_h = rho * z_s + math.sqrt(1 - rho ** 2) * z
         r_az = np.exp(math.log(1 + REND_AZ_REALE) + SIGMA_AZ * z_s) - 1
-        F_sim = F_sim * (1 + q * r_az + (1 - q) * REND_OBB_REALE) + (risparmio * h_sim / reddito0 if lavora else 0)
+        P_sim = P_sim * (1 + q * r_az + (1 - q) * REND_OBB_REALE)
+        FP_sim = FP_sim * (1 + q_fondo * r_az + (1 - q_fondo) * REND_OBB_REALE)
+        TFR_sim = TFR_sim * (1 + REND_OBB_REALE)
+        if lavora:
+            k = h_sim / reddito0
+            P_sim = P_sim + risparmio * k
+            FP_sim = FP_sim + (contributo + (tfr_annuo if nel_fondo else 0)) * k
+            TFR_sim = TFR_sim + (0 if nel_fondo else tfr_annuo) * k
         h_sim = h_sim * np.exp(math.log(1 + g) + sigma_h * z_h)
-    return {"anni": righe, "eta_sorpasso": sorpasso, "avvisi": avvisi}
+    if righe and righe[0]["F"] > righe[0]["HC"]:
+        stato = "gia_superato"
+    elif sorpasso is not None:
+        stato = "entro_la_proiezione"
+    else:
+        stato = "non_prima_della_fine"
+    return {"anni": righe, "eta_sorpasso": sorpasso, "stato_sorpasso": stato, "avvisi": avvisi}
 
 
 def stampa_proiezione(p):
-    print("\n3. PROIEZIONE (euro di oggi; esposizione totale attesa e fascia P10-P90 del Monte Carlo)")
-    print(f"   {'Età':>4}{'Finanziario':>14}{'Cap. umano':>14}{'Pensione':>13}{'Peso c.u.':>11}{'Esposizione':>13}{'P10-P90':>16}")
+    print("\n3. PROIEZIONE (euro di oggi; esposizione totale attesa e percentili del Monte Carlo)")
+    print(f"   {'Età':>4}{'Finanziario':>14}{'Cap. umano':>14}{'Pensione':>13}{'Peso c.u.':>11}{'Esposizione':>13}"
+          f"{'P10 · P50 · P90':>24}")
     anni = p["anni"]
     for i, r in enumerate(anni):
         if i % 5 and i != len(anni) - 1:
             continue
         print(f"   {r['eta']:>4}{euro(r['F']):>14}{euro(r['HC']):>14}{euro(r['PP']):>13}{pct(r['quota_hc']):>11}"
-              f"{pct(r['esposizione']):>13}{pct(r['p10']) + '-' + pct(r['p90']):>16}")
-    if p["eta_sorpasso"] is not None:
+              f"{pct(r['esposizione']):>13}{pct(r['p10']) + ' · ' + pct(r['p50']) + ' · ' + pct(r['p90']):>24}")
+    if p["stato_sorpasso"] == "entro_la_proiezione":
         print(f"   Il patrimonio finanziario supera il capitale umano a {p['eta_sorpasso']} anni.")
-    elif anni and anni[0]["F"] >= anni[0]["HC"]:
+    elif p["stato_sorpasso"] == "gia_superato":
         print("   Il patrimonio finanziario supera già il capitale umano.")
     else:
         print("   Il patrimonio finanziario non supera il capitale umano prima della fine della proiezione.")
+    print("   La mediana P50 sta di solito un po' sopra l'esposizione attesa: un portafoglio misto ribilanciato ogni "
+          "anno cresce, in mediana, più della media dei suoi pezzi.")
     for a in p["avvisi"]:
         print(f"   ⚠️  {a}")
 
@@ -465,6 +532,19 @@ NOMI_PARAMETRI = {"s": "quota azionaria del capitale umano", "nu": "premio ν de
                   "p_u": "probabilità di perdere il lavoro", "r_f": "tasso reale privo di rischio"}
 
 
+def punti(frazione):
+    """Differenza di esposizione in punti percentuali, con un decimale; zero senza segno («0,0 punti»)."""
+    v = round(frazione * 100, 1)
+    return "0,0 punti" if v == 0 else f"{numero(v, 1, segno=True)} punti"
+
+
+def etichetta_punti(frazione):
+    """Variazione di un parametro in punti: «+10 punti», «+1,5 punti», «-1 punto»."""
+    v = round(frazione * 100, 6)
+    testo = numero(v, 0 if v == int(v) else 1, segno=True)
+    return f"{testo} {'punto' if abs(v) == 1 else 'punti'}"
+
+
 def sensibilita(dati, profilo, c):
     """Diagnosi 5: un parametro alla volta, capitale umano ed esposizione totale rispetto al caso base.
     Ordinate per l'effetto più ampio sull'esposizione totale, con le varianti dello stesso parametro vicine."""
@@ -477,15 +557,15 @@ def sensibilita(dati, profilo, c):
         return d
 
     varianti = [
-        ("s", numero(0.10, 3, segno=True), dati, dict(profilo, quota_azionaria_hc=min(profilo["quota_azionaria_hc"] + 0.10, 1)), c),
-        ("s", numero(-0.10, 3, segno=True), dati, dict(profilo, quota_azionaria_hc=max(profilo["quota_azionaria_hc"] - 0.10, 0)), c),
-        ("nu", numero(0.015, 3, segno=True), dati, dict(profilo, nu=profilo["nu"] + 0.015), c),
-        ("nu", numero(-0.015, 3, segno=True), dati, dict(profilo, nu=max(profilo["nu"] - 0.015, 0)), c),
+        ("s", etichetta_punti(0.10), dati, dict(profilo, quota_azionaria_hc=min(profilo["quota_azionaria_hc"] + 0.10, 1)), c),
+        ("s", etichetta_punti(-0.10), dati, dict(profilo, quota_azionaria_hc=max(profilo["quota_azionaria_hc"] - 0.10, 0)), c),
+        ("nu", etichetta_punti(0.015), dati, dict(profilo, nu=profilo["nu"] + 0.015), c),
+        ("nu", etichetta_punti(-0.015), dati, dict(profilo, nu=max(profilo["nu"] - 0.015, 0)), c),
         ("g", pct(0, 0), con_g(0.0), profilo, c),
         ("g", pct(0.02, 0), con_g(0.02), profilo, c),
         ("p_u", "× 2", dati, dict(profilo, p_u=min(profilo["p_u"] * 2, 1)), c),
-        ("r_f", numero(0.01, 3, segno=True), dati, profilo, dict(c, R_F=c["R_F"] + 0.01)),
-        ("r_f", numero(-0.01, 3, segno=True), dati, profilo, dict(c, R_F=c["R_F"] - 0.01)),
+        ("r_f", etichetta_punti(0.01), dati, profilo, dict(c, R_F=c["R_F"] + 0.01)),
+        ("r_f", etichetta_punti(-0.01), dati, profilo, dict(c, R_F=c["R_F"] - 0.01)),
     ]
     righe = []
     for parametro, variante, d, prof, cc in varianti:
@@ -501,10 +581,10 @@ def sensibilita(dati, profilo, c):
 
 def stampa_sensibilita(righe):
     print("\n5. SENSIBILITÀ (un parametro alla volta, dal più influente)")
-    print(f"   {'Parametro':<38}{'Variante':>10}{'Cap. umano':>14}{'Esposizione':>13}{'Differenza':>14}")
+    print(f"   {'Parametro':<38}{'Variante':>12}{'Cap. umano':>14}{'Esposizione':>13}{'Differenza':>14}")
     for r in righe:
-        print(f"   {NOMI_PARAMETRI[r['parametro']]:<38}{r['variante']:>10}{euro(r['HC']):>14}"
-              f"{pct(r['esposizione_totale']):>13}{numero(r['delta'] * 100, 1, segno=True) + ' punti':>14}")
+        print(f"   {NOMI_PARAMETRI[r['parametro']]:<38}{r['variante']:>12}{euro(r['HC']):>14}"
+              f"{pct(r['esposizione_totale']):>13}{punti(r['delta']):>14}")
 
 
 def eta_intera(valore, nome, note):
@@ -591,6 +671,9 @@ def main():
     persona = dati["persona"]
     note = []
     persona["eta"] = eta_intera(persona["eta"], "età", note)
+    ignote = chiavi_sconosciute(dati)
+    if ignote:
+        note.append(f"chiavi non riconosciute, ignorate (refusi?): {', '.join(ignote)}")
     nomi_set = {e.split("=", 1)[0].strip() for e in args.set}
     c, origine = risolvi_costanti(dati, nomi_set, note)
     profilo = profilo_effettivo(persona, carica_profili())
@@ -645,6 +728,7 @@ def main():
             "equivalenza": eq,
             "proiezione": p["anni"],
             "eta_sorpasso": p["eta_sorpasso"],
+            "stato_sorpasso": p["stato_sorpasso"],
             "settore": z,
             "sensibilita": sens,
             "profilo_usato": {**{k: v for k, v in profilo.items() if k not in ("fonte", "natura")},
