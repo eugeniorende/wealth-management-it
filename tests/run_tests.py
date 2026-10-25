@@ -4718,6 +4718,7 @@ def t_cu_errori():
             (lambda d: d["fondo_pensione"].update(quota_azionaria=60), "quota"),
             (lambda d: d.update(liquidita=-1), "negativ"),
             (lambda d: d.update(persone=[d.pop("persona")]), "persona"),
+            (lambda d: d["persona"].update(tfr_nel_fondo="sì"), "tfr_nel_fondo"),
         ]:
             rc, so, se = _cu("--dati", con(modifica), cwd=tmp)
             assert rc == 1 and se.lstrip().startswith("ERRORE:") and atteso in se, (atteso, rc, se[-200:])
@@ -4821,7 +4822,7 @@ def t_cu_sensibilita_catena():
         ampiezze[-1][1] = max(ampiezze[-1][1], abs(r["delta"]))
     assert [a[1] for a in ampiezze] == sorted((a[1] for a in ampiezze), reverse=True), ampiezze
     assert len(ampiezze) == 5, "le varianti dello stesso parametro devono essere adiacenti"
-    assert next(r for r in righe if r["parametro"] == "nu" and r["variante"] == "+0,015")["HC"] < m.bilancio(dati, prof, c)["HC"]
+    assert next(r for r in righe if r["parametro"] == "nu" and r["variante"] == "+1,5 punti")["HC"] < m.bilancio(dati, prof, c)["HC"]
     tmp = tempfile.mkdtemp()
     try:
         A = "it-pianificazione"
@@ -4890,6 +4891,87 @@ def t_cu_revisione_finale():
             f.write("strumento;settore;peso\nA;Tecnologia;100\n")
         rc, so, se = _cu("--composizione", comp, cwd=tmp)
         assert rc == 1 and "1. BILANCIO" not in so, so[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: proiezione a tre contenitori, TFR e contributi trasferiti, orizzonte dei pensionati")
+def t_cu_contenitori():
+    m = carica_modulo(asset(*CU))
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    b = m.bilancio(dati, prof, c)
+    # l'anno 0 è la fotografia di oggi, anche con un glide path: coincide con la diagnosi 2
+    for glide in (None, [0.9, 0.9, 0.5]):
+        r0 = m.proiezione(dati, prof, c, glide, 50, 1)["anni"][0]
+        assert abs(r0["esposizione"] - b["esposizione_totale"]) < 1e-12, (glide, r0["esposizione"], b["esposizione_totale"])
+    # il glide path agisce solo sul portafoglio, dall'anno 1: fondo pensione e TFR tengono la loro quota
+    g1 = m.proiezione(dati, prof, c, [0.0, 0.0], 50, 1)["anni"][1]
+    assert g1["az_fondo"] > 0 and g1["az_portafoglio"] == 0, g1
+    # con rendimenti, crescita e risparmio a zero il TFR fa crescere il patrimonio di tfr_annuo l'anno
+    m.REND_AZ_REALE, m.REND_OBB_REALE, m.SIGMA_AZ = 0.0, 0.0, 0.0
+    try:
+        d = _cu_esempio()
+        d["persona"].update(crescita_reale=0, tfr_annuo=3000, contributo_datore_fp=1000)
+        d["risparmio_annuo"] = 0
+        righe = m.proiezione(d, prof, c, None, 20, 1)["anni"]
+        assert abs((righe[1]["F"] - righe[0]["F"]) - 4000) < 1e-6, righe[1]["F"] - righe[0]["F"]
+        assert abs((righe[1]["tfr"] - righe[0]["tfr"]) - 3000) < 1e-6 and abs((righe[1]["fondo"] - righe[0]["fondo"]) - 1000) < 1e-6
+        d["persona"]["tfr_nel_fondo"] = True
+        righe = m.proiezione(d, prof, c, None, 20, 1)["anni"]
+        assert righe[1]["tfr"] == righe[0]["tfr"] and abs((righe[1]["fondo"] - righe[0]["fondo"]) - 4000) < 1e-6
+        # dopo la pensione non entra più niente
+        ultimi = [r for r in righe if r["eta"] >= 67]
+        assert all(abs(x["F"] - ultimi[0]["F"]) < 1e-6 for x in ultimi)
+    finally:
+        m.REND_AZ_REALE, m.REND_OBB_REALE, m.SIGMA_AZ = 0.03, 0.005, 0.18
+    # un pensionato di 80 anni: cinque anni di proiezione, senza superare l'età finale
+    pens = _cu_esempio()
+    pens["persona"].update(eta=80, netto_annuo=0, tfr_annuo=0)
+    eta = [r["eta"] for r in m.proiezione(pens, prof, c, None, 20, 1)["anni"]]
+    assert eta == list(range(80, 86)), eta
+    pens["persona"]["eta"] = 87
+    eta = [r["eta"] for r in m.proiezione(pens, prof, c, None, 20, 1)["anni"]]
+    assert eta[0] == 87 and eta[-1] <= 89 and len(eta) > 1, eta
+
+
+@test("T15 capitale umano: report leggibile (sensibilità in punti, P50, stato del sorpasso, chiavi sconosciute)")
+def t_cu_report():
+    m = carica_modulo(asset(*CU))
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    varianti = {(r["parametro"], r["variante"]) for r in m.sensibilita(dati, prof, c)}
+    assert varianti == {("s", "+10 punti"), ("s", "-10 punti"), ("nu", "+1,5 punti"), ("nu", "-1,5 punti"),
+                        ("g", "0%"), ("g", "2%"), ("p_u", "× 2"), ("r_f", "+1 punto"), ("r_f", "-1 punto")}, varianti
+    assert m.punti(-0.0002) == "0,0 punti" and m.punti(0.0123) == "+1,2 punti" and m.punti(-0.07) == "-7,0 punti"
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "cu.json")
+        rc, so, se = _cu("--json", out, cwd=tmp)
+        assert rc == 0 and "P10 · P50 · P90" in so and "-0,0 punti" not in so, so[-1500:]
+        j = json.load(open(out, encoding="utf-8"))
+        assert j["stato_sorpasso"] == "entro_la_proiezione" and j["eta_sorpasso"] is not None
+        pens = _cu_esempio()
+        pens["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "p.json"), pens), "--json", out, cwd=tmp)
+        assert rc == 0 and json.load(open(out, encoding="utf-8"))["stato_sorpasso"] == "gia_superato"
+        povero = _cu_esempio()
+        povero.update(posizioni=[], liquidita=0, risparmio_annuo=0, tfr_maturato_azienda=0)
+        povero["fondo_pensione"]["valore"] = 0
+        povero["persona"].update(tfr_annuo=0, contributo_datore_fp=0)
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "n.json"), povero), "--json", out, cwd=tmp)
+        j = json.load(open(out, encoding="utf-8"))
+        assert rc == 0 and j["stato_sorpasso"] == "non_prima_della_fine" and j["eta_sorpasso"] is None, j["stato_sorpasso"]
+        # chiavi sconosciute: avviso che le nomina; «_nota» e i campi extra delle posizioni sono ammessi
+        refuso = _cu_esempio()
+        refuso["liquidta"] = 5000
+        refuso["persona"]["netto_anuo"] = 1
+        refuso["posizioni"][0]["broker"] = "Fineco"
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "r.json"), refuso), cwd=tmp)
+        assert rc == 0 and "liquidta" in so and "persona.netto_anuo" in so, so[:1200]
+        assert "_nota" not in so and "broker" not in so
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -5118,7 +5200,8 @@ def t_contratto_revisione():
                   ("imp.json", "posizioni[].valore"), ("imp.json", "analisi.per_broker[].zainetto_in_scadenza"),
                   ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"),
                   ("cu.json", "esposizione_finanziaria"), ("cu.json", "esposizione_totale"),
-                  ("cu.json", "settore.quota_settore_fin"), ("cu.json", "settore.sovrappeso"), ("cu.json", "eta_sorpasso"))
+                  ("cu.json", "settore.quota_settore_fin"), ("cu.json", "settore.sovrappeso"), ("cu.json", "eta_sorpasso"),
+                  ("cu.json", "stato_sorpasso"))
         for nome, percorso in attese:
             assert percorso.replace("[]", "[") .split("[")[0].split(".")[-1] in tabella or percorso in tabella, \
                 f"la tabella del contratto non nomina «{percorso}»"

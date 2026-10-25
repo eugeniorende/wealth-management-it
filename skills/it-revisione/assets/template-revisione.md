@@ -57,7 +57,7 @@ Glide path: [qualche obiettivo richiede de-risking quest'anno? quale, di quanto]
 
 - Esposizione azionaria: patrimonio finanziario [—]% contro ricchezza totale [—]%
 - Settore del lavoro nel portafoglio azionario: [—]% contro [—]% del mercato mondiale [sovrappeso sì/no]
-- Età in cui il patrimonio finanziario supera il capitale umano: [—]
+- Età in cui il patrimonio finanziario supera il capitale umano: [—] (oppure «già superato» o «non prima della pensione»)
 - Nota: è una lente per leggere il rischio complessivo, non un target; non cambia l'allocazione
 
 ### Fiscalità *(da `it-tax-optimization`)*

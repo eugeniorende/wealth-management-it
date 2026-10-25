@@ -198,6 +198,7 @@ Prese il 20/10/2026.
   - [x] Diagnosi 1-5 con la riga di equivalenza.
   - [x] Integrazione in `it-revisione` (contratto di input e template).
   - [x] Test con valori chiusi, invarianti e il caso di Ibbotson et al. 2007.
+  - [x] Gli otto minori della revisione finale: proiezione a tre contenitori con TFR e contributi trasferiti, orizzonte dei pensionati, P50, sensibilità in punti, `stato_sorpasso`, chiavi non riconosciute, mediana del Monte Carlo spiegata.
   - Sviluppi successivi, da decidere: secondo reddito del nucleo; volatilità personale del reddito dall'estratto INPS (`importa-previdenza.py`); aggiustamento dei target (il capitale umano che modifica l'allocazione); polizza vita (Ibbotson et al. cap. 3; Chen et al. 2006).
 - [ ] **T16 Fonti dati esterne e connettori** (P2). Principio: gli script di calcolo restano offline; il dato si procura a parte (importatore su file, o Claude che lo scarica nella cartella di lavoro) e lo script legge un file locale. Per ogni fonte si annotano licenza (quelle a pagamento non si ridistribuiscono nel repository) e mese di verifica.
 
