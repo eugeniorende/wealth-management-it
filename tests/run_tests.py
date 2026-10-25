@@ -5342,6 +5342,30 @@ def t_ce_capitale_umano():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T16 composizione ETF: skill, reference, comando e revisione allineati")
+def t_ce_documentazione():
+    ob = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    skill = open(os.path.join(ob, "SKILL.md"), encoding="utf-8").read()
+    step8 = skill.split("Step 8")[1]
+    assert "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" in step8 and "--strumento" in step8
+    assert step8.index("importa-composizione-etf.py") < step8.index("capitale-umano.py\" --dati"), step8[:600]
+    assert "references/composizione-etf.md" in skill and 'version: "0.23"' in skill
+    ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
+    for parola in ("iShares", "Xtrackers", "Vanguard", "Amundi", "SPDR", "ICB", "da confermare", "non si ridistribuisc",
+                   "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py"):
+        assert parola in ref, parola
+    assert "importa-composizione-etf.py" in open(os.path.join(ob, "references", "capitale-umano.md"), encoding="utf-8").read()
+    # il comando è un alias e non nomina script (t_dove_lavorare): rimanda all'importatore della skill
+    assert "importatore della composizione" in open(os.path.join(ROOT, "commands", "capitale-umano.md"), encoding="utf-8").read()
+    rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    assert "importa-composizione-etf.py" in rev.split("### Contratto di input")[1].split("\n## ")[0]
+    t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
+    assert "composizione-etf" in t16 and "Look-through" in t16 and "tedesc" in t16, t16[:400]
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "Tutti i 17 script" in readme and "importa-composizione-etf.py" in readme
+    assert "importatore della composizione" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().lower()
+
+
 # ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
 
 def _righe_csv_ordini(cartella):

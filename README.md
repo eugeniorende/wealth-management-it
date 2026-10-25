@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 160 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 166 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007), l'importatore della composizione degli ETF (layout sintetici dei cinque emittenti, esclusioni, fusione del CSV) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -92,10 +92,11 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 6: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
 | `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 16: T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
-| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 21: T15 capitale umano ×10; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 |
+| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 24: T15 capitale umano ×10; T16 composizione ETF ×3; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati … |
 | `it-pianificazione-obiettivi/assets/decumulo-obiettivi.py` | 9: T12 rami avanzati; T9 formati; T9 interfaccia ×2; decumulo-obiettivi; obiettivi; serie storica ×2 … |
-| `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 9: T15 capitale umano; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione |
+| `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 10: T15 capitale umano; T16 composizione ETF; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione |
 | `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 19: T12 rami avanzati; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati … |
+| `it-pianificazione-obiettivi/assets/importa-composizione-etf.py` | 9: T16 composizione ETF ×6; T9 formati; T9 interfaccia ×2 |
 | `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 23: T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
 | `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 25: T12 Excel ×2; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 interfaccia; T9 lettore unico del pianificatore … |
 | `it-pianificazione-obiettivi/assets/profili-capitale-umano.csv` | 1: T15 capitale umano |
@@ -171,7 +172,7 @@ Ogni skill ha una versione propria, nel campo `metadata.version` del frontmatter
 | 1 | `tax-loss-harvesting` | `it-tax-optimization` | ✅ v0.11 (minus/plus, multi-broker, dichiarativo RT/RW/IVAFE, Tobin tax 2026, cripto: base + avanzata + casi speciali) + importatore estratti broker |
 | 2 | `financial-plan` | `it-pianificazione` | ✅ v0.13 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione, riscatto della laurea) |
 | 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.5 (pensione autonomi/forfettari, casse professionali, Excel, rivalsa e acconti del secondo anno) |
-| 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.22 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo, capitale umano) |
+| 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.23 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo, capitale umano, importatore della composizione degli ETF) |
 | 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.8 (tax-aware con versamenti, aliquota per posizione e rientro misto, multi-broker, bande 5/25, prelievo in decumulo, sequenza di liquidazione, ordini CSV, piano in JSON per il cruscotto) |
 | 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.8 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR, **cruscotto grafico** pubblicabile come Artifact) |
 
@@ -227,6 +228,7 @@ Cosa conviene sapere:
 - `importa-previdenza.py` legge l'estratto conto INPS e il prospetto del fondo pensione. Di default stampa intestatario e data di nascita, da cui calcola l'età; con `--anonimo` li omette e stampa l'età arrotondata all'anno. Le retribuzioni le stampa aggregate per anno, senza i datori di lavoro;
 - gli estratti dei broker contengono posizioni e importi; prima di passarli, togli quello che al calcolo non serve: intestatario, codice fiscale, IBAN, numero di dossier;
 - per i calcoli bastano età, importi e date: nomi e identificativi non servono a nessuno strumento del plugin;
+- `importa-composizione-etf.py` legge i file delle posizioni degli ETF che scarichi dal sito dell'emittente: restano nella cartella di lavoro, lo script non li invia a nessuno e il plugin non li ridistribuisce;
 - il cruscotto grafico (`genera-cruscotto.py`, comando `/cruscotto`) è un file HTML che resta nella cartella di lavoro e si apre offline. Pubblicarlo come Artifact lo mette su claude.ai, privato finché non lo condividi: Claude lo fa solo dopo una tua conferma esplicita, ogni volta. La pagina porta importi, età e proiezioni del piano, ma non ISIN né descrizioni delle singole posizioni.
 
 ### Verifica
@@ -256,7 +258,7 @@ Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazion
 
 ### Convenzioni degli script
 
-Tutti i 16 script del plugin seguono la stessa interfaccia, verificata dalla suite:
+Tutti i 17 script del plugin seguono la stessa interfaccia, verificata dalla suite:
 
 - `--help` descrive argomenti e opzioni; un argomento o un flag non riconosciuto ferma lo script con l'usage.
 - Codici d'uscita: **0** riuscito; **1** errore nei dati o nei parametri (file mancante o illeggibile, valori incoerenti, costante `--set` sconosciuta), con un messaggio che inizia per `ERRORE:` su stderr; **2** riga di comando non riconosciuta.

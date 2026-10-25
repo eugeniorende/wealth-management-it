@@ -2,7 +2,7 @@
 name: it-pianificazione-obiettivi
 description: "Pianificazione finanziaria per obiettivi (goals-based) per investitori privati italiani: più obiettivi (fondo di emergenza, casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte, importo e priorità, profilo di allocazione e piano di accumulo. Usa questa skill quando l'utente parla di pianificare gli investimenti, da dove iniziare, quanto mettere da parte al mese, fondo di emergenza, risparmiare per la casa o per i figli, asset allocation per obiettivo, orizzonte e rischio, «ho X € e non so come allocarli», PAC, bucket strategy, probabilità di raggiungere un obiettivo, Monte Carlo del piano, glide path, capitale umano (reddito da lavoro nella ricchezza totale, «sono un'azione o un'obbligazione?»). È il passo a monte di `it-rebalance`: definisce l'allocazione target che quella mantiene. Postura educativa e metodologica: mostra allocazioni-tipo come esempi, NON raccomanda titoli specifici, NON sceglie l'allocazione al posto dell'utente e NON è consulenza di investimento."
 metadata:
-  version: "0.22"
+  version: "0.23"
 ---
 
 # it-pianificazione-obiettivi
@@ -221,8 +221,11 @@ Principio: il **dossier amministrato è il default**; si devia verso un contenit
 Il portafoglio non è tutta la ricchezza di chi lavora: il bene più grande è spesso il **capitale umano**, il valore attuale dei redditi da lavoro futuri, più la pensione INPS che verrà. Questo step li mette nel conto, per capire se il portafoglio **compensa** il capitale umano o lo **duplica** (un dipendente pubblico ha già una grossa «obbligazione»; chi lavora in finanza o nella tecnologia ha già molta «azione», spesso dello stesso settore).
 
 ```
+python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv --strumento "ETF MSCI World" [--file … --strumento …]
 python "${CLAUDE_SKILL_DIR}/assets/capitale-umano.py" --dati capitale-umano.json --composizione composizione.csv --json capitale-umano-out.json
 ```
+
+La composizione per la diagnosi 4 si importa dal **file delle posizioni** di ogni ETF, scaricato dalla pagina del fondo sul sito dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, italiano o inglese): l'importatore scrive `composizione.csv` per settore GICS e paese, con le esclusioni dichiarate. `--strumento` va scritto come il campo `strumento` delle posizioni, altrimenti lo strumento finisce tra quelli senza composizione. Formati, esclusioni e limiti in `references/composizione-etf.md`; la compilazione a mano di `composizione.csv` resta possibile.
 
 Il JSON ha la forma di `assets/esempio-capitale-umano.json` (persona, pensione, posizioni con lo schema di `it-rebalance`); età di pensione e pensione netta possono arrivare con `--from` dai JSON di `proiezione-inps.py` e `netto-pensione.py`. Le cinque diagnosi:
 
@@ -374,6 +377,7 @@ Workflow tipico end-to-end: l'utente parte da qui per definire obiettivi e alloc
 - `assets/decumulo-obiettivi.py` — simulazione del decumulo: probabilità di successo, sensibilità sul tasso di prelievo, dimostrazione del rischio di sequenza, confronto con/senza buffer, lente USA vs scenario globale (de-rating) (richiede numpy; usa rendimenti-storici.csv)
 - `references/mercati-e-correlazione.md` — le due correzioni di onestà al Monte Carlo: la **non-USA-centricità** (l'azionario mondiale rende ~5,2% reale vs gli USA eccezionali, fonte DMS; de-rating e calibrazione globale) e la **correlazione sistemica** tra obiettivi (un crollo li colpisce insieme; l'indipendenza sottostima il rischio che saltino tutti nello stesso scenario)
 - `references/capitale-umano.md` — il capitale umano nella ricchezza totale: modello (Ibbotson, Milevsky, Chen e Zhu 2007), quota azionaria per profilo di lavoro, NASpI, le cinque diagnosi, esempio svolto, limiti e bibliografia verificata
+- `references/composizione-etf.md` — l'importatore della composizione degli ETF: dove si scarica il file delle posizioni per emittente, colonne riconosciute, esclusioni (liquidità, derivati, righe non classificate), stato dei layout verificati, limiti e licenza
 - `assets/capitale-umano.py` — la lente del capitale umano: bilancio patrimoniale totale, esposizione azionaria del portafoglio contro quella della ricchezza totale (con la riga di equivalenza), proiezione con fascia Monte Carlo, sovrapposizione settoriale, sensibilità; non modifica i target (richiede numpy)
 - `assets/profili-capitale-umano.csv` — i sei profili di lavoro (quota azionaria del capitale umano, premio ν, correlazione e volatilità del reddito, probabilità di perdere il lavoro, NASpI), con la fonte e la natura di ogni valore
 - `assets/esempio-capitale-umano.json` — dati d'esempio di `capitale-umano.py` (sviluppatore di 35 anni nel privato), da copiare nella cartella di lavoro e compilare
