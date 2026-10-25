@@ -378,4 +378,5 @@ Workflow tipico end-to-end: l'utente parte da qui per definire obiettivi e alloc
 - `assets/profili-capitale-umano.csv` — i sei profili di lavoro (quota azionaria del capitale umano, premio ν, correlazione e volatilità del reddito, probabilità di perdere il lavoro, NASpI), con la fonte e la natura di ogni valore
 - `assets/esempio-capitale-umano.json` — dati d'esempio di `capitale-umano.py` (sviluppatore di 35 anni nel privato), da copiare nella cartella di lavoro e compilare
 - `assets/esempio-composizione.csv` — composizione settoriale d'esempio (pesi illustrativi) per `capitale-umano.py --composizione`
+- `assets/importa-composizione-etf.py` — importatore della composizione degli ETF: dal file delle posizioni dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, italiano o inglese) a `composizione.csv` per settore GICS e paese (richiede openpyxl per gli XLSX)
 - **Vedi anche** `it-rebalance/SKILL.md` (mantenimento delle allocazioni), `it-tax-optimization/SKILL.md` (fiscalità degli strumenti), `it-pianificazione/SKILL.md` (obiettivo pensione)

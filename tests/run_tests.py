@@ -4981,6 +4981,79 @@ def t_cu_report():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ═══════════════════════════ T16: composizione degli ETF ═══════════════════════════
+
+CE = ("it-pianificazione-obiettivi", "importa-composizione-etf.py")
+
+
+@test("T16 composizione ETF: lettura della tabella (intestazione, preambolo, fine, numeri, formati di file)")
+def t_ce_lettura():
+    m = carica_modulo(asset(*CE))
+    for nome, sep in (("composizione-ishares-en.csv", ","), ("composizione-ishares-it.csv", ";")):
+        righe, foglio = m.leggi_righe(os.path.join(FIXTURES, nome))
+        i, col, testi = m.trova_intestazione(righe)
+        assert i == 5 and foglio is None, (nome, i)
+        assert set(col) == {"peso", "settore", "paese", "asset_class", "nome"}, col
+        dati = m.righe_dati(righe, i, col["peso"])
+        assert len(dati) == 8, (nome, len(dati))                 # il disclaimer in fondo non entra
+        v = m.virgola_decimale([r[col["peso"]] for r in dati])
+        assert v is (sep == ";")
+        assert [m.peso_numerico(r[col["peso"]], v) for r in dati] == [30, 20, 15, 15, 10, 9, 0.8, 0.2]
+    assert testi["peso"] == "Ponderazione (%)" and testi["paese"] == "Area geografica"
+    assert m.peso_numerico("1.234,5", True) == 1234.5 and m.peso_numerico("1,234.5", False) == 1234.5
+    assert m.peso_numerico("4,46%", True) == 4.46 and m.peso_numerico("N/A", False) is None
+    assert m.peso_numerico(0.0565, False) == 0.0565
+    # precedenza tra due candidate: «Sector Classification» batte «Industry Classification»
+    _, col, testi = m.trova_intestazione([["ISIN", "Percent of Fund", "Trade Country Name",
+                                           "Industry Classification", "Sector Classification"]])
+    assert testi["settore"] == "Sector Classification" and col["settore"] == 4
+    tmp = tempfile.mkdtemp()
+    try:
+        # CSV risalvato da Excel italiano: cp1252, «;», righe di soli «;»
+        p = os.path.join(tmp, "excel.csv")
+        with open(p, "w", encoding="cp1252") as f:
+            f.write("Fondo;;;\nPosizioni al;30/09/2026;;\n;;;\nNome;Settore;Area geografica;Ponderazione (%)\n"
+                    "ALPHA;Informatica;Stati Uniti;60,0\nBETA;Sanità;Giappone;40,0\n;;;\n")
+        righe, _ = m.leggi_righe(p)
+        i, col, _ = m.trova_intestazione(righe)
+        assert i == 3 and len(m.righe_dati(righe, i, col["peso"])) == 2
+        assert righe[5][1] == "Sanità"
+        # XLSX con l'intestazione alla riga 4 e il titolo del foglio
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "2026-10-25"
+        ws.append([None])
+        ws.append(["Although information in this document…"])
+        ws.append([None])
+        ws.append([None, "Name", "ISIN", "Country", "Type of Security", "Industry Classification", "Weighting"])
+        ws.append([1, "ALPHA", "US0000000001", "United States", "Equities", "Information Technology", 0.6])
+        px = os.path.join(tmp, "x.xlsx")
+        wb.save(px)
+        righe, foglio = m.leggi_righe(px)
+        i, col, _ = m.trova_intestazione(righe)
+        assert foglio == "2026-10-25" and i == 3 and col["peso"] == 6
+        # errori: pagina HTML, file mancante, scheda prodotto, estensione
+        ph = os.path.join(tmp, "pagina.csv")
+        with open(ph, "w", encoding="utf-8") as f:
+            f.write("  <!DOCTYPE html><html><head><title>iShares</title></head></html>")
+        for percorso, atteso in ((ph, "pagina HTML"), ("/non/esiste.csv", "non trovato")):
+            rc, so, se = run_script_split(asset(*CE), "--file", percorso, "--strumento", "X", cwd=tmp)
+            assert rc == 1 and se.startswith("ERRORE:") and atteso in se and "Traceback" not in se, se[-300:]
+        ps = os.path.join(tmp, "scheda.csv")
+        with open(ps, "w", encoding="utf-8") as f:
+            f.write("Caratteristiche principali\nTER,0.20%\nValuta,USD\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", ps, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "file delle posizioni" in se and "TER" in se, se[-300:]
+        pp = os.path.join(tmp, "f.pdf")
+        with open(pp, "w", encoding="ascii") as f:    # non «wb»: t_cli_utf8 vuole encoding= o «rb» in ogni open()
+            f.write("%PDF-1.4")
+        rc, so, se = run_script_split(asset(*CE), "--file", pp, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "XLSX o CSV" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
 
 def _righe_csv_ordini(cartella):
