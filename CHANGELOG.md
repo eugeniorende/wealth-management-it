@@ -8,6 +8,8 @@ Ogni skill ha anche una versione propria (`metadata.version` nel frontmatter di 
 
 Su `develop` dopo il tag `v0.11.0`.
 
+- **Cruscotto grafico del piano** (T17): nuovo `genera-cruscotto.py` in it-revisione, passo 6 della skill e comando `/cruscotto`. Legge i `--json` degli script (allocatore, glide path, Monte Carlo degli obiettivi, proiezione INPS, Monte Carlo e netto della pensione, capitale umano, importatore dei broker, ribilanciamento), ne riconosce il tipo dalle chiavi e scrive una pagina HTML autosufficiente (`cruscotto.html`, nessuna risorsa esterna) con nove sezioni: indicatori, allocazione attuale contro target con le bande, obiettivi con probabilità e capitale P10–P90, glide path, pensione lorda e netta, capitale umano con il sorpasso, zainetto per scadenza, drift e ordini del ribilanciamento, disclaimer. Le sezioni senza JSON non compaiono; un JSON non riconosciuto, incompleto o doppio ferma lo script. La pagina non porta ISIN né descrizioni delle posizioni. Claude la pubblica come Artifact su claude.ai solo dopo un sì esplicito. Test in Python e in Chromium (Playwright, obbligatorio in CI). Spec e piano in `docs/sviluppo/`.
+- **Il piano del ribilanciamento in JSON** (T17): `ribilanciamento-multibroker.py --json FILE` scrive drift con le bande, allocazione risultante, imposta, zainetto residuo e ordini; stdout e CSV invariati.
 - **Capitale umano, i minori della revisione finale** (T15): la proiezione tiene separati portafoglio, fondo pensione e TFR in azienda, con il glide path solo sul portafoglio e dall'anno 1 (l'anno 0 coincide con la diagnosi 2); ogni anno di lavoro TFR e contributo del datore passano dal capitale umano al patrimonio (`persona.tfr_nel_fondo` per il TFR nel fondo), e la reference definisce `risparmio_annuo`. L'orizzonte arriva a 5 anni oltre l'età più alta tra pensione ed età attuale, entro l'età finale. Report: percentili P10 · P50 · P90 e la ragione per cui la mediana sta sopra il percorso atteso; sensibilità in punti, con «0,0 punti» senza segno; avviso sulle chiavi non riconosciute del JSON. Nuova chiave `stato_sorpasso`, letta anche da it-revisione. Sull'esempio il sorpasso passa da 56 a 54 anni.
 - **Capitale umano nella ricchezza totale** (T15): nuovo `capitale-umano.py` in it-pianificazione-obiettivi, Step 8 della skill e comando `/capitale-umano`. Valuta il capitale umano (valore attuale dei redditi da lavoro netti, con TFR, probabilità di perdere il lavoro e NASpI) e la pensione INPS come blocco obbligazionario, con la quota azionaria esplicita per profilo di lavoro (sei profili in `profili-capitale-umano.csv`, con fonte e natura di ogni valore). Cinque diagnosi: bilancio patrimoniale totale; esposizione azionaria del patrimonio finanziario contro quella della ricchezza totale, con la riga di equivalenza facoltativa («calcolo, non target»); proiezione fino alla pensione con fascia Monte Carlo a shock di reddito e borsa correlati; sovrapposizione tra il settore del lavoro e il portafoglio contro i pesi dell'MSCI ACWI (scheda del 30/09/2026); sensibilità. Sull'esempio (sviluppatore di 35 anni) l'esposizione azionaria è 61,1% sul portafoglio e 27,7% sulla ricchezza totale. Legge con `--from` i JSON di `proiezione-inps.py`, `netto-pensione.py` e `glidepath-obiettivi.py`; `it-revisione` ne riporta esposizioni e sovrapposizione. Reference `capitale-umano.md` con il metodo di Ibbotson, Milevsky, Chen e Zhu (2007), la bibliografia verificata e la NASpI letta sull'art. 4 D.Lgs. 22/2015 e sulla Circ. INPS 4/2026. Spec e piano in `docs/sviluppo/`.
 - **CI per il ruleset** (PR #54): il ruleset di `main` e `develop` chiede i check `test` e `validate`, ma i job della matrice si chiamano «test (3.11)» e «test (3.14)», quindi un check «test» non arrivava mai e ogni PR restava bloccata. La matrice ora è il job `suite`, e un job `test` la riassume con quello Windows: verde solo se lo sono entrambi.
@@ -561,6 +563,9 @@ Roadmap:
 
 ### it-rebalance
 
+#### v0.8 (non rilasciato)
+- `--json FILE`: il piano in JSON (drift per classe con le due bande, allocazione risultante, imposta, zainetto residuo, ordini dei CSV), letto dal cruscotto grafico di `it-revisione`. Lo stdout e i CSV non cambiano.
+
 #### v0.7 (plugin 0.11.0)
 - Input da file (`--dati`, `--zainetto`, `--out`) invece delle costanti in testa allo script; CSV degli ordini con `;` e la colonna `categoria_fiscale`; sinonimi del vocabolario accettati.
 - `--dati` con chiavi e tipi controllati (niente completamenti dai dati d'esempio), aliquota in percentuale convertita con un avviso, zainetto allineato ai nomi delle posizioni; la riga NOTA del CSV dichiara i dati d'esempio.
@@ -591,6 +596,9 @@ Roadmap:
 - ✅ Modulazione della banda per la volatilità della classe: fatta in v0.5 (fattore clampato sulla 5/25, con la tensione teorica documentata onestamente), oltre l'allargamento cost-aware
 
 ### it-revisione
+
+#### v0.8 (non rilasciato)
+- Passo 6 «Cruscotto grafico»: `genera-cruscotto.py` e il template `cruscotto.html`, comando `/cruscotto`; conferma esplicita prima di pubblicare l'Artifact, due anti-pattern nuovi.
 
 #### v0.7 (plugin 0.11.0)
 - `genera-ips.py --dati`; contratto di input del cruscotto (script `--json` → campo → cella); IPS in Word con titolo e lingua italiana nelle proprietà del documento.

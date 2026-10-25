@@ -36,6 +36,12 @@ jobs:
           cache: pip
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
+      # Playwright e Chromium per i test che aprono il cruscotto grafico (it-revisione) nel browser.
+      # Solo qui e non in tests/requirements.txt: il job Windows e chi lancia la suite in locale non ne
+      # hanno bisogno (senza Playwright quei test risultano saltati). Versione fissata: aggiornarla a mano.
+      - name: Installa Playwright e Chromium
+        timeout-minutes: 10
+        run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
       # LibreOffice per i test che ricalcolano gli Excel (scripts/ricalcola-excel.py).
       # I .deb restano in cache tra un run e l'altro: su alcuni runner il mirror li
       # serve a ~70 KB/s (perché e come, in scripts/installa-libreoffice.sh). Oltre
@@ -60,6 +66,7 @@ jobs:
       - run: python tests/run_tests.py --skip freshness
         env:
           RICHIEDI_LIBREOFFICE: "1"   # in CI i test degli Excel non si saltano
+          RICHIEDI_BROWSER: "1"       # né quelli del cruscotto nel browser
 
   # Windows: script e suite devono girare anche con una console cp1252 e i percorsi con
   # la barra rovesciata. Una sola versione di Python (il minimo dichiarato) e niente

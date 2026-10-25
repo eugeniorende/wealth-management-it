@@ -206,6 +206,9 @@ def t_check_ruleset():
     assert not any("||" in r or r == "true" for r in righe), righe
     suite = ci.split("\n  suite:\n")[1].split("\n\n  #")[0]
     assert "matrix:" in suite and "RICHIEDI_LIBREOFFICE" in suite, "la matrice con LibreOffice è il job suite"
+    # T17: il cruscotto si verifica in Chromium, obbligatorio nel job suite
+    assert "RICHIEDI_BROWSER" in suite and "playwright==1.55.0" in suite, "Playwright fissato e obbligatorio nel job suite"
+    assert "playwright install --with-deps chromium" in suite, "Chromium installato da Playwright nel job suite"
 
 
 @test("igiene CI: le action dei workflow sono fissate per SHA completo")
@@ -340,6 +343,7 @@ SCRIPT_CLI = [
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
     ("it-rebalance", "ribilanciamento-multibroker.py"),
+    ("it-revisione", "genera-cruscotto.py"),
     ("it-revisione", "genera-ips.py"),
     ("it-tax-optimization", "importa-estratto-broker.py"),
 ]
@@ -348,6 +352,7 @@ ARGOMENTI_DEFAULT = {
     "importa-previdenza.py": (os.path.join(FIXTURES, "estratto-inps-test.xml"),
                               os.path.join(FIXTURES, "storico-fondo-test.csv")),
     "importa-estratto-broker.py": (os.path.join(FIXTURES, "estratto-broker-test.csv"),),
+    "genera-cruscotto.py": ("--from", os.path.join(FIXTURES, "cruscotto-allocatore.json")),
 }
 _OUTPUT_CP1252 = {}
 
@@ -370,7 +375,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 15 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 16 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -4974,6 +4979,465 @@ def t_cu_report():
         assert "_nota" not in so and "broker" not in so
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
+
+def _righe_csv_ordini(cartella):
+    """(broker, operazione, classe, importo) di ogni riga dei CSV degli ordini, senza la riga NOTA finale."""
+    import csv
+    righe = []
+    for nome in sorted(os.listdir(cartella)):
+        with open(os.path.join(cartella, nome), encoding="utf-8-sig", newline="") as f:
+            r = list(csv.reader(f, delimiter=";"))
+        for riga in r[1:]:
+            if riga and riga[1] != "NOTA":
+                righe.append((riga[0], riga[1], riga[2], float(riga[5].replace(".", "").replace(",", "."))))
+    return righe
+
+
+@test("T17 ribilanciamento --json: chiavi del piano, ordini uguali ai CSV, stdout invariato")
+def t_t17_ribilancia_json():
+    script = asset("it-rebalance", "ribilanciamento-multibroker.py")
+    a, b = tempfile.mkdtemp(), tempfile.mkdtemp()
+    try:
+        rc, out = run_script(script, "--out", "ordini", cwd=a)
+        rc_json, out_json = run_script(script, "--out", "ordini", "--json", "piano.json", cwd=b)
+        assert rc == 0 and rc_json == 0, (rc, rc_json, out_json[-400:])
+        riga_json = "JSON del piano: piano.json\n"
+        assert out_json.count(riga_json) == 1 and out == out_json.replace(riga_json, ""), out_json[-600:]
+        d = json.load(open(os.path.join(b, "piano.json"), encoding="utf-8"))
+        chiavi = {"totale", "totale_post", "imposta", "prelievo", "entrate", "liquidato", "drift", "risultante",
+                  "zainetto", "ordini"}
+        assert chiavi <= set(d), set(d)
+        assert d["totale"] == 100000 and d["imposta"] == 0, (d["totale"], d["imposta"])
+        az = d["drift"]["azionario"]
+        assert az["fuori_banda"] is True and abs(az["peso"] - 0.68) < 1e-9, az
+        assert {"peso", "target", "drift", "tight", "wide", "fuori_banda", "esito", "motivo"} <= set(az), set(az)
+        assert abs(d["risultante"]["azionario"] - 0.60) < 1e-6, d["risultante"]
+        assert round(d["zainetto"]["Fineco"]) == 1800, d["zainetto"]
+        dal_json = sorted((o["broker"], o["operazione"], o["classe"], round(o["importo_eur"], 2)) for o in d["ordini"])
+        assert dal_json and dal_json == sorted(_righe_csv_ordini(os.path.join(b, "ordini"))), dal_json
+        # file di output non scrivibile → ERRORE e rc 1
+        rc, so, se = run_script_split(script, "--out", "ordini", "--json", "/non/esiste/x.json", cwd=b)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, (rc, se[-300:])
+        assert "ERRORE:" not in so and "Traceback" not in se, so[-300:]
+    finally:
+        shutil.rmtree(a, ignore_errors=True)
+        shutil.rmtree(b, ignore_errors=True)
+    # Review Focus 4: zainetto Fineco a zero → nessun ordine, il drift resta fuori banda, JSON serializzabile
+    m, p = _ribilancia(ZAINETTO={"Fineco": 0, "Directa": 0})
+    d = m.piano_json(p, m.genera_ordini(p))
+    assert d["ordini"] == [] and d["drift"]["azionario"]["fuori_banda"] is True, d["ordini"]
+    json.dumps(d)
+
+
+_JSON_ESEMPIO = {}
+NOME_PERICOLOSO = "</script><img src=x onerror=alert(1)> & l'«anticipo»"
+
+
+def _json_esempio():
+    """I JSON degli script del piano sugli esempi del plugin, generati una volta per esecuzione della suite:
+    {nome del file: percorso}. Sono gli input reali del cruscotto."""
+    if not _JSON_ESEMPIO:
+        tmp = tempfile.mkdtemp(prefix="cruscotto-")
+        pian = asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx")
+        OB, PE = (lambda n: asset("it-pianificazione-obiettivi", n)), (lambda n: asset("it-pianificazione", n))
+        lanci = [
+            ("alloc.json", OB("allocatore-capitale.py"), [pian]),
+            ("glide.json", OB("glidepath-obiettivi.py"), [pian]),
+            ("mco.json", OB("montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
+            ("cu.json", OB("capitale-umano.py"), ["--composizione", OB("esempio-composizione.csv")]),
+            ("dati.json", PE("importa-previdenza.py"), [os.path.join(FIXTURES, "estratto-inps-test.xml"),
+                                                       os.path.join(FIXTURES, "storico-fondo-test.csv"), "--anonimo"]),
+            ("inps.json", PE("proiezione-inps.py"), ["--from", "dati.json"]),
+            ("mc.json", PE("montecarlo-pensione.py"), ["--from", "dati.json", "--from", "inps.json", "--set", "N_SIM=500"]),
+            ("netto.json", PE("netto-pensione.py"), ["--from", "mc.json"]),
+            ("broker.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
+             [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
+            ("piano.json", asset("it-rebalance", "ribilanciamento-multibroker.py"), ["--out", "ordini"]),
+        ]
+        for nome, script, args in lanci:
+            rc, out = run_script(script, *args, "--json", nome, cwd=tmp)
+            assert rc == 0, f"{os.path.basename(script)}: rc {rc}, {out[-300:]}"
+            _JSON_ESEMPIO[nome] = os.path.join(tmp, nome)
+    return _JSON_ESEMPIO
+
+
+def _cruscotto(*sorgenti, cartella=None, extra=()):
+    """Lancia genera-cruscotto.py sui file dati; ritorna (rc, stdout, stderr, bundle o None, html o None)."""
+    cartella = cartella or tempfile.mkdtemp(prefix="cruscotto-out-")
+    args = [a for f in sorgenti for a in ("--from", f)]
+    html, bundle = os.path.join(cartella, "c.html"), os.path.join(cartella, "b.json")
+    rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), *args, "-o", html, "--json", bundle,
+                                  "--data", "2026-10-25", *extra, cwd=cartella)
+    b = json.load(open(bundle, encoding="utf-8")) if rc == 0 else None
+    h = open(html, encoding="utf-8").read() if rc == 0 else None
+    return rc, so, se, b, h
+
+
+def _json_variante(nome, modifica):
+    """Copia di un JSON d'esempio con `modifica(dati)` applicata, nella stessa cartella con un prefisso."""
+    d = json.load(open(_json_esempio()[nome], encoding="utf-8"))
+    modifica(d)
+    path = os.path.join(os.path.dirname(_json_esempio()[nome]), "variante-" + nome)
+    json.dump(d, open(path, "w", encoding="utf-8"), ensure_ascii=False)
+    return path
+
+
+@test("T17 cruscotto: ogni output reale riconosciuto con il suo tipo, nessuno con due firme")
+def t_t17_riconosci():
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    js = _json_esempio()
+    attesi = {"alloc.json": "allocatore", "glide.json": "glide_path", "mco.json": "mc_obiettivi", "inps.json": "inps",
+              "mc.json": "mc_pensione", "netto.json": "netto_pensione", "cu.json": "capitale_umano",
+              "broker.json": "broker", "piano.json": "ribilanciamento", "dati.json": "ignorato:importa-previdenza"}
+    for nome, tipo in attesi.items():
+        d = json.load(open(js[nome], encoding="utf-8"))
+        assert mod.riconosci(d) == tipo, (nome, mod.riconosci(d))
+        assert sum(1 for _, firma in mod.FIRME if firma(d)) <= 1, nome
+    assert {t for t, _ in mod.FIRME} == {t for t in attesi.values() if not t.startswith("ignorato")}
+    assert mod.riconosci({"a": 1}) is None
+    # ponte e riscatto si riconoscono e si ignorano: la catena previdenziale si passa intera
+    tmp = os.path.dirname(js["inps.json"])
+    PE = lambda n: asset("it-pianificazione", n)
+    rc, out = run_script(PE("riscatto-laurea.py"), "--from", "dati.json", "--from", "inps.json", "--json", "ris.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    rc, out = run_script(PE("montecarlo-pensione.py"), "--from", "dati.json", "--from", "inps.json", "--set", "ANNI=25",
+                         "--set", "N_SIM=500", "--json", "mc-uscita.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    rc, out = run_script(PE("ponte-pensione.py"), "--from", "inps.json", "--from", "mc-uscita.json", "--set", "ETA_USCITA=62",
+                         "--json", "ponte.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    assert mod.riconosci(json.load(open(os.path.join(tmp, "ris.json"), encoding="utf-8"))) == "ignorato:riscatto-laurea"
+    assert mod.riconosci(json.load(open(os.path.join(tmp, "ponte.json"), encoding="utf-8"))) == "ignorato:ponte-pensione"
+
+
+@test("T17 cruscotto: il bundle porta i valori dei JSON di origine e nessuna posizione dell'estratto")
+def t_t17_bundle():
+    js = _json_esempio()
+    L = lambda n: json.load(open(js[n], encoding="utf-8"))
+    tutti = [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
+                             "broker.json", "piano.json")]
+    rc, so, se, b, html = _cruscotto(*tutti)
+    assert rc == 0, (so[-300:], se[-300:])
+    mco, mc, netto, cu, broker, piano = (L(n) for n in ("mco.json", "mc.json", "netto.json", "cu.json", "broker.json", "piano.json"))
+    assert b["generato_il"] == "2026-10-25" and b["versione"] == 1
+    assert b["plugin"] == json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
+    assert [f["tipo"] for f in b["fonti"]] == ["allocatore", "glide_path", "mc_obiettivi", "inps", "mc_pensione",
+                                              "netto_pensione", "capitale_umano", "broker", "ribilanciamento"], b["fonti"]
+    assert b["obiettivi"]["obiettivi"][0]["probabilita_successo"] == mco["obiettivi"][0]["probabilita_successo"]
+    assert b["obiettivi"]["obiettivi"][1]["capitale_finale"] == mco["obiettivi"][1]["capitale_finale"]
+    assert b["pensione"]["tasso_lordo"]["mediana"] == mc["tasso_sostituzione_lordo"]["mediana"]
+    assert b["pensione"]["target"] == mc["target"]
+    assert b["glide_path"]["portafoglio"] == L("glide.json")["portafoglio"]
+    assert b["allocazione"]["target_aggregato"] == L("alloc.json")["aggregato"]
+    ind = {i["id"]: i for i in b["indicatori"]}
+    assert list(ind) == ["capitale_allocato", "valore_portafoglio", "probabilita_essenziali", "sostituzione_netta",
+                         "zainetto_in_scadenza"], list(ind)
+    assert ind["capitale_allocato"]["valore"] == L("alloc.json")["capitale"]
+    assert ind["sostituzione_netta"]["valore"] == next(s for s in netto["scenari"] if s["nome"] == "mediana")["tasso_sostituzione_netto"]
+    assert ind["probabilita_essenziali"]["nota"] == "Fondo di emergenza"
+    assert ind["probabilita_essenziali"]["valore"] == mco["obiettivi"][0]["probabilita_successo"]
+    assert b["capitale_umano"]["eta_sorpasso"] == cu["eta_sorpasso"] and b["capitale_umano"]["stato_sorpasso"] == cu["stato_sorpasso"]
+    assert ind["zainetto_in_scadenza"]["valore"] == broker["analisi"]["zainetto_in_scadenza"]
+    assert ind["valore_portafoglio"]["valore"] == broker["analisi"]["totale_valore"]
+    assert b["ribilanciamento"]["drift"]["azionario"]["drift"] == piano["drift"]["azionario"]["drift"]
+    assert len(b["ribilanciamento"]["ordini"]) == len(piano["ordini"]) > 0
+    for p in broker["posizioni"]:
+        assert p["isin"] not in html and p["descrizione"] not in html and p["isin"] not in json.dumps(b), p["isin"]
+    # stdout: percorso, tipi riconosciuti, sezioni e indicatori in formato italiano
+    assert "Cruscotto:" in so and "mc.json → mc_pensione" in so and "Sezioni:" in so and "€130.000" in so, so[-800:]
+
+
+@test("T17 cruscotto: sezioni assenti, indicatori senza fonte, errori con rc 1 e rc 2")
+def t_t17_errori():
+    js = _json_esempio()
+    rc, so, se, b, _ = _cruscotto(js["alloc.json"])
+    assert rc == 0, se[-300:]
+    assert b["allocazione"] and all(b[k] is None for k in ("obiettivi", "glide_path", "pensione", "capitale_umano",
+                                                            "fiscalita", "ribilanciamento")), b
+    assert [i["id"] for i in b["indicatori"]] == ["capitale_allocato"], b["indicatori"]
+    # Review Focus 3: nessun obiettivo essenziale → niente indicatore della probabilità minima
+    def senza_essenziali(d):
+        for o in d["obiettivi"]:
+            o["priorita"] = "importante"
+    rc, so, se, b, _ = _cruscotto(_json_variante("mco.json", senza_essenziali))
+    assert rc == 0 and [i["id"] for i in b["indicatori"]] == [] and b["obiettivi"], (se[-300:], b and b["indicatori"])
+    # dati.json di importa-previdenza: riconosciuto e ignorato, con un avviso
+    rc, so, se, b, _ = _cruscotto(js["alloc.json"], js["dati.json"])
+    assert rc == 0 and "ℹ" in so and "ignorato" in so and "dati.json" in so, so[-400:]
+
+    def errore(*args, atteso, extra=()):
+        rc, so, se, _, _ = _cruscotto(*args, extra=extra)
+        assert rc == 1, (args, rc, so[-200:], se[-300:])
+        assert se.lstrip().startswith("ERRORE:") and "ERRORE:" not in so and "Traceback" not in se, (so[-200:], se[-300:])
+        for a in (atteso if isinstance(atteso, tuple) else (atteso,)):
+            assert a in se, (a, se[-300:])
+    tmp = tempfile.mkdtemp()
+    try:
+        non_json = os.path.join(tmp, "rotto.json")
+        open(non_json, "w", encoding="utf-8").write("{non è json")
+        lista = os.path.join(tmp, "lista.json")
+        open(lista, "w", encoding="utf-8").write("[1, 2]")
+        ignoto = os.path.join(tmp, "ignoto.json")
+        open(ignoto, "w", encoding="utf-8").write('{"a": 1}')
+        copia = os.path.join(tmp, "mc-uscita.json")
+        shutil.copy(js["mc.json"], copia)
+        errore("/non/esiste.json", atteso="non trovato")
+        errore(non_json, atteso=("rotto.json", "JSON"))
+        errore(lista, atteso="lista.json")
+        errore(ignoto, atteso=("ignoto.json", "non è un output riconosciuto", "mc_pensione"))
+        errore(js["mc.json"], copia, atteso=("mc.json", "mc-uscita.json", "stesso tipo"))
+        # Review Focus 1: un JSON di una versione precedente senza un campo usato
+        errore(_json_variante("mc.json", lambda d: d["tasso_sostituzione_lordo"].pop("p90")),
+               atteso=("variante-mc.json", "tasso_sostituzione_lordo.p90"))
+        errore(js["alloc.json"], extra=("--data", "2026-13-01"), atteso="data")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), "--from", js["alloc.json"],
+                                  "-o", "/non/esiste/c.html")
+    assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, (rc, se[-300:])
+    rc, out = run_script(asset("it-revisione", "genera-cruscotto.py"))
+    assert rc == 2 and "usage:" in out, (rc, out[-300:])
+    rc, out = run_script(asset("it-revisione", "genera-cruscotto.py"), "--from")
+    assert rc == 2 and "usage:" in out, (rc, out[-300:])
+
+
+@test("T17 cruscotto: HTML autosufficiente, segnaposto unico, nomi pericolosi innocui")
+def t_t17_html():
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    js = _json_esempio()
+    tpl = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    assert tpl.count("__DATI_CRUSCOTTO__") == 1
+    def pericoloso(d):
+        d["obiettivi"][0]["nome"] = NOME_PERICOLOSO
+    rc, so, se, b, html = _cruscotto(js["alloc.json"], _json_variante("mco.json", pericoloso))
+    assert rc == 0, se[-300:]
+    for testo in (tpl, html):
+        assert not re.search(r"https?://|(src|href)\s*=\s*[\"']//|@import|fetch\(", testo)
+    assert "__DATI_CRUSCOTTO__" not in html
+    # Review Focus 5: il nome non chiude il tag e il JSON incorporato si rilegge identico
+    assert "</script><img" not in html and html.count("</script>") == tpl.count("</script>")
+    dati = json.loads(re.search(r'<script id="dati" type="application/json">(.*?)</script>', html, re.S).group(1))
+    assert dati["obiettivi"]["obiettivi"][0]["nome"] == NOME_PERICOLOSO
+    assert dati == b
+    for tpl_rotto in ("<p>senza</p>", "__DATI_CRUSCOTTO__ __DATI_CRUSCOTTO__"):
+        try:
+            mod.incorpora(tpl_rotto, {})
+            raise AssertionError("incorpora deve respingere il template")
+        except mod.ErroreDati:
+            pass
+
+
+# Il rendering si verifica in Chromium con Playwright per Python. Senza Playwright i test sono saltati,
+# salvo RICHIEDI_BROWSER=1 (la CI). PLAYWRIGHT_CHROMIUM_EXECUTABLE indica un Chromium già installato
+# fuori dalla cache di Playwright.
+
+def browser():
+    """Il modulo sync di Playwright e una funzione che lancia Chromium; Salta se Playwright manca."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        if os.environ.get("RICHIEDI_BROWSER"):
+            raise AssertionError("RICHIEDI_BROWSER è impostato ma Playwright non è installato")
+        raise Salta("Playwright non installato")
+    def lancia(p):
+        eseguibile = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE")
+        return p.chromium.launch(executable_path=eseguibile) if eseguibile else p.chromium.launch()
+    return sync_playwright, lancia
+
+
+def formato_it_percento(x):
+    """Una frazione come la mostra il cruscotto: un decimale, virgola, «%» attaccato (0,4901 → «49,0%»)."""
+    return f"{x * 100:.1f}".replace(".", ",") + "%"
+
+
+def _apri_cruscotto(pagina, html, schema="light", larghezza=1200):
+    """Scrive l'HTML in un file e lo apre in una pagina nuova; ritorna (page, errori, eccezioni, richieste)."""
+    cartella = tempfile.mkdtemp(prefix="cruscotto-browser-")
+    path = os.path.join(cartella, "c.html")
+    open(path, "w", encoding="utf-8").write(html)
+    contesto = pagina.new_context(color_scheme=schema, viewport={"width": larghezza, "height": 900})
+    page = contesto.new_page()
+    page.set_default_timeout(5000)
+    errori, eccezioni, richieste = [], [], []
+    page.on("console", lambda m: errori.append(m.text) if m.type == "error" else None)
+    page.on("pageerror", lambda e: eccezioni.append(str(e)))
+    page.on("request", lambda r: richieste.append(r.url))
+    page.goto("file://" + path)
+    page.wait_for_load_state("load")
+    return page, errori, eccezioni, richieste
+
+
+SEZIONI_CRUSCOTTO = ("allocazione", "obiettivi", "glide_path", "pensione", "capitale_umano", "fiscalita", "ribilanciamento")
+
+
+def _tutti_i_json():
+    js = _json_esempio()
+    return [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
+                            "broker.json", "piano.json")]
+
+
+@test("T17 cruscotto nel browser: si apre senza errori, ogni sezione col suo SVG, nessuna richiesta di rete")
+def t_t17_browser_rendering():
+    sync_playwright, lancia = browser()
+    rc, so, se, b, html = _cruscotto(*_tutti_i_json())
+    assert rc == 0, se[-300:]
+    rc, _, se, _, solo_alloc = _cruscotto(_json_esempio()["alloc.json"])
+    assert rc == 0, se[-300:]
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, richieste = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert all(r.startswith(("file://", "data:")) for r in richieste), richieste
+            for k in SEZIONI_CRUSCOTTO:
+                assert page.locator(f"#sez-{k} svg").count() >= 1, k
+            assert page.locator("#sez-indicatori").count() == 1
+            page, errori, eccezioni, _ = _apri_cruscotto(br, solo_alloc)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert page.locator("section[id^=sez-]").count() == 2, page.locator("section[id^=sez-]").count()
+        finally:
+            br.close()
+
+
+@test("T17 cruscotto nel browser: numeri in italiano, nomi intatti, null senza NaN, tema scuro, 375px")
+def t_t17_browser_contenuti():
+    sync_playwright, lancia = browser()
+    def pericoloso(d):
+        d["obiettivi"][0]["nome"] = NOME_PERICOLOSO
+    def senza_sorpasso(d):
+        d["eta_sorpasso"], d["stato_sorpasso"] = None, "non_prima_della_fine"
+    def senza_ordini(d):
+        d["ordini"] = []
+    sorgenti = [f for f in _tutti_i_json() if not f.endswith(("mco.json", "cu.json", "piano.json"))]
+    sorgenti += [_json_variante("mco.json", pericoloso), _json_variante("cu.json", senza_sorpasso),
+                 _json_variante("piano.json", senza_ordini)]
+    rc, so, se, b, html = _cruscotto(*sorgenti)
+    assert rc == 0, se[-300:]
+    rc, _, se, b_tutti, html_tutti = _cruscotto(*_tutti_i_json())
+    assert rc == 0, se[-300:]
+    ind = {i["id"]: i for i in b_tutti["indicatori"]}
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti)
+            assert page.inner_text('[data-valore="prob-0"]') == formato_it_percento(b_tutti["obiettivi"]["obiettivi"][0]["probabilita_successo"])
+            assert page.inner_text('[data-valore="sostituzione_netta"]') == formato_it_percento(ind["sostituzione_netta"]["valore"])
+            assert page.inner_text('[data-valore="capitale_allocato"]') == "€130.000", page.inner_text('[data-valore="capitale_allocato"]')
+            assert page.inner_text('[data-valore="valore_portafoglio"]') == "€8.900"
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            corpo = page.inner_text("body")
+            for brutto in ("NaN", "undefined", "null", "Infinity"):
+                assert brutto not in corpo, brutto
+            # Review Focus 5: il nome pericoloso si legge identico, nessun markup interpretato
+            assert NOME_PERICOLOSO in corpo and page.locator("img").count() == 0
+            # Review Focus 2 e 4: nessun sorpasso, nessun ordine, detti a parole
+            assert "nessun sorpasso" in page.inner_text("#sez-capitale_umano").lower()
+            assert "nessun ordine" in page.inner_text("#sez-ribilanciamento").lower()
+            sfondo = lambda pg: pg.evaluate("getComputedStyle(document.body).backgroundColor")
+            chiaro = sfondo(page)
+            scura, errori, eccezioni, _ = _apri_cruscotto(br, html, schema="dark")
+            assert sfondo(scura) != chiaro and errori == [] and eccezioni == [], (chiaro, sfondo(scura))
+            stretta, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti, larghezza=375)
+            larghezza = stretta.evaluate("document.documentElement.scrollWidth")
+            assert larghezza <= 375 and errori == [] and eccezioni == [], larghezza
+        finally:
+            br.close()
+    src = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    for vietato in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"):
+        assert vietato not in src, vietato
+
+
+@test("T17 cruscotto: la skill chiede conferma prima di pubblicare, comando e README allineati")
+def t_t17_skill():
+    skill_md = lambda s: os.path.join(SKILLS, s, "SKILL.md")
+    skill = open(skill_md("it-revisione"), encoding="utf-8").read()
+    assert "### 6. Cruscotto grafico" in skill, "it-revisione: manca il passo 6 «Cruscotto grafico»"
+    passo = skill.split("### 6. Cruscotto grafico")[1].split("\n## ")[0]
+    assert "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" in passo, passo[:300]
+    assert "chiedi" in passo.lower() and "sì esplicito" in passo and "claude.ai" in passo and "Artifact" in passo, passo[:600]
+    anti = skill.split("## Anti-pattern")[1].split("\n## ")[0]
+    assert "senza conferma" in anti and "a mano" in anti, anti[-600:]
+    assert os.path.isfile(os.path.join(ROOT, "commands", "cruscotto.md"))
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "/cruscotto" in readme and "genera-cruscotto.py" in readme
+    dati = readme.split("### Dove vanno i tuoi dati")[1].split("\n### ")[0]
+    assert "Artifact" in dati and "conferma" in dati, dati[-600:]
+    for s in ("it-pianificazione-obiettivi", "it-pianificazione", "it-rebalance"):
+        assert "/cruscotto" in open(skill_md(s), encoding="utf-8").read(), s
+    # revisione finale T17: i file di input degli script stanno nella stessa cartella e non si passano;
+    # due file dello stesso tipo sono una scelta dell'utente, non un file da rigenerare
+    for nome in ("piano.json", "capitale-umano.json", "ips.json"):
+        assert nome in passo, f"il passo 6 deve nominare l'input {nome} da non passare"
+    assert "stesso tipo" in passo and "chiedi all'utente" in passo.lower(), passo[:1500]
+    comando = open(os.path.join(ROOT, "commands", "cruscotto.md"), encoding="utf-8").read()
+    assert "--json" in comando and "input" in comando, comando
+
+
+@test("T17 cruscotto: gli avvisi dell'importatore che nominano le posizioni non entrano nella pagina")
+def t_t17_avvisi_posizioni():
+    # revisione finale T17: gli avvisi dell'importatore nominano la posizione (descrizione o ISIN), e il
+    # testo del consenso dice che le posizioni non ci sono. Restano solo gli avvisi di zainetto e broker.
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"),
+                             os.path.join(FIXTURES, "estratto-pubblici-etc.csv"), "--broker", "Fineco",
+                             "--anno", "2026", "--json", "b.json", cwd=tmp)
+        assert rc == 0, out[-300:]
+        broker = json.load(open(os.path.join(tmp, "b.json"), encoding="utf-8"))
+        nomi = [p[k] for p in broker["posizioni"] for k in ("isin", "descrizione") if p.get(k)]
+        assert any(n in a for a in broker["avvisi"] for n in nomi), "la fixture deve produrre avvisi sulle posizioni"
+        rc, so, se, b, html = _cruscotto(os.path.join(tmp, "b.json"))
+        assert rc == 0, se[-300:]
+        for n in nomi:
+            assert n not in html and n not in json.dumps(b, ensure_ascii=False), n
+        assert b["fiscalita"]["avvisi_omessi"] >= 1, b["fiscalita"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T17 cruscotto: il ribilanciamento sui dati d'esempio lo dice nel JSON e nella pagina")
+def t_t17_dati_esempio():
+    js = _json_esempio()
+    assert json.load(open(js["piano.json"], encoding="utf-8"))["dati_esempio"] is True
+    rc, so, se, b, html = _cruscotto(js["piano.json"])
+    assert rc == 0 and b["ribilanciamento"]["dati_esempio"] is True, se[-300:]
+    # un piano da --dati non è d'esempio
+    m, piano = _ribilancia(DATI_ESEMPIO=False)
+    assert m.piano_json(piano, m.genera_ordini(piano))["dati_esempio"] is False
+    sync_playwright, lancia = browser()
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            for sez in ("#sez-ribilanciamento", "#sez-allocazione"):
+                assert "dati di esempio" in page.inner_text(sez).lower(), sez
+        finally:
+            br.close()
+
+
+@test("T17 cruscotto nel browser: il template aperto senza dati spiega come generarlo, senza errori")
+def t_t17_template_vuoto():
+    # Segnalato dal proprietario: aperto così com'è, il template andava in SyntaxError sul segnaposto e la
+    # pagina restava vuota. Ora dice cosa fare; lo stesso vale per un blocco dati non leggibile.
+    sync_playwright, lancia = browser()
+    tpl = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    rotto = tpl.replace("__DATI_CRUSCOTTO__", '{"versione": 1, "probabilita": NaN}')
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            for html in (tpl, rotto):
+                page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+                assert errori == [] and eccezioni == [], (errori, eccezioni)
+                testo = page.inner_text("#cruscotto")
+                assert "genera-cruscotto.py" in testo and "/cruscotto" in testo, testo
+                assert page.locator("section[id^=sez-]").count() == 0
+        finally:
+            br.close()
 
 
 # ══════════════════════ freshness · json · guardia ══════════════════════

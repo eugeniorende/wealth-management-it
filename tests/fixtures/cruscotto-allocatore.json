@@ -1,0 +1,43 @@
+{
+  "capitale": 130000.0,
+  "aggregato": {
+    "azioni": 75363.31,
+    "obbligazioni": 42636.69,
+    "liquidita": 12000.0,
+    "totale": 130000.0
+  },
+  "surplus_capitale_libero": 28036.82,
+  "deficit": 0.0,
+  "obiettivi": [
+    {
+      "nome": "Fondo di emergenza",
+      "profilo": "Preservazione",
+      "tipo": "permanente",
+      "permanente": true,
+      "richiesto": 12000.0,
+      "allocato": 12000.0,
+      "pieno": true,
+      "peso_az": 0.0
+    },
+    {
+      "nome": "Anticipo casa",
+      "profilo": "Moderato",
+      "tipo": "terminante",
+      "permanente": false,
+      "richiesto": 32822.84901506366,
+      "allocato": 32822.84901506366,
+      "pieno": true,
+      "peso_az": 0.4
+    },
+    {
+      "nome": "Lungo termine / libertà",
+      "profilo": "Crescita",
+      "tipo": "terminante",
+      "permanente": false,
+      "richiesto": 57140.33002367726,
+      "allocato": 57140.33002367726,
+      "pieno": true,
+      "peso_az": 0.65
+    }
+  ]
+}

@@ -93,6 +93,7 @@ I dati personali e i file compilati vivono nella **cartella di lavoro** dell'ute
 - i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/pianificatore-obiettivi.xlsx`;
 - gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/montecarlo-obiettivi.py" pianificatore-obiettivi.xlsx --json montecarlo.json`, `python "${CLAUDE_SKILL_DIR}/assets/glidepath-obiettivi.py" pianificatore-obiettivi.xlsx --json glide.json`, `python "${CLAUDE_SKILL_DIR}/assets/allocatore-capitale.py" pianificatore-obiettivi.xlsx 50000 --json allocazione.json`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+- i JSON scritti con `--json` si vedono in grafico con `/cruscotto` (it-revisione, passo «Cruscotto grafico»), che chiede prima di pubblicare la pagina come Artifact.
 
 `${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze degli script: Python 3.11 o successivo con numpy e openpyxl (`pip install numpy openpyxl`).
 

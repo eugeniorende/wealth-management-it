@@ -1,8 +1,8 @@
 ---
 name: it-revisione
-description: "Revisione periodica personale della situazione finanziaria complessiva: il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole «fare il punto», chiede una revisione annuale o di fine anno, dice «come sta andando il mio piano», «rivediamo il portafoglio», «check-up finanziario», «tiriamo le somme», o a novembre-dicembre vuole una verifica complessiva prima del 31/12; anche per l'Investment Policy Statement (IPS) e il cruscotto patrimoniale. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento), `it-tax-optimization` (minusvalenze di fine anno) e `it-rebalance` (deriva dell'allocazione). NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato."
+description: "Revisione periodica personale della situazione finanziaria complessiva: il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole «fare il punto», chiede una revisione annuale o di fine anno, dice «come sta andando il mio piano», «rivediamo il portafoglio», «check-up finanziario», «tiriamo le somme», o a novembre-dicembre vuole una verifica complessiva prima del 31/12; anche per l'Investment Policy Statement (IPS), il cruscotto patrimoniale e quello grafico del piano. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento), `it-tax-optimization` (minusvalenze di fine anno) e `it-rebalance` (deriva dell'allocazione). NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato."
 metadata:
-  version: "0.7"
+  version: "0.8"
 ---
 
 # Revisione periodica personale
@@ -26,14 +26,14 @@ NON è il posto per una singola analisi verticale: se l'utente chiede solo "quan
 I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
 
 - i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/cruscotto-patrimoniale.xlsx`, `${CLAUDE_SKILL_DIR}/assets/tracker-secchielli.xlsx`, `${CLAUDE_SKILL_DIR}/assets/investment-policy-statement.xlsx`;
-- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`;
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`, `python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from mc.json -o cruscotto.html`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
 
-`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze dello script: Python 3.11 o successivo con python-docx (`pip install python-docx`).
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze degli script: Python 3.11 o successivo; `genera-ips.py` vuole python-docx (`pip install python-docx`), `genera-cruscotto.py` solo la libreria standard.
 
 ## Il workflow della revisione
 
-La revisione segue un'agenda in cinque passi. Ai passi 1-2 fotografa; al passo 3 **richiama le altre skill** (non ne duplica la logica); ai passi 4-5 sintetizza e produce il report. Lo strumento `assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa.
+La revisione segue un'agenda in cinque passi più uno facoltativo. Ai passi 1-2 fotografa; al passo 3 **richiama le altre skill** (non ne duplica la logica); ai passi 4-5 sintetizza e produce il report; al passo 6, se l'utente lo vuole, disegna il piano in un cruscotto grafico. Lo strumento `assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa.
 
 ### 1. Fotografia (dove sono)
 Patrimonio netto (attività per contenitore fiscale − passività), composizione, e allocazione complessiva per classe. Il cruscotto (fogli **Patrimonio** e **Allocazione**) la raccoglie. I contenitori fiscali richiamano `it-pianificazione-obiettivi/references/asset-location.md`.
@@ -57,6 +57,28 @@ Il valore della sintesi sono le **azioni cross-dominio** che risolvono più cose
 
 ### 5. Report
 Si produce il **report della revisione** come deliverable (vedi Formato output). È il pezzo che nessuna singola skill produce: la fotografia, i progressi e le azioni in un documento unico.
+
+### 6. Cruscotto grafico
+Una pagina HTML con i grafici del piano: allocazione attuale contro target con le bande, probabilità e capitale finale degli obiettivi, glide path, pensione lorda e netta, capitale umano, zainetto per scadenza, drift e ordini del ribilanciamento. I numeri vengono **solo** dai JSON che gli script scrivono con `--json` (quelli del «Contratto di input» più `ribilanciamento-multibroker.py --json`): la pagina li disegna, non li ricalcola, e tu non li riscrivi.
+
+1. Dalla cartella di lavoro, lancia il generatore sui JSON **scritti dagli script con `--json`** (`--from` ripetibile, l'ordine non conta; quelli di `importa-previdenza.py`, `ponte-pensione.py` e `riscatto-laurea.py` si riconoscono e si saltano). Non passare i file di **input** che stanno nella stessa cartella: `piano.json` (il `--dati` del ribilanciamento), `capitale-umano.json` (il `--dati` del capitale umano), `ips.json` (il `--dati` dell'IPS):
+   ```bash
+   python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from glide.json --from mco.json \
+       --from inps.json --from mc.json --from netto.json --from capitale-umano-out.json \
+       --from broker.json --from ribilancia.json -o cruscotto.html
+   ```
+   Se un JSON manca, dillo e genera il cruscotto con quelli che ci sono: le sezioni senza dati non compaiono. Gli errori fermano lo script con `ERRORE:`; secondo il messaggio:
+   - «non è un output riconosciuto»: è un file di input o di un altro programma, toglilo dai `--from`;
+   - «sono dello stesso tipo»: due file dello stesso script (per esempio `mc.json` al pensionamento e `mc-uscita.json` all'uscita anticipata): chiedi all'utente quale usare, non scegliere tu;
+   - «manca …»: il JSON viene da una versione precedente dello script; rigeneralo con lo script, non correggerlo a mano.
+2. Comunica il percorso del file e le sezioni incluse (le stampa lo script). Il file resta nella cartella di lavoro e si apre nel browser con un doppio clic, anche offline.
+3. **Chiedi sempre** se pubblicarlo come Artifact, con questa informazione: la pagina va su claude.ai e contiene importi, età e proiezioni del piano; resta privata finché l'utente non la condivide; si può cancellare. Le singole posizioni dell'estratto (ISIN, descrizioni) non ci sono. **Senza un sì esplicito non pubblicare.**
+4. Se l'utente dice sì:
+   - in **Claude Code**, pubblica con lo strumento Artifact il file `cruscotto.html` così com'è, senza riscriverlo;
+   - in **claude.ai** e in **Cowork**, crea un artifact HTML con il contenuto del file, copiato senza modifiche;
+   - se l'ambiente non ha un modo di creare artifact, dillo e lascia il file locale.
+   Per aggiornare il cruscotto dopo una nuova revisione si rilanciano gli script e il generatore, e si ripubblica sullo stesso Artifact.
+5. Se l'utente dice no, basta il file locale.
 
 ## Formato output
 
@@ -129,6 +151,8 @@ Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione
 - ❌ **Trattare i quattro domini come liste separate**: il valore è nelle azioni cross-dominio (ribilanciare usando le minus, versare dove rende di più). Cercarle sempre.
 - ❌ **Ignorare le scadenze di fine anno**: a novembre-dicembre le minus in scadenza, il versamento al fondo pensione e la comunicazione dei contributi non dedotti hanno priorità operativa, vanno prima dell'impatto strutturale.
 - ❌ **Promettere risultati o dare raccomandazioni di investimento personalizzate**: la revisione mette ordine e propone, ma rinvia al professionista per le decisioni.
+- ❌ **Pubblicare il cruscotto senza conferma**: un Artifact porta i dati del piano su claude.ai; si pubblica solo dopo un sì esplicito, ogni volta.
+- ❌ **Scrivere a mano numeri nel cruscotto o modificare il template nel plugin**: i numeri vengono dai JSON degli script; se uno è sbagliato si rilancia lo script, e `cruscotto.html` si rigenera, non si edita.
 
 ## Riferimenti
 
@@ -138,6 +162,8 @@ Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione
 - `assets/cruscotto-patrimoniale.xlsx` — il cruscotto quantitativo (Patrimonio, Allocazione, Andamento, Sintesi, Azioni, Rendimento TWR)
 - `assets/tracker-secchielli.xlsx` — il monitoraggio goals-based: secchielli e anno del piano (Impostazioni), calendario del glide path incollato da `glidepath-obiettivi.py` (Glide), posizioni assegnate a secchiello e classe con tendine (Posizioni), effettivo contro target per secchiello e aggregato con semaforo sulle bande 5/25 (Controllo), registro dei versamenti; si compila nella cartella di lavoro e si rilegge al passo 3
 - `assets/genera-ips.py` — l'IPS in Word: copertina, 12 sezioni, appendici con la checklist e il broker; la nota di rischio viene dalla quota azionaria; i dati del caso arrivano da `--dati ips.json` (vedi «I dati dell'IPS»), senza il documento è l'esempio e lo dice in copertina
+- `assets/genera-cruscotto.py` — il **cruscotto grafico**: legge i `--json` degli script del piano (`--from`, ripetibile), ne riconosce il tipo dalle chiavi e scrive una pagina HTML autosufficiente con i grafici; `--json` scrive anche i dati che finiscono nella pagina (vedi «Cruscotto grafico»)
+- `assets/cruscotto.html` — il template della pagina, fisso: HTML, CSS e JavaScript senza risorse esterne; non si modifica, lo usa `genera-cruscotto.py`
 - `assets/template-revisione.md` — il **template del report** di revisione, scheletro markdown precompilato da riempire (le cinque sezioni + disclaimer)
 - **Orchestra** (non duplica) le altre skill del plugin:
   - `it-pianificazione` / `it-pianificazione-autonomi` — il gap previdenziale e il fondo pensione
