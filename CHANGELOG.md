@@ -561,6 +561,9 @@ Roadmap:
 
 ### it-rebalance
 
+#### v0.8 (non rilasciato)
+- `--json FILE`: il piano in JSON (drift per classe con le due bande, allocazione risultante, imposta, zainetto residuo, ordini dei CSV), letto dal cruscotto grafico di `it-revisione`. Lo stdout e i CSV non cambiano.
+
 #### v0.7 (plugin 0.11.0)
 - Input da file (`--dati`, `--zainetto`, `--out`) invece delle costanti in testa allo script; CSV degli ordini con `;` e la colonna `categoria_fiscale`; sinonimi del vocabolario accettati.
 - `--dati` con chiavi e tipi controllati (niente completamenti dai dati d'esempio), aliquota in percentuale convertita con un avviso, zainetto allineato ai nomi delle posizioni; la riga NOTA del CSV dichiara i dati d'esempio.

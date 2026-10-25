@@ -4976,6 +4976,57 @@ def t_cu_report():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
+
+def _righe_csv_ordini(cartella):
+    """(broker, operazione, classe, importo) di ogni riga dei CSV degli ordini, senza la riga NOTA finale."""
+    import csv
+    righe = []
+    for nome in sorted(os.listdir(cartella)):
+        with open(os.path.join(cartella, nome), encoding="utf-8-sig", newline="") as f:
+            r = list(csv.reader(f, delimiter=";"))
+        for riga in r[1:]:
+            if riga and riga[1] != "NOTA":
+                righe.append((riga[0], riga[1], riga[2], float(riga[5].replace(".", "").replace(",", "."))))
+    return righe
+
+
+@test("T17 ribilanciamento --json: chiavi del piano, ordini uguali ai CSV, stdout invariato")
+def t_t17_ribilancia_json():
+    script = asset("it-rebalance", "ribilanciamento-multibroker.py")
+    a, b = tempfile.mkdtemp(), tempfile.mkdtemp()
+    try:
+        rc, out = run_script(script, "--out", "ordini", cwd=a)
+        rc_json, out_json = run_script(script, "--out", "ordini", "--json", "piano.json", cwd=b)
+        assert rc == 0 and rc_json == 0, (rc, rc_json, out_json[-400:])
+        riga_json = "JSON del piano: piano.json\n"
+        assert out_json.count(riga_json) == 1 and out == out_json.replace(riga_json, ""), out_json[-600:]
+        d = json.load(open(os.path.join(b, "piano.json"), encoding="utf-8"))
+        chiavi = {"totale", "totale_post", "imposta", "prelievo", "entrate", "liquidato", "drift", "risultante",
+                  "zainetto", "ordini"}
+        assert chiavi <= set(d), set(d)
+        assert d["totale"] == 100000 and d["imposta"] == 0, (d["totale"], d["imposta"])
+        az = d["drift"]["azionario"]
+        assert az["fuori_banda"] is True and abs(az["peso"] - 0.68) < 1e-9, az
+        assert {"peso", "target", "drift", "tight", "wide", "fuori_banda", "esito", "motivo"} <= set(az), set(az)
+        assert abs(d["risultante"]["azionario"] - 0.60) < 1e-6, d["risultante"]
+        assert round(d["zainetto"]["Fineco"]) == 1800, d["zainetto"]
+        dal_json = sorted((o["broker"], o["operazione"], o["classe"], round(o["importo_eur"], 2)) for o in d["ordini"])
+        assert dal_json and dal_json == sorted(_righe_csv_ordini(os.path.join(b, "ordini"))), dal_json
+        # file di output non scrivibile → ERRORE e rc 1
+        rc, so, se = run_script_split(script, "--out", "ordini", "--json", "/non/esiste/x.json", cwd=b)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, (rc, se[-300:])
+        assert "ERRORE:" not in so and "Traceback" not in se, so[-300:]
+    finally:
+        shutil.rmtree(a, ignore_errors=True)
+        shutil.rmtree(b, ignore_errors=True)
+    # Review Focus 4: zainetto Fineco a zero → nessun ordine, il drift resta fuori banda, JSON serializzabile
+    m, p = _ribilancia(ZAINETTO={"Fineco": 0, "Directa": 0})
+    d = m.piano_json(p, m.genera_ordini(p))
+    assert d["ordini"] == [] and d["drift"]["azionario"]["fuori_banda"] is True, d["ordini"]
+    json.dumps(d)
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:
