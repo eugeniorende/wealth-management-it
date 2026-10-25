@@ -4847,6 +4847,53 @@ def t_cu_sensibilita_catena():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T15 capitale umano: input realistici dalla revisione finale (età frazionarie, CSV da Excel, --from scartato)")
+def t_cu_revisione_finale():
+    m = carica_modulo(asset(*CU))
+    tmp = tempfile.mkdtemp()
+    def con(modifica, nome="d.json"):
+        d = _cu_esempio()
+        modifica(d)
+        return _scrivi_json(os.path.join(tmp, nome), d)
+    try:
+        # età frazionarie (proiezione-inps.py le accetta): arrotondate per difetto, senza traceback
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"].update(eta=35.5, eta_pensione=67.5)), cwd=tmp)
+        assert rc == 0 and "Traceback" not in se and "per difetto" in so, (rc, se[-300:])
+        # la frase della diagnosi 2 nomina il blocco più grande: per un pensionato è la pensione
+        def pensionato(d):
+            d["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+        rc, so, se = _cu("--dati", con(pensionato), cwd=tmp)
+        assert rc == 0 and "gli somiglia" not in so and "capitale pensionistico" in so.split("2. ESPOSIZIONE")[1].split("3. ")[0], so[-900:]
+        # CSV da Excel italiano: righe «;;», «;» finale, cp1252 con accenti, celle in percento
+        comp = os.path.join(tmp, "comp.csv")
+        with open(comp, "w", encoding="cp1252") as f:
+            f.write("strumento;settore;peso;\nETF Società;Information Technology;60,0%;\n"
+                    "ETF Società;Financials;40,0%;\n;;;\n")
+        assert m.leggi_composizione(comp) == {"ETF Società": {"Information Technology": 0.6, "Financials": 0.4}}
+        # --dati che scavalca un valore letto con --from: lo dice
+        A = "it-pianificazione"
+        assert run_script(asset(A, "netto-pensione.py"), "--json", os.path.join(tmp, "netto.json"), cwd=tmp)[0] == 0
+        rc, so, se = _cu("--from", os.path.join(tmp, "netto.json"), cwd=tmp)
+        assert rc == 0 and "togli la chiave" in so, so[:900]
+        # nessuna composizione che combaci: niente esposizione combinata fittizia; nomi confrontati senza spazi
+        pos = [{"asset_class": "azionario", "valore": 1000, "strumento": " A "}]
+        z = m.sovrapposizione(pos, {"B": {"Financials": 1.0}}, "Financials", 0, 500, m.PESI_MONDO)
+        assert z["quota_settore_fin"] is None and z["esposizione_combinata"] is None, z
+        z = m.sovrapposizione(pos, {"A": {"Financials": 1.0}}, "Financials", 1000, 500, m.PESI_MONDO)
+        assert z["quota_settore_fin"] == 1.0, z
+        # override fuori dominio: ERRORE pulito, e nessun pezzo di report prima dell'errore
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"]["override"].update(rho=1.5)), cwd=tmp)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "rho" in se and "1. BILANCIO" not in so, (rc, so[-200:], se[-200:])
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"].update(crescita_reale="1%")), cwd=tmp)
+        assert rc == 1 and "crescita_reale" in se and "Traceback" not in se, se[-300:]
+        with open(comp, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Tecnologia;100\n")
+        rc, so, se = _cu("--composizione", comp, cwd=tmp)
+        assert rc == 1 and "1. BILANCIO" not in so, so[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:

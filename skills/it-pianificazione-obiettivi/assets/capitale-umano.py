@@ -194,6 +194,11 @@ def leggi_dati(path):
             _quota(f"persona.override.{k}", v)
         elif k in ("nu", "sigma_h", "durata_anni"):
             _non_negativo(f"persona.override.{k}", v)
+        elif k == "rho" and (not isinstance(v, (int, float)) or isinstance(v, bool) or not -1 <= v <= 1):
+            errore(f"persona.override.rho = {v!r}: la correlazione sta tra -1 e 1")
+    g = persona.get("crescita_reale", 0.01)
+    if not isinstance(g, (int, float)) or isinstance(g, bool) or g <= -1:
+        errore(f"persona.crescita_reale = {g!r}: serve un numero come frazione (0.01 per l'1%)")
     pensione = d.get("pensione") or {}
     for k in ("netta_annua", "eta_fine"):
         if k in pensione:
@@ -378,20 +383,29 @@ def leggi_composizione(path):
     Pesi in frazione o in percento (se quelli di uno strumento sommano più di 1,5), virgola o punto."""
     if not os.path.exists(path):
         errore(f"--composizione: file non trovato: {path}")
-    with open(path, encoding="utf-8-sig") as f:
-        righe = [r for r in f if r.strip() and not r.lstrip().startswith("#")]
+    with open(path, "rb") as f:
+        grezzo = f.read()
+    try:
+        testo = grezzo.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        testo = grezzo.decode("cp1252", errors="replace")   # «CSV» semplice di Excel italiano
+    righe = [r for r in testo.splitlines() if r.strip(" ;\t") and not r.lstrip().startswith("#")]
     lettore = csv.DictReader(righe, delimiter=";")
     if not lettore.fieldnames or not {"strumento", "settore", "peso"} <= {c.strip() for c in lettore.fieldnames}:
         errore("--composizione: servono le colonne strumento;settore;peso")
     comp = {}
     for r in lettore:
-        r = {k.strip(): (v or "").strip() for k, v in r.items()}
+        r = {k.strip(): (v or "").strip() for k, v in r.items() if k is not None}   # «;» in fondo alle righe
+        if not any(r.values()):
+            continue
         if r["settore"] not in SETTORI_GICS:
             errore(f"--composizione: settore {r['settore']!r} non GICS: usa uno di {', '.join(SETTORI_GICS)}")
         try:
-            peso = _numero_csv(r["peso"])
+            peso = _numero_csv(r["peso"].rstrip("%"))
         except ValueError:
             errore(f"--composizione: peso {r['peso']!r} non numerico ({r['strumento']})")
+        if r["peso"].endswith("%"):
+            peso /= 100
         settori = comp.setdefault(r["strumento"], {})
         settori[r["settore"]] = settori.get(r["settore"], 0) + peso
     for strumento, settori in comp.items():
@@ -413,7 +427,7 @@ def sovrapposizione(posizioni, composizione, settore, F_az, HC_az, pesi_mondo):
     for p in posizioni:
         if p["asset_class"] != "azionario":
             continue
-        nome = p.get("strumento", "(senza strumento)")
+        nome = (p.get("strumento") or "(senza strumento)").strip()
         if nome not in composizione:
             mancanti.append(nome)
             continue
@@ -422,7 +436,7 @@ def sovrapposizione(posizioni, composizione, settore, F_az, HC_az, pesi_mondo):
     quota = num / con if con else None
     peso_mondo = pesi_mondo[settore]
     rapporto = quota / peso_mondo if quota is not None else None
-    combinata = (F_az * (quota or 0) + HC_az) / (F_az + HC_az) if F_az + HC_az > 0 else None
+    combinata = (F_az * quota + HC_az) / (F_az + HC_az) if quota is not None and F_az + HC_az > 0 else None
     return {"settore": settore, "quota_settore_fin": quota, "peso_mondo": peso_mondo, "rapporto": rapporto,
             "esposizione_combinata": combinata, "sovrappeso": bool(rapporto is not None and rapporto > SOGLIA_SOVRAPPESO),
             "mancanti": mancanti}
@@ -493,8 +507,17 @@ def stampa_sensibilita(righe):
               f"{pct(r['esposizione_totale']):>13}{numero(r['delta'] * 100, 1, segno=True) + ' punti':>14}")
 
 
-def risolvi_costanti(dati, nomi_set):
-    """Età di pensione, pensione netta ed età finale con la precedenza --set > --dati > --from > default."""
+def eta_intera(valore, nome, note):
+    """Il modello lavora ad anni interi: un'età frazionaria (proiezione-inps.py le accetta) si arrotonda per
+    difetto, dicendolo."""
+    if valore != int(valore):
+        note.append(f"{nome} {numero(valore, 1)} arrotondata per difetto a {int(valore)}: il modello lavora ad anni interi")
+    return int(valore)
+
+
+def risolvi_costanti(dati, nomi_set, note):
+    """Età di pensione, pensione netta ed età finale con la precedenza --set > --dati > --from > default.
+    Le età diventano intere; quando --dati scavalca un valore letto con --from lo aggiunge alle note."""
     global ETA_PENSIONE, PENSIONE_NETTA, ETA_FINE
     persona, pensione = dati["persona"], dati.get("pensione") or {}
     origine = {}
@@ -504,6 +527,10 @@ def risolvi_costanti(dati, nomi_set):
         if nome in nomi_set:
             origine[nome] = "set"
         elif valore_dati is not None:
+            letto = globals()[nome]
+            if letto is not None and letto != default and letto != valore_dati:
+                note.append(f"{nome}: uso {valore_dati} da --dati, non {letto} letto con --from "
+                            "(per usare il valore di --from, togli la chiave da --dati)")
             globals()[nome] = valore_dati
             origine[nome] = "dati"
         elif globals()[nome] is not None and globals()[nome] != default:
@@ -517,6 +544,9 @@ def risolvi_costanti(dati, nomi_set):
         errore("manca la pensione netta annua: indicala in --dati (pensione.netta_annua), con --from del JSON di "
                "netto-pensione.py o con --set PENSIONE_NETTA=18000")
     _non_negativo("PENSIONE_NETTA", PENSIONE_NETTA)
+    _non_negativo("ETA_PENSIONE", ETA_PENSIONE)
+    ETA_PENSIONE = eta_intera(ETA_PENSIONE, "età di pensione", note)
+    ETA_FINE = eta_intera(ETA_FINE, "età finale", note)
     c = {"R_F": R_F, "NU_PENSIONE": NU_PENSIONE, "ETA_FINE": ETA_FINE, "ETA_PENSIONE": ETA_PENSIONE,
          "PENSIONE_NETTA": PENSIONE_NETTA}
     return c, origine
@@ -538,9 +568,15 @@ def stampa_bilancio(b, eq):
     print(f"   Patrimonio finanziario: {pct(ef) if ef is not None else 'n/d'} in azioni")
     print(f"   Ricchezza totale:       {pct(b['esposizione_totale'])} in azioni")
     peso_hc = b["HC"] / b["W"]
-    print(f"   Peso del capitale umano sulla ricchezza totale: {pct(peso_hc)}; sua quota azionaria: {pct(b['s'], 0)}. "
-          + ("Conta più del portafoglio, quindi l'esposizione totale dipende soprattutto da lui."
-                             if peso_hc > 0.5 else "Il portafoglio pesa di più, e l'esposizione totale gli somiglia."))
+    blocchi = {"il capitale umano": b["HC"], "il capitale pensionistico": b["PP"], "il patrimonio finanziario": b["F"]}
+    maggiore = max(blocchi, key=blocchi.get)
+    print(f"   Peso del capitale umano sulla ricchezza totale: {pct(peso_hc)}; sua quota azionaria: {pct(b['s'], 0)}.")
+    if maggiore == "il patrimonio finanziario":
+        print(f"   Il blocco più grande è il patrimonio finanziario ({pct(b['F'] / b['W'])}): "
+              "l'esposizione totale gli somiglia.")
+    else:
+        print(f"   Il blocco più grande è {maggiore} ({pct(blocchi[maggiore] / b['W'])}): l'esposizione totale "
+              "dipende soprattutto da lui, non dal portafoglio.")
     if eq is not None:
         print(f"   Equivalenza: {eq['messaggio']}")
 
@@ -552,30 +588,17 @@ def main():
                                                  "help": "CSV strumento;settore;peso per la sovrapposizione settoriale"})])
     esempio = args.dati is None
     dati = leggi_dati(ESEMPIO if esempio else args.dati)
-    nomi_set = {e.split("=", 1)[0].strip() for e in args.set}
-    c, origine = risolvi_costanti(dati, nomi_set)
-    profilo = profilo_effettivo(dati["persona"], carica_profili())
-    verifica_eta(dati["persona"], c)
-    b = bilancio(dati, profilo, c)
-    T = dati.get("esposizione_totale_desiderata")
-    eq = equivalenza(T, b) if T is not None else None
-
-    print("=" * 74)
-    print("CAPITALE UMANO — il portafoglio dentro la ricchezza totale")
-    print("=" * 74)
-    print("⚠️  Lente diagnostica, non consulenza: non modifica i target degli obiettivi né di it-rebalance.")
-    if esempio:
-        print("   (dati d'esempio: passa i tuoi con --dati FILE)")
     persona = dati["persona"]
-    print(f"   Profilo {profilo['nome']}, {persona['eta']} anni, pensione a {c['ETA_PENSIONE']}, "
-          f"netto {euro(persona.get('netto_annuo', 0))} l'anno")
-    stampa_bilancio(b, eq)
+    note = []
+    persona["eta"] = eta_intera(persona["eta"], "età", note)
+    nomi_set = {e.split("=", 1)[0].strip() for e in args.set}
+    c, origine = risolvi_costanti(dati, nomi_set, note)
+    profilo = profilo_effettivo(persona, carica_profili())
+    verifica_eta(persona, c)
     if QUOTE_GLIDE is not None:
         if not isinstance(QUOTE_GLIDE, list) or not all(isinstance(x, (int, float)) and 0 <= x <= 1 for x in QUOTE_GLIDE):
             errore("QUOTE_GLIDE: serve una lista di quote tra 0 e 1 (il campo «portafoglio» del JSON del glide path)")
-    p = proiezione(dati, profilo, c, QUOTE_GLIDE, N_SIM, SEED)
-    stampa_proiezione(p)
-    z = None
+    comp = settore = None
     if args.composizione:
         comp = leggi_composizione(args.composizione)
         settore = persona.get("settore") or profilo.get("settore_default")
@@ -583,11 +606,34 @@ def main():
             errore('--composizione: manca "persona.settore", il settore GICS del tuo lavoro')
         if settore not in SETTORI_GICS:
             errore(f"persona.settore {settore!r} non GICS: usa uno di {', '.join(SETTORI_GICS)}")
+
+    # tutti i calcoli prima di stampare: un errore non lascia mezzo report
+    b = bilancio(dati, profilo, c)
+    T = dati.get("esposizione_totale_desiderata")
+    eq = equivalenza(T, b) if T is not None else None
+    p = proiezione(dati, profilo, c, QUOTE_GLIDE, N_SIM, SEED)
+    z = None
+    if comp is not None:
         posizioni = dati.get("posizioni") or []
-        F_az_comp = sum(q["valore"] for q in posizioni if q["asset_class"] == "azionario" and q.get("strumento") in comp)
+        F_az_comp = sum(q["valore"] for q in posizioni
+                        if q["asset_class"] == "azionario" and (q.get("strumento") or "").strip() in comp)
         z = sovrapposizione(posizioni, comp, settore, F_az_comp, b["HC_az"], PESI_MONDO)
-        stampa_settore(z)
     sens = sensibilita(dati, profilo, c)
+
+    print("=" * 74)
+    print("CAPITALE UMANO — il portafoglio dentro la ricchezza totale")
+    print("=" * 74)
+    print("⚠️  Lente diagnostica, non consulenza: non modifica i target degli obiettivi né di it-rebalance.")
+    if esempio:
+        print("   (dati d'esempio: passa i tuoi con --dati FILE)")
+    print(f"   Profilo {profilo['nome']}, {persona['eta']} anni, pensione a {c['ETA_PENSIONE']}, "
+          f"netto {euro(persona.get('netto_annuo', 0))} l'anno")
+    for n in note:
+        print(f"   ℹ️  {n}")
+    stampa_bilancio(b, eq)
+    stampa_proiezione(p)
+    if z is not None:
+        stampa_settore(z)
     stampa_sensibilita(sens)
     print("\nNon è consulenza: è una lente per ragionare sul rischio complessivo, non un'allocazione da adottare.")
 
