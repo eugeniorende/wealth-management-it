@@ -167,7 +167,7 @@ Ogni skill ha una versione propria, nel campo `metadata.version` del frontmatter
 | 1 | `tax-loss-harvesting` | `it-tax-optimization` | ✅ v0.11 (minus/plus, multi-broker, dichiarativo RT/RW/IVAFE, Tobin tax 2026, cripto: base + avanzata + casi speciali) + importatore estratti broker |
 | 2 | `financial-plan` | `it-pianificazione` | ✅ v0.13 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione, riscatto della laurea) |
 | 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.5 (pensione autonomi/forfettari, casse professionali, Excel, rivalsa e acconti del secondo anno) |
-| 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.20 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo) |
+| 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.21 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo, capitale umano) |
 | 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.7 (tax-aware con versamenti, aliquota per posizione e rientro misto, multi-broker, bande 5/25, prelievo in decumulo, sequenza di liquidazione, ordini CSV) |
 | 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.7 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR) |
 
@@ -238,6 +238,7 @@ Comandi espliciti: sono scorciatoie che caricano la skill corrispondente, con gl
 
 ```
 /obiettivi         → it-pianificazione-obiettivi (pianificazione goals-based multi-obiettivo)
+/capitale-umano    → it-pianificazione-obiettivi (capitale umano e pensione nella ricchezza totale: la lente diagnostica)
 /minusvalenze      → it-tax-optimization (ottimizzazione minus/plus, zainetto)
 /pensione          → it-pianificazione (pensione dipendenti: INPS + complementare + TFR)
 /pensione-autonomi → it-pianificazione-autonomi (pensione autonomi/forfettari: Gestione Separata)

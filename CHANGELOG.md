@@ -376,6 +376,9 @@ Le note di ogni iterazione, fino alla 0.10.0 tenute in fondo a ciascun `SKILL.md
 
 ### it-pianificazione-obiettivi
 
+#### v0.21 (non rilasciato)
+- Step 8, la lente del capitale umano: `capitale-umano.py` con bilancio patrimoniale totale, esposizione azionaria della ricchezza totale e riga di equivalenza, proiezione con fascia Monte Carlo, sovrapposizione settoriale e sensibilità; profili di lavoro in CSV, reference `capitale-umano.md`, comando `/capitale-umano`.
+
 #### v0.20 (plugin 0.11.0)
 - Lettore unico del pianificatore con errori espliciti; numeri all'italiana negli script; sezione «Dove lavorare».
 - Celle numeriche scritte come testo e nomi d'obiettivo duplicati sono errori che indicano cella e righe; l'asset location tiene anche gli obiettivi senza target.

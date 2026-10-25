@@ -4875,6 +4875,7 @@ OBBLIGATI_FRESHNESS = (
     "it-pianificazione-autonomi/references/previdenza-gestione-separata.md",
     "it-pianificazione-autonomi/references/fiscalita-forfettario.md",
     "it-pianificazione-obiettivi/references/asset-location.md",
+    "it-pianificazione-obiettivi/references/capitale-umano.md",
     "it-rebalance/SKILL.md",
     "it-revisione/assets/genera-ips.py",
 )
