@@ -4,16 +4,697 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cruscotto del piano</title>
+<!--
+  Template del cruscotto grafico di wealth-management-it. Non modificarlo: genera-cruscotto.py lo copia
+  con i dati del piano al posto del segnaposto nel blocco <script id="dati">. Nessuna risorsa esterna:
+  la pagina si apre dal disco, offline, e dentro un Artifact. I dati entrano nel DOM solo come testo
+  (textContent, setAttribute), mai come markup. Palette: la palette di riferimento validata della skill
+  dataviz (categoriali in ordine fisso, colori di stato riservati, chiaro e scuro scelti a parte).
+-->
+<style>
+:root {
+  color-scheme: light;
+  --pagina: #f9f9f7;
+  --superficie: #fcfcfb;
+  --testo: #0b0b0b;
+  --testo-2: #52514e;
+  --muto: #898781;
+  --griglia: #e1e0d9;
+  --asse: #c3c2b7;
+  --bordo: rgba(11, 11, 11, 0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --fascia: rgba(42, 120, 214, 0.14);
+  --neutro: #f0efec;
+  --buono: #0ca30c; --attenzione: #fab219; --serio: #ec835a; --critico: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --pagina: #0d0d0d;
+    --superficie: #1a1a19;
+    --testo: #f0efec;
+    --testo-2: #c3c2b7;
+    --muto: #898781;
+    --griglia: #2c2c2a;
+    --asse: #383835;
+    --bordo: rgba(255, 255, 255, 0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --fascia: rgba(57, 135, 229, 0.22);
+    --neutro: #383835;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --pagina: #0d0d0d;
+  --superficie: #1a1a19;
+  --testo: #f0efec;
+  --testo-2: #c3c2b7;
+  --muto: #898781;
+  --griglia: #2c2c2a;
+  --asse: #383835;
+  --bordo: rgba(255, 255, 255, 0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --fascia: rgba(57, 135, 229, 0.22);
+  --neutro: #383835;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--pagina);
+  color: var(--testo);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.pagina { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { font-size: 26px; line-height: 1.2; margin: 0 0 6px; font-weight: 650; }
+.sotto { color: var(--testo-2); margin: 0; }
+.avviso {
+  margin: 14px 0 0; padding: 10px 12px; border-radius: 8px;
+  background: var(--superficie); border: 1px solid var(--bordo); color: var(--testo-2); font-size: 14px;
+}
+section {
+  background: var(--superficie); border: 1px solid var(--bordo); border-radius: 12px;
+  padding: 18px 18px 20px; margin-top: 18px;
+}
+section h2 { font-size: 18px; margin: 0 0 4px; font-weight: 650; }
+.nota { color: var(--testo-2); font-size: 14px; margin: 0 0 14px; }
+h3 { font-size: 15px; margin: 18px 0 6px; font-weight: 600; }
+.indicatori { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--bordo); border-radius: 10px; padding: 12px 14px; }
+.tile .etichetta { color: var(--testo-2); font-size: 13px; }
+.tile .valore { font-size: 26px; font-weight: 650; line-height: 1.25; margin-top: 2px; }
+.tile .fonte { color: var(--muto); font-size: 12px; margin-top: 2px; }
+.grafico { width: 100%; margin: 6px 0 4px; }
+.grafico svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 2px; font-size: 13px; color: var(--testo-2); }
+.legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.legenda i.linea { height: 2px; border-radius: 1px; }
+.riga { margin: 12px 0 0; }
+.riga .titolo { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; }
+.riga .nome { font-weight: 600; overflow-wrap: anywhere; }
+.riga .valori { color: var(--testo-2); font-size: 13px; }
+.cifra { font-weight: 650; color: var(--testo); }
+.stato { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--testo-2); }
+.stato i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.tabella { overflow-x: auto; margin-top: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--griglia); vertical-align: top; }
+th { color: var(--testo-2); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+details { margin-top: 10px; }
+summary { cursor: pointer; color: var(--testo-2); font-size: 13px; }
+ul.avvisi { margin: 8px 0 0; padding-left: 18px; color: var(--testo-2); font-size: 13px; }
+footer { margin-top: 24px; color: var(--testo-2); font-size: 13px; }
+footer .fonti { color: var(--muto); }
+@media (max-width: 520px) {
+  .pagina { padding: 16px 16px 40px; }
+  header h1 { font-size: 22px; }
+  section { padding: 14px 12px 16px; }
+  .tile .valore { font-size: 22px; }
+}
+</style>
 </head>
 <body>
+<div class="pagina">
 <header>
   <h1>Cruscotto del piano</h1>
-  <p>Bozza educativa: i numeri sono quelli degli script del plugin, non una previsione né un consiglio.</p>
+  <p class="sotto" id="testata">Bozza educativa</p>
+  <p class="avviso">Bozza educativa: i numeri sono quelli calcolati dagli script del plugin sui tuoi dati, alla data indicata. Non sono una previsione né un consiglio di investimento.</p>
 </header>
 <main id="cruscotto"></main>
 <footer>
-  <p>Disclaimer: bozza di analisi di pianificazione personale. Non costituisce consulenza fiscale, finanziaria o di investimento. Verificare con un professionista abilitato e con il portale del proprio intermediario prima di decidere.</p>
+  <p><strong>Disclaimer.</strong> Bozza di analisi di pianificazione personale, a fini informativi. Non costituisce consulenza fiscale, finanziaria o di investimento. I calcoli si basano sui dati forniti e sulle regole vigenti alla data indicata: verificare sempre con un professionista abilitato e con il portale del proprio intermediario prima di decidere.</p>
+  <p class="fonti" id="fonti"></p>
 </footer>
+</div>
+<svg id="ns" hidden aria-hidden="true"></svg>
 <script id="dati" type="application/json">__DATI_CRUSCOTTO__</script>
+<script>
+"use strict";
+(function () {
+  var B = JSON.parse(document.getElementById("dati").textContent);
+  // il namespace SVG dall'elemento #ns: il parser HTML glielo assegna, senza scrivere l'URL nella pagina
+  var SVGNS = document.getElementById("ns").namespaceURI;
+  var SERIE = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8"];
+
+  // ─── formati: come gli script del plugin (€130.000, 49,0%) ───
+  var nf0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0, useGrouping: "always" });
+  function nfDec(d) {
+    return new Intl.NumberFormat("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: "always" });
+  }
+  function ok(x) { return typeof x === "number" && isFinite(x); }
+  function euro(x) {
+    if (!ok(x)) return "n/d";
+    var v = Math.round(x);
+    return (v < 0 ? "-€" : "€") + nf0.format(Math.abs(v));
+  }
+  function pct(x, d) {
+    if (!ok(x)) return "n/d";
+    return nfDec(d === undefined ? 1 : d).format(x * 100) + "%";
+  }
+  function punti(x) {
+    if (!ok(x)) return "n/d";
+    var v = x * 100;
+    var s = nfDec(1).format(Math.abs(v));
+    return (v > 0.05 ? "+" : v < -0.05 ? "-" : "") + s + " punti";
+  }
+  function anni(x) { return ok(x) ? nfDec(Number.isInteger(x) ? 0 : 1).format(x) : "n/d"; }
+
+  // ─── DOM: gli unici punti che creano nodi, i dati solo come testo ───
+  function el(tag, attrs) {
+    var n = document.createElement(tag);
+    for (var k in attrs || {}) {
+      if (k === "testo") n.textContent = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c === null || c === undefined || c === false) continue;
+      n.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    }
+    return n;
+  }
+  function sv(tag, attrs, titolo) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs || {}) n.setAttribute(k, attrs[k]);
+    if (titolo) { var t = document.createElementNS(SVGNS, "title"); t.textContent = titolo; n.appendChild(t); }
+    return n;
+  }
+  function testoSvg(x, y, s, attrs) {
+    var t = sv("text", Object.assign({ x: x, y: y, fill: "var(--testo-2)", "font-size": 12 }, attrs || {}));
+    t.textContent = s;
+    return t;
+  }
+  function colore(i) { return "var(" + SERIE[i % SERIE.length] + ")"; }
+  function contenitore(svg) { return el("div", { class: "grafico" }, svg); }
+  function legenda(voci) {
+    var l = el("div", { class: "legenda" });
+    voci.forEach(function (v) {
+      var i = el("i", { class: v.linea ? "linea" : "" });
+      i.style.background = v.colore;
+      l.appendChild(el("span", {}, i, v.nome));
+    });
+    return l;
+  }
+  function stato(nome, varColore) {
+    var i = el("i");
+    i.style.background = "var(" + varColore + ")";
+    return el("span", { class: "stato" }, i, nome);
+  }
+  function tabella(intestazioni, righe, numeriche) {
+    var thead = el("tr");
+    intestazioni.forEach(function (h, j) { thead.appendChild(el("th", { class: numeriche[j] ? "num" : "", testo: h })); });
+    var tbody = el("tbody");
+    righe.forEach(function (r) {
+      var tr = el("tr");
+      r.forEach(function (c, j) { tr.appendChild(el("td", { class: numeriche[j] ? "num" : "", testo: c })); });
+      tbody.appendChild(tr);
+    });
+    return el("div", { class: "tabella" }, el("table", {}, el("thead", {}, thead), tbody));
+  }
+  function inTabella(titolo, t) { return el("details", {}, el("summary", { testo: titolo }), t); }
+  function sezione(id, titolo, nota) {
+    var s = el("section", { id: "sez-" + id }, el("h2", { testo: titolo }));
+    if (nota) s.appendChild(el("p", { class: "nota", testo: nota }));
+    return s;
+  }
+
+  // ─── scale e assi ───
+  function tacche(min, max, n) {
+    var span = max - min || 1, grezzo = span / (n || 4);
+    var mag = Math.pow(10, Math.floor(Math.log10(grezzo)));
+    var passo = [1, 2, 2.5, 5, 10].map(function (m) { return m * mag; }).find(function (p) { return p >= grezzo; });
+    var t = [], v = Math.ceil(min / passo) * passo;
+    for (; v <= max + passo * 1e-9; v += passo) t.push(Math.abs(v) < passo * 1e-9 ? 0 : v);
+    return t;
+  }
+  function tetto(x) { var t = tacche(0, x, 4); return t[t.length - 1] < x ? t[t.length - 1] + (t[1] - t[0]) : t[t.length - 1]; }
+  function larghezza() {
+    var m = document.getElementById("cruscotto");
+    var w = m && m.clientWidth ? m.clientWidth - 40 : 640;
+    return Math.max(260, Math.min(w, 940));
+  }
+
+  // Traccia orizzontale con fascia P10–P90, punto sulla mediana e tacca del target (per riga, scala propria).
+  function trackFascia(p, target, fmt, max) {
+    var W = larghezza(), H = 34, x0 = 4, x1 = W - 4;
+    max = max || tetto(Math.max(p.p90, target || 0) * 1.05);
+    var x = function (v) { return x0 + (x1 - x0) * Math.max(0, Math.min(1, v / max)); };
+    var s = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+                        "aria-label": "P10 " + fmt(p.p10) + ", mediana " + fmt(p.mediana) + ", P90 " + fmt(p.p90) });
+    s.appendChild(sv("rect", { x: x0, y: 15, width: x1 - x0, height: 4, rx: 2, fill: "var(--griglia)" }));
+    s.appendChild(sv("rect", { x: x(p.p10), y: 9, width: Math.max(2, x(p.p90) - x(p.p10)), height: 16, rx: 4,
+                               fill: "var(--fascia)" }, "Da P10 " + fmt(p.p10) + " a P90 " + fmt(p.p90)));
+    if (ok(target)) {
+      s.appendChild(sv("line", { x1: x(target), x2: x(target), y1: 3, y2: 31, stroke: "var(--testo)", "stroke-width": 2 },
+                       "Target " + fmt(target)));
+    }
+    s.appendChild(sv("circle", { cx: x(p.mediana), cy: 17, r: 6, fill: "var(--s1)", stroke: "var(--superficie)",
+                                 "stroke-width": 2 }, "Mediana " + fmt(p.mediana)));
+    return contenitore(s);
+  }
+
+  // Barra di una quota 0–1 con soglia opzionale (probabilità contro confidenza).
+  function trackQuota(v, soglia, colori, titolo) {
+    var W = larghezza(), H = 22, x0 = 0, x1 = W;
+    var x = function (q) { return x0 + (x1 - x0) * Math.max(0, Math.min(1, q)); };
+    var s = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": titolo });
+    s.appendChild(sv("rect", { x: x0, y: 6, width: x1 - x0, height: 10, rx: 4, fill: "var(--griglia)" }));
+    s.appendChild(sv("rect", { x: x0, y: 6, width: Math.max(0, x(v) - x0), height: 10, rx: 4, fill: colori }, titolo));
+    if (ok(soglia)) {
+      s.appendChild(sv("line", { x1: x(soglia), x2: x(soglia), y1: 1, y2: 21, stroke: "var(--testo)", "stroke-width": 2 },
+                       "Soglia " + pct(soglia, 0)));
+    }
+    return contenitore(s);
+  }
+
+  // Linee nel tempo: serie [{nome, valori, colore}], fascia {lo, hi}, marcatore {x, testo}.
+  function linee(opz) {
+    var W = larghezza(), H = opz.altezza || 230, ml = opz.margineSx || 52, mr = 14, mt = 12, mb = 30;
+    var xs = opz.x, n = xs.length;
+    var tutti = [];
+    opz.serie.forEach(function (s) { tutti = tutti.concat(s.valori.filter(ok)); });
+    if (opz.fascia) tutti = tutti.concat(opz.fascia.hi.filter(ok));
+    var ymax = opz.ymax || tetto(Math.max.apply(null, tutti.concat([0])) || 1);
+    var X = function (i) { return ml + (W - ml - mr) * (n > 1 ? i / (n - 1) : 0.5); };
+    var Y = function (v) { return mt + (H - mt - mb) * (1 - v / ymax); };
+    var s = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opz.etichetta });
+    tacche(0, ymax, 4).forEach(function (t) {
+      s.appendChild(sv("line", { x1: ml, x2: W - mr, y1: Y(t), y2: Y(t), stroke: t === 0 ? "var(--asse)" : "var(--griglia)",
+                                 "stroke-width": 1 }));
+      s.appendChild(testoSvg(ml - 6, Y(t) + 4, opz.fmtY(t), { "text-anchor": "end", fill: "var(--muto)", "font-size": 11 }));
+    });
+    var passoX = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - ml) / 56))));
+    xs.forEach(function (v, i) {
+      if (i % passoX === 0 || (i === n - 1 && (n - 1) % passoX >= passoX / 2)) {
+        s.appendChild(testoSvg(X(i), H - 10, opz.fmtX(v), { "text-anchor": "middle", fill: "var(--muto)", "font-size": 11 }));
+      }
+    });
+    if (opz.fascia) {
+      var su = [], giu = [];
+      xs.forEach(function (_, i) {
+        if (ok(opz.fascia.hi[i]) && ok(opz.fascia.lo[i])) { su.push(X(i) + "," + Y(opz.fascia.hi[i])); giu.unshift(X(i) + "," + Y(opz.fascia.lo[i])); }
+      });
+      s.appendChild(sv("polygon", { points: su.concat(giu).join(" "), fill: "var(--fascia)" }, opz.fascia.nome));
+    }
+    if (opz.marcatore && ok(opz.marcatore.indice)) {
+      var mx = X(opz.marcatore.indice);
+      s.appendChild(sv("line", { x1: mx, x2: mx, y1: mt, y2: H - mb, stroke: "var(--testo-2)", "stroke-width": 1 }));
+      var ancora = mx > W * 0.7 ? "end" : "start";
+      s.appendChild(testoSvg(mx + (ancora === "end" ? -6 : 6), mt + 12, opz.marcatore.testo,
+                             { "text-anchor": ancora, fill: "var(--testo)", "font-size": 12 }));
+    }
+    opz.serie.forEach(function (serie) {
+      var d = "";
+      serie.valori.forEach(function (v, i) { if (ok(v)) d += (d ? "L" : "M") + X(i).toFixed(1) + "," + Y(v).toFixed(1); });
+      s.appendChild(sv("path", { d: d, fill: "none", stroke: serie.colore, "stroke-width": 2, "stroke-linejoin": "round",
+                                 "stroke-linecap": "round" }, serie.nome));
+      var ultimo = serie.valori.length - 1;
+      while (ultimo >= 0 && !ok(serie.valori[ultimo])) ultimo--;
+      if (ultimo >= 0) {
+        s.appendChild(sv("circle", { cx: X(ultimo), cy: Y(serie.valori[ultimo]), r: 4, fill: serie.colore,
+                                     stroke: "var(--superficie)", "stroke-width": 2 },
+                         serie.nome + ": " + opz.fmtY(serie.valori[ultimo])));
+      }
+    });
+    // strisce invisibili per il tooltip di ogni anno, più larghe dei segni
+    xs.forEach(function (v, i) {
+      var righe = [opz.fmtX(v)];
+      opz.serie.forEach(function (serie) { if (ok(serie.valori[i])) righe.push(serie.nome + ": " + opz.fmtY(serie.valori[i])); });
+      if (opz.fascia && ok(opz.fascia.lo[i])) righe.push(opz.fascia.nome + ": " + opz.fmtY(opz.fascia.lo[i]) + " – " + opz.fmtY(opz.fascia.hi[i]));
+      var w = (W - ml - mr) / Math.max(1, n - 1);
+      s.appendChild(sv("rect", { x: X(i) - w / 2, y: mt, width: w, height: H - mt - mb, fill: "transparent" }, righe.join("\n")));
+    });
+    var box = el("div", {});
+    if (opz.serie.length > 1 || opz.fascia) {
+      var voci = opz.serie.map(function (x) { return { nome: x.nome, colore: x.colore, linea: true }; });
+      if (opz.fascia) voci.push({ nome: opz.fascia.nome, colore: "var(--fascia)" });
+      box.appendChild(legenda(voci));
+    }
+    box.appendChild(contenitore(s));
+    return box;
+  }
+
+  // Colonne impilate per anno: serie [{nome, valori, colore}], con 2px di superficie tra i segmenti.
+  function colonneImpilate(opz) {
+    var W = larghezza(), H = 220, ml = 64, mr = 8, mt = 10, mb = 30;
+    var n = opz.x.length;
+    var totali = opz.x.map(function (_, i) {
+      return opz.serie.reduce(function (a, s) { return a + (ok(s.valori[i]) ? s.valori[i] : 0); }, 0);
+    });
+    var ymax = tetto(Math.max.apply(null, totali.concat([1])));
+    var banda = (W - ml - mr) / n, lb = Math.min(24, banda - 2);
+    var Y = function (v) { return mt + (H - mt - mb) * (1 - v / ymax); };
+    var s = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opz.etichetta });
+    tacche(0, ymax, 4).forEach(function (t) {
+      s.appendChild(sv("line", { x1: ml, x2: W - mr, y1: Y(t), y2: Y(t), stroke: t === 0 ? "var(--asse)" : "var(--griglia)", "stroke-width": 1 }));
+      s.appendChild(testoSvg(ml - 6, Y(t) + 4, euro(t), { "text-anchor": "end", fill: "var(--muto)", "font-size": 11 }));
+    });
+    var passoX = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - ml) / 48))));
+    opz.x.forEach(function (v, i) {
+      var cx = ml + banda * (i + 0.5), base = 0;
+      opz.serie.forEach(function (serie) {
+        var val = ok(serie.valori[i]) ? serie.valori[i] : 0;
+        if (val <= 0) return;
+        var y0 = Y(base), y1 = Y(base + val);
+        var h = Math.max(0, y0 - y1 - (base > 0 ? 2 : 0));
+        s.appendChild(sv("rect", { x: cx - lb / 2, y: y1, width: Math.max(1, lb), height: h, rx: 2, fill: serie.colore },
+                         opz.fmtX(v) + " · " + serie.nome + ": " + euro(val)));
+        base += val;
+      });
+      if (i % passoX === 0 || (i === n - 1 && (n - 1) % passoX >= passoX / 2)) {
+        s.appendChild(testoSvg(cx, H - 10, opz.fmtX(v), { "text-anchor": "middle", fill: "var(--muto)", "font-size": 11 }));
+      }
+    });
+    var box = el("div", {});
+    if (opz.serie.length > 1) box.appendChild(legenda(opz.serie.map(function (x) { return { nome: x.nome, colore: x.colore }; })));
+    box.appendChild(contenitore(s));
+    return box;
+  }
+
+  // Barre orizzontali: righe [{nome, valore, colore?}], scala comune, valore alla punta.
+  function barre(righe, fmt, etichetta) {
+    // su uno schermo stretto l'etichetta sta sopra la barra: a fianco verrebbe tagliata
+    var W = larghezza(), sopra = W < 520, riga = sopra ? 44 : 30, H = righe.length * riga + 4;
+    var ml = sopra ? 0 : Math.min(240, Math.max(120, W * 0.38)), mr = 84;
+    var max = Math.max.apply(null, righe.map(function (r) { return Math.abs(r.valore) || 0; }).concat([1]));
+    var s = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": etichetta });
+    righe.forEach(function (r, i) {
+      var y = i * riga + (sopra ? 20 : 6), w = (W - ml - mr) * Math.abs(r.valore) / max;
+      var lunghezza = sopra ? 48 : Math.floor(ml / 7);
+      var nome = r.nome.length > lunghezza ? r.nome.slice(0, lunghezza - 1) + "…" : r.nome;
+      s.appendChild(sopra ? testoSvg(0, y - 4, nome, { fill: "var(--testo-2)" })
+                          : testoSvg(ml - 8, y + 13, nome, { "text-anchor": "end", fill: "var(--testo-2)" }));
+      s.appendChild(sv("rect", { x: ml, y: y + 2, width: Math.max(1, w), height: 16, rx: 4, fill: r.colore || "var(--s1)" },
+                       r.nome + ": " + fmt(r.valore)));
+      s.appendChild(testoSvg(ml + w + 6, y + 14, fmt(r.valore), { fill: "var(--testo)" }));
+    });
+    return contenitore(s);
+  }
+
+  // Drift attorno a zero con le due bande: righe [{classe, drift, tight, wide, fuori}].
+  function barreDivergenti(righe) {
+    var W = larghezza(), riga = 34, H = righe.length * riga + 26, ml = Math.min(160, W * 0.32), mr = 12;
+    var lim = Math.max.apply(null, righe.map(function (r) { return Math.max(Math.abs(r.drift), r.wide); }).concat([0.01])) * 1.15;
+    var X = function (v) { return ml + (W - ml - mr) * (0.5 + v / (2 * lim)); };
+    var s = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Drift per classe contro le bande" });
+    righe.forEach(function (r, i) {
+      var y = i * riga + 4;
+      s.appendChild(sv("rect", { x: X(-r.wide), y: y, width: X(r.wide) - X(-r.wide), height: 24, rx: 4, fill: "var(--neutro)" },
+                       "Banda larga ±" + pct(r.wide)));
+      s.appendChild(sv("rect", { x: X(-r.tight), y: y, width: X(r.tight) - X(-r.tight), height: 24, rx: 4, fill: "var(--fascia)" },
+                       "Banda stretta ±" + pct(r.tight)));
+      var a = X(Math.min(0, r.drift)), b = X(Math.max(0, r.drift));
+      s.appendChild(sv("rect", { x: a, y: y + 6, width: Math.max(2, b - a), height: 12, rx: 3,
+                                 fill: r.fuori ? "var(--serio)" : "var(--s1)" },
+                       r.classe + ": drift " + punti(r.drift) + (r.fuori ? ", fuori banda" : ", in banda")));
+      s.appendChild(testoSvg(ml - 8, y + 16, r.classe, { "text-anchor": "end", fill: "var(--testo-2)" }));
+    });
+    s.appendChild(sv("line", { x1: X(0), x2: X(0), y1: 0, y2: H - 22, stroke: "var(--asse)", "stroke-width": 1 }));
+    s.appendChild(testoSvg(X(0), H - 6, "target", { "text-anchor": "middle", fill: "var(--muto)", "font-size": 11 }));
+    s.appendChild(testoSvg(X(-lim * 0.9), H - 6, "sottopeso", { "text-anchor": "start", fill: "var(--muto)", "font-size": 11 }));
+    s.appendChild(testoSvg(X(lim * 0.9), H - 6, "sovrappeso", { "text-anchor": "end", fill: "var(--muto)", "font-size": 11 }));
+    var box = el("div", {}, legenda([{ nome: "banda stretta", colore: "var(--fascia)" }, { nome: "banda larga", colore: "var(--neutro)" },
+                                     { nome: "in banda", colore: "var(--s1)" }, { nome: "fuori banda", colore: "var(--serio)" }]));
+    box.appendChild(contenitore(s));
+    return box;
+  }
+
+  function riga(nome, valori) {
+    return el("div", { class: "titolo" }, el("span", { class: "nome", testo: nome }), valori);
+  }
+  function cifra(testo, attrs) { return el("span", Object.assign({ class: "cifra", testo: testo }, attrs || {})); }
+
+  // ═══════════════════ SEZIONI ═══════════════════
+
+  function sezioneIndicatori(lista) {
+    var s = sezione("indicatori", "In sintesi", null);
+    var g = el("div", { class: "indicatori" });
+    lista.forEach(function (ind) {
+      var v = ind.formato === "euro" ? euro(ind.valore) : pct(ind.valore);
+      g.appendChild(el("div", { class: "tile" },
+        el("div", { class: "etichetta", testo: ind.etichetta }),
+        el("div", { class: "valore", "data-valore": ind.id, testo: v }),
+        el("div", { class: "fonte", testo: (ind.nota ? ind.nota + " · " : "") + "fonte: " + ind.fonte })));
+    });
+    s.appendChild(g);
+    return s;
+  }
+
+  function sezioneAllocazione(a) {
+    if (!a) return null;
+    var s = sezione("allocazione", "Allocazione",
+      a.classi ? "Peso attuale per classe contro il target, con la banda stretta attorno al target e il peso dopo il piano di ribilanciamento."
+               : "L'allocazione target che l'allocatore ricava dagli obiettivi.");
+    if (a.classi) {
+      var W = larghezza(), rr = 40, H = a.classi.length * rr + 4, ml = Math.min(160, W * 0.32), mr = 60;
+      var max = tetto(Math.max.apply(null, a.classi.map(function (c) { return Math.max(c.peso, c.target + c.tight, c.risultante || 0); })));
+      var X = function (v) { return ml + (W - ml - mr) * v / max; };
+      var g = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Peso attuale contro target per classe" });
+      a.classi.forEach(function (c, i) {
+        var y = i * rr + 4;
+        g.appendChild(testoSvg(ml - 8, y + 15, c.classe, { "text-anchor": "end", fill: "var(--testo-2)" }));
+        g.appendChild(sv("rect", { x: X(Math.max(0, c.target - c.tight)), y: y, width: X(c.target + c.tight) - X(Math.max(0, c.target - c.tight)),
+                                   height: 22, rx: 4, fill: "var(--fascia)" }, "Banda stretta: " + pct(c.target - c.tight) + " – " + pct(c.target + c.tight)));
+        g.appendChild(sv("rect", { x: ml, y: y + 5, width: Math.max(1, X(c.peso) - ml), height: 12, rx: 4,
+                                   fill: c.fuori_banda ? "var(--serio)" : "var(--s1)" },
+                         c.classe + ": attuale " + pct(c.peso) + (c.fuori_banda ? " (fuori banda)" : " (in banda)")));
+        g.appendChild(sv("line", { x1: X(c.target), x2: X(c.target), y1: y - 2, y2: y + 24, stroke: "var(--testo)", "stroke-width": 2 },
+                         "Target " + pct(c.target)));
+        if (ok(c.risultante)) {
+          g.appendChild(sv("circle", { cx: X(c.risultante), cy: y + 11, r: 5, fill: "var(--superficie)", stroke: "var(--testo)", "stroke-width": 2 },
+                           "Dopo il piano: " + pct(c.risultante)));
+        }
+        g.appendChild(testoSvg(W - mr + 6, y + 15, pct(c.peso), { fill: "var(--testo)" }));
+      });
+      s.appendChild(legenda([{ nome: "attuale, in banda", colore: "var(--s1)" }, { nome: "attuale, fuori banda", colore: "var(--serio)" },
+                             { nome: "banda stretta", colore: "var(--fascia)" }, { nome: "target", colore: "var(--testo)", linea: true }]));
+      s.appendChild(contenitore(g));
+      s.appendChild(el("p", { class: "nota", testo: "Il cerchio vuoto è il peso dopo il piano di ribilanciamento." }));
+      s.appendChild(inTabella("Valori in tabella", tabella(["Classe", "Attuale", "Target", "Banda stretta", "Dopo il piano", "Stato"],
+        a.classi.map(function (c) {
+          return [c.classe, pct(c.peso), pct(c.target), "±" + pct(c.tight), ok(c.risultante) ? pct(c.risultante) : "n/d",
+                  c.fuori_banda ? "fuori banda" : "in banda"];
+        }), [false, true, true, true, true, false])));
+    }
+    if (a.target_aggregato) {
+      var t = a.target_aggregato, tot = t.totale || 1;
+      if (a.classi) s.appendChild(el("h3", { testo: "Target dell'allocatore" }));
+      s.appendChild(barre([{ nome: "Azioni", valore: t.azioni / tot }, { nome: "Obbligazioni", valore: t.obbligazioni / tot },
+                           { nome: "Liquidità", valore: t.liquidita / tot }], function (v) { return pct(v); }, "Allocazione target"));
+      s.appendChild(inTabella("Obiettivi e capitale allocato", tabella(["Obiettivo", "Profilo", "Richiesto", "Allocato", "Azioni"],
+        a.obiettivi.map(function (o) { return [o.nome, o.profilo, euro(o.richiesto), euro(o.allocato), pct(o.peso_az, 0)]; }),
+        [false, false, true, true, true])));
+    }
+    return s;
+  }
+
+  function sezioneObiettivi(o) {
+    if (!o) return null;
+    var s = sezione("obiettivi", "Obiettivi",
+      "Probabilità di raggiungere ogni obiettivo nel Monte Carlo (" + o.modello + ", " + nf0.format(o.n_sim) +
+      " simulazioni) contro la confidenza scelta, e il capitale finale tra P10 e P90 contro il target nominale.");
+    s.appendChild(legenda([{ nome: "probabilità di successo", colore: "var(--s1)" }, { nome: "sotto la confidenza", colore: "var(--serio)" },
+                           { nome: "confidenza / target", colore: "var(--testo)", linea: true },
+                           { nome: "capitale finale P10–P90", colore: "var(--fascia)" }]));
+    o.obiettivi.forEach(function (ob, i) {
+      var r = el("div", { class: "riga" });
+      r.appendChild(riga(ob.nome, el("span", { class: "valori" },
+        cifra(pct(ob.probabilita_successo), { "data-valore": "prob-" + i }), " di probabilità · confidenza " + pct(ob.confidenza, 0))));
+      r.appendChild(el("div", { class: "valori", testo: ob.priorita + " · " + ob.profilo + " · " + anni(ob.anni) + " anni" }));
+      r.appendChild(trackQuota(ob.probabilita_successo, ob.confidenza,
+                               ob.probabilita_successo >= ob.confidenza ? "var(--s1)" : "var(--serio)",
+                               "Probabilità " + pct(ob.probabilita_successo) + " contro confidenza " + pct(ob.confidenza, 0)));
+      r.appendChild(trackFascia(ob.capitale_finale, ob.target_nominale, euro));
+      r.appendChild(el("div", { class: "valori", testo: "Capitale finale: P10 " + euro(ob.capitale_finale.p10) + " · mediana " +
+        euro(ob.capitale_finale.mediana) + " · P90 " + euro(ob.capitale_finale.p90) + " · target " + euro(ob.target_nominale) }));
+      s.appendChild(r);
+    });
+    s.appendChild(inTabella("Versamenti in tabella", tabella(["Obiettivo", "Priorità", "Versamento", "Con confidenza", "Già accumulato"],
+      o.obiettivi.map(function (ob) { return [ob.nome, ob.priorita, euro(ob.versamento_deterministico) + "/mese",
+                                              euro(ob.versamento_confidenza) + "/mese", euro(ob.gia)]; })
+        .concat([["Totale", "", euro(o.totale_versamento_deterministico) + "/mese", euro(o.totale_versamento_confidenza) + "/mese", ""]]),
+      [false, false, true, true, true])));
+    return s;
+  }
+
+  function sezioneGlide(g) {
+    if (!g) return null;
+    var s = sezione("glide_path", "Glide path",
+      "Quota azionaria anno per anno: aggregata e per obiettivo; sotto, il capitale proiettato di ogni obiettivo.");
+    var fx = function (a) { return "anno " + a; };
+    var serie = [{ nome: "Portafoglio aggregato", valori: g.portafoglio, colore: "var(--testo)" }].concat(
+      g.obiettivi.map(function (o, i) { return { nome: o.nome, valori: o.quota_azionaria, colore: colore(i) }; }));
+    s.appendChild(linee({ x: g.anni, serie: serie, ymax: 1, fmtY: function (v) { return pct(v, 0); }, fmtX: fx,
+                          etichetta: "Quota azionaria nel tempo" }));
+    s.appendChild(el("h3", { testo: "Capitale proiettato per obiettivo" }));
+    s.appendChild(colonneImpilate({ x: g.anni, fmtX: fx, etichetta: "Capitale proiettato per anno",
+      serie: g.obiettivi.map(function (o, i) { return { nome: o.nome, valori: o.capitale_proiettato, colore: colore(i) }; }) }));
+    s.appendChild(inTabella("Valori in tabella", tabella(["Anno", "Aggregato"].concat(g.obiettivi.map(function (o) { return o.nome; })),
+      g.anni.map(function (a, i) { return [String(a), pct(g.portafoglio[i], 0)].concat(g.obiettivi.map(function (o) { return pct(o.quota_azionaria[i], 0); })); }),
+      [false, true].concat(g.obiettivi.map(function () { return true; })))));
+    return s;
+  }
+
+  function sezionePensione(p) {
+    if (!p) return null;
+    var s = sezione("pensione", "Pensione",
+      "Il tasso di sostituzione lordo (INPS più fondo, sulla RAL finale) si confronta con il target lordo; il netto si legge come tenore di vita e non si confronta con un target lordo.");
+    if (p.tasso_lordo) {
+      var r = el("div", { class: "riga" });
+      r.appendChild(riga("Tasso di sostituzione lordo", el("span", { class: "valori" }, "mediana ", cifra(pct(p.tasso_lordo.mediana)),
+        " · target " + pct(p.target) + " · probabilità di raggiungerlo " + pct(p.prob_target))));
+      r.appendChild(trackFascia(p.tasso_lordo, p.target, function (v) { return pct(v); }));
+      r.appendChild(el("div", { class: "valori", testo: "P10 " + pct(p.tasso_lordo.p10) + " · mediana " + pct(p.tasso_lordo.mediana) + " · P90 " + pct(p.tasso_lordo.p90) }));
+      s.appendChild(r);
+      var m = el("div", { class: "riga" });
+      m.appendChild(riga("Montante del fondo pensione al pensionamento", el("span", { class: "valori" }, "mediana ", cifra(euro(p.montante_fp.mediana)))));
+      m.appendChild(trackFascia(p.montante_fp, null, euro));
+      m.appendChild(el("div", { class: "valori", testo: "P10 " + euro(p.montante_fp.p10) + " · mediana " + euro(p.montante_fp.mediana) + " · P90 " + euro(p.montante_fp.p90) }));
+      s.appendChild(m);
+    }
+    if (p.netto) {
+      s.appendChild(el("h3", { testo: "Pensione netta annua per scenario" }));
+      var righe = p.netto.scenari.map(function (sc) { return { nome: sc.nome, valore: sc.pensione_netta_totale }; });
+      righe.push({ nome: "Ultimo stipendio netto", valore: p.netto.netto_ultimo_stipendio, colore: "var(--muto)" });
+      s.appendChild(barre(righe, euro, "Pensione netta per scenario contro l'ultimo stipendio netto"));
+      s.appendChild(inTabella("Valori in tabella", tabella(["Scenario", "Pensione netta", "Sostituzione netta", "Sostituzione lorda"],
+        p.netto.scenari.map(function (sc) { return [sc.nome, euro(sc.pensione_netta_totale), pct(sc.tasso_sostituzione_netto), pct(sc.tasso_sostituzione_lordo)]; }),
+        [false, true, true, true])));
+    }
+    if (p.inps) {
+      s.appendChild(el("p", { class: "nota", testo: "Pensione INPS lorda " + euro(p.inps.pensione_inps_lorda_annua) + " l'anno a " +
+        anni(p.inps.eta_pensionamento) + " anni, tra " + anni(p.inps.anni_al_pensionamento) + " anni; montante contributivo " +
+        euro(p.inps.montante_finale) + ", RAL finale " + euro(p.inps.ral_finale) + "." }));
+    }
+    return s;
+  }
+
+  var FRASI_SORPASSO = {
+    gia_superato: function () { return "Il patrimonio finanziario supera già il capitale umano."; },
+    entro_la_proiezione: function (e) { return "Il patrimonio finanziario supera il capitale umano a " + anni(e) + " anni."; },
+    non_prima_della_fine: function () { return "Nessun sorpasso entro la proiezione: il patrimonio finanziario non supera il capitale umano prima della fine."; }
+  };
+
+  function sezioneCapitaleUmano(c) {
+    if (!c) return null;
+    var s = sezione("capitale_umano", "Capitale umano",
+      "Il portafoglio dentro la ricchezza totale: redditi da lavoro futuri e pensione. È una lente, non un target: non cambia l'allocazione degli obiettivi.");
+    s.appendChild(el("div", { class: "indicatori" },
+      el("div", { class: "tile" }, el("div", { class: "etichetta", testo: "Esposizione azionaria del patrimonio finanziario" }),
+         el("div", { class: "valore", testo: pct(c.esposizione_finanziaria) })),
+      el("div", { class: "tile" }, el("div", { class: "etichetta", testo: "Esposizione azionaria della ricchezza totale" }),
+         el("div", { class: "valore", testo: pct(c.esposizione_totale) }))));
+    s.appendChild(el("h3", { testo: "Bilancio totale" }));
+    s.appendChild(barre(c.voci.map(function (v) { return { nome: v.nome, valore: v.valore }; }), euro, "Bilancio patrimoniale totale"));
+    var frase = (FRASI_SORPASSO[c.stato_sorpasso] || FRASI_SORPASSO.non_prima_della_fine)(c.eta_sorpasso);
+    var eta = c.proiezione.map(function (r) { return r.eta; });
+    var indice = ok(c.eta_sorpasso) ? eta.indexOf(c.eta_sorpasso) : NaN;
+    s.appendChild(el("h3", { testo: "Patrimonio finanziario e capitale umano nel tempo" }));
+    s.appendChild(el("p", { class: "nota", testo: frase }));
+    s.appendChild(linee({ x: eta, fmtX: function (e) { return anni(e); }, fmtY: euro, margineSx: 72, etichetta: "Patrimonio finanziario e capitale umano per età",
+      serie: [{ nome: "Patrimonio finanziario", valori: c.proiezione.map(function (r) { return r.F; }), colore: colore(0) },
+              { nome: "Capitale umano", valori: c.proiezione.map(function (r) { return r.HC; }), colore: colore(1) }],
+      marcatore: indice >= 0 ? { indice: indice, testo: "sorpasso a " + anni(c.eta_sorpasso) + " anni" } : null }));
+    s.appendChild(el("h3", { testo: "Esposizione azionaria totale per età" }));
+    s.appendChild(linee({ x: eta, fmtX: function (e) { return anni(e); }, fmtY: function (v) { return pct(v, 0); },
+      etichetta: "Esposizione azionaria della ricchezza totale per età",
+      serie: [{ nome: "Esposizione attesa", valori: c.proiezione.map(function (r) { return r.esposizione; }), colore: colore(0) }],
+      fascia: { nome: "Monte Carlo P10–P90", lo: c.proiezione.map(function (r) { return r.p10; }), hi: c.proiezione.map(function (r) { return r.p90; }) } }));
+    if (c.settore) {
+      s.appendChild(el("p", { class: "nota", testo: "Settore del lavoro (" + c.settore.settore + "): " + pct(c.settore.quota_settore_fin) +
+        " del portafoglio contro " + pct(c.settore.peso_mondo) + " nel mondo" +
+        (c.settore.sovrappeso ? ": il portafoglio è sovrappesato sul settore da cui viene il reddito." : ": nessun sovrappeso.") }));
+    }
+    return s;
+  }
+
+  function sezioneFiscalita(f) {
+    if (!f) return null;
+    var s = sezione("fiscalita", "Fiscalità",
+      "Zainetto fiscale per broker e anno di scadenza (in euro 26%-equivalenti) e plus latenti compensabili.");
+    var t = f.totali;
+    s.appendChild(el("p", { class: "nota", testo: "Zainetto " + euro(t.zainetto_26_equivalente) + ", di cui in scadenza al 31/12 " +
+      euro(t.zainetto_in_scadenza) + "; plus compensabili " + euro(t.plus_latenti_compensabili) + ", realizzabili a costo zero " +
+      euro(t.plus_realizzabili_a_costo_zero) + "; imposta risparmiabile " + euro(t.imposta_risparmiabile) + "." }));
+    if (f.zainetto.length) {
+      var COLORI = { scaduta: "var(--muto)", in_scadenza: "var(--attenzione)", valida: "var(--s1)" };
+      var ordinate = f.zainetto.slice().sort(function (a, b) { return String(a.scade_il).localeCompare(String(b.scade_il)); });
+      s.appendChild(legenda([{ nome: "valida", colore: COLORI.valida }, { nome: "in scadenza quest'anno", colore: COLORI.in_scadenza },
+                             { nome: "scaduta", colore: COLORI.scaduta }]));
+      s.appendChild(barre(ordinate.map(function (z) {
+        return { nome: z.broker + " · " + z.anno + " → " + (z.scade_il || "n/d"), valore: z.importo_26_equivalente, colore: COLORI[z.stato] || "var(--s1)" };
+      }), euro, "Zainetto per broker e scadenza"));
+    } else {
+      s.appendChild(el("p", { class: "nota", testo: "Nessuna minus nello zainetto." }));
+    }
+    var broker = Object.keys(f.per_broker);
+    s.appendChild(tabella(["Broker", "Zainetto", "In scadenza", "Plus compensabili", "A costo zero", "Imposta risparmiabile"],
+      broker.map(function (b) { var x = f.per_broker[b];
+        return [b, euro(x.zainetto_26_equivalente), euro(x.zainetto_in_scadenza), euro(x.plus_latenti_compensabili),
+                euro(x.plus_realizzabili_a_costo_zero), euro(x.imposta_risparmiabile)]; }),
+      [false, true, true, true, true, true]));
+    if (f.avvisi.length) {
+      var u = el("ul", { class: "avvisi" });
+      f.avvisi.forEach(function (a) { u.appendChild(el("li", { testo: a })); });
+      s.appendChild(u);
+    }
+    return s;
+  }
+
+  function sezioneRibilanciamento(r) {
+    if (!r) return null;
+    var s = sezione("ribilanciamento", "Ribilanciamento",
+      "Scostamento di ogni classe dal target, contro la banda stretta e quella larga (regola 5/25), e gli ordini del piano.");
+    var classi = Object.keys(r.drift);
+    s.appendChild(barreDivergenti(classi.map(function (c) {
+      var d = r.drift[c]; return { classe: c, drift: d.drift, tight: d.tight, wide: d.wide, fuori: d.fuori_banda };
+    })));
+    classi.forEach(function (c) {
+      var d = r.drift[c];
+      var p = el("div", { class: "riga" }, riga(c, el("span", { class: "valori" }, cifra(punti(d.drift)), " · ",
+        stato(d.fuori_banda ? "fuori banda" : "in banda", d.fuori_banda ? "--serio" : "--buono"))));
+      var testo = [d.esito, d.motivo].filter(function (x) { return x; }).join(": ");
+      if (testo) p.appendChild(el("div", { class: "valori", testo: testo }));
+      s.appendChild(p);
+    });
+    s.appendChild(el("h3", { testo: "Imposta del piano: " + euro(r.imposta) }));
+    if (r.ordini.length) {
+      s.appendChild(tabella(["Broker", "Operazione", "Classe", "Categoria fiscale", "Importo", "Imposta", "Nota"],
+        r.ordini.map(function (o) { return [o.broker, o.operazione, o.classe || "", o.categoria_fiscale || "", euro(o.importo_eur),
+                                            ok(o.imposta_eur) ? euro(o.imposta_eur) : "", o.nota || ""]; }),
+        [false, false, false, false, true, true, false]));
+      s.appendChild(el("p", { class: "nota", testo: "Gli ordini sono una checklist di esecuzione: i broker italiani non li importano da file." }));
+    } else {
+      s.appendChild(el("p", { class: "nota", testo: "Nessun ordine: le correzioni sono rinviate o non necessarie." }));
+    }
+    return s;
+  }
+
+  function disegna() {
+    var main = document.getElementById("cruscotto");
+    var sezioni = [
+      B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori) : null,
+      sezioneAllocazione(B.allocazione), sezioneObiettivi(B.obiettivi), sezioneGlide(B.glide_path),
+      sezionePensione(B.pensione), sezioneCapitaleUmano(B.capitale_umano), sezioneFiscalita(B.fiscalita),
+      sezioneRibilanciamento(B.ribilanciamento)
+    ].filter(function (x) { return x; });
+    main.replaceChildren.apply(main, sezioni.length ? sezioni :
+      [el("p", { class: "avviso", testo: "Nessun dato da disegnare: rigenera il cruscotto con i JSON degli script." })]);
+  }
+
+  document.getElementById("testata").textContent = "Dati del " + String(B.generato_il || "").split("-").reverse().join("/") +
+    " · wealth-management-it " + (B.plugin || "?");
+  document.getElementById("fonti").textContent = "Fonti: " + (B.fonti || []).map(function (f) { return f.file + " (" + f.tipo + ")"; }).join(", ");
+  disegna();
+  var attesa = null;
+  window.addEventListener("resize", function () { clearTimeout(attesa); attesa = setTimeout(disegna, 150); });
+})();
+</script>
 </body>
 </html>

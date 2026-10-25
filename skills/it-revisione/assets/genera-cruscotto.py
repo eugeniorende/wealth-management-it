@@ -221,7 +221,7 @@ def _capitale_umano(cu):
         "voci": [estrai(v, ("nome", "valore"), f, f"bilancio.voci[{i}]") for i, v in enumerate(lista_di(d, "bilancio.voci", f))],
         "esposizione_finanziaria": numero_di(d, "esposizione_finanziaria", f, nullo=True),
         "esposizione_totale": numero_di(d, "esposizione_totale", f),
-        "proiezione": [estrai(r, ("eta", "esposizione", "p10", "p90"), f, f"proiezione[{i}]")
+        "proiezione": [estrai(r, ("eta", "F", "HC", "esposizione", "p10", "p90"), f, f"proiezione[{i}]")
                        for i, r in enumerate(lista_di(d, "proiezione", f))],
         "eta_sorpasso": numero_di(d, "eta_sorpasso", f, nullo=True),
         "stato_sorpasso": campo(d, "stato_sorpasso", f),
@@ -302,7 +302,7 @@ def componi_bundle(sorgenti, data, versione_plugin):
       netto {netto_ultimo_stipendio, netto_pensione_inps, scenari [{nome, pensione_netta_totale,
       tasso_sostituzione_netto, tasso_sostituzione_lordo}]} | None;
     - capitale_umano: voci [{nome, valore}], esposizione_finanziaria, esposizione_totale, proiezione
-      [{eta, esposizione, p10, p90}], eta_sorpasso, stato_sorpasso, settore {settore, quota_settore_fin,
+      [{eta, F (patrimonio finanziario), HC (capitale umano), esposizione, p10, p90}], eta_sorpasso, stato_sorpasso, settore {settore, quota_settore_fin,
       peso_mondo, sovrappeso} | None;
     - fiscalita: totali, per_broker, zainetto [{broker, anno, scade_il, stato, importo_26_equivalente}], avvisi;
     - ribilanciamento: totale, totale_post, imposta, prelievo, drift {classe: {peso, target, drift, tight, wide,

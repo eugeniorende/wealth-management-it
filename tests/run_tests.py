@@ -5227,6 +5227,127 @@ def t_t17_html():
             pass
 
 
+# Il rendering si verifica in Chromium con Playwright per Python. Senza Playwright i test sono saltati,
+# salvo RICHIEDI_BROWSER=1 (la CI). PLAYWRIGHT_CHROMIUM_EXECUTABLE indica un Chromium già installato
+# fuori dalla cache di Playwright.
+
+def browser():
+    """Il modulo sync di Playwright e una funzione che lancia Chromium; Salta se Playwright manca."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        if os.environ.get("RICHIEDI_BROWSER"):
+            raise AssertionError("RICHIEDI_BROWSER è impostato ma Playwright non è installato")
+        raise Salta("Playwright non installato")
+    def lancia(p):
+        eseguibile = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE")
+        return p.chromium.launch(executable_path=eseguibile) if eseguibile else p.chromium.launch()
+    return sync_playwright, lancia
+
+
+def formato_it_percento(x):
+    """Una frazione come la mostra il cruscotto: un decimale, virgola, «%» attaccato (0,4901 → «49,0%»)."""
+    return f"{x * 100:.1f}".replace(".", ",") + "%"
+
+
+def _apri_cruscotto(pagina, html, schema="light", larghezza=1200):
+    """Scrive l'HTML in un file e lo apre in una pagina nuova; ritorna (page, errori, eccezioni, richieste)."""
+    cartella = tempfile.mkdtemp(prefix="cruscotto-browser-")
+    path = os.path.join(cartella, "c.html")
+    open(path, "w", encoding="utf-8").write(html)
+    contesto = pagina.new_context(color_scheme=schema, viewport={"width": larghezza, "height": 900})
+    page = contesto.new_page()
+    page.set_default_timeout(5000)
+    errori, eccezioni, richieste = [], [], []
+    page.on("console", lambda m: errori.append(m.text) if m.type == "error" else None)
+    page.on("pageerror", lambda e: eccezioni.append(str(e)))
+    page.on("request", lambda r: richieste.append(r.url))
+    page.goto("file://" + path)
+    page.wait_for_load_state("load")
+    return page, errori, eccezioni, richieste
+
+
+SEZIONI_CRUSCOTTO = ("allocazione", "obiettivi", "glide_path", "pensione", "capitale_umano", "fiscalita", "ribilanciamento")
+
+
+def _tutti_i_json():
+    js = _json_esempio()
+    return [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
+                            "broker.json", "piano.json")]
+
+
+@test("T17 cruscotto nel browser: si apre senza errori, ogni sezione col suo SVG, nessuna richiesta di rete")
+def t_t17_browser_rendering():
+    sync_playwright, lancia = browser()
+    rc, so, se, b, html = _cruscotto(*_tutti_i_json())
+    assert rc == 0, se[-300:]
+    rc, _, se, _, solo_alloc = _cruscotto(_json_esempio()["alloc.json"])
+    assert rc == 0, se[-300:]
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, richieste = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert all(r.startswith(("file://", "data:")) for r in richieste), richieste
+            for k in SEZIONI_CRUSCOTTO:
+                assert page.locator(f"#sez-{k} svg").count() >= 1, k
+            assert page.locator("#sez-indicatori").count() == 1
+            page, errori, eccezioni, _ = _apri_cruscotto(br, solo_alloc)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert page.locator("section[id^=sez-]").count() == 2, page.locator("section[id^=sez-]").count()
+        finally:
+            br.close()
+
+
+@test("T17 cruscotto nel browser: numeri in italiano, nomi intatti, null senza NaN, tema scuro, 375px")
+def t_t17_browser_contenuti():
+    sync_playwright, lancia = browser()
+    def pericoloso(d):
+        d["obiettivi"][0]["nome"] = NOME_PERICOLOSO
+    def senza_sorpasso(d):
+        d["eta_sorpasso"], d["stato_sorpasso"] = None, "non_prima_della_fine"
+    def senza_ordini(d):
+        d["ordini"] = []
+    sorgenti = [f for f in _tutti_i_json() if not f.endswith(("mco.json", "cu.json", "piano.json"))]
+    sorgenti += [_json_variante("mco.json", pericoloso), _json_variante("cu.json", senza_sorpasso),
+                 _json_variante("piano.json", senza_ordini)]
+    rc, so, se, b, html = _cruscotto(*sorgenti)
+    assert rc == 0, se[-300:]
+    rc, _, se, b_tutti, html_tutti = _cruscotto(*_tutti_i_json())
+    assert rc == 0, se[-300:]
+    ind = {i["id"]: i for i in b_tutti["indicatori"]}
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti)
+            assert page.inner_text('[data-valore="prob-0"]') == formato_it_percento(b_tutti["obiettivi"]["obiettivi"][0]["probabilita_successo"])
+            assert page.inner_text('[data-valore="sostituzione_netta"]') == formato_it_percento(ind["sostituzione_netta"]["valore"])
+            assert page.inner_text('[data-valore="capitale_allocato"]') == "€130.000", page.inner_text('[data-valore="capitale_allocato"]')
+            assert page.inner_text('[data-valore="valore_portafoglio"]') == "€8.900"
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            corpo = page.inner_text("body")
+            for brutto in ("NaN", "undefined", "null", "Infinity"):
+                assert brutto not in corpo, brutto
+            # Review Focus 5: il nome pericoloso si legge identico, nessun markup interpretato
+            assert NOME_PERICOLOSO in corpo and page.locator("img").count() == 0
+            # Review Focus 2 e 4: nessun sorpasso, nessun ordine, detti a parole
+            assert "nessun sorpasso" in page.inner_text("#sez-capitale_umano").lower()
+            assert "nessun ordine" in page.inner_text("#sez-ribilanciamento").lower()
+            sfondo = lambda pg: pg.evaluate("getComputedStyle(document.body).backgroundColor")
+            chiaro = sfondo(page)
+            scura, errori, eccezioni, _ = _apri_cruscotto(br, html, schema="dark")
+            assert sfondo(scura) != chiaro and errori == [] and eccezioni == [], (chiaro, sfondo(scura))
+            stretta, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti, larghezza=375)
+            larghezza = stretta.evaluate("document.documentElement.scrollWidth")
+            assert larghezza <= 375 and errori == [] and eccezioni == [], larghezza
+        finally:
+            br.close()
+    src = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    for vietato in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"):
+        assert vietato not in src, vietato
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:

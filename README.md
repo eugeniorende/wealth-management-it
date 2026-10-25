@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 154 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 156 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -80,35 +80,35 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 <!-- generata con: python tests/run_tests.py --tabella-test -->
 | Strumento | Test che lo esercitano |
 |---|---|
-| `it-pianificazione/assets/importa-previdenza.py` | 18: T12 fixture realistiche; T13 riscatto della laurea; T17 cruscotto ×4; T9 catena --json → --from; T9 formati; T9 interfaccia ×2 … |
-| `it-pianificazione/assets/montecarlo-pensione.py` | 14: T12 --json previdenziali; T17 cruscotto ×4; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
+| `it-pianificazione/assets/importa-previdenza.py` | 20: T12 fixture realistiche; T13 riscatto della laurea; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 catena --json → --from; T9 formati … |
+| `it-pianificazione/assets/montecarlo-pensione.py` | 16: T12 --json previdenziali; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati … |
 | `it-pianificazione/assets/motore_bootstrap.py` | 12: T12 rami avanzati; T14 skill; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap … |
-| `it-pianificazione/assets/netto-pensione.py` | 25: T12 --json previdenziali; T15 capitale umano ×2; T17 cruscotto ×4; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati … |
+| `it-pianificazione/assets/netto-pensione.py` | 27: T12 --json previdenziali; T15 capitale umano ×2; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 catena --json → --from; T9 contratto di input della revisione … |
 | `it-pianificazione/assets/ponte-pensione.py` | 13: T12 --json previdenziali; T14 postura e fonti; T17 cruscotto; T9 catena --json → --from; T9 formati; T9 interfaccia ×2 … |
-| `it-pianificazione/assets/proiezione-inps.py` | 22: T12 rami avanzati; T13 riscatto della laurea; T15 capitale umano ×2; T17 cruscotto ×4; T9 catena --json → --from; T9 formati … |
+| `it-pianificazione/assets/proiezione-inps.py` | 24: T12 rami avanzati; T13 riscatto della laurea; T15 capitale umano ×2; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 catena --json → --from … |
 | `it-pianificazione/assets/proiezione-pensione.xlsx` | 13: T12 Excel; T15 capitale umano ×2; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
 | `it-pianificazione/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-pianificazione/assets/riscatto-laurea.py` | 10: T13 riscatto della laurea ×3; T14 skill; T17 cruscotto; T9 formati; T9 interfaccia ×2; freshness fiscale … |
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 6: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
-| `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 13: T17 cruscotto ×4; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; allocatore-capitale … |
+| `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 15: T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
-| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 18: T15 capitale umano ×10; T17 cruscotto ×4; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 |
+| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 20: T15 capitale umano ×10; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 |
 | `it-pianificazione-obiettivi/assets/decumulo-obiettivi.py` | 9: T12 rami avanzati; T9 formati; T9 interfaccia ×2; decumulo-obiettivi; obiettivi; serie storica ×2 … |
-| `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 6: T15 capitale umano; T17 cruscotto ×4; T9 contratto di input della revisione |
-| `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 16: T12 rami avanzati; T17 cruscotto ×4; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
-| `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 20: T17 cruscotto ×4; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore … |
-| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 22: T12 Excel ×2; T17 cruscotto ×4; T9 contratto di input della revisione; T9 interfaccia; T9 lettore unico del pianificatore; allocatore-capitale … |
+| `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 8: T15 capitale umano; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 contratto di input della revisione |
+| `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 18: T12 rami avanzati; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati … |
+| `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 22: T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
+| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 24: T12 Excel ×2; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 interfaccia; T9 lettore unico del pianificatore … |
 | `it-pianificazione-obiettivi/assets/profili-capitale-umano.csv` | 1: T15 capitale umano |
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
-| `it-rebalance/assets/ribilanciamento-multibroker.py` | 24: T1; T17 cruscotto ×4; T17 ribilanciamento --json; T7 ribilanciamento ×10; T9 formati ×2; T9 input esterno … |
+| `it-rebalance/assets/ribilanciamento-multibroker.py` | 26: T1; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T17 ribilanciamento --json; T7 ribilanciamento ×10; T9 formati ×2 … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |
-| `it-revisione/assets/genera-cruscotto.py` | 7: T17 cruscotto ×4; T9 formati; T9 interfaccia ×2 |
+| `it-revisione/assets/genera-cruscotto.py` | 9: T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 formati; T9 interfaccia ×2 |
 | `it-revisione/assets/genera-ips.py` | 10: T14 postura e fonti; T9 formati; T9 input esterno; T9 interfaccia ×2; freshness fiscale; genera-ips ×2 … |
 | `it-revisione/assets/investment-policy-statement.xlsx` | 3: T12 Excel; bande di ribilanciamento; scadenze di fine anno |
 | `it-revisione/assets/tracker-secchielli.xlsx` | 4: T12 Excel ×2; bande di ribilanciamento; tracker-secchielli |
 | `it-tax-optimization/assets/esempio-estratto.csv` | 2: T2 importatore ×2 |
 | `it-tax-optimization/assets/esempio-zainetto.csv` | 2: T2 importatore ×2 |
-| `it-tax-optimization/assets/importa-estratto-broker.py` | 19: T14 postura e fonti; T17 cruscotto ×4; T2 importatore ×6; T3; T9 contratto di input della revisione; T9 formati … |
+| `it-tax-optimization/assets/importa-estratto-broker.py` | 21: T14 postura e fonti; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T2 importatore ×6; T3; T9 contratto di input della revisione … |
 
 ### Freshness fiscale
 
