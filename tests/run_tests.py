@@ -4735,6 +4735,45 @@ def t_cu_errori():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T15 capitale umano: proiezione, fascia Monte Carlo e caso di Ibbotson")
+def t_cu_proiezione():
+    m = carica_modulo(asset(*CU))
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    p = m.proiezione(dati, prof, c, None, 500, 7)
+    righe = {r["eta"]: r for r in p["anni"]}
+    assert min(righe) == 35 and max(righe) == 72, sorted(righe)[:3]
+    hc = [righe[e]["HC"] for e in range(35, 68)]
+    assert all(a > b for a, b in zip(hc, hc[1:])) and righe[67]["HC"] == 0 and righe[70]["HC"] == 0
+    assert righe[66]["PP"] > righe[35]["PP"] and righe[72]["PP"] < righe[67]["PP"]
+    assert all(r["p10"] <= r["p50"] <= r["p90"] for r in p["anni"])
+    assert p == m.proiezione(dati, prof, c, None, 500, 7)                      # riproducibile col seme
+    # ρ = σ_h = 0 e σ_S = 0: nessuna dispersione, fascia sul deterministico
+    m.SIGMA_AZ = 0.0
+    piatto = dict(prof, rho=0.0, sigma_h=0.0)
+    for r in m.proiezione(dati, piatto, c, None, 200, 7)["anni"]:
+        assert abs(r["p10"] - r["p90"]) < 1e-9 and abs(r["p50"] - r["esposizione"]) < 1e-9, r
+    m.SIGMA_AZ = 0.18
+    # glide path più corto della proiezione: si tiene l'ultima quota, dicendolo
+    g = m.proiezione(dati, prof, c, [0.6, 0.5, 0.4], 200, 7)
+    assert any("più corto" in a for a in g["avvisi"])
+    # già in pensione
+    pens = _cu_esempio()
+    pens["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+    r = m.proiezione(pens, prof, dict(c), None, 200, 7)
+    assert r["eta_sorpasso"] is None and all(x["HC"] == 0 for x in r["anni"])
+    # Ibbotson et al. 2007, fig. 2.3: (HC + PP)/W ≈ 94% a 25 anni (tolleranza larga: letto da un grafico)
+    ib = {"persona": {"profilo": "pubblico", "eta": 25, "eta_pensione": 65, "netto_annuo": 50000, "crescita_reale": 0,
+                      "tfr_annuo": 0, "contributo_datore_fp": 0, "quota_reddito_azioni_datore": 0,
+                      "override": {"p_u": 0, "nu": 0.04}},
+          "pensione": {"netta_annua": 10000, "eta_fine": 85}, "posizioni": [], "liquidita": 50000,
+          "fondo_pensione": {"valore": 0, "quota_azionaria": 0}, "tfr_maturato_azienda": 0, "risparmio_annuo": 5000}
+    pi = m.profilo_effettivo(ib["persona"], m.carica_profili())
+    b = m.bilancio(ib, pi, {"R_F": 0.02, "NU_PENSIONE": 0.04, "ETA_FINE": 85, "ETA_PENSIONE": 65, "PENSIONE_NETTA": 10000})
+    assert 0.92 <= (b["HC"] + b["PP"]) / b["W"] <= 0.96, (b["HC"], b["PP"], b["W"])
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:

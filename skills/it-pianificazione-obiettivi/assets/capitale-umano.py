@@ -36,7 +36,10 @@ ONESTÀ METODOLOGICA
   portafoglio da replicare.
 """
 import csv
+import math
 import os
+
+import numpy as np
 
 from motore_bootstrap import cli, errore, numero, euro, pct, scrivi_json
 
@@ -285,6 +288,82 @@ def equivalenza(T, b):
                          f"{ETICHETTA_EQUIVALENZA}"}
 
 
+def proiezione(dati, profilo, c, quote_glide, n_sim, seed):
+    """Diagnosi 3: anno per anno fino a 5 anni dopo la pensione. Percorso atteso (rendimenti e crescita ai
+    valori centrali) e fascia P10-P90 dell'esposizione totale da un Monte Carlo con shock di borsa e di
+    reddito correlati (Ibbotson et al. 2007, eq. A.6-A.9). Il patrimonio finanziario è un solo contenitore
+    con la quota azionaria di oggi o quella del glide path dell'anno."""
+    persona = dati["persona"]
+    eta0, ep = persona["eta"], c["ETA_PENSIONE"]
+    g = persona.get("crescita_reale", 0.01)
+    reddito0 = persona.get("netto_annuo", 0) + persona.get("tfr_annuo", 0) + persona.get("contributo_datore_fp", 0)
+    frazione = frazione_lavorata(profilo["p_u"], profilo["durata_anni"], profilo["sostituzione_naspi"])
+    s = quota_azionaria_effettiva(profilo["quota_azionaria_hc"], persona.get("quota_reddito_azioni_datore", 0))
+    b0 = bilancio(dati, profilo, c)
+    q0 = b0["esposizione_finanziaria"] or 0.0
+    risparmio = dati.get("risparmio_annuo", 0)
+    anni = max(int(ep) + 5, eta0) - eta0 + 1
+    avvisi = []
+    if quote_glide is not None and len(quote_glide) < anni:
+        avvisi.append(f"glide path più corto della proiezione ({len(quote_glide)} anni su {anni}): "
+                      "tenuta l'ultima quota per gli anni successivi")
+
+    def quota(t):
+        if quote_glide is None or not len(quote_glide):
+            return q0
+        return quote_glide[min(t, len(quote_glide) - 1)]
+
+    rng = np.random.default_rng(seed)
+    rho, sigma_h = profilo["rho"], profilo["sigma_h"]
+    F_det, h_sim, F_sim = b0["F"], np.full(n_sim, float(reddito0)), np.full(n_sim, float(b0["F"]))
+    righe, sorpasso, prima = [], None, None
+    for t in range(anni):
+        eta = eta0 + t
+        anni_lavoro = max(int(ep - eta), 0)
+        fattore_hc = valore_capitale_umano(1.0, g, anni_lavoro, c["R_F"], profilo["nu"], frazione)
+        h_det = reddito0 * (1 + g) ** t if anni_lavoro > 0 else 0.0
+        HC = h_det * fattore_hc
+        PP = valore_pensione(c["PENSIONE_NETTA"], int(ep - eta), int(c["ETA_FINE"] - eta), c["R_F"], c["NU_PENSIONE"])
+        q = quota(t)
+        esposizione = (q * F_det + s * HC) / (F_det + HC + PP)
+        HC_sim = h_sim * fattore_hc if anni_lavoro > 0 else np.zeros(n_sim)
+        esp_sim = (q * F_sim + s * HC_sim) / (F_sim + HC_sim + PP)
+        righe.append({"eta": eta, "F": float(F_det), "HC": float(HC), "PP": float(PP), "quota_hc": float(HC / (F_det + HC + PP)),
+                      "esposizione": float(esposizione), "p10": float(np.percentile(esp_sim, 10)),
+                      "p50": float(np.percentile(esp_sim, 50)), "p90": float(np.percentile(esp_sim, 90))})
+        if prima is not None and prima and F_det >= HC and sorpasso is None:
+            sorpasso = eta
+        prima = F_det < HC
+        # anno successivo
+        lavora = eta < ep and reddito0 > 0
+        F_det = F_det * (1 + q * REND_AZ_REALE + (1 - q) * REND_OBB_REALE) + (risparmio * (1 + g) ** t if lavora else 0)
+        z_s, z = rng.standard_normal(n_sim), rng.standard_normal(n_sim)
+        z_h = rho * z_s + math.sqrt(1 - rho ** 2) * z
+        r_az = np.exp(math.log(1 + REND_AZ_REALE) + SIGMA_AZ * z_s) - 1
+        F_sim = F_sim * (1 + q * r_az + (1 - q) * REND_OBB_REALE) + (risparmio * h_sim / reddito0 if lavora else 0)
+        h_sim = h_sim * np.exp(math.log(1 + g) + sigma_h * z_h)
+    return {"anni": righe, "eta_sorpasso": sorpasso, "avvisi": avvisi}
+
+
+def stampa_proiezione(p):
+    print("\n3. PROIEZIONE (euro di oggi; esposizione totale attesa e fascia P10-P90 del Monte Carlo)")
+    print(f"   {'Età':>4}{'Finanziario':>14}{'Cap. umano':>14}{'Pensione':>13}{'Peso c.u.':>11}{'Esposizione':>13}{'P10-P90':>16}")
+    anni = p["anni"]
+    for i, r in enumerate(anni):
+        if i % 5 and i != len(anni) - 1:
+            continue
+        print(f"   {r['eta']:>4}{euro(r['F']):>14}{euro(r['HC']):>14}{euro(r['PP']):>13}{pct(r['quota_hc']):>11}"
+              f"{pct(r['esposizione']):>13}{pct(r['p10']) + '-' + pct(r['p90']):>16}")
+    if p["eta_sorpasso"] is not None:
+        print(f"   Il patrimonio finanziario supera il capitale umano a {p['eta_sorpasso']} anni.")
+    elif anni and anni[0]["F"] >= anni[0]["HC"]:
+        print("   Il patrimonio finanziario supera già il capitale umano.")
+    else:
+        print("   Il patrimonio finanziario non supera il capitale umano prima della fine della proiezione.")
+    for a in p["avvisi"]:
+        print(f"   ⚠️  {a}")
+
+
 def risolvi_costanti(dati, nomi_set):
     """Età di pensione, pensione netta ed età finale con la precedenza --set > --dati > --from > default."""
     global ETA_PENSIONE, PENSIONE_NETTA, ETA_FINE
@@ -362,6 +441,11 @@ def main():
     print(f"   Profilo {profilo['nome']}, {persona['eta']} anni, pensione a {c['ETA_PENSIONE']}, "
           f"netto {euro(persona.get('netto_annuo', 0))} l'anno")
     stampa_bilancio(b, eq)
+    if QUOTE_GLIDE is not None:
+        if not isinstance(QUOTE_GLIDE, list) or not all(isinstance(x, (int, float)) and 0 <= x <= 1 for x in QUOTE_GLIDE):
+            errore("QUOTE_GLIDE: serve una lista di quote tra 0 e 1 (il campo «portafoglio» del JSON del glide path)")
+    p = proiezione(dati, profilo, c, QUOTE_GLIDE, N_SIM, SEED)
+    stampa_proiezione(p)
 
     if args.json:
         scrivi_json(args.json, {
@@ -369,8 +453,8 @@ def main():
             "esposizione_finanziaria": b["esposizione_finanziaria"],
             "esposizione_totale": b["esposizione_totale"],
             "equivalenza": eq,
-            "proiezione": None,
-            "eta_sorpasso": None,
+            "proiezione": p["anni"],
+            "eta_sorpasso": p["eta_sorpasso"],
             "settore": None,
             "sensibilita": None,
             "profilo_usato": {**{k: v for k, v in profilo.items() if k not in ("fonte", "natura")},
