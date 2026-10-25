@@ -1,0 +1,14 @@
+# Profili del capitale umano per capitale-umano.py (25/10/2026). Metodo, fonti e limiti: references/capitale-umano.md.
+# quota_azionaria_hc: parte «azionaria» del capitale umano (Milevsky; Huggett e Kaplan 2016: di solito sotto il 35%).
+# nu: premio di illiquidità e rischio specifico sopra il tasso reale privo di rischio. rho, sigma_h: correlazione con la borsa
+# e volatilità del reddito (servono solo a sensibilità e proiezione). p_u: probabilità annua di perdere il lavoro;
+# durata_anni: durata media della disoccupazione; sostituzione_naspi: quota del reddito coperta dalla NASpI.
+# natura: «letteratura» = valore ancorato a un paper; «giudizio» = calibrazione da verificare; «da verificare» = fonte primaria da leggere.
+# Precari e contratti a termine: privato_ciclico con p_u più alto (override nel JSON della persona).
+profilo;quota_azionaria_hc;nu;rho;sigma_h;p_u;durata_anni;sostituzione_naspi;settore_default;fonte;natura
+pubblico;0,05;0,01;0,0;0,02;0,005;0,5;0,0;;"Ibbotson, Milevsky, Chen e Zhu 2007 (il professore di ruolo); Merton 1971 §7";"s:letteratura; nu:giudizio; rho:letteratura; sigma_h:giudizio; p_u:giudizio; naspi:da verificare"
+privato_stabile;0,15;0,02;0,1;0,05;0,03;0,5;0,6;;"Davis e Willen 2000/2013 (rho da -0,2 a 0,1); Ibbotson et al. 2007 caso 3 (rho 0,2, sigma 5%)";"s:giudizio; nu:giudizio; rho:letteratura; sigma_h:letteratura; p_u:giudizio; naspi:da verificare"
+privato_ciclico;0,30;0,03;0,3;0,10;0,05;0,5;0,6;;"Huggett e Kaplan 2016 (componente azionaria fino al 35%); Catherine 2022 (rischio controciclico)";"s:letteratura; nu:giudizio; rho:giudizio; sigma_h:giudizio; p_u:giudizio; naspi:da verificare"
+finanza;0,50;0,03;0,5;0,15;0,04;0,5;0,6;Financials;"Ibbotson et al. 2007 scenario 1 (rho 0,5) e l'esempio del broker";"s:giudizio; nu:giudizio; rho:letteratura; sigma_h:giudizio; p_u:giudizio; naspi:da verificare"
+autonomo;0,30;0,04;0,2;0,20;0,0;0,0;0,0;;"Heaton e Lucas 2000 (rischio del reddito d'impresa); nessuna NASpI";"s:giudizio; nu:giudizio; rho:giudizio; sigma_h:giudizio; p_u:non applicabile"
+imprenditore;0,60;0,05;0,4;0,25;0,0;0,0;0,0;;"Heaton e Lucas 2000 (rischio imprenditoriale)";"s:giudizio; nu:giudizio; rho:giudizio; sigma_h:giudizio; p_u:non applicabile"

@@ -335,6 +335,7 @@ SCRIPT_CLI = [
     ("it-pianificazione", "riscatto-laurea.py"),
     ("it-pianificazione-obiettivi", "allocatore-capitale.py"),
     ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
+    ("it-pianificazione-obiettivi", "capitale-umano.py"),
     ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
@@ -369,7 +370,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 14 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 15 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -4622,6 +4623,277 @@ def t_autonomi_perimetro():
         assert superato not in gs, f"previdenza-gestione-separata.md: «{superato}»"
 
 
+# ═══════════════════════════ T15: capitale umano ═══════════════════════════
+
+CU = ("it-pianificazione-obiettivi", "capitale-umano.py")
+
+
+@test("T15 capitale umano: valori chiusi della valutazione")
+def t_cu_valutazione():
+    m = carica_modulo(asset(*CU))
+    # rendita: g = 0, frazione 1, ν = 0 → formula chiusa
+    assert abs(m.valore_capitale_umano(32000, 0, 32, 0.01, 0, 1) - 32000 * (1 - 1.01 ** -32) / 0.01) < 0.01
+    assert m.valore_capitale_umano(32000, 0.01, 0, 0.01, 0.03, 1) == 0
+    assert abs(m.frazione_lavorata(0.08, 0.5, 0.6) - 0.984) < 1e-12
+    assert abs(m.valore_pensione(18000, 32, 55, 0.01, 0.0075) - 194248.56) < 0.01
+    assert m.quota_azionaria_effettiva(0.3, 1) == 1 and abs(m.quota_azionaria_effettiva(0.3, 0.5) - 0.65) < 1e-12
+    # invarianti: il capitale umano decresce con ν e con p_u, cresce con g
+    base = m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.03, 0.984)
+    assert abs(base - 705036.01) < 0.01, base
+    assert m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.04, 0.984) < base
+    assert m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.03, m.frazione_lavorata(0.16, 0.5, 0.6)) < base
+    assert m.valore_capitale_umano(35000, 0.02, 32, 0.01, 0.03, 0.984) > base
+
+
+@test("T15 capitale umano: profili con fonte, natura e valori plausibili")
+def t_cu_profili():
+    m = carica_modulo(asset(*CU))
+    p = m.carica_profili()
+    assert p == m.carica_profili(asset("it-pianificazione-obiettivi", "profili-capitale-umano.csv"))
+    assert set(p) == {"pubblico", "privato_stabile", "privato_ciclico", "finanza", "autonomo", "imprenditore"}, set(p)
+    assert p["privato_ciclico"]["quota_azionaria_hc"] == 0.30 and p["privato_ciclico"]["nu"] == 0.03
+    assert p["finanza"]["settore_default"] == "Financials"
+    for nome, r in p.items():
+        assert r["fonte"].strip() and r["natura"].strip(), nome
+        assert 0 <= r["quota_azionaria_hc"] <= 1 and 0 <= r["nu"] <= 0.10 and -1 <= r["rho"] <= 1, nome
+        assert 0 <= r["sigma_h"] <= 0.5 and 0 <= r["p_u"] <= 0.5 and 0 <= r["sostituzione_naspi"] <= 1, nome
+        assert r["settore_default"] in (None, *m.SETTORI_GICS), nome
+    e = m.profilo_effettivo({"profilo": "privato_ciclico", "override": {"p_u": 0.08}}, p)
+    assert e["p_u"] == 0.08 and p["privato_ciclico"]["p_u"] == 0.05   # l'override non tocca la tabella
+
+
+def _cu(*args, cwd=None):
+    return run_script_split(asset(*CU), *args, cwd=cwd)
+
+
+def _cu_esempio():
+    return json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+
+
+def _scrivi_json(path, dati):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dati, f)
+    return path
+
+
+@test("T15 capitale umano: bilancio, esposizione ed equivalenza sull'esempio")
+def t_cu_bilancio():
+    tmp = tempfile.mkdtemp()
+    try:
+        out_json = os.path.join(tmp, "cu.json")
+        rc, so, se = _cu("--json", out_json, cwd=tmp)
+        assert rc == 0 and "dati d'esempio" in so, se[-300:]
+        j = json.load(open(out_json, encoding="utf-8"))
+        b = j["bilancio"]
+        assert abs(b["HC"] - 705036.01) < 0.01 and abs(b["PP"] - 194248.56) < 0.01 and b["F"] == 113000, b
+        assert abs(j["esposizione_finanziaria"] - 0.610619) < 1e-5 and abs(j["esposizione_totale"] - 0.277107) < 1e-5
+        assert j["equivalenza"] is None
+        m = carica_modulo(asset(*CU))
+        assert m.equivalenza(0.5, b)["limite"] == "max" and m.equivalenza(0.5, b)["x"] == 1
+        assert m.equivalenza(0.1, b)["limite"] == "min" and m.equivalenza(0.1, b)["x"] == 0
+        assert abs(m.equivalenza(0.25, b)["x"] - 0.361781) < 1e-5
+        assert "calcolo, non target" in m.equivalenza(0.25, b)["messaggio"]
+        # s = 0 con un portafoglio azionario: esposizione totale < finanziaria
+        dati = _cu_esempio()
+        dati["persona"]["override"]["quota_azionaria_hc"] = 0
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "s0.json"), dati), "--json", out_json, cwd=tmp)
+        j = json.load(open(out_json, encoding="utf-8"))
+        assert rc == 0 and j["esposizione_totale"] < j["esposizione_finanziaria"], se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: dati incoerenti respinti con rc 1, casi limite gestiti")
+def t_cu_errori():
+    tmp = tempfile.mkdtemp()
+    def con(modifica):
+        d = _cu_esempio()
+        modifica(d)
+        return _scrivi_json(os.path.join(tmp, "d.json"), d)
+    try:
+        for modifica, atteso in [
+            (lambda d: d["persona"].update(profilo="astronauta"), "profilo"),
+            (lambda d: d["persona"].update(eta=95), "eta_fine"),
+            (lambda d: d["persona"].update(eta_pensione=30), "eta_pensione"),
+            (lambda d: d["fondo_pensione"].update(quota_azionaria=60), "quota"),
+            (lambda d: d.update(liquidita=-1), "negativ"),
+            (lambda d: d.update(persone=[d.pop("persona")]), "persona"),
+        ]:
+            rc, so, se = _cu("--dati", con(modifica), cwd=tmp)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and atteso in se, (atteso, rc, se[-200:])
+        # portafoglio vuoto con l'equivalenza richiesta: niente divisione per zero
+        def vuoto(d):
+            d.update(posizioni=[], liquidita=0, esposizione_totale_desiderata=0.3)
+        rc, so, se = _cu("--dati", con(vuoto), "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        j = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))
+        assert j["equivalenza"]["x"] is None and "nessun portafoglio" in j["equivalenza"]["messaggio"]
+        # asset_class sconosciuta: non azionaria, con un avviso che la nomina
+        rc, so, se = _cu("--dati", con(lambda d: d["posizioni"].append({"asset_class": "oro", "valore": 5000})), cwd=tmp)
+        assert rc == 0 and "oro" in so and "non azionari" in so, so[-400:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: proiezione, fascia Monte Carlo e caso di Ibbotson")
+def t_cu_proiezione():
+    m = carica_modulo(asset(*CU))
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    p = m.proiezione(dati, prof, c, None, 500, 7)
+    righe = {r["eta"]: r for r in p["anni"]}
+    assert min(righe) == 35 and max(righe) == 72, sorted(righe)[:3]
+    hc = [righe[e]["HC"] for e in range(35, 68)]
+    assert all(a > b for a, b in zip(hc, hc[1:])) and righe[67]["HC"] == 0 and righe[70]["HC"] == 0
+    assert righe[66]["PP"] > righe[35]["PP"] and righe[72]["PP"] < righe[67]["PP"]
+    assert all(r["p10"] <= r["p50"] <= r["p90"] for r in p["anni"])
+    assert p == m.proiezione(dati, prof, c, None, 500, 7)                      # riproducibile col seme
+    # ρ = σ_h = 0 e σ_S = 0: nessuna dispersione, fascia sul deterministico
+    m.SIGMA_AZ = 0.0
+    piatto = dict(prof, rho=0.0, sigma_h=0.0)
+    for r in m.proiezione(dati, piatto, c, None, 200, 7)["anni"]:
+        assert abs(r["p10"] - r["p90"]) < 1e-9 and abs(r["p50"] - r["esposizione"]) < 1e-9, r
+    m.SIGMA_AZ = 0.18
+    # glide path più corto della proiezione: si tiene l'ultima quota, dicendolo
+    g = m.proiezione(dati, prof, c, [0.6, 0.5, 0.4], 200, 7)
+    assert any("più corto" in a for a in g["avvisi"])
+    # già in pensione
+    pens = _cu_esempio()
+    pens["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+    r = m.proiezione(pens, prof, dict(c), None, 200, 7)
+    assert r["eta_sorpasso"] is None and all(x["HC"] == 0 for x in r["anni"])
+    # Ibbotson et al. 2007, fig. 2.3: (HC + PP)/W ≈ 94% a 25 anni (tolleranza larga: letto da un grafico)
+    ib = {"persona": {"profilo": "pubblico", "eta": 25, "eta_pensione": 65, "netto_annuo": 50000, "crescita_reale": 0,
+                      "tfr_annuo": 0, "contributo_datore_fp": 0, "quota_reddito_azioni_datore": 0,
+                      "override": {"p_u": 0, "nu": 0.04}},
+          "pensione": {"netta_annua": 10000, "eta_fine": 85}, "posizioni": [], "liquidita": 50000,
+          "fondo_pensione": {"valore": 0, "quota_azionaria": 0}, "tfr_maturato_azienda": 0, "risparmio_annuo": 5000}
+    pi = m.profilo_effettivo(ib["persona"], m.carica_profili())
+    b = m.bilancio(ib, pi, {"R_F": 0.02, "NU_PENSIONE": 0.04, "ETA_FINE": 85, "ETA_PENSIONE": 65, "PENSIONE_NETTA": 10000})
+    assert 0.92 <= (b["HC"] + b["PP"]) / b["W"] <= 0.96, (b["HC"], b["PP"], b["W"])
+
+
+@test("T15 capitale umano: sovrapposizione settoriale e CSV da Excel italiano")
+def t_cu_settore():
+    m = carica_modulo(asset(*CU))
+    assert set(m.PESI_MONDO) == set(m.SETTORI_GICS) and 0.99 <= sum(m.PESI_MONDO.values()) <= 1.01
+    tmp = tempfile.mkdtemp()
+    try:
+        p = os.path.join(tmp, "comp.csv")
+        with open(p, "w", encoding="utf-8-sig") as f:              # BOM, «;» e percento con la virgola
+            f.write("strumento;settore;peso\nA;Information Technology;50,0\nA;Financials;50,0\n"
+                    "B;Health Care;1,0\n")
+        comp = m.leggi_composizione(p)
+        assert comp == {"A": {"Information Technology": 0.5, "Financials": 0.5}, "B": {"Health Care": 1.0}}, comp
+        pos = [{"asset_class": "azionario", "valore": 30000, "strumento": "A"},
+               {"asset_class": "azionario", "valore": 10000, "strumento": "B"},
+               {"asset_class": "azionario", "valore": 10000, "strumento": "C"}]
+        s = m.sovrapposizione(pos, comp, "Information Technology", 40000, 60000,
+                              {**m.PESI_MONDO, "Information Technology": 0.25})
+        assert abs(s["quota_settore_fin"] - 15000 / 40000) < 1e-12 and s["mancanti"] == ["C"], s
+        assert abs(s["esposizione_combinata"] - (40000 * 0.375 + 60000) / 100000) < 1e-12
+        assert abs(s["rapporto"] - 1.5) < 1e-12 and s["sovrappeso"] is False
+        # l'esempio del plugin passa da riga di comando
+        rc, so, se = run_script_split(asset(*CU), "--composizione",
+                                      asset("it-pianificazione-obiettivi", "esempio-composizione.csv"), cwd=tmp)
+        assert rc == 0 and "4. SOVRAPPOSIZIONE" in so, se[-300:]
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Tecnologia;100\n")
+        rc, so, se = run_script_split(asset(*CU), "--composizione", p, cwd=tmp)
+        assert rc == 1 and "Information Technology" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: sensibilità ordinata e catena --from dagli script previdenziali")
+def t_cu_sensibilita_catena():
+    m = carica_modulo(asset(*CU))
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    righe = m.sensibilita(dati, prof, c)
+    assert {r["parametro"] for r in righe} == {"s", "nu", "g", "p_u", "r_f"} and len(righe) == 9, righe
+    ampiezze = []
+    for r in righe:
+        if not ampiezze or ampiezze[-1][0] != r["parametro"]:
+            ampiezze.append([r["parametro"], 0])
+        ampiezze[-1][1] = max(ampiezze[-1][1], abs(r["delta"]))
+    assert [a[1] for a in ampiezze] == sorted((a[1] for a in ampiezze), reverse=True), ampiezze
+    assert len(ampiezze) == 5, "le varianti dello stesso parametro devono essere adiacenti"
+    assert next(r for r in righe if r["parametro"] == "nu" and r["variante"] == "+0,015")["HC"] < m.bilancio(dati, prof, c)["HC"]
+    tmp = tempfile.mkdtemp()
+    try:
+        A = "it-pianificazione"
+        assert run_script(asset(A, "proiezione-inps.py"), "--json", os.path.join(tmp, "inps.json"), cwd=tmp)[0] == 0
+        assert run_script(asset(A, "netto-pensione.py"), "--json", os.path.join(tmp, "netto.json"), cwd=tmp)[0] == 0
+        senza = _cu_esempio()
+        senza["persona"].pop("eta_pensione")
+        senza.pop("pensione")
+        p = _scrivi_json(os.path.join(tmp, "d.json"), senza)
+        rc, so, se = run_script_split(asset(*CU), "--dati", p, "--from", os.path.join(tmp, "inps.json"),
+                                      "--from", os.path.join(tmp, "netto.json"), "--json", os.path.join(tmp, "cu.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        j = json.load(open(os.path.join(tmp, "cu.json"), encoding="utf-8"))
+        inps = json.load(open(os.path.join(tmp, "inps.json"), encoding="utf-8"))
+        netto = json.load(open(os.path.join(tmp, "netto.json"), encoding="utf-8"))
+        assert j["profilo_usato"]["eta_pensione"] == int(inps["eta_pensionamento"]), j["profilo_usato"]
+        assert j["profilo_usato"]["pensione_netta"] == netto["netto_pensione_inps"]
+        assert j["sensibilita"] and len(j["sensibilita"]) == 9
+        # --set prevale su --dati
+        rc, so, se = run_script_split(asset(*CU), "--set", "ETA_PENSIONE=70", "--json", os.path.join(tmp, "cu.json"), cwd=tmp)
+        assert rc == 0 and json.load(open(os.path.join(tmp, "cu.json"), encoding="utf-8"))["profilo_usato"]["eta_pensione"] == 70
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: input realistici dalla revisione finale (età frazionarie, CSV da Excel, --from scartato)")
+def t_cu_revisione_finale():
+    m = carica_modulo(asset(*CU))
+    tmp = tempfile.mkdtemp()
+    def con(modifica, nome="d.json"):
+        d = _cu_esempio()
+        modifica(d)
+        return _scrivi_json(os.path.join(tmp, nome), d)
+    try:
+        # età frazionarie (proiezione-inps.py le accetta): arrotondate per difetto, senza traceback
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"].update(eta=35.5, eta_pensione=67.5)), cwd=tmp)
+        assert rc == 0 and "Traceback" not in se and "per difetto" in so, (rc, se[-300:])
+        # la frase della diagnosi 2 nomina il blocco più grande: per un pensionato è la pensione
+        def pensionato(d):
+            d["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+        rc, so, se = _cu("--dati", con(pensionato), cwd=tmp)
+        assert rc == 0 and "gli somiglia" not in so and "capitale pensionistico" in so.split("2. ESPOSIZIONE")[1].split("3. ")[0], so[-900:]
+        # CSV da Excel italiano: righe «;;», «;» finale, cp1252 con accenti, celle in percento
+        comp = os.path.join(tmp, "comp.csv")
+        with open(comp, "w", encoding="cp1252") as f:
+            f.write("strumento;settore;peso;\nETF Società;Information Technology;60,0%;\n"
+                    "ETF Società;Financials;40,0%;\n;;;\n")
+        assert m.leggi_composizione(comp) == {"ETF Società": {"Information Technology": 0.6, "Financials": 0.4}}
+        # --dati che scavalca un valore letto con --from: lo dice
+        A = "it-pianificazione"
+        assert run_script(asset(A, "netto-pensione.py"), "--json", os.path.join(tmp, "netto.json"), cwd=tmp)[0] == 0
+        rc, so, se = _cu("--from", os.path.join(tmp, "netto.json"), cwd=tmp)
+        assert rc == 0 and "togli la chiave" in so, so[:900]
+        # nessuna composizione che combaci: niente esposizione combinata fittizia; nomi confrontati senza spazi
+        pos = [{"asset_class": "azionario", "valore": 1000, "strumento": " A "}]
+        z = m.sovrapposizione(pos, {"B": {"Financials": 1.0}}, "Financials", 0, 500, m.PESI_MONDO)
+        assert z["quota_settore_fin"] is None and z["esposizione_combinata"] is None, z
+        z = m.sovrapposizione(pos, {"A": {"Financials": 1.0}}, "Financials", 1000, 500, m.PESI_MONDO)
+        assert z["quota_settore_fin"] == 1.0, z
+        # override fuori dominio: ERRORE pulito, e nessun pezzo di report prima dell'errore
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"]["override"].update(rho=1.5)), cwd=tmp)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "rho" in se and "1. BILANCIO" not in so, (rc, so[-200:], se[-200:])
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"].update(crescita_reale="1%")), cwd=tmp)
+        assert rc == 1 and "crescita_reale" in se and "Traceback" not in se, se[-300:]
+        with open(comp, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Tecnologia;100\n")
+        rc, so, se = _cu("--composizione", comp, cwd=tmp)
+        assert rc == 1 and "1. BILANCIO" not in so, so[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:
@@ -4650,6 +4922,7 @@ OBBLIGATI_FRESHNESS = (
     "it-pianificazione-autonomi/references/previdenza-gestione-separata.md",
     "it-pianificazione-autonomi/references/fiscalita-forfettario.md",
     "it-pianificazione-obiettivi/references/asset-location.md",
+    "it-pianificazione-obiettivi/references/capitale-umano.md",
     "it-rebalance/SKILL.md",
     "it-revisione/assets/genera-ips.py",
 )
@@ -4806,6 +5079,8 @@ def t_contratto_revisione():
         "mco.json": (asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
         "alloc.json": (asset("it-pianificazione-obiettivi", "allocatore-capitale.py"), [pian]),
         "glide.json": (asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py"), [pian]),
+        "cu.json": (asset("it-pianificazione-obiettivi", "capitale-umano.py"),
+                    ["--composizione", asset("it-pianificazione-obiettivi", "esempio-composizione.csv")]),
         "imp.json": (asset("it-tax-optimization", "importa-estratto-broker.py"),
                      [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
     }
@@ -4841,7 +5116,9 @@ def t_contratto_revisione():
                   ("mco.json", "obiettivi[].target_oggi"), ("mco.json", "obiettivi[].priorita"),
                   ("alloc.json", "aggregato.azioni"), ("alloc.json", "aggregato.totale"), ("glide.json", "portafoglio"),
                   ("imp.json", "posizioni[].valore"), ("imp.json", "analisi.per_broker[].zainetto_in_scadenza"),
-                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"))
+                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"),
+                  ("cu.json", "esposizione_finanziaria"), ("cu.json", "esposizione_totale"),
+                  ("cu.json", "settore.quota_settore_fin"), ("cu.json", "settore.sovrappeso"), ("cu.json", "eta_sorpasso"))
         for nome, percorso in attese:
             assert percorso.replace("[]", "[") .split("[")[0].split(".")[-1] in tabella or percorso in tabella, \
                 f"la tabella del contratto non nomina «{percorso}»"

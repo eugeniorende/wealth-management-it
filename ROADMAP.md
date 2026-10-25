@@ -193,6 +193,24 @@ Prese il 20/10/2026.
 
   Il confronto TFR contro fondo (F037) e il prelievo in decumulo (F046) sono già in T4 e T7.
 
+- [x] **T15 Capitale umano, lente diagnostica** (P2, L): spec `docs/sviluppo/specs/2026-10-25-capitale-umano-design.md`, piano `docs/sviluppo/piani/2026-10-25-capitale-umano.md`.
+  - [x] `capitale-umano.py`, profili, esempi, reference, comando `/capitale-umano` e Step 8 di it-pianificazione-obiettivi.
+  - [x] Diagnosi 1-5 con la riga di equivalenza.
+  - [x] Integrazione in `it-revisione` (contratto di input e template).
+  - [x] Test con valori chiusi, invarianti e il caso di Ibbotson et al. 2007.
+  - Sviluppi successivi, da decidere: secondo reddito del nucleo; volatilità personale del reddito dall'estratto INPS (`importa-previdenza.py`); aggiustamento dei target (il capitale umano che modifica l'allocazione); polizza vita (Ibbotson et al. cap. 3; Chen et al. 2006).
+- [ ] **T16 Fonti dati esterne e connettori** (P2). Principio: gli script di calcolo restano offline; il dato si procura a parte (importatore su file, o Claude che lo scarica nella cartella di lavoro) e lo script legge un file locale. Per ogni fonte si annotano licenza (quelle a pagamento non si ridistribuiscono nel repository) e mese di verifica.
+
+  | Priorità | Dato | Serve per | Fonte | Forma |
+  |---|---|---|---|---|
+  | Alta | Composizione degli ETF per settore e paese | Diagnosi 4 del capitale umano; look-through del portafoglio | File delle posizioni di iShares, Xtrackers, Vanguard, Amundi, SPDR | Importatore offline dei formati degli emittenti → `composizione.csv` |
+  | Media | Tasso reale privo di rischio dell'area euro | `R_F` del capitale umano | BCE Data Portal (curva dei tassi; aspettative d'inflazione SPF); BTP€i/OAT€i | Fetch di Claude o `--set R_F` |
+  | Media | Perdita del lavoro e durata della disoccupazione per settore e contratto | `p_u`, `durata_anni` dei profili | ISTAT (flussi delle forze di lavoro); Osservatorio INPS su precariato e NASpI | Calibrazione annuale con `Verificato:` |
+  | Media | Parametri NASpI | `sostituzione_naspi` | Circolare INPS annuale sui massimali | Manuale, nella freshness |
+  | Bassa | Volatilità delle retribuzioni per settore | `sigma_h` dei profili | ISTAT (retribuzioni contrattuali); Eurostat SES; Banca d'Italia SHIW | Calibrazione una tantum, citata nel CSV |
+  | Bassa | Rendimenti azionari europei e mondiali | Correlazioni e bootstrap non solo USA | Kenneth French Data Library (gratuita); MSCI, DMS (a pagamento) | CSV sostitutivo di `rendimenti-storici.csv` |
+  | Bassa | Pesi settoriali dell'indice mondiale | `PESI_MONDO` di `capitale-umano.py` | Scheda MSCI ACWI | Manuale a ogni release |
+
 ## Fuori dal codice
 
 - [x] Branch protection su `main` e `develop`: dal 24/10/2026, con il repository pubblico, il proprietario ha attivato un ruleset su entrambi i branch (niente cancellazione né force push, check obbligatori `test` e `validate`).

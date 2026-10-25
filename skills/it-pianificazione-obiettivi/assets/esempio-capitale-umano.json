@@ -1,0 +1,26 @@
+{
+  "_nota": "Dati d'esempio di capitale-umano.py: uno sviluppatore di 35 anni, dipendente nel privato, settore tecnologico. Copia il file nella cartella di lavoro e sostituisci i valori con i tuoi.",
+  "persona": {
+    "profilo": "privato_ciclico",
+    "settore": "Information Technology",
+    "eta": 35,
+    "eta_pensione": 67,
+    "netto_annuo": 32000,
+    "crescita_reale": 0.01,
+    "tfr_annuo": 3000,
+    "contributo_datore_fp": 0,
+    "quota_reddito_azioni_datore": 0,
+    "override": {"p_u": 0.08}
+  },
+  "pensione": {"netta_annua": 18000, "eta_fine": 90},
+  "posizioni": [
+    {"asset_class": "azionario", "valore": 60000, "strumento": "ETF MSCI World"},
+    {"asset_class": "obbligazionario", "valore": 20000, "strumento": "ETF obbligazionario euro"}
+  ],
+  "fondo_pensione": {"valore": 15000, "quota_azionaria": 0.6},
+  "tfr_maturato_azienda": 8000,
+  "liquidita": 10000,
+  "risparmio_annuo": 9000,
+  "esposizione_totale_desiderata": null,
+  "altri_attivi": 0
+}
