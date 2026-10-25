@@ -62,6 +62,8 @@ SINONIMI_COLONNE = {
 RIGHE_INTESTAZIONE = 40   # la riga d'intestazione si cerca nelle prime N righe
 SEGNAPOSTO = ("", "-", "n/a", "na", "n.d.", "nd")   # peso o nome assente
 SOGLIA_AVVISO = 0.05      # avviso se le righe non classificate, o liquidità e derivati, superano il 5% del fondo
+SOGLIA_CLASSIFICATI = 0.5  # sotto questa quota dei titoli classificati la dimensione non si scrive: il 3% del fondo
+                           # rinormalizzato a 100 descriverebbe un fondo che non esiste
 
 # ── Settori GICS ────────────────────────────────────────────────────────────
 # Gli 11 settori con il nome inglese degli emittenti e quello italiano del report: gli stessi di SETTORI_GICS in
@@ -458,17 +460,17 @@ def _righe_csv(grezzo):
     except UnicodeDecodeError:
         testo = grezzo.decode("cp1252", errors="replace")
     linee = testo.splitlines()
-    campione = "\n".join(linee[10:] if len(linee) > 10 else linee)
-    try:
-        separatore = csv.Sniffer().sniff(campione, delimiters=",;\t").delimiter
-    except csv.Error:
-        separatore = max(",;\t", key=testo.count)
-    return [r for r in csv.reader(linee, delimiter=separatore)]
+    # Il separatore è quello con cui si trova la riga d'intestazione: in un file italiano ogni riga ha lo stesso
+    # numero di virgole decimali, quindi a guardare le sole righe di dati «,» sembrerebbe coerente quanto «;».
+    for separatore in (";", ",", "\t"):
+        righe = list(csv.reader(linee, delimiter=separatore))
+        if _cerca_intestazione(righe) is not None:
+            return righe
+    return list(csv.reader(linee, delimiter=max(",;\t", key=testo.count)))   # trova_intestazione dirà cosa ha visto
 
 
-def trova_intestazione(righe):
-    """(indice della riga, ruolo → colonna, ruolo → testo dell'intestazione): la prima riga, tra le prime
-    RIGHE_INTESTAZIONE, con una colonna di peso e almeno una tra settore e paese."""
+def _cerca_intestazione(righe):
+    """Come trova_intestazione, ma None se la riga non c'è (serve anche a scegliere il separatore del CSV)."""
     for i, riga in enumerate(righe[:RIGHE_INTESTAZIONE]):
         celle = [normalizza(c) for c in riga]
         col = {}
@@ -479,6 +481,15 @@ def trova_intestazione(righe):
                     break
         if "peso" in col and ("settore" in col or "paese" in col):
             return i, col, {ruolo: str(riga[j]).strip() for ruolo, j in col.items()}
+    return None
+
+
+def trova_intestazione(righe):
+    """(indice della riga, ruolo → colonna, ruolo → testo dell'intestazione): la prima riga, tra le prime
+    RIGHE_INTESTAZIONE, con una colonna di peso e almeno una tra settore e paese."""
+    trovata = _cerca_intestazione(righe)
+    if trovata is not None:
+        return trovata
     viste = []
     for riga in righe[:15]:
         for c in riga:
@@ -701,10 +712,14 @@ def componi(path, strumento, forzato=None):
         errore(f"{file}: {'; '.join(parti)}. Lo script non li indovina: segnalali per aggiungerli ai sinonimi "
                "(references/composizione-etf.md)")
 
-    # rinormalizzazione per dimensione, peso decrescente
-    risultato = {}
+    # rinormalizzazione per dimensione, peso decrescente; una dimensione con pochi titoli classificati non si scrive
+    risultato, scartate = {}, {}
     for dim, plurale in _DIMENSIONI:
         totale_dim = sum(pesi[dim].values())
+        con_dim = totale_dim + esclusi[f"{dim}_non_classificato"]
+        if totale_dim > 0 and totale_dim / con_dim < SOGLIA_CLASSIFICATI:
+            scartate[dim] = totale_dim / con_dim
+            totale_dim = 0
         risultato[plurale] = {k: v / totale_dim for k, v in sorted(pesi[dim].items(), key=lambda kv: -kv[1])} \
             if totale_dim > 0 else {}
     if not risultato["settori"] and not risultato["paesi"]:
@@ -719,6 +734,9 @@ def componi(path, strumento, forzato=None):
     for dim, plurale in _DIMENSIONI:
         if dim not in col:
             avvisi.append(f"il file non ha la colonna del {dim}: {plurale} non scritti")
+        elif dim in scartate:
+            avvisi.append(f"solo {pct(scartate[dim], 2)} dei titoli ha il {dim}, meno del "
+                          f"{numero(SOGLIA_CLASSIFICATI * 100)}%: {plurale} non scritti, quella quota non descrive il fondo")
         elif not risultato[plurale] and not (dim == "settore" and classificazione == "ICB"):
             avvisi.append(f"nessun titolo con il {dim}: {plurale} non scritti")
         if esclusi[f"{dim}_non_classificato"] > SOGLIA_AVVISO:
@@ -756,7 +774,8 @@ def _peso_vecchio(testo, path, strumento):
 
 def leggi_out(path):
     """Il composizione.csv esistente: (commenti in testa, blocchi, vecchio formato?). Un blocco è (strumento,
-    righe di testo), con i commenti che lo precedono; i commenti in fondo formano un blocco senza strumento.
+    righe di testo), con il suo commento «# <strumento>: …» scritto dall'importatore; ogni altro commento è
+    libero e forma un blocco senza strumento, che resta al suo posto a ogni reimport.
     Il vecchio formato strumento;settore;peso si converte nel nuovo, con i pesi in percento. Colonne
     sconosciute: ERRORE, perché un file che non si capisce non si sovrascrive."""
     if not os.path.exists(path):
@@ -784,10 +803,14 @@ def leggi_out(path):
             continue
         riga = dict(zip(colonne, campi))
         strumento = riga.get("strumento", "")
+        propri = [c for c in in_sospeso if c.startswith(f"# {strumento}:")]
+        liberi = [c for c in in_sospeso if c not in propri]
+        if liberi:
+            blocchi.append((None, liberi))
         if blocchi and blocchi[-1][0] == strumento:
-            blocchi[-1][1].extend(in_sospeso)
+            blocchi[-1][1].extend(propri)
         else:
-            blocchi.append((strumento, list(in_sospeso)))
+            blocchi.append((strumento, propri))
         in_sospeso = []
         if colonne[1] == "settore":
             vecchi.setdefault(strumento, []).append((riga.get("settore", ""),) + _peso_vecchio(riga.get("peso", ""), path, strumento))
@@ -891,6 +914,10 @@ def main():
                                               "help": "forza la scheda dell'emittente per tutti i file"}),
                           (("--out",), {"default": "composizione.csv", "metavar": "FILE",
                                         "help": "composizione.csv da scrivere o aggiornare (default nella cartella corrente)"})])
+    # il nome si confronta senza spazi ai bordi, come fanno leggi_out() e capitale-umano.py: «ETF World » è «ETF World»
+    args.strumento = [n.strip() for n in args.strumento]
+    if not all(args.strumento):
+        args.parser.error("--strumento vuoto: scrivi il nome dello strumento come nelle posizioni")
     if len(args.file) != len(args.strumento):
         args.parser.error(f"--file e --strumento vanno in coppia: {len(args.file)} file e {len(args.strumento)} strumenti")
     doppi = sorted({s for s in args.strumento if args.strumento.count(s) > 1})

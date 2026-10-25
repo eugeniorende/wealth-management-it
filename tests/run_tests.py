@@ -5366,6 +5366,64 @@ def t_ce_documentazione():
     assert "importatore della composizione" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().lower()
 
 
+@test("T16 composizione ETF: revisione finale (CSV italiano lungo, --strumento con spazi, poche righe classificate, commenti liberi)")
+def t_ce_revisione():
+    m = carica_modulo(asset(*CE))
+    tmp = tempfile.mkdtemp()
+    try:
+        # 1. CSV italiano di lunghezza reale: con molte righe la virgola decimale sembra un separatore coerente
+        righe = open(os.path.join(FIXTURES, "composizione-ishares-it.csv"), encoding="utf-8").read().splitlines()
+        testa, dati = righe[:6], righe[6:14]
+        lungo = os.path.join(tmp, "lungo.csv")
+        with open(lungo, "w", encoding="utf-8") as f:
+            f.write("\n".join(testa) + "\n")
+            for _ in range(5):
+                for r in dati:
+                    c = r.split(";")
+                    c[5] = m.numero(float(c[5].replace(",", ".")) / 5, 2)
+                    f.write(";".join(c) + "\n")
+            f.write("\nIl contenuto è di proprietà di BlackRock e dei suoi fornitori di informazioni\n")
+        c = m.componi(lungo, "L")
+        assert round(c["settori"]["Information Technology"] * 100, 2) == 40.40 and c["titoli"] == 30, c
+        # lo stesso risalvato da Excel italiano: cp1252, ogni riga riempita di «;», disclaimer senza virgolette
+        excel = os.path.join(tmp, "excel-lungo.csv")
+        testo = open(lungo, encoding="utf-8").read().splitlines()
+        with open(excel, "w", encoding="cp1252") as f:
+            for r in testo:
+                f.write(r + ";" * max(0, 9 - r.count(";")) + "\n")      # dieci colonne su ogni riga
+        c = m.componi(excel, "E")
+        assert round(c["paesi"]["US"] * 100, 2) == 50.51, c["paesi"]
+        # 2. --strumento con uno spazio in più: stesso strumento, nessun blocco doppio; vuoto o ripetuto → rc 2
+        out = os.path.join(tmp, "composizione.csv")
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        for nome in ("ETF World", "ETF World "):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", nome, "--out", out, cwd=tmp)
+            assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert sum(r.startswith("# ETF World") for r in testo.splitlines()) == 1, testo
+        assert sum(r.startswith("ETF World") and ";settore;Energy;" in r for r in testo.splitlines()) == 1, testo
+        for args in (("--strumento", "A", "--file", en, "--strumento", "A "), ("--strumento", "  ")):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, *args, "--out", out, cwd=tmp)
+            assert rc == 2 and "usage:" in se, (args, rc, se[-300:])
+        # 3. poche righe classificate: il 3% del fondo non diventa il 100% dei settori
+        g = os.path.join(tmp, "pochi.csv")
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nA,-,Equity,United States,97\nB,Financials,Equity,Italy,3\n")
+        c = m.componi(g, "P")
+        assert c["settori"] == {} and set(c["paesi"]) == {"US", "IT"}, c
+        assert any("settori non scritti" in a for a in c["avvisi"]), c["avvisi"]
+        # 4. un commento libero resta anche dopo due reimport
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("# nota finale dell'utente\n")
+        for _ in range(2):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "ETF World", "--out", out, cwd=tmp)
+            assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert testo.count("# nota finale dell'utente") == 1 and testo.count("# ETF World:") == 1, testo
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
 
 def _righe_csv_ordini(cartella):
