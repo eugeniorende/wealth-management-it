@@ -36,12 +36,13 @@ Uso:
 import csv
 import datetime
 import io
+import json
 import os
 import re
 import unicodedata
 import warnings
 
-from motore_bootstrap import cli, errore, numero, pct
+from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 
 # ── Colonne riconosciute ────────────────────────────────────────────────────
 # Per ruolo, i nomi delle intestazioni in italiano e in inglese. L'ordine conta: con due colonne candidate per lo
@@ -104,47 +105,262 @@ NOMI_ICB_ESCLUSIVI = {"technology", "telecommunications", "basic materials"}
 NOMI_GICS_ESCLUSIVI = {"information technology", "communication services", "materials"}
 
 # ── Paesi ───────────────────────────────────────────────────────────────────
-# ISO 3166-1 alpha-2 → (nome italiano, nome inglese e varianti dei file). Il codice e il nome italiano valgono
-# anch'essi come sinonimi. Copre MSCI ACWI IMI e FTSE All-World, i domicili frequenti e qualche frontiera.
-PAESI = {
-    "AU": ("Australia", ("Australia",)), "AT": ("Austria", ("Austria",)), "BE": ("Belgio", ("Belgium",)),
-    "CA": ("Canada", ("Canada",)), "DK": ("Danimarca", ("Denmark",)), "FI": ("Finlandia", ("Finland",)),
-    "FR": ("Francia", ("France",)), "DE": ("Germania", ("Germany",)),
-    "HK": ("Hong Kong", ("Hong Kong", "Hong Kong SAR", "Hong Kong SAR, China")),
-    "IE": ("Irlanda", ("Ireland",)), "IL": ("Israele", ("Israel",)), "IT": ("Italia", ("Italy",)),
-    "JP": ("Giappone", ("Japan",)), "NL": ("Paesi Bassi", ("Netherlands", "The Netherlands", "Holland", "Olanda")),
-    "NZ": ("Nuova Zelanda", ("New Zealand",)), "NO": ("Norvegia", ("Norway",)), "PT": ("Portogallo", ("Portugal",)),
-    "SG": ("Singapore", ("Singapore",)), "ES": ("Spagna", ("Spain",)), "SE": ("Svezia", ("Sweden",)),
-    "CH": ("Svizzera", ("Switzerland",)),
-    "GB": ("Regno Unito", ("United Kingdom", "UK", "Great Britain", "Gran Bretagna", "England", "Inghilterra")),
-    "US": ("Stati Uniti", ("United States", "USA", "United States of America", "Stati Uniti d'America", "U.S.")),
-    "BR": ("Brasile", ("Brazil",)), "CL": ("Cile", ("Chile",)),
-    "CN": ("Cina", ("China", "People's Republic of China", "China (Mainland)", "Repubblica popolare cinese")),
-    "CO": ("Colombia", ("Colombia",)), "CZ": ("Repubblica Ceca", ("Czech Republic", "Czechia", "Cechia")),
-    "EG": ("Egitto", ("Egypt",)), "GR": ("Grecia", ("Greece",)), "HU": ("Ungheria", ("Hungary",)),
-    "IN": ("India", ("India",)), "ID": ("Indonesia", ("Indonesia",)),
-    "KR": ("Corea del Sud", ("Korea (South)", "Korea, Republic of", "South Korea", "Republic of Korea", "Korea",
-                             "Corea", "Repubblica di Corea")),
-    "KW": ("Kuwait", ("Kuwait",)), "MY": ("Malesia", ("Malaysia",)), "MX": ("Messico", ("Mexico",)),
-    "PE": ("Perù", ("Peru",)), "PH": ("Filippine", ("Philippines",)), "PL": ("Polonia", ("Poland",)),
-    "QA": ("Qatar", ("Qatar",)), "SA": ("Arabia Saudita", ("Saudi Arabia",)),
-    "ZA": ("Sudafrica", ("South Africa", "Sud Africa")),
-    "TW": ("Taiwan", ("Taiwan", "Taiwan, Province of China", "Chinese Taipei")),
-    "TH": ("Thailandia", ("Thailand",)), "TR": ("Turchia", ("Turkey", "Türkiye")),
-    "AE": ("Emirati Arabi Uniti", ("United Arab Emirates", "UAE")),
-    "LU": ("Lussemburgo", ("Luxembourg",)), "BM": ("Bermuda", ("Bermuda",)),
-    "KY": ("Isole Cayman", ("Cayman Islands",)), "JE": ("Jersey", ("Jersey",)), "GG": ("Guernsey", ("Guernsey",)),
-    "CW": ("Curaçao", ("Curacao",)), "PA": ("Panama", ("Panama",)), "LR": ("Liberia", ("Liberia",)),
-    "IM": ("Isola di Man", ("Isle of Man",)), "MO": ("Macao", ("Macau", "Macao SAR")),
-    "AR": ("Argentina", ("Argentina",)), "RU": ("Russia", ("Russian Federation", "Federazione Russa")),
-    "PK": ("Pakistan", ("Pakistan",)), "VN": ("Vietnam", ("Viet Nam",)), "NG": ("Nigeria", ("Nigeria",)),
-    "KZ": ("Kazakistan", ("Kazakhstan",)), "IS": ("Islanda", ("Iceland",)), "MT": ("Malta", ("Malta",)),
-    "CY": ("Cipro", ("Cyprus",)), "RO": ("Romania", ("Romania",)), "EE": ("Estonia", ("Estonia",)),
-    "LT": ("Lituania", ("Lithuania",)), "LV": ("Lettonia", ("Latvia",)),
-    "SK": ("Slovacchia", ("Slovakia", "Slovak Republic")), "SI": ("Slovenia", ("Slovenia",)),
-    "HR": ("Croazia", ("Croatia",)), "BG": ("Bulgaria", ("Bulgaria",)), "UY": ("Uruguay", ("Uruguay",)),
-    "MA": ("Marocco", ("Morocco",)), "KE": ("Kenya", ("Kenya",)),
-}
+# Tutti i codici ISO 3166-1 alpha-2, una riga per paese: codice;nome italiano;nome inglese|varianti dei file.
+# Il codice e il nome italiano valgono anch'essi come sinonimi. L'elenco è completo perché i file reali
+# contengono anche paesi minori (in un MSCI World di Xtrackers c'era un titolo dello Zambia allo 0,02%).
+_ELENCO_PAESI = """
+AD;Andorra;Andorra
+AE;Emirati Arabi Uniti;United Arab Emirates|UAE
+AF;Afghanistan;Afghanistan
+AG;Antigua e Barbuda;Antigua and Barbuda
+AI;Anguilla;Anguilla
+AL;Albania;Albania
+AM;Armenia;Armenia
+AO;Angola;Angola
+AQ;Antartide;Antarctica
+AR;Argentina;Argentina
+AS;Samoa Americane;American Samoa
+AT;Austria;Austria
+AU;Australia;Australia
+AW;Aruba;Aruba
+AX;Isole Åland;Aland Islands|Åland Islands
+AZ;Azerbaigian;Azerbaijan
+BA;Bosnia ed Erzegovina;Bosnia and Herzegovina|Bosnia-Herzegovina
+BB;Barbados;Barbados
+BD;Bangladesh;Bangladesh
+BE;Belgio;Belgium
+BF;Burkina Faso;Burkina Faso
+BG;Bulgaria;Bulgaria
+BH;Bahrein;Bahrain|Bahrein
+BI;Burundi;Burundi
+BJ;Benin;Benin
+BL;Saint-Barthélemy;Saint Barthelemy
+BM;Bermuda;Bermuda|Bermude
+BN;Brunei;Brunei|Brunei Darussalam
+BO;Bolivia;Bolivia|Bolivia, Plurinational State of
+BQ;Caraibi olandesi;Bonaire, Sint Eustatius and Saba|Caribbean Netherlands
+BR;Brasile;Brazil
+BS;Bahamas;Bahamas|The Bahamas
+BT;Bhutan;Bhutan
+BV;Isola Bouvet;Bouvet Island
+BW;Botswana;Botswana
+BY;Bielorussia;Belarus
+BZ;Belize;Belize
+CA;Canada;Canada
+CC;Isole Cocos;Cocos (Keeling) Islands
+CD;Repubblica Democratica del Congo;Congo, Democratic Republic of the|Democratic Republic of the Congo|Congo (Kinshasa)|DR Congo
+CF;Repubblica Centrafricana;Central African Republic
+CG;Repubblica del Congo;Congo|Republic of the Congo|Congo (Brazzaville)
+CH;Svizzera;Switzerland
+CI;Costa d'Avorio;Cote d'Ivoire|Côte d'Ivoire|Ivory Coast
+CK;Isole Cook;Cook Islands
+CL;Cile;Chile
+CM;Camerun;Cameroon
+CN;Cina;China|People's Republic of China|China (Mainland)|Repubblica popolare cinese|Repubblica Popolare Cinese
+CO;Colombia;Colombia
+CR;Costa Rica;Costa Rica
+CU;Cuba;Cuba
+CV;Capo Verde;Cabo Verde|Cape Verde
+CW;Curaçao;Curacao|Curaçao
+CX;Isola di Natale;Christmas Island
+CY;Cipro;Cyprus
+CZ;Repubblica Ceca;Czech Republic|Czechia|Cechia
+DE;Germania;Germany
+DJ;Gibuti;Djibouti
+DK;Danimarca;Denmark
+DM;Dominica;Dominica
+DO;Repubblica Dominicana;Dominican Republic
+DZ;Algeria;Algeria
+EC;Ecuador;Ecuador
+EE;Estonia;Estonia
+EG;Egitto;Egypt
+EH;Sahara Occidentale;Western Sahara
+ER;Eritrea;Eritrea
+ES;Spagna;Spain
+ET;Etiopia;Ethiopia
+FI;Finlandia;Finland
+FJ;Figi;Fiji
+FK;Isole Falkland;Falkland Islands|Falkland Islands (Malvinas)
+FM;Micronesia;Micronesia|Micronesia, Federated States of
+FO;Isole Fær Øer;Faroe Islands|Isole Faroe
+FR;Francia;France
+GA;Gabon;Gabon
+GB;Regno Unito;United Kingdom|UK|Great Britain|Gran Bretagna|England|Inghilterra|United Kingdom of Great Britain and Northern Ireland
+GD;Grenada;Grenada
+GE;Georgia;Georgia
+GF;Guyana francese;French Guiana
+GG;Guernsey;Guernsey
+GH;Ghana;Ghana
+GI;Gibilterra;Gibraltar
+GL;Groenlandia;Greenland
+GM;Gambia;Gambia|The Gambia
+GN;Guinea;Guinea
+GP;Guadalupa;Guadeloupe
+GQ;Guinea Equatoriale;Equatorial Guinea
+GR;Grecia;Greece
+GS;Georgia del Sud e isole Sandwich australi;South Georgia and the South Sandwich Islands
+GT;Guatemala;Guatemala
+GU;Guam;Guam
+GW;Guinea-Bissau;Guinea-Bissau
+GY;Guyana;Guyana
+HK;Hong Kong;Hong Kong|Hong Kong SAR|Hong Kong SAR, China|Hong Kong, China
+HM;Isole Heard e McDonald;Heard Island and McDonald Islands
+HN;Honduras;Honduras
+HR;Croazia;Croatia
+HT;Haiti;Haiti
+HU;Ungheria;Hungary
+ID;Indonesia;Indonesia
+IE;Irlanda;Ireland
+IL;Israele;Israel
+IM;Isola di Man;Isle of Man
+IN;India;India
+IO;Territorio britannico dell'Oceano Indiano;British Indian Ocean Territory
+IQ;Iraq;Iraq
+IR;Iran;Iran|Iran, Islamic Republic of
+IS;Islanda;Iceland
+IT;Italia;Italy
+JE;Jersey;Jersey
+JM;Giamaica;Jamaica
+JO;Giordania;Jordan
+JP;Giappone;Japan
+KE;Kenya;Kenya
+KG;Kirghizistan;Kyrgyzstan
+KH;Cambogia;Cambodia
+KI;Kiribati;Kiribati
+KM;Comore;Comoros
+KN;Saint Kitts e Nevis;Saint Kitts and Nevis
+KP;Corea del Nord;North Korea|Korea (North)|Korea, Democratic People's Republic of
+KR;Corea del Sud;Korea (South)|Korea, Republic of|South Korea|Republic of Korea|Korea|Corea|Repubblica di Corea
+KW;Kuwait;Kuwait
+KY;Isole Cayman;Cayman Islands
+KZ;Kazakistan;Kazakhstan
+LA;Laos;Laos|Lao People's Democratic Republic
+LB;Libano;Lebanon
+LC;Santa Lucia;Saint Lucia
+LI;Liechtenstein;Liechtenstein
+LK;Sri Lanka;Sri Lanka
+LR;Liberia;Liberia
+LS;Lesotho;Lesotho
+LT;Lituania;Lithuania
+LU;Lussemburgo;Luxembourg
+LV;Lettonia;Latvia
+LY;Libia;Libya
+MA;Marocco;Morocco
+MC;Monaco;Monaco|Principato di Monaco
+MD;Moldavia;Moldova|Moldova, Republic of
+ME;Montenegro;Montenegro
+MF;Saint-Martin;Saint Martin (French part)
+MG;Madagascar;Madagascar
+MH;Isole Marshall;Marshall Islands
+MK;Macedonia del Nord;North Macedonia|Macedonia
+ML;Mali;Mali
+MM;Myanmar;Myanmar|Burma|Birmania
+MN;Mongolia;Mongolia
+MO;Macao;Macau|Macao SAR|Macao, China
+MP;Isole Marianne Settentrionali;Northern Mariana Islands
+MQ;Martinica;Martinique
+MR;Mauritania;Mauritania
+MS;Montserrat;Montserrat
+MT;Malta;Malta
+MU;Mauritius;Mauritius
+MV;Maldive;Maldives
+MW;Malawi;Malawi
+MX;Messico;Mexico
+MY;Malesia;Malaysia
+MZ;Mozambico;Mozambique
+NA;Namibia;Namibia
+NC;Nuova Caledonia;New Caledonia
+NE;Niger;Niger
+NF;Isola Norfolk;Norfolk Island
+NG;Nigeria;Nigeria
+NI;Nicaragua;Nicaragua
+NL;Paesi Bassi;Netherlands|The Netherlands|Holland|Olanda
+NO;Norvegia;Norway
+NP;Nepal;Nepal
+NR;Nauru;Nauru
+NU;Niue;Niue
+NZ;Nuova Zelanda;New Zealand
+OM;Oman;Oman
+PA;Panama;Panama
+PE;Perù;Peru
+PF;Polinesia francese;French Polynesia
+PG;Papua Nuova Guinea;Papua New Guinea
+PH;Filippine;Philippines
+PK;Pakistan;Pakistan
+PL;Polonia;Poland
+PM;Saint-Pierre e Miquelon;Saint Pierre and Miquelon
+PN;Isole Pitcairn;Pitcairn
+PR;Porto Rico;Puerto Rico
+PS;Palestina;Palestine|Palestine, State of
+PT;Portogallo;Portugal
+PW;Palau;Palau
+PY;Paraguay;Paraguay
+QA;Qatar;Qatar
+RE;Riunione;Reunion|Réunion
+RO;Romania;Romania
+RS;Serbia;Serbia
+RU;Russia;Russian Federation|Federazione Russa
+RW;Ruanda;Rwanda
+SA;Arabia Saudita;Saudi Arabia
+SB;Isole Salomone;Solomon Islands
+SC;Seychelles;Seychelles
+SD;Sudan;Sudan
+SE;Svezia;Sweden
+SG;Singapore;Singapore
+SH;Sant'Elena;Saint Helena|Saint Helena, Ascension and Tristan da Cunha
+SI;Slovenia;Slovenia
+SJ;Svalbard e Jan Mayen;Svalbard and Jan Mayen
+SK;Slovacchia;Slovakia|Slovak Republic
+SL;Sierra Leone;Sierra Leone
+SM;San Marino;San Marino
+SN;Senegal;Senegal
+SO;Somalia;Somalia
+SR;Suriname;Suriname
+SS;Sudan del Sud;South Sudan
+ST;São Tomé e Príncipe;Sao Tome and Principe
+SV;El Salvador;El Salvador
+SX;Sint Maarten;Sint Maarten (Dutch part)
+SY;Siria;Syria|Syrian Arab Republic
+SZ;Eswatini;Eswatini|Swaziland
+TC;Isole Turks e Caicos;Turks and Caicos Islands
+TD;Ciad;Chad
+TF;Terre australi e antartiche francesi;French Southern Territories
+TG;Togo;Togo
+TH;Thailandia;Thailand
+TJ;Tagikistan;Tajikistan
+TK;Tokelau;Tokelau
+TL;Timor Est;Timor-Leste|East Timor
+TM;Turkmenistan;Turkmenistan
+TN;Tunisia;Tunisia
+TO;Tonga;Tonga
+TR;Turchia;Turkey|Türkiye|Turkiye
+TT;Trinidad e Tobago;Trinidad and Tobago
+TV;Tuvalu;Tuvalu
+TW;Taiwan;Taiwan|Taiwan, Province of China|Chinese Taipei
+TZ;Tanzania;Tanzania|Tanzania, United Republic of
+UA;Ucraina;Ukraine
+UG;Uganda;Uganda
+UM;Isole minori esterne degli Stati Uniti;United States Minor Outlying Islands
+US;Stati Uniti;United States|USA|United States of America|Stati Uniti d'America|U.S.
+UY;Uruguay;Uruguay
+UZ;Uzbekistan;Uzbekistan
+VA;Città del Vaticano;Holy See|Vatican City|Vaticano
+VC;Saint Vincent e Grenadine;Saint Vincent and the Grenadines
+VE;Venezuela;Venezuela|Venezuela, Bolivarian Republic of
+VG;Isole Vergini britanniche;Virgin Islands, British|British Virgin Islands
+VI;Isole Vergini americane;Virgin Islands, U.S.|US Virgin Islands
+VN;Vietnam;Vietnam|Viet Nam
+VU;Vanuatu;Vanuatu
+WF;Wallis e Futuna;Wallis and Futuna
+WS;Samoa;Samoa
+YE;Yemen;Yemen
+YT;Mayotte;Mayotte
+ZA;Sudafrica;South Africa|Sud Africa
+ZM;Zambia;Zambia
+ZW;Zimbabwe;Zimbabwe
+"""
+PAESI = {codice: (italiano, tuple(varianti.split("|")))
+         for codice, italiano, varianti in (r.split(";") for r in _ELENCO_PAESI.strip().splitlines())}
 
 # ── Righe da escludere ──────────────────────────────────────────────────────
 # Asset class o settore che indicano liquidità e derivati: esclusi da tutte e due le dimensioni
@@ -152,8 +368,11 @@ VALORI_LIQUIDITA = ("cash", "cash and/or derivatives", "cash and derivatives", "
                     "money market", "fx", "futures", "future", "forward", "forwards", "swap", "swaps",
                     "liquidità", "liquidità e/o derivati", "derivati", "contanti")
 # Settore o paese assente: la riga resta nell'altra dimensione
-VALORI_NON_CLASSIFICATI = ("unknown", "unassigned", "other", "-", "n/a", "non classificato", "altro", "",
-                           "not classified")
+# («European Union», «Supranational»: emittenti sovranazionali o liquidità in euro, nessun paese ISO; «NA» qui è
+# un segnaposto, non la Namibia, come nei pesi)
+VALORI_NON_CLASSIFICATI = ("unknown", "unassigned", "other", "-", "n/a", "na", "n.d.", "non classificato", "altro",
+                           "", "not classified", "european union", "unione europea", "supranational",
+                           "sovranazionale", "multinational", "multinazionale")
 
 # ── Schede degli emittenti ──────────────────────────────────────────────────
 # Solo quello che il motore non deduce. «verificato»: mese e fonte della verifica del layout su un file reale.
@@ -186,12 +405,9 @@ def normalizza(testo):
 
 
 _SINONIMI_NORM = {ruolo: tuple(normalizza(s) for s in nomi) for ruolo, nomi in SINONIMI_COLONNE.items()}
-_SEGNAPOSTO_NORM = {normalizza(s) for s in SEGNAPOSTO}
 # Tabelle di confronto: nome normalizzato → settore GICS, → codice ISO
 SINONIMI_SETTORI = {normalizza(n): g for g in SETTORI_GICS for n in (g,) + _VARIANTI_SETTORI[g]}
 SINONIMI_PAESI = {normalizza(n): codice for codice, (it, varianti) in PAESI.items() for n in (codice, it) + varianti}
-_LIQUIDITA_NORM = {normalizza(v) for v in VALORI_LIQUIDITA}
-_NON_CLASSIFICATI_NORM = {normalizza(v) for v in VALORI_NON_CLASSIFICATI}
 
 
 def _vuota(cella):
@@ -274,7 +490,7 @@ def trova_intestazione(righe):
 
 
 def _segnaposto(cella):
-    return normalizza(cella) in _SEGNAPOSTO_NORM
+    return normalizza(cella) in {normalizza(s) for s in SEGNAPOSTO}
 
 
 def _sembra_numero(cella):
@@ -392,7 +608,7 @@ def data_posizioni(preambolo, titolo_foglio, scheda):
 
 # ── Composizione di un file ─────────────────────────────────────────────────
 
-DIMENSIONI = (("settore", "settori"), ("paese", "paesi"))
+_DIMENSIONI = (("settore", "settori"), ("paese", "paesi"))
 
 
 def componi(path, strumento, forzato=None):
@@ -430,22 +646,24 @@ def componi(path, strumento, forzato=None):
     else:
         errore(f"{file}: i pesi sommano a {numero(totale, 2)}, né circa 1 né circa 100: file troncato o colonna sbagliata?")
 
-    liquidita_extra = {normalizza(v) for v in (scheda["liquidita"] if scheda else ())}
+    # le tabelle si leggono qui e non all'import: --set VALORI_LIQUIDITA=… ha effetto
+    liquidita = {normalizza(v) for v in tuple(VALORI_LIQUIDITA) + (scheda["liquidita"] if scheda else ())}
+    non_classificati = {normalizza(v) for v in VALORI_NON_CLASSIFICATI}
     esclusi = {"liquidita_derivati": 0.0, "settore_non_classificato": 0.0, "paese_non_classificato": 0.0}
     grezzi = {"settore": [], "paese": []}            # (nome normalizzato, nome originale, peso) per dimensione
     n_titoli = 0
     for r, peso in titoli:
         peso /= scala
         classe, settore = normalizza(cella(r, "asset_class")), normalizza(cella(r, "settore"))
-        if peso < 0 or classe in _LIQUIDITA_NORM | liquidita_extra or settore in _LIQUIDITA_NORM:
+        if peso < 0 or classe in liquidita or settore in liquidita:
             esclusi["liquidita_derivati"] += abs(peso)
             continue
         n_titoli += 1
-        for dim, _ in DIMENSIONI:
+        for dim, _ in _DIMENSIONI:
             if dim not in col:
                 continue
             valore = cella(r, dim)
-            if normalizza(valore) in _NON_CLASSIFICATI_NORM:
+            if normalizza(valore) in non_classificati:
                 esclusi[f"{dim}_non_classificato"] += peso
             else:
                 grezzi[dim].append((normalizza(valore), str(valore).strip(), peso))
@@ -463,7 +681,7 @@ def componi(path, strumento, forzato=None):
     ignoti = {"settore": {}, "paese": {}}
     pesi = {"settore": {}, "paese": {}}
     vecchi = set()
-    for dim, _ in DIMENSIONI:
+    for dim, _ in _DIMENSIONI:
         if dim == "settore" and classificazione == "ICB":
             continue
         for n, originale, peso in grezzi[dim]:
@@ -485,7 +703,7 @@ def componi(path, strumento, forzato=None):
 
     # rinormalizzazione per dimensione, peso decrescente
     risultato = {}
-    for dim, plurale in DIMENSIONI:
+    for dim, plurale in _DIMENSIONI:
         totale_dim = sum(pesi[dim].values())
         risultato[plurale] = {k: v / totale_dim for k, v in sorted(pesi[dim].items(), key=lambda kv: -kv[1])} \
             if totale_dim > 0 else {}
@@ -498,7 +716,7 @@ def componi(path, strumento, forzato=None):
                       "umano tratterà lo strumento come senza composizione settoriale")
     for vecchio in sorted(vecchi):
         avvisi.append(f"«{vecchio}» (GICS prima del 2018) letto come Communication Services: il perimetro non è identico")
-    for dim, plurale in DIMENSIONI:
+    for dim, plurale in _DIMENSIONI:
         if dim not in col:
             avvisi.append(f"il file non ha la colonna del {dim}: {plurale} non scritti")
         elif not risultato[plurale] and not (dim == "settore" and classificazione == "ICB"):
@@ -516,8 +734,155 @@ def componi(path, strumento, forzato=None):
             "settori": risultato["settori"], "paesi": risultato["paesi"], "avvisi": avvisi}
 
 
+# ── composizione.csv ────────────────────────────────────────────────────────
+
+_INTESTAZIONE_OUT = "strumento;dimensione;voce;peso"
+
+
+def _linea(campi):
+    """Una riga del CSV con «;» (le virgolette solo se un campo contiene «;» o virgolette)."""
+    buffer = io.StringIO()
+    csv.writer(buffer, delimiter=";", lineterminator="").writerow(campi)
+    return buffer.getvalue()
+
+
+def _peso_vecchio(testo, path, strumento):
+    try:
+        valore = float(testo.strip().rstrip("%").replace(",", "."))
+    except ValueError:
+        errore(f"--out {path}: peso {testo!r} non numerico ({strumento}): non lo sovrascrivo")
+    return valore, testo.strip().endswith("%")
+
+
+def leggi_out(path):
+    """Il composizione.csv esistente: (commenti in testa, blocchi, vecchio formato?). Un blocco è (strumento,
+    righe di testo), con i commenti che lo precedono; i commenti in fondo formano un blocco senza strumento.
+    Il vecchio formato strumento;settore;peso si converte nel nuovo, con i pesi in percento. Colonne
+    sconosciute: ERRORE, perché un file che non si capisce non si sovrascrive."""
+    if not os.path.exists(path):
+        return [], [], False
+    with open(path, "rb") as f:
+        grezzo = f.read()
+    try:
+        testo = grezzo.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        testo = grezzo.decode("cp1252", errors="replace")
+    testa, blocchi, in_sospeso, colonne = [], [], [], None
+    vecchi = {}                                     # vecchio formato: strumento → [(settore, peso, in percento?)]
+    for linea in testo.splitlines():
+        if not linea.strip(" ;\t"):
+            continue
+        if linea.lstrip().startswith("#"):
+            (testa if colonne is None else in_sospeso).append(linea)
+            continue
+        campi = [c.strip() for c in next(csv.reader([linea], delimiter=";"))]
+        if colonne is None:
+            colonne = [c.lower() for c in campi if c]
+            if colonne not in (["strumento", "settore", "peso"], ["strumento", "dimensione", "voce", "peso"]):
+                errore(f"--out {path}: colonne non riconosciute ({';'.join(campi)}): non lo sovrascrivo, scegli "
+                       f"un altro --out o usa le colonne {_INTESTAZIONE_OUT}")
+            continue
+        riga = dict(zip(colonne, campi))
+        strumento = riga.get("strumento", "")
+        if blocchi and blocchi[-1][0] == strumento:
+            blocchi[-1][1].extend(in_sospeso)
+        else:
+            blocchi.append((strumento, list(in_sospeso)))
+        in_sospeso = []
+        if colonne[1] == "settore":
+            vecchi.setdefault(strumento, []).append((riga.get("settore", ""),) + _peso_vecchio(riga.get("peso", ""), path, strumento))
+        else:
+            blocchi[-1][1].append(linea)
+    if in_sospeso:
+        blocchi.append((None, in_sospeso))
+    vecchio = colonne is not None and colonne[1] == "settore"
+    if vecchio:                                     # pesi in frazione o in percento per strumento, come leggi_composizione
+        for strumento, righe in blocchi:
+            if strumento is None:
+                continue
+            voci = vecchi.pop(strumento, [])
+            percento = sum(p for _, p, _ in voci) > 1.5
+            for settore, peso, con_segno in voci:
+                peso = peso if (percento or con_segno) else peso * 100
+                righe.append(_linea([strumento, "settore", settore, numero(peso, 2)]))
+    return testa, blocchi, vecchio
+
+
+def _data_italiana(iso):
+    return datetime.date.fromisoformat(iso).strftime("%d/%m/%Y")
+
+
+def _esclusi(c):
+    """Le quote escluse, per il commento del CSV e il report; quelle sotto lo 0,005% si scrivono «< 0,01%»
+    (un file reale ne ha spesso: righe di diritti o di valuta allo 0,0001%)."""
+    quota = lambda x: pct(x, 2) if x >= 0.00005 else "< 0,01%"  # noqa: E731
+    return [f"{etichetta} {quota(c['esclusi'][k])}" for k, etichetta in (
+        ("liquidita_derivati", "liquidità e derivati"), ("settore_non_classificato", "settore non classificato"),
+        ("paese_non_classificato", "paese non classificato")) if c["esclusi"][k] > 0]
+
+
+def righe_strumento(c, oggi):
+    """Il commento e le righe di uno strumento importato, pesi in percento con due decimali."""
+    nome = SCHEDE[c["emittente"]]["nome"] if c["emittente"] else "emittente non riconosciuto"
+    commento = f"# {c['strumento']}: {nome}, {c['file']}"
+    if c["data_posizioni"]:
+        commento += f", posizioni al {_data_italiana(c['data_posizioni'])}"
+    commento += f", importato il {oggi}"
+    esclusi = _esclusi(c)
+    if esclusi:
+        commento += "; esclusi " + ", ".join(esclusi)
+    righe = [commento]
+    for dim, plurale in _DIMENSIONI:
+        righe += [_linea([c["strumento"], dim, voce, numero(peso * 100, 2)]) for voce, peso in c[plurale].items()]
+    return righe
+
+
+def scrivi_out(path, testa, blocchi, nuovi, oggi):
+    """Riscrive composizione.csv: i blocchi degli strumenti importati si tolgono, i nuovi vanno in fondo
+    nell'ordine della riga di comando. UTF-8 con BOM e «;»: si apre in Excel italiano."""
+    importati = {c["strumento"] for c in nuovi}
+    linee = testa + [_INTESTAZIONE_OUT]
+    for strumento, righe in blocchi:
+        if strumento not in importati:
+            linee += righe
+    for c in nuovi:
+        linee += righe_strumento(c, oggi)
+    try:
+        with open(path, "w", encoding="utf-8-sig", newline="") as f:
+            f.write("\n".join(linee) + "\n")
+    except OSError as e:
+        errore(f"impossibile scrivere {path}: {e.strerror}")
+
+
+# ── Report ──────────────────────────────────────────────────────────────────
+
+def stampa(composizioni, out, conservati, vecchio):
+    print("IMPORTAZIONE DELLA COMPOSIZIONE DEGLI ETF (settori GICS, paesi ISO; pesi rinormalizzati a 100 dopo "
+          "liquidità, derivati e righe non classificate)")
+    for c in composizioni:
+        nome = SCHEDE[c["emittente"]]["nome"] if c["emittente"] else "emittente non riconosciuto"
+        come = {"preambolo": "dal preambolo", "nome del file": "dal nome del file", "--emittente": "da --emittente",
+                "nessuno": "regole generiche"}[c["riconosciuto_da"]]
+        print(f"\n{c['strumento']} — {nome} ({come}), {c['file']}")
+        data = f"posizioni al {_data_italiana(c['data_posizioni'])}" if c["data_posizioni"] else "data delle posizioni non indicata nel file"
+        colonne = ", ".join(f"{r} «{t}»" for r, t in c["colonne"].items())
+        print(f"   {data}; {c['titoli']} titoli; classificazione {c['classificazione']}; colonne lette: {colonne}")
+        print(f"   Esclusi: {', '.join(_esclusi(c)) or 'nessuno'}")
+        if c["settori"]:
+            print("   Settori: " + " · ".join(f"{SETTORI_GICS[k]} {pct(v, 2)}" for k, v in list(c["settori"].items())[:5]))
+        if c["paesi"]:
+            print("   Paesi: " + " · ".join(f"{PAESI[k][0]} {pct(v, 2)}" for k, v in list(c["paesi"].items())[:5]))
+        for a in c["avvisi"]:
+            print(f"   ⚠️  {a}")
+    print(f"\nScritto {out}: {len(composizioni)} strumenti importati"
+          + (f"; conservati senza modifiche: {', '.join(conservati)}" if conservati else ""))
+    if vecchio:
+        print("   Il file esistente era nel vecchio formato strumento;settore;peso: convertito nel nuovo, stessi pesi.")
+    print("Non è consulenza: è la composizione dichiarata dall'emittente alla data del file, da riguardare a ogni revisione.")
+
+
 def main():
-    args = cli(__doc__.strip().splitlines()[0].split("— ", 1)[1],
+    args = cli(__doc__.strip().splitlines()[0].split("— ", 1)[1], spazio=globals(), json=True,
                argomenti=[(("--file",), {"action": "append", "required": True, "metavar": "FILE",
                                          "help": "file delle posizioni dell'emittente, CSV o XLSX (ripetibile)"}),
                           (("--strumento",), {"action": "append", "required": True, "metavar": "NOME",
@@ -526,9 +891,24 @@ def main():
                                               "help": "forza la scheda dell'emittente per tutti i file"}),
                           (("--out",), {"default": "composizione.csv", "metavar": "FILE",
                                         "help": "composizione.csv da scrivere o aggiornare (default nella cartella corrente)"})])
-    for path, strumento in zip(args.file, args.strumento):
-        c = componi(path, strumento, args.emittente)
-        print(f"{strumento}: {len(c['settori'])} settori, {len(c['paesi'])} paesi")
+    if len(args.file) != len(args.strumento):
+        args.parser.error(f"--file e --strumento vanno in coppia: {len(args.file)} file e {len(args.strumento)} strumenti")
+    doppi = sorted({s for s in args.strumento if args.strumento.count(s) > 1})
+    if doppi:
+        args.parser.error(f"--strumento ripetuto: {', '.join(doppi)}")
+
+    # tutto letto e validato prima di scrivere: un errore lascia composizione.csv com'era
+    testa, blocchi, vecchio = leggi_out(args.out)
+    composizioni = [componi(path, strumento, args.emittente) for path, strumento in zip(args.file, args.strumento)]
+    scrivi_out(args.out, testa, blocchi, composizioni, datetime.date.today().strftime("%d/%m/%Y"))
+    risultato = {"strumenti": composizioni, "out": args.out}
+    if args.json == "-":
+        print(json.dumps(risultato, ensure_ascii=False, indent=2))
+        return
+    conservati = [s for s, _ in blocchi if s is not None and s not in set(args.strumento)]
+    stampa(composizioni, args.out, conservati, vecchio)
+    if args.json:
+        scrivi_json(args.json, risultato)
 
 
 if __name__ == "__main__":

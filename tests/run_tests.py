@@ -12,8 +12,10 @@ regressione di un bug reale), non l'output cosmetico. La suite protegge i
 refactor: se passa, la meccanica di calcolo non è cambiata.
 """
 
+import csv
 import glob
 import importlib.util
+import io
 import json
 import os
 import re
@@ -339,6 +341,7 @@ SCRIPT_CLI = [
     ("it-pianificazione-obiettivi", "allocatore-capitale.py"),
     ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
     ("it-pianificazione-obiettivi", "capitale-umano.py"),
+    ("it-pianificazione-obiettivi", "importa-composizione-etf.py"),
     ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
@@ -353,6 +356,8 @@ ARGOMENTI_DEFAULT = {
                               os.path.join(FIXTURES, "storico-fondo-test.csv")),
     "importa-estratto-broker.py": (os.path.join(FIXTURES, "estratto-broker-test.csv"),),
     "genera-cruscotto.py": ("--from", os.path.join(FIXTURES, "cruscotto-allocatore.json")),
+    "importa-composizione-etf.py": ("--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                    "--strumento", "ETF MSCI World"),
 }
 _OUTPUT_CP1252 = {}
 
@@ -375,7 +380,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 16 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 17 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -408,6 +413,8 @@ def t_cli_help():
     errore_pulito(asset("it-pianificazione", "proiezione-inps.py"), "--json", "/non/esiste/x.json", atteso="impossibile scrivere")
     errore_pulito(asset("it-revisione", "genera-ips.py"), os.path.join(tempfile.gettempdir(), "cartella-inesistente", "x.docx"), atteso="impossibile scrivere")
     errore_pulito(asset("it-tax-optimization", "importa-estratto-broker.py"), "/non/esiste.csv", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione-obiettivi", "importa-composizione-etf.py"), "--file", "/non/esiste.csv",
+                  "--strumento", "X", atteso="non trovato")
     # niente abbreviazioni dei flag: «--se» non è «--set»
     rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--se", "RAL_FINALE_LORDA=1")
     assert rc == 2 and "usage:" in out, (rc, out[-200:])
@@ -422,9 +429,11 @@ def t_cli_utf8():
         assert rc == 0, f"{nome} da una cartella esterna con cp1252: rc {rc}, {out[-400:]}"
         assert "UnicodeEncodeError" not in out and "Traceback" not in out, f"{nome}: {out[-400:]}"
         assert "serie storica non trovata" not in out, f"{nome}: serie storica non trovata"
-        # lo stdout resta UTF-8: ogni script stampa almeno un «€», e senza reconfigure il simbolo
-        # uscirebbe in cp1252 (qui decodificato come «\ufffd») anche dove non va in crash
-        assert "€" in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
+        # lo stdout resta UTF-8: ogni script stampa almeno un «€» (l'importatore della composizione, che non
+        # stampa importi, una «à»), e senza reconfigure il carattere uscirebbe in cp1252 (qui decodificato
+        # come «\ufffd») anche dove non va in crash
+        carattere = "à" if nome == "importa-composizione-etf.py" else "€"
+        assert carattere in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
     # nessuna open() senza encoding negli script e nel runner: su Windows leggerebbero in cp1252
     cartelle = [os.path.join(SKILLS, s, "assets") for s in sorted(os.listdir(SKILLS))] + \
                [os.path.join(ROOT, "scripts"), os.path.join(ROOT, "tests")]
@@ -5181,7 +5190,16 @@ def t_ce_composizione():
         c = m.componi(g, "C")
         assert c["settori"] == {"Communication Services": 1.0}, c["settori"]
         assert any("liquidit" in w for w in c["avvisi"]) and any("Telecommunication" in w for w in c["avvisi"]), c["avvisi"]
-        # sotto le soglie nessun avviso (l'iShares sopra: 1% di liquidità)
+        # dai file reali: paesi minori (Zambia in un MSCI World), «European Union» e «NA» come non classificati,
+        # quote escluse minime scritte «< 0,01%» e non «0,00%»
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Location,Weight (%)\nA,Materials,Zambia,0.02\nB,Financials,European Union,0.003\n"
+                     "C,Energy,NA,0.001\nD,Energy,Italy,99.976\n")
+        c = m.componi(g, "R")
+        assert set(c["paesi"]) == {"ZM", "IT"}, c["paesi"]
+        assert abs(c["esclusi"]["paese_non_classificato"] - 0.00004) < 1e-12, c["esclusi"]
+        assert all(len(m.PAESI[k]) == 2 for k in m.PAESI) and len(m.PAESI) == 249     # ISO 3166-1 completo
+        assert "paese non classificato < 0,01%" in m.righe_strumento(c, "25/10/2026")[0], m.righe_strumento(c, "x")[0]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     assert m.SETTORI_GICS == carica_modulo(asset(*CU)).SETTORI_GICS
@@ -5213,6 +5231,75 @@ def t_ce_errori():
             for parola in attesi:
                 assert parola in se, (n, parola, se[-400:])
             assert (open(out, encoding="utf-8").read(), os.path.getmtime(out)) == prima, n
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: CSV fuso con l'esistente, formato, --json e report")
+def t_ce_uscita():
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:     # vecchio formato, scritto a mano, con un commento libero
+            f.write("# compilato a mano\nstrumento;settore;peso\nETF Europa;Financials;0,6\nETF Europa;Industrials;0,4\n"
+                    "ETF MSCI World;Energy;100\n")
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        uscite = []
+        for _ in range(2):                             # reimportare due volte non duplica
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "ETF MSCI World",
+                                          "--out", out, "--json", os.path.join(tmp, "c.json"), cwd=tmp)
+            assert rc == 0, se[-400:]
+            uscite.append(so)
+        assert "convertito" in uscite[0] and "convertito" not in uscite[1], uscite   # solo il primo trova il vecchio formato
+        testo = open(out, encoding="utf-8-sig").read()
+        with open(out, "rb") as f:
+            assert f.read().startswith(b"\xef\xbb\xbf")
+        righe = testo.splitlines()
+        assert righe[0] == "# compilato a mano" and righe[1] == "strumento;dimensione;voce;peso", righe[:3]
+        assert righe[2:4] == ["ETF Europa;settore;Financials;60,00", "ETF Europa;settore;Industrials;40,00"], righe[2:4]
+        assert sum(1 for r in righe if r.startswith("# ETF MSCI World:")) == 1, righe
+        commento = next(r for r in righe if r.startswith("# ETF MSCI World:"))
+        assert re.fullmatch(r"# ETF MSCI World: iShares, composizione-ishares-en\.csv, posizioni al 30/09/2026, "
+                            r"importato il \d\d/\d\d/\d{4}; esclusi liquidità e derivati 1,00%", commento), commento
+        mw = [r for r in righe if r.startswith("ETF MSCI World;")]
+        assert mw[0] == "ETF MSCI World;settore;Information Technology;40,40" and "ETF MSCI World;paese;KR;10,10" in mw, mw
+        assert len(mw) == 10 and not any(";Energy;100" in r for r in righe), mw
+        for dim in ("settore", "paese"):
+            tot = sum(float(r.split(";")[3].replace(",", ".")) for r in mw if r.split(";")[1] == dim)
+            assert abs(tot - 100) <= 0.05, (dim, tot)
+        so = uscite[1]
+        assert "ETF Europa" in so, so                                        # il report dice cosa ha conservato
+        assert "Tecnologia dell'informazione" in so and "Corea del Sud" in so and "Weight (%)" in so, so
+        d = json.load(open(os.path.join(tmp, "c.json"), encoding="utf-8"))
+        assert d["out"] == out and [s["strumento"] for s in d["strumenti"]] == ["ETF MSCI World"], d
+        s = d["strumenti"][0]
+        assert {"strumento", "emittente", "riconosciuto_da", "file", "data_posizioni", "classificazione", "colonne",
+                "titoli", "esclusi", "settori", "paesi", "avvisi"} == set(s), set(s)
+        assert abs(sum(s["settori"].values()) - 1) < 1e-9 and abs(sum(s["paesi"].values()) - 1) < 1e-9
+        # --json - : solo JSON su stdout, --out scritto lo stesso
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "Y", "--out", out, "--json", "-", cwd=tmp)
+        assert rc == 0 and json.loads(so)["strumenti"][0]["strumento"] == "Y", (so[:300], se[-300:])
+        assert "Y;paese;US;50,51" in open(out, encoding="utf-8-sig").read()
+        # due file in una chiamata; riga di comando spaiata o ripetuta → rc 2
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--file",
+                                      os.path.join(FIXTURES, "composizione-ishares-it.csv"), "--strumento", "B",
+                                      "--out", out, cwd=tmp)
+        assert rc == 0 and "A;settore;Energy;9,09" in open(out, encoding="utf-8-sig").read(), se[-300:]
+        assert "B;paese;KR;10,10" in open(out, encoding="utf-8-sig").read()
+        for args in (("--file", en, "--file", en, "--strumento", "A"),
+                     ("--file", en, "--strumento", "A", "--file", en, "--strumento", "A")):
+            rc, so, se = run_script_split(asset(*CE), *args, "--out", out, cwd=tmp)
+            assert rc == 2 and "usage:" in se, (args, rc, se[-300:])
+        # un --out con colonne sconosciute non si sovrascrive
+        strano = os.path.join(tmp, "strano.csv")
+        with open(strano, "w", encoding="utf-8") as f:
+            f.write("isin;quota\nIE00;1\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--out", strano, cwd=tmp)
+        assert rc == 1 and open(strano, encoding="utf-8").read() == "isin;quota\nIE00;1\n", se[-300:]
+        # il CSV scritto si rilegge con csv senza perdite: quattro campi per riga dati
+        dati = [r for r in csv.reader(io.StringIO(open(out, encoding="utf-8-sig").read()), delimiter=";")
+                if r and not r[0].startswith("#")]
+        assert all(len(r) == 4 for r in dati), dati
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
