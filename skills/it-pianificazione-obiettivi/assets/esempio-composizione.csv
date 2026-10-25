@@ -1,0 +1,15 @@
+# Composizione settoriale d'esempio per capitale-umano.py --composizione: pesi ILLUSTRATIVI, non di un ETF reale.
+# Una riga per strumento e settore GICS (nome inglese, come nei file delle posizioni degli emittenti); pesi in percento
+# o in frazione, con la virgola o il punto. Il nome dello strumento è quello del campo «strumento» delle posizioni.
+strumento;settore;peso
+ETF MSCI World;Information Technology;27,0
+ETF MSCI World;Financials;17,0
+ETF MSCI World;Industrials;12,0
+ETF MSCI World;Health Care;10,0
+ETF MSCI World;Consumer Discretionary;9,5
+ETF MSCI World;Communication Services;8,0
+ETF MSCI World;Consumer Staples;5,5
+ETF MSCI World;Energy;3,5
+ETF MSCI World;Materials;3,0
+ETF MSCI World;Utilities;2,5
+ETF MSCI World;Real Estate;2,0

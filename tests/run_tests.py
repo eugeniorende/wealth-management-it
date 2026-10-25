@@ -4774,6 +4774,38 @@ def t_cu_proiezione():
     assert 0.92 <= (b["HC"] + b["PP"]) / b["W"] <= 0.96, (b["HC"], b["PP"], b["W"])
 
 
+@test("T15 capitale umano: sovrapposizione settoriale e CSV da Excel italiano")
+def t_cu_settore():
+    m = carica_modulo(asset(*CU))
+    assert set(m.PESI_MONDO) == set(m.SETTORI_GICS) and 0.99 <= sum(m.PESI_MONDO.values()) <= 1.01
+    tmp = tempfile.mkdtemp()
+    try:
+        p = os.path.join(tmp, "comp.csv")
+        with open(p, "w", encoding="utf-8-sig") as f:              # BOM, «;» e percento con la virgola
+            f.write("strumento;settore;peso\nA;Information Technology;50,0\nA;Financials;50,0\n"
+                    "B;Health Care;1,0\n")
+        comp = m.leggi_composizione(p)
+        assert comp == {"A": {"Information Technology": 0.5, "Financials": 0.5}, "B": {"Health Care": 1.0}}, comp
+        pos = [{"asset_class": "azionario", "valore": 30000, "strumento": "A"},
+               {"asset_class": "azionario", "valore": 10000, "strumento": "B"},
+               {"asset_class": "azionario", "valore": 10000, "strumento": "C"}]
+        s = m.sovrapposizione(pos, comp, "Information Technology", 40000, 60000,
+                              {**m.PESI_MONDO, "Information Technology": 0.25})
+        assert abs(s["quota_settore_fin"] - 15000 / 40000) < 1e-12 and s["mancanti"] == ["C"], s
+        assert abs(s["esposizione_combinata"] - (40000 * 0.375 + 60000) / 100000) < 1e-12
+        assert abs(s["rapporto"] - 1.5) < 1e-12 and s["sovrappeso"] is False
+        # l'esempio del plugin passa da riga di comando
+        rc, so, se = run_script_split(asset(*CU), "--composizione",
+                                      asset("it-pianificazione-obiettivi", "esempio-composizione.csv"), cwd=tmp)
+        assert rc == 0 and "4. SOVRAPPOSIZIONE" in so, se[-300:]
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Tecnologia;100\n")
+        rc, so, se = run_script_split(asset(*CU), "--composizione", p, cwd=tmp)
+        assert rc == 1 and "Information Technology" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:

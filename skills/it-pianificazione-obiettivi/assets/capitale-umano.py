@@ -75,6 +75,15 @@ SETTORI_GICS = {
     "Real Estate": "Immobiliare",
 }
 
+# Pesi dei settori nell'indice MSCI ACWI (USD), dalla scheda ufficiale MSCI «Index Factsheet» del 30/09/2026,
+# sezione Sector Weights: https://www.msci.com/documents/10199/255599/msci-acwi-net.pdf
+# Da riverificare a ogni release: il peso della tecnologia cambia di qualche punto in pochi mesi.
+PESI_MONDO = {
+    "Information Technology": 0.3321, "Financials": 0.1617, "Industrials": 0.1027, "Health Care": 0.0842,
+    "Consumer Discretionary": 0.0824, "Communication Services": 0.0801, "Consumer Staples": 0.0451,
+    "Energy": 0.0396, "Materials": 0.0351, "Utilities": 0.0225, "Real Estate": 0.0145,
+}
+
 
 def _numero_csv(testo):
     """Numero da CSV italiano o anglosassone: «0,30», «0.30», «23,4»."""
@@ -364,6 +373,80 @@ def stampa_proiezione(p):
         print(f"   ⚠️  {a}")
 
 
+def leggi_composizione(path):
+    """Composizione settoriale degli strumenti: CSV strumento;settore;peso (righe «#» saltate, BOM ammesso).
+    Pesi in frazione o in percento (se quelli di uno strumento sommano più di 1,5), virgola o punto."""
+    if not os.path.exists(path):
+        errore(f"--composizione: file non trovato: {path}")
+    with open(path, encoding="utf-8-sig") as f:
+        righe = [r for r in f if r.strip() and not r.lstrip().startswith("#")]
+    lettore = csv.DictReader(righe, delimiter=";")
+    if not lettore.fieldnames or not {"strumento", "settore", "peso"} <= {c.strip() for c in lettore.fieldnames}:
+        errore("--composizione: servono le colonne strumento;settore;peso")
+    comp = {}
+    for r in lettore:
+        r = {k.strip(): (v or "").strip() for k, v in r.items()}
+        if r["settore"] not in SETTORI_GICS:
+            errore(f"--composizione: settore {r['settore']!r} non GICS: usa uno di {', '.join(SETTORI_GICS)}")
+        try:
+            peso = _numero_csv(r["peso"])
+        except ValueError:
+            errore(f"--composizione: peso {r['peso']!r} non numerico ({r['strumento']})")
+        settori = comp.setdefault(r["strumento"], {})
+        settori[r["settore"]] = settori.get(r["settore"], 0) + peso
+    for strumento, settori in comp.items():
+        totale = sum(settori.values())
+        if totale > 1.5:
+            for k in settori:
+                settori[k] /= 100
+            totale /= 100
+        if abs(totale - 1) > 0.02:
+            errore(f"--composizione: i pesi di {strumento!r} sommano a {pct(totale)}, non a 100%")
+    return comp
+
+
+def sovrapposizione(posizioni, composizione, settore, F_az, HC_az, pesi_mondo):
+    """Diagnosi 4: quanto della parte azionaria del portafoglio sta nel settore del proprio lavoro, contro il
+    mercato mondiale, e l'esposizione combinata se la parte azionaria del capitale umano sta tutta lì.
+    Contano solo le posizioni azionarie con una composizione; le altre sono elencate in «mancanti»."""
+    con, num, mancanti = 0.0, 0.0, []
+    for p in posizioni:
+        if p["asset_class"] != "azionario":
+            continue
+        nome = p.get("strumento", "(senza strumento)")
+        if nome not in composizione:
+            mancanti.append(nome)
+            continue
+        con += p["valore"]
+        num += p["valore"] * composizione[nome].get(settore, 0)
+    quota = num / con if con else None
+    peso_mondo = pesi_mondo[settore]
+    rapporto = quota / peso_mondo if quota is not None else None
+    combinata = (F_az * (quota or 0) + HC_az) / (F_az + HC_az) if F_az + HC_az > 0 else None
+    return {"settore": settore, "quota_settore_fin": quota, "peso_mondo": peso_mondo, "rapporto": rapporto,
+            "esposizione_combinata": combinata, "sovrappeso": bool(rapporto is not None and rapporto > SOGLIA_SOVRAPPESO),
+            "mancanti": mancanti}
+
+
+def stampa_settore(z):
+    nome = f"{SETTORI_GICS[z['settore']]} ({z['settore']})"
+    print(f"\n4. SOVRAPPOSIZIONE SETTORIALE: {nome}")
+    if z["quota_settore_fin"] is None:
+        print("   Nessuna posizione azionaria con una composizione: aggiungi le righe nel CSV di --composizione.")
+    else:
+        print(f"   Nel portafoglio azionario: {pct(z['quota_settore_fin'])}; nel mercato mondiale (MSCI ACWI): "
+              f"{pct(z['peso_mondo'])}, cioè {numero(z['rapporto'], 1)} volte.")
+    if z["esposizione_combinata"] is not None:
+        print(f"   Azioni del portafoglio più parte azionaria del capitale umano, quota in questo settore: "
+              f"{pct(z['esposizione_combinata'])} (si assume che il capitale umano azionario sia tutto qui).")
+    if z["sovrappeso"]:
+        print(f"   ⚠️  Il settore pesa più di {numero(SOGLIA_SOVRAPPESO, 0)} volte il mercato: reddito e portafoglio "
+              "dipendono dalla stessa parte dell'economia.")
+    if z["mancanti"]:
+        print(f"   Senza composizione, esclusi dal calcolo: {', '.join(z['mancanti'])}.")
+    print("   Il fondo pensione non entra nel calcolo: la sua composizione non è disponibile.")
+
+
 def risolvi_costanti(dati, nomi_set):
     """Età di pensione, pensione netta ed età finale con la precedenza --set > --dati > --from > default."""
     global ETA_PENSIONE, PENSIONE_NETTA, ETA_FINE
@@ -409,9 +492,9 @@ def stampa_bilancio(b, eq):
     print(f"   Patrimonio finanziario: {pct(ef) if ef is not None else 'n/d'} in azioni")
     print(f"   Ricchezza totale:       {pct(b['esposizione_totale'])} in azioni")
     peso_hc = b["HC"] / b["W"]
-    print(f"   Il capitale umano pesa il {pct(peso_hc)} della ricchezza totale ed è per il {pct(b['s'], 0)} "
-          f"un'azione: " + ("conta più del portafoglio, quindi l'esposizione totale dipende soprattutto da lui."
-                             if peso_hc > 0.5 else "il portafoglio pesa di più, e l'esposizione totale gli somiglia."))
+    print(f"   Peso del capitale umano sulla ricchezza totale: {pct(peso_hc)}; sua quota azionaria: {pct(b['s'], 0)}. "
+          + ("Conta più del portafoglio, quindi l'esposizione totale dipende soprattutto da lui."
+                             if peso_hc > 0.5 else "Il portafoglio pesa di più, e l'esposizione totale gli somiglia."))
     if eq is not None:
         print(f"   Equivalenza: {eq['messaggio']}")
 
@@ -446,6 +529,18 @@ def main():
             errore("QUOTE_GLIDE: serve una lista di quote tra 0 e 1 (il campo «portafoglio» del JSON del glide path)")
     p = proiezione(dati, profilo, c, QUOTE_GLIDE, N_SIM, SEED)
     stampa_proiezione(p)
+    z = None
+    if args.composizione:
+        comp = leggi_composizione(args.composizione)
+        settore = persona.get("settore") or profilo.get("settore_default")
+        if not settore:
+            errore('--composizione: manca "persona.settore", il settore GICS del tuo lavoro')
+        if settore not in SETTORI_GICS:
+            errore(f"persona.settore {settore!r} non GICS: usa uno di {', '.join(SETTORI_GICS)}")
+        posizioni = dati.get("posizioni") or []
+        F_az_comp = sum(q["valore"] for q in posizioni if q["asset_class"] == "azionario" and q.get("strumento") in comp)
+        z = sovrapposizione(posizioni, comp, settore, F_az_comp, b["HC_az"], PESI_MONDO)
+        stampa_settore(z)
 
     if args.json:
         scrivi_json(args.json, {
@@ -455,7 +550,7 @@ def main():
             "equivalenza": eq,
             "proiezione": p["anni"],
             "eta_sorpasso": p["eta_sorpasso"],
-            "settore": None,
+            "settore": z,
             "sensibilita": None,
             "profilo_usato": {**{k: v for k, v in profilo.items() if k not in ("fonte", "natura")},
                               "eta_pensione": c["ETA_PENSIONE"], "pensione_netta": c["PENSIONE_NETTA"],
