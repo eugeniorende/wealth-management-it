@@ -5420,6 +5420,26 @@ def t_t17_dati_esempio():
             br.close()
 
 
+@test("T17 cruscotto nel browser: il template aperto senza dati spiega come generarlo, senza errori")
+def t_t17_template_vuoto():
+    # Segnalato dal proprietario: aperto così com'è, il template andava in SyntaxError sul segnaposto e la
+    # pagina restava vuota. Ora dice cosa fare; lo stesso vale per un blocco dati non leggibile.
+    sync_playwright, lancia = browser()
+    tpl = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    rotto = tpl.replace("__DATI_CRUSCOTTO__", '{"versione": 1, "probabilita": NaN}')
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            for html in (tpl, rotto):
+                page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+                assert errori == [] and eccezioni == [], (errori, eccezioni)
+                testo = page.inner_text("#cruscotto")
+                assert "genera-cruscotto.py" in testo and "/cruscotto" in testo, testo
+                assert page.locator("section[id^=sez-]").count() == 0
+        finally:
+            br.close()
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:

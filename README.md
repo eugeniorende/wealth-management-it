@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 159 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 160 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -102,7 +102,7 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-rebalance/assets/ribilanciamento-multibroker.py` | 27: T1; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T17 ribilanciamento --json; T7 ribilanciamento ×10; T9 formati ×2 … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |
-| `it-revisione/assets/genera-cruscotto.py` | 12: T17 cruscotto ×7; T17 cruscotto nel browser ×2; T9 formati; T9 interfaccia ×2 |
+| `it-revisione/assets/genera-cruscotto.py` | 13: T17 cruscotto ×7; T17 cruscotto nel browser ×3; T9 formati; T9 interfaccia ×2 |
 | `it-revisione/assets/genera-ips.py` | 10: T14 postura e fonti; T9 formati; T9 input esterno; T9 interfaccia ×2; freshness fiscale; genera-ips ×2 … |
 | `it-revisione/assets/investment-policy-statement.xlsx` | 3: T12 Excel; bande di ribilanciamento; scadenze di fine anno |
 | `it-revisione/assets/tracker-secchielli.xlsx` | 4: T12 Excel ×2; bande di ribilanciamento; tracker-secchielli |

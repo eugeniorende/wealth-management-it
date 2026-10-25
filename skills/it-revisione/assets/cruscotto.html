@@ -141,7 +141,16 @@ footer .fonti { color: var(--muto); }
 <script>
 "use strict";
 (function () {
-  var B = JSON.parse(document.getElementById("dati").textContent);
+  // Il template aperto così com'è ha ancora il segnaposto al posto dei dati: niente eccezione, la pagina
+  // spiega come generarlo (vale anche per un blocco dati non leggibile).
+  var B = (function () {
+    try {
+      var d = JSON.parse(document.getElementById("dati").textContent);
+      return d && typeof d === "object" && !Array.isArray(d) ? d : null;
+    } catch (e) {
+      return null;
+    }
+  })();
   // il namespace SVG dall'elemento #ns: il parser HTML glielo assegna, senza scrivere l'URL nella pagina
   var SVGNS = document.getElementById("ns").namespaceURI;
   var SERIE = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8"];
@@ -703,6 +712,14 @@ footer .fonti { color: var(--muto); }
       [el("p", { class: "avviso", testo: "Nessun dato da disegnare: rigenera il cruscotto con i JSON degli script." })]);
   }
 
+  if (!B) {
+    document.getElementById("cruscotto").replaceChildren(el("p", { class: "avviso", testo:
+      "Questa pagina è il template del cruscotto, senza dati. Il cruscotto si genera dalla cartella di lavoro con " +
+      "genera-cruscotto.py (in Claude: il comando /cruscotto o il passo 6 della skill it-revisione), passando i JSON " +
+      "scritti dagli script con --json: python genera-cruscotto.py --from alloc.json --from mc.json -o cruscotto.html. " +
+      "Si apre il file generato, non questo." }));
+    return;
+  }
   document.getElementById("testata").textContent = "Dati del " + String(B.generato_il || "").split("-").reverse().join("/") +
     " · wealth-management-it " + (B.plugin || "?");
   document.getElementById("fonti").textContent = "Fonti: " + (B.fonti || []).map(function (f) { return f.file + " (" + f.tipo + ")"; }).join(", ");
