@@ -100,7 +100,7 @@ I nomi delle chiavi restano quelli interni del piano; la skill `it-rebalance` li
 
 ## 4. Il bundle e le sezioni
 
-Il bundle contiene **solo i campi che la pagina mostra**: è anche una misura di privacy, perché ciò che non serve al grafico non finisce nell'Artifact. In particolare le singole posizioni dell'estratto (ISIN, descrizioni, quantità) **non** entrano: dalla fiscalità passano gli aggregati per broker e le righe dello zainetto. Gli ordini del ribilanciamento entrano con broker, operazione, classe, strumento e importo, perché sono il risultato da leggere.
+Il bundle contiene **solo i campi che la pagina mostra**: è anche una misura di privacy, perché ciò che non serve al grafico non finisce nell'Artifact. In particolare le singole posizioni dell'estratto (ISIN, descrizioni, quantità) **non** entrano: dalla fiscalità passano gli aggregati per broker e le righe dello zainetto. Gli ordini del ribilanciamento entrano con broker, operazione, classe, categoria fiscale, importo e imposta, perché sono il risultato da leggere (gli ordini dello script non hanno uno strumento: la colonna ISIN dei CSV la compila l'utente).
 
 ```
 {
