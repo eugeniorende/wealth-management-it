@@ -53,6 +53,13 @@ Fondo pensione: spazio deducibile residuo quest'anno **€ [—]** (max(0, €5.
 
 Glide path: [qualche obiettivo richiede de-risking quest'anno? quale, di quanto]
 
+### Capitale umano *(da `it-pianificazione-obiettivi`, Step 8; facoltativo)*
+
+- Esposizione azionaria: patrimonio finanziario [—]% contro ricchezza totale [—]%
+- Settore del lavoro nel portafoglio azionario: [—]% contro [—]% del mercato mondiale [sovrappeso sì/no]
+- Età in cui il patrimonio finanziario supera il capitale umano: [—]
+- Nota: è una lente per leggere il rischio complessivo, non un target; non cambia l'allocazione
+
 ### Fiscalità *(da `it-tax-optimization`)*
 Minusvalenze in scadenza al 31/12: **€ [—]** (anno di formazione [—]). Plusvalenze compensabili realizzabili: € [—]. [opportunità di harvesting / nessuna scadenza imminente]
 

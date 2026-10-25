@@ -61,7 +61,7 @@ Le skill non sono isolate: formano un sistema dove le vendite generano eventi fi
         └────────────────────────────────────────────────┘
 ```
 
-Il flusso end-to-end: `it-pianificazione-obiettivi` definisce obiettivi e allocazioni → l'obiettivo pensione passa a `it-pianificazione`/`it-pianificazione-autonomi` → `it-rebalance` mantiene le allocazioni ed esegue il glide path → `it-tax-optimization` ottimizza la fiscalità delle vendite. Le due skill previdenziali sono gemelle ma con regimi opposti: il dipendente deduce il fondo pensione dall'IRPEF; il forfettario, tassato con imposta sostitutiva, NON lo deduce.
+Il flusso end-to-end: `it-pianificazione-obiettivi` definisce obiettivi e allocazioni (e, con lo Step 8, mette il portafoglio dentro la ricchezza totale: capitale umano e pensione futura, come lente e non come target) → l'obiettivo pensione passa a `it-pianificazione`/`it-pianificazione-autonomi` → `it-rebalance` mantiene le allocazioni ed esegue il glide path → `it-tax-optimization` ottimizza la fiscalità delle vendite. Le due skill previdenziali sono gemelle ma con regimi opposti: il dipendente deduce il fondo pensione dall'IRPEF; il forfettario, tassato con imposta sostitutiva, NON lo deduce.
 
 ## Test
 
@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 139 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 146 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -83,19 +83,22 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-pianificazione/assets/importa-previdenza.py` | 14: T12 fixture realistiche; T13 riscatto della laurea; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale … |
 | `it-pianificazione/assets/montecarlo-pensione.py` | 10: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; montecarlo-pensione … |
 | `it-pianificazione/assets/motore_bootstrap.py` | 12: T12 rami avanzati; T14 skill; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap … |
-| `it-pianificazione/assets/netto-pensione.py` | 19: T12 --json previdenziali; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
+| `it-pianificazione/assets/netto-pensione.py` | 20: T12 --json previdenziali; T15 capitale umano; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
 | `it-pianificazione/assets/ponte-pensione.py` | 12: T12 --json previdenziali; T14 postura e fonti; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; freshness fiscale … |
-| `it-pianificazione/assets/proiezione-inps.py` | 16: T12 rami avanzati; T13 riscatto della laurea; T9 catena --json → --from; T9 formati; T9 interfaccia ×2; coerenza tra skill … |
-| `it-pianificazione/assets/proiezione-pensione.xlsx` | 11: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
+| `it-pianificazione/assets/proiezione-inps.py` | 17: T12 rami avanzati; T13 riscatto della laurea; T15 capitale umano; T9 catena --json → --from; T9 formati; T9 interfaccia ×2 … |
+| `it-pianificazione/assets/proiezione-pensione.xlsx` | 13: T12 Excel; T15 capitale umano ×2; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
 | `it-pianificazione/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-pianificazione/assets/riscatto-laurea.py` | 9: T13 riscatto della laurea ×3; T14 skill; T9 formati; T9 interfaccia ×2; freshness fiscale; runner |
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 6: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
 | `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 9: T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; allocatore-capitale; glidepath e Monte Carlo … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
+| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 11: T15 capitale umano ×7; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 |
 | `it-pianificazione-obiettivi/assets/decumulo-obiettivi.py` | 9: T12 rami avanzati; T9 formati; T9 interfaccia ×2; decumulo-obiettivi; obiettivi; serie storica ×2 … |
+| `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 2: T15 capitale umano; T9 contratto di input della revisione |
 | `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 12: T12 rami avanzati; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore … |
 | `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 16: T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; glidepath e Monte Carlo … |
 | `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 18: T12 Excel ×2; T9 contratto di input della revisione; T9 interfaccia; T9 lettore unico del pianificatore; allocatore-capitale; asset-location … |
+| `it-pianificazione-obiettivi/assets/profili-capitale-umano.csv` | 1: T15 capitale umano |
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-rebalance/assets/ribilanciamento-multibroker.py` | 19: T1; T7 ribilanciamento ×10; T9 formati ×2; T9 input esterno; T9 interfaccia ×2; T9 vocabolario … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |

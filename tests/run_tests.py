@@ -5032,6 +5032,8 @@ def t_contratto_revisione():
         "mco.json": (asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
         "alloc.json": (asset("it-pianificazione-obiettivi", "allocatore-capitale.py"), [pian]),
         "glide.json": (asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py"), [pian]),
+        "cu.json": (asset("it-pianificazione-obiettivi", "capitale-umano.py"),
+                    ["--composizione", asset("it-pianificazione-obiettivi", "esempio-composizione.csv")]),
         "imp.json": (asset("it-tax-optimization", "importa-estratto-broker.py"),
                      [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
     }
@@ -5067,7 +5069,9 @@ def t_contratto_revisione():
                   ("mco.json", "obiettivi[].target_oggi"), ("mco.json", "obiettivi[].priorita"),
                   ("alloc.json", "aggregato.azioni"), ("alloc.json", "aggregato.totale"), ("glide.json", "portafoglio"),
                   ("imp.json", "posizioni[].valore"), ("imp.json", "analisi.per_broker[].zainetto_in_scadenza"),
-                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"))
+                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"),
+                  ("cu.json", "esposizione_finanziaria"), ("cu.json", "esposizione_totale"),
+                  ("cu.json", "settore.quota_settore_fin"), ("cu.json", "settore.sovrappeso"), ("cu.json", "eta_sorpasso"))
         for nome, percorso in attese:
             assert percorso.replace("[]", "[") .split("[")[0].split(".")[-1] in tabella or percorso in tabella, \
                 f"la tabella del contratto non nomina «{percorso}»"
