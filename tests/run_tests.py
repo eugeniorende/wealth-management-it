@@ -340,6 +340,7 @@ SCRIPT_CLI = [
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
     ("it-rebalance", "ribilanciamento-multibroker.py"),
+    ("it-revisione", "genera-cruscotto.py"),
     ("it-revisione", "genera-ips.py"),
     ("it-tax-optimization", "importa-estratto-broker.py"),
 ]
@@ -348,6 +349,7 @@ ARGOMENTI_DEFAULT = {
     "importa-previdenza.py": (os.path.join(FIXTURES, "estratto-inps-test.xml"),
                               os.path.join(FIXTURES, "storico-fondo-test.csv")),
     "importa-estratto-broker.py": (os.path.join(FIXTURES, "estratto-broker-test.csv"),),
+    "genera-cruscotto.py": ("--from", os.path.join(FIXTURES, "cruscotto-allocatore.json")),
 }
 _OUTPUT_CP1252 = {}
 
@@ -370,7 +372,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 15 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 16 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -5025,6 +5027,204 @@ def t_t17_ribilancia_json():
     d = m.piano_json(p, m.genera_ordini(p))
     assert d["ordini"] == [] and d["drift"]["azionario"]["fuori_banda"] is True, d["ordini"]
     json.dumps(d)
+
+
+_JSON_ESEMPIO = {}
+NOME_PERICOLOSO = "</script><img src=x onerror=alert(1)> & l'«anticipo»"
+
+
+def _json_esempio():
+    """I JSON degli script del piano sugli esempi del plugin, generati una volta per esecuzione della suite:
+    {nome del file: percorso}. Sono gli input reali del cruscotto."""
+    if not _JSON_ESEMPIO:
+        tmp = tempfile.mkdtemp(prefix="cruscotto-")
+        pian = asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx")
+        OB, PE = (lambda n: asset("it-pianificazione-obiettivi", n)), (lambda n: asset("it-pianificazione", n))
+        lanci = [
+            ("alloc.json", OB("allocatore-capitale.py"), [pian]),
+            ("glide.json", OB("glidepath-obiettivi.py"), [pian]),
+            ("mco.json", OB("montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
+            ("cu.json", OB("capitale-umano.py"), ["--composizione", OB("esempio-composizione.csv")]),
+            ("dati.json", PE("importa-previdenza.py"), [os.path.join(FIXTURES, "estratto-inps-test.xml"),
+                                                       os.path.join(FIXTURES, "storico-fondo-test.csv"), "--anonimo"]),
+            ("inps.json", PE("proiezione-inps.py"), ["--from", "dati.json"]),
+            ("mc.json", PE("montecarlo-pensione.py"), ["--from", "dati.json", "--from", "inps.json", "--set", "N_SIM=500"]),
+            ("netto.json", PE("netto-pensione.py"), ["--from", "mc.json"]),
+            ("broker.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
+             [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
+            ("piano.json", asset("it-rebalance", "ribilanciamento-multibroker.py"), ["--out", "ordini"]),
+        ]
+        for nome, script, args in lanci:
+            rc, out = run_script(script, *args, "--json", nome, cwd=tmp)
+            assert rc == 0, f"{os.path.basename(script)}: rc {rc}, {out[-300:]}"
+            _JSON_ESEMPIO[nome] = os.path.join(tmp, nome)
+    return _JSON_ESEMPIO
+
+
+def _cruscotto(*sorgenti, cartella=None, extra=()):
+    """Lancia genera-cruscotto.py sui file dati; ritorna (rc, stdout, stderr, bundle o None, html o None)."""
+    cartella = cartella or tempfile.mkdtemp(prefix="cruscotto-out-")
+    args = [a for f in sorgenti for a in ("--from", f)]
+    html, bundle = os.path.join(cartella, "c.html"), os.path.join(cartella, "b.json")
+    rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), *args, "-o", html, "--json", bundle,
+                                  "--data", "2026-10-25", *extra, cwd=cartella)
+    b = json.load(open(bundle, encoding="utf-8")) if rc == 0 else None
+    h = open(html, encoding="utf-8").read() if rc == 0 else None
+    return rc, so, se, b, h
+
+
+def _json_variante(nome, modifica):
+    """Copia di un JSON d'esempio con `modifica(dati)` applicata, nella stessa cartella con un prefisso."""
+    d = json.load(open(_json_esempio()[nome], encoding="utf-8"))
+    modifica(d)
+    path = os.path.join(os.path.dirname(_json_esempio()[nome]), "variante-" + nome)
+    json.dump(d, open(path, "w", encoding="utf-8"), ensure_ascii=False)
+    return path
+
+
+@test("T17 cruscotto: ogni output reale riconosciuto con il suo tipo, nessuno con due firme")
+def t_t17_riconosci():
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    js = _json_esempio()
+    attesi = {"alloc.json": "allocatore", "glide.json": "glide_path", "mco.json": "mc_obiettivi", "inps.json": "inps",
+              "mc.json": "mc_pensione", "netto.json": "netto_pensione", "cu.json": "capitale_umano",
+              "broker.json": "broker", "piano.json": "ribilanciamento", "dati.json": "ignorato:importa-previdenza"}
+    for nome, tipo in attesi.items():
+        d = json.load(open(js[nome], encoding="utf-8"))
+        assert mod.riconosci(d) == tipo, (nome, mod.riconosci(d))
+        assert sum(1 for _, firma in mod.FIRME if firma(d)) <= 1, nome
+    assert {t for t, _ in mod.FIRME} == {t for t in attesi.values() if not t.startswith("ignorato")}
+    assert mod.riconosci({"a": 1}) is None
+    # ponte e riscatto si riconoscono e si ignorano: la catena previdenziale si passa intera
+    tmp = os.path.dirname(js["inps.json"])
+    PE = lambda n: asset("it-pianificazione", n)
+    rc, out = run_script(PE("riscatto-laurea.py"), "--from", "dati.json", "--from", "inps.json", "--json", "ris.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    rc, out = run_script(PE("montecarlo-pensione.py"), "--from", "dati.json", "--from", "inps.json", "--set", "ANNI=25",
+                         "--set", "N_SIM=500", "--json", "mc-uscita.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    rc, out = run_script(PE("ponte-pensione.py"), "--from", "inps.json", "--from", "mc-uscita.json", "--set", "ETA_USCITA=62",
+                         "--json", "ponte.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    assert mod.riconosci(json.load(open(os.path.join(tmp, "ris.json"), encoding="utf-8"))) == "ignorato:riscatto-laurea"
+    assert mod.riconosci(json.load(open(os.path.join(tmp, "ponte.json"), encoding="utf-8"))) == "ignorato:ponte-pensione"
+
+
+@test("T17 cruscotto: il bundle porta i valori dei JSON di origine e nessuna posizione dell'estratto")
+def t_t17_bundle():
+    js = _json_esempio()
+    L = lambda n: json.load(open(js[n], encoding="utf-8"))
+    tutti = [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
+                             "broker.json", "piano.json")]
+    rc, so, se, b, html = _cruscotto(*tutti)
+    assert rc == 0, (so[-300:], se[-300:])
+    mco, mc, netto, cu, broker, piano = (L(n) for n in ("mco.json", "mc.json", "netto.json", "cu.json", "broker.json", "piano.json"))
+    assert b["generato_il"] == "2026-10-25" and b["versione"] == 1
+    assert b["plugin"] == json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
+    assert [f["tipo"] for f in b["fonti"]] == ["allocatore", "glide_path", "mc_obiettivi", "inps", "mc_pensione",
+                                              "netto_pensione", "capitale_umano", "broker", "ribilanciamento"], b["fonti"]
+    assert b["obiettivi"]["obiettivi"][0]["probabilita_successo"] == mco["obiettivi"][0]["probabilita_successo"]
+    assert b["obiettivi"]["obiettivi"][1]["capitale_finale"] == mco["obiettivi"][1]["capitale_finale"]
+    assert b["pensione"]["tasso_lordo"]["mediana"] == mc["tasso_sostituzione_lordo"]["mediana"]
+    assert b["pensione"]["target"] == mc["target"]
+    assert b["glide_path"]["portafoglio"] == L("glide.json")["portafoglio"]
+    assert b["allocazione"]["target_aggregato"] == L("alloc.json")["aggregato"]
+    ind = {i["id"]: i for i in b["indicatori"]}
+    assert list(ind) == ["capitale_allocato", "valore_portafoglio", "probabilita_essenziali", "sostituzione_netta",
+                         "zainetto_in_scadenza"], list(ind)
+    assert ind["capitale_allocato"]["valore"] == L("alloc.json")["capitale"]
+    assert ind["sostituzione_netta"]["valore"] == next(s for s in netto["scenari"] if s["nome"] == "mediana")["tasso_sostituzione_netto"]
+    assert ind["probabilita_essenziali"]["nota"] == "Fondo di emergenza"
+    assert ind["probabilita_essenziali"]["valore"] == mco["obiettivi"][0]["probabilita_successo"]
+    assert b["capitale_umano"]["eta_sorpasso"] == cu["eta_sorpasso"] and b["capitale_umano"]["stato_sorpasso"] == cu["stato_sorpasso"]
+    assert ind["zainetto_in_scadenza"]["valore"] == broker["analisi"]["zainetto_in_scadenza"]
+    assert ind["valore_portafoglio"]["valore"] == broker["analisi"]["totale_valore"]
+    assert b["ribilanciamento"]["drift"]["azionario"]["drift"] == piano["drift"]["azionario"]["drift"]
+    assert len(b["ribilanciamento"]["ordini"]) == len(piano["ordini"]) > 0
+    for p in broker["posizioni"]:
+        assert p["isin"] not in html and p["descrizione"] not in html and p["isin"] not in json.dumps(b), p["isin"]
+    # stdout: percorso, tipi riconosciuti, sezioni e indicatori in formato italiano
+    assert "Cruscotto:" in so and "mc.json → mc_pensione" in so and "Sezioni:" in so and "€130.000" in so, so[-800:]
+
+
+@test("T17 cruscotto: sezioni assenti, indicatori senza fonte, errori con rc 1 e rc 2")
+def t_t17_errori():
+    js = _json_esempio()
+    rc, so, se, b, _ = _cruscotto(js["alloc.json"])
+    assert rc == 0, se[-300:]
+    assert b["allocazione"] and all(b[k] is None for k in ("obiettivi", "glide_path", "pensione", "capitale_umano",
+                                                            "fiscalita", "ribilanciamento")), b
+    assert [i["id"] for i in b["indicatori"]] == ["capitale_allocato"], b["indicatori"]
+    # Review Focus 3: nessun obiettivo essenziale → niente indicatore della probabilità minima
+    def senza_essenziali(d):
+        for o in d["obiettivi"]:
+            o["priorita"] = "importante"
+    rc, so, se, b, _ = _cruscotto(_json_variante("mco.json", senza_essenziali))
+    assert rc == 0 and [i["id"] for i in b["indicatori"]] == [] and b["obiettivi"], (se[-300:], b and b["indicatori"])
+    # dati.json di importa-previdenza: riconosciuto e ignorato, con un avviso
+    rc, so, se, b, _ = _cruscotto(js["alloc.json"], js["dati.json"])
+    assert rc == 0 and "ℹ" in so and "ignorato" in so and "dati.json" in so, so[-400:]
+
+    def errore(*args, atteso, extra=()):
+        rc, so, se, _, _ = _cruscotto(*args, extra=extra)
+        assert rc == 1, (args, rc, so[-200:], se[-300:])
+        assert se.lstrip().startswith("ERRORE:") and "ERRORE:" not in so and "Traceback" not in se, (so[-200:], se[-300:])
+        for a in (atteso if isinstance(atteso, tuple) else (atteso,)):
+            assert a in se, (a, se[-300:])
+    tmp = tempfile.mkdtemp()
+    try:
+        non_json = os.path.join(tmp, "rotto.json")
+        open(non_json, "w", encoding="utf-8").write("{non è json")
+        lista = os.path.join(tmp, "lista.json")
+        open(lista, "w", encoding="utf-8").write("[1, 2]")
+        ignoto = os.path.join(tmp, "ignoto.json")
+        open(ignoto, "w", encoding="utf-8").write('{"a": 1}')
+        copia = os.path.join(tmp, "mc-uscita.json")
+        shutil.copy(js["mc.json"], copia)
+        errore("/non/esiste.json", atteso="non trovato")
+        errore(non_json, atteso=("rotto.json", "JSON"))
+        errore(lista, atteso="lista.json")
+        errore(ignoto, atteso=("ignoto.json", "non è un output riconosciuto", "mc_pensione"))
+        errore(js["mc.json"], copia, atteso=("mc.json", "mc-uscita.json", "stesso tipo"))
+        # Review Focus 1: un JSON di una versione precedente senza un campo usato
+        errore(_json_variante("mc.json", lambda d: d["tasso_sostituzione_lordo"].pop("p90")),
+               atteso=("variante-mc.json", "tasso_sostituzione_lordo.p90"))
+        errore(js["alloc.json"], extra=("--data", "2026-13-01"), atteso="data")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), "--from", js["alloc.json"],
+                                  "-o", "/non/esiste/c.html")
+    assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, (rc, se[-300:])
+    rc, out = run_script(asset("it-revisione", "genera-cruscotto.py"))
+    assert rc == 2 and "usage:" in out, (rc, out[-300:])
+    rc, out = run_script(asset("it-revisione", "genera-cruscotto.py"), "--from")
+    assert rc == 2 and "usage:" in out, (rc, out[-300:])
+
+
+@test("T17 cruscotto: HTML autosufficiente, segnaposto unico, nomi pericolosi innocui")
+def t_t17_html():
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    js = _json_esempio()
+    tpl = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    assert tpl.count("__DATI_CRUSCOTTO__") == 1
+    def pericoloso(d):
+        d["obiettivi"][0]["nome"] = NOME_PERICOLOSO
+    rc, so, se, b, html = _cruscotto(js["alloc.json"], _json_variante("mco.json", pericoloso))
+    assert rc == 0, se[-300:]
+    for testo in (tpl, html):
+        assert not re.search(r"https?://|(src|href)\s*=\s*[\"']//|@import|fetch\(", testo)
+    assert "__DATI_CRUSCOTTO__" not in html
+    # Review Focus 5: il nome non chiude il tag e il JSON incorporato si rilegge identico
+    assert "</script><img" not in html and html.count("</script>") == tpl.count("</script>")
+    dati = json.loads(re.search(r'<script id="dati" type="application/json">(.*?)</script>', html, re.S).group(1))
+    assert dati["obiettivi"]["obiettivi"][0]["nome"] == NOME_PERICOLOSO
+    assert dati == b
+    for tpl_rotto in ("<p>senza</p>", "__DATI_CRUSCOTTO__ __DATI_CRUSCOTTO__"):
+        try:
+            mod.incorpora(tpl_rotto, {})
+            raise AssertionError("incorpora deve respingere il template")
+        except mod.ErroreDati:
+            pass
 
 
 # ══════════════════════ freshness · json · guardia ══════════════════════

@@ -138,6 +138,8 @@ Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione
 - `assets/cruscotto-patrimoniale.xlsx` — il cruscotto quantitativo (Patrimonio, Allocazione, Andamento, Sintesi, Azioni, Rendimento TWR)
 - `assets/tracker-secchielli.xlsx` — il monitoraggio goals-based: secchielli e anno del piano (Impostazioni), calendario del glide path incollato da `glidepath-obiettivi.py` (Glide), posizioni assegnate a secchiello e classe con tendine (Posizioni), effettivo contro target per secchiello e aggregato con semaforo sulle bande 5/25 (Controllo), registro dei versamenti; si compila nella cartella di lavoro e si rilegge al passo 3
 - `assets/genera-ips.py` — l'IPS in Word: copertina, 12 sezioni, appendici con la checklist e il broker; la nota di rischio viene dalla quota azionaria; i dati del caso arrivano da `--dati ips.json` (vedi «I dati dell'IPS»), senza il documento è l'esempio e lo dice in copertina
+- `assets/genera-cruscotto.py` — il **cruscotto grafico**: legge i `--json` degli script del piano (`--from`, ripetibile), ne riconosce il tipo dalle chiavi e scrive una pagina HTML autosufficiente con i grafici; `--json` scrive anche i dati che finiscono nella pagina (vedi «Cruscotto grafico»)
+- `assets/cruscotto.html` — il template della pagina, fisso: HTML, CSS e JavaScript senza risorse esterne; non si modifica, lo usa `genera-cruscotto.py`
 - `assets/template-revisione.md` — il **template del report** di revisione, scheletro markdown precompilato da riempire (le cinque sezioni + disclaimer)
 - **Orchestra** (non duplica) le altre skill del plugin:
   - `it-pianificazione` / `it-pianificazione-autonomi` — il gap previdenziale e il fondo pensione
