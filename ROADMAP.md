@@ -200,6 +200,14 @@ Prese il 20/10/2026.
   - [x] Test con valori chiusi, invarianti e il caso di Ibbotson et al. 2007.
   - [x] Gli otto minori della revisione finale: proiezione a tre contenitori con TFR e contributi trasferiti, orizzonte dei pensionati, P50, sensibilità in punti, `stato_sorpasso`, chiavi non riconosciute, mediana del Monte Carlo spiegata.
   - Sviluppi successivi, da decidere: secondo reddito del nucleo; volatilità personale del reddito dall'estratto INPS (`importa-previdenza.py`); aggiustamento dei target (il capitale umano che modifica l'allocazione); polizza vita (Ibbotson et al. cap. 3; Chen et al. 2006).
+- [x] **T17 Cruscotto grafico e Artifact** (P2, M): spec `docs/sviluppo/specs/2026-10-25-cruscotto-grafico-design.md`, piano `docs/sviluppo/piani/2026-10-25-cruscotto-grafico.md`.
+  - [x] `ribilanciamento-multibroker.py --json`.
+  - [x] `genera-cruscotto.py`: firme dei JSON, bundle minimo, errori espliciti.
+  - [x] `cruscotto.html`: nove sezioni in SVG, tema chiaro e scuro, larghezza da telefono, nessuna risorsa esterna.
+  - [x] Test in Chromium con Playwright, obbligatori in CI.
+  - [x] Passo 6 di it-revisione e comando `/cruscotto`, con la conferma prima di pubblicare l'Artifact.
+  - [ ] Prova manuale della pubblicazione in claude.ai e in Cowork alla prossima release.
+  - Sviluppi successivi, da decidere: confronto tra due revisioni; ponte pensione e riscatto della laurea nel cruscotto; versione anonimizzata per la condivisione.
 - [ ] **T16 Fonti dati esterne e connettori** (P2). Principio: gli script di calcolo restano offline; il dato si procura a parte (importatore su file, o Claude che lo scarica nella cartella di lavoro) e lo script legge un file locale. Per ogni fonte si annotano licenza (quelle a pagamento non si ridistribuiscono nel repository) e mese di verifica.
 
   | Priorità | Dato | Serve per | Fonte | Forma |

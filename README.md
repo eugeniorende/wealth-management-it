@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 156 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 157 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -102,7 +102,7 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
 | `it-rebalance/assets/ribilanciamento-multibroker.py` | 26: T1; T17 cruscotto ×4; T17 cruscotto nel browser ×2; T17 ribilanciamento --json; T7 ribilanciamento ×10; T9 formati ×2 … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |
-| `it-revisione/assets/genera-cruscotto.py` | 9: T17 cruscotto ×4; T17 cruscotto nel browser ×2; T9 formati; T9 interfaccia ×2 |
+| `it-revisione/assets/genera-cruscotto.py` | 10: T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 formati; T9 interfaccia ×2 |
 | `it-revisione/assets/genera-ips.py` | 10: T14 postura e fonti; T9 formati; T9 input esterno; T9 interfaccia ×2; freshness fiscale; genera-ips ×2 … |
 | `it-revisione/assets/investment-policy-statement.xlsx` | 3: T12 Excel; bande di ribilanciamento; scadenze di fine anno |
 | `it-revisione/assets/tracker-secchielli.xlsx` | 4: T12 Excel ×2; bande di ribilanciamento; tracker-secchielli |
@@ -173,7 +173,7 @@ Ogni skill ha una versione propria, nel campo `metadata.version` del frontmatter
 | 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.5 (pensione autonomi/forfettari, casse professionali, Excel, rivalsa e acconti del secondo anno) |
 | 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.22 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo, capitale umano) |
 | 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.8 (tax-aware con versamenti, aliquota per posizione e rientro misto, multi-broker, bande 5/25, prelievo in decumulo, sequenza di liquidazione, ordini CSV, piano in JSON per il cruscotto) |
-| 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.7 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR) |
+| 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.8 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR, **cruscotto grafico** pubblicabile come Artifact) |
 
 Le sei skill attive formano un sistema coordinato attorno a un flusso end-to-end: `it-pianificazione-obiettivi` definisce gli obiettivi e le allocazioni (a monte), le due skill previdenziali coprono il secchiello pensione, `it-rebalance` mantiene le allocazioni nel tempo, `it-tax-optimization` ottimizza la fiscalità delle vendite, e `it-revisione` è il **livello di sintesi** che una volta l'anno tiene insieme tutto in un quadro unico con azioni prioritizzate. Vedi la sezione "Architettura" sotto. Note: il goals-based, che nell'upstream è spezzato tra `financial-plan` (modellazione obiettivi) e `investment-proposal` (allocazione/IPS), nel fork è unificato in `it-pianificazione-obiettivi` con postura personale/educativa; e le skill upstream rivolte al consulente (`client-review`, `client-report`, in parte `investment-proposal`) sono riformulate per chi gestisce i propri soldi nell'unica `it-revisione`.
 
@@ -226,7 +226,8 @@ Gli script del plugin girano **in locale** e non fanno chiamate di rete: leggono
 Cosa conviene sapere:
 - `importa-previdenza.py` legge l'estratto conto INPS e il prospetto del fondo pensione. Di default stampa intestatario e data di nascita, da cui calcola l'età; con `--anonimo` li omette e stampa l'età arrotondata all'anno. Le retribuzioni le stampa aggregate per anno, senza i datori di lavoro;
 - gli estratti dei broker contengono posizioni e importi; prima di passarli, togli quello che al calcolo non serve: intestatario, codice fiscale, IBAN, numero di dossier;
-- per i calcoli bastano età, importi e date: nomi e identificativi non servono a nessuno strumento del plugin.
+- per i calcoli bastano età, importi e date: nomi e identificativi non servono a nessuno strumento del plugin;
+- il cruscotto grafico (`genera-cruscotto.py`, comando `/cruscotto`) è un file HTML che resta nella cartella di lavoro e si apre offline. Pubblicarlo come Artifact lo mette su claude.ai, privato finché non lo condividi: Claude lo fa solo dopo una tua conferma esplicita, ogni volta. La pagina porta importi, età e proiezioni del piano, ma non ISIN né descrizioni delle singole posizioni.
 
 ### Verifica
 
@@ -248,13 +249,14 @@ Comandi espliciti: sono scorciatoie che caricano la skill corrispondente, con gl
 /pensione-autonomi → it-pianificazione-autonomi (pensione autonomi/forfettari: Gestione Separata)
 /ribilancia        → it-rebalance (ribilanciamento tax-aware del portafoglio)
 /revisione         → it-revisione (revisione periodica: stato, scostamenti, azioni)
+/cruscotto         → it-revisione (cruscotto grafico del piano, pubblicabile come Artifact su conferma)
 ```
 
 Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazione-obiettivi` su obiettivi/pianificare investimenti/fondo emergenza/quanto risparmiare; `it-tax-optimization` su minusvalenze/plusvalenze/zainetto/Tobin tax; `it-pianificazione` su pensione/fondo pensione/TFR per dipendenti; `it-pianificazione-autonomi` su pensione/Gestione Separata/forfettario per P.IVA; `it-rebalance` su ribilanciamento/drift/allocazione target; `it-revisione` su fare il punto, revisione annuale o di fine anno, IPS e cruscotto.
 
 ### Convenzioni degli script
 
-Tutti i 13 script del plugin seguono la stessa interfaccia, verificata dalla suite:
+Tutti i 16 script del plugin seguono la stessa interfaccia, verificata dalla suite:
 
 - `--help` descrive argomenti e opzioni; un argomento o un flag non riconosciuto ferma lo script con l'usage.
 - Codici d'uscita: **0** riuscito; **1** errore nei dati o nei parametri (file mancante o illeggibile, valori incoerenti, costante `--set` sconosciuta), con un messaggio che inizia per `ERRORE:` su stderr; **2** riga di comando non riconosciuta.
@@ -290,7 +292,7 @@ Ogni skill descrive il suo report nella sezione «Formato output» di `SKILL.md`
 2. **Opportunità identificate** — trade candidati con razionale fiscale
 3. **Calendario d'azione** — scadenze ordinate cronologicamente
 
-Gli script scrivono i loro output (JSON, CSV degli ordini, IPS in Word) nella cartella di lavoro.
+Gli script scrivono i loro output (JSON, CSV degli ordini, IPS in Word) nella cartella di lavoro. `/cruscotto` raccoglie i JSON in un cruscotto grafico: una pagina HTML con allocazione, obiettivi, glide path, pensione, capitale umano, fiscalità e ribilanciamento, da aprire nel browser o, su conferma, da pubblicare come Artifact.
 
 ## Cosa il plugin NON fa
 

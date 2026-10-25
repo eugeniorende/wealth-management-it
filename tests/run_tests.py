@@ -5351,6 +5351,25 @@ def t_t17_browser_contenuti():
         assert vietato not in src, vietato
 
 
+@test("T17 cruscotto: la skill chiede conferma prima di pubblicare, comando e README allineati")
+def t_t17_skill():
+    skill_md = lambda s: os.path.join(SKILLS, s, "SKILL.md")
+    skill = open(skill_md("it-revisione"), encoding="utf-8").read()
+    assert "### 6. Cruscotto grafico" in skill, "it-revisione: manca il passo 6 «Cruscotto grafico»"
+    passo = skill.split("### 6. Cruscotto grafico")[1].split("\n## ")[0]
+    assert "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" in passo, passo[:300]
+    assert "chiedi" in passo.lower() and "sì esplicito" in passo and "claude.ai" in passo and "Artifact" in passo, passo[:600]
+    anti = skill.split("## Anti-pattern")[1].split("\n## ")[0]
+    assert "senza conferma" in anti and "a mano" in anti, anti[-600:]
+    assert os.path.isfile(os.path.join(ROOT, "commands", "cruscotto.md"))
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "/cruscotto" in readme and "genera-cruscotto.py" in readme
+    dati = readme.split("### Dove vanno i tuoi dati")[1].split("\n### ")[0]
+    assert "Artifact" in dati and "conferma" in dati, dati[-600:]
+    for s in ("it-pianificazione-obiettivi", "it-pianificazione", "it-rebalance"):
+        assert "/cruscotto" in open(skill_md(s), encoding="utf-8").read(), s
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:
