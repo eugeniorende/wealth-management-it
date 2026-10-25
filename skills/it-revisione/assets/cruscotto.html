@@ -71,6 +71,10 @@ body {
 .pagina { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
 header h1 { font-size: 26px; line-height: 1.2; margin: 0 0 6px; font-weight: 650; }
 .sotto { color: var(--testo-2); margin: 0; }
+.esempio {
+  margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; font-size: 14px;
+  border: 1px solid var(--serio); color: var(--testo);
+}
 .avviso {
   margin: 14px 0 0; padding: 10px 12px; border-radius: 8px;
   background: var(--superficie); border: 1px solid var(--bordo); color: var(--testo-2); font-size: 14px;
@@ -446,11 +450,17 @@ footer .fonti { color: var(--muto); }
     return s;
   }
 
+  function avvisoEsempio() {
+    return el("p", { class: "esempio", testo: "Dati di esempio dello script di ribilanciamento: non sono il tuo portafoglio. " +
+      "Rilancia ribilanciamento-multibroker.py con --dati e i tuoi dati." });
+  }
+
   function sezioneAllocazione(a) {
     if (!a) return null;
     var s = sezione("allocazione", "Allocazione",
       a.classi ? "Peso attuale per classe contro il target, con la banda stretta attorno al target e il peso dopo il piano di ribilanciamento."
                : "L'allocazione target che l'allocatore ricava dagli obiettivi.");
+    if (a.classi && B.ribilanciamento && B.ribilanciamento.dati_esempio) s.appendChild(avvisoEsempio());
     if (a.classi) {
       var W = larghezza(), rr = 40, H = a.classi.length * rr + 4, ml = Math.min(160, W * 0.32), mr = 60;
       var max = tetto(Math.max.apply(null, a.classi.map(function (c) { return Math.max(c.peso, c.target + c.tight, c.risultante || 0); })));
@@ -639,9 +649,13 @@ footer .fonti { color: var(--muto); }
         return [b, euro(x.zainetto_26_equivalente), euro(x.zainetto_in_scadenza), euro(x.plus_latenti_compensabili),
                 euro(x.plus_realizzabili_a_costo_zero), euro(x.imposta_risparmiabile)]; }),
       [false, true, true, true, true, true]));
-    if (f.avvisi.length) {
+    if (f.avvisi.length || f.avvisi_omessi) {
       var u = el("ul", { class: "avvisi" });
       f.avvisi.forEach(function (a) { u.appendChild(el("li", { testo: a })); });
+      if (f.avvisi_omessi) {
+        u.appendChild(el("li", { testo: f.avvisi_omessi + (f.avvisi_omessi === 1 ? " avviso" : " avvisi") +
+          " sulle singole posizioni non riportati qui: sono nell'output dell'importatore." }));
+      }
       s.appendChild(u);
     }
     return s;
@@ -651,6 +665,7 @@ footer .fonti { color: var(--muto); }
     if (!r) return null;
     var s = sezione("ribilanciamento", "Ribilanciamento",
       "Scostamento di ogni classe dal target, contro la banda stretta e quella larga (regola 5/25), e gli ordini del piano.");
+    if (r.dati_esempio) s.appendChild(avvisoEsempio());
     var classi = Object.keys(r.drift);
     s.appendChild(barreDivergenti(classi.map(function (c) {
       var d = r.drift[c]; return { classe: c, drift: d.drift, tight: d.tight, wide: d.wide, fuori: d.fuori_banda };

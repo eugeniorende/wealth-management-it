@@ -61,13 +61,16 @@ Si produce il **report della revisione** come deliverable (vedi Formato output).
 ### 6. Cruscotto grafico
 Una pagina HTML con i grafici del piano: allocazione attuale contro target con le bande, probabilità e capitale finale degli obiettivi, glide path, pensione lorda e netta, capitale umano, zainetto per scadenza, drift e ordini del ribilanciamento. I numeri vengono **solo** dai JSON che gli script scrivono con `--json` (quelli del «Contratto di input» più `ribilanciamento-multibroker.py --json`): la pagina li disegna, non li ricalcola, e tu non li riscrivi.
 
-1. Dalla cartella di lavoro, lancia il generatore sui JSON prodotti nella revisione (`--from` ripetibile, l'ordine non conta; quelli di `importa-previdenza.py`, `ponte-pensione.py` e `riscatto-laurea.py` si riconoscono e si saltano):
+1. Dalla cartella di lavoro, lancia il generatore sui JSON **scritti dagli script con `--json`** (`--from` ripetibile, l'ordine non conta; quelli di `importa-previdenza.py`, `ponte-pensione.py` e `riscatto-laurea.py` si riconoscono e si saltano). Non passare i file di **input** che stanno nella stessa cartella: `piano.json` (il `--dati` del ribilanciamento), `capitale-umano.json` (il `--dati` del capitale umano), `ips.json` (il `--dati` dell'IPS):
    ```bash
    python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from glide.json --from mco.json \
        --from inps.json --from mc.json --from netto.json --from capitale-umano-out.json \
        --from broker.json --from ribilancia.json -o cruscotto.html
    ```
-   Se un JSON manca, dillo e genera il cruscotto con quelli che ci sono: le sezioni senza dati non compaiono. Un JSON non riconosciuto, incompleto o doppio ferma lo script con `ERRORE:`: rigenera quel file con lo script giusto, non correggerlo a mano.
+   Se un JSON manca, dillo e genera il cruscotto con quelli che ci sono: le sezioni senza dati non compaiono. Gli errori fermano lo script con `ERRORE:`; secondo il messaggio:
+   - «non è un output riconosciuto»: è un file di input o di un altro programma, toglilo dai `--from`;
+   - «sono dello stesso tipo»: due file dello stesso script (per esempio `mc.json` al pensionamento e `mc-uscita.json` all'uscita anticipata): chiedi all'utente quale usare, non scegliere tu;
+   - «manca …»: il JSON viene da una versione precedente dello script; rigeneralo con lo script, non correggerlo a mano.
 2. Comunica il percorso del file e le sezioni incluse (le stampa lo script). Il file resta nella cartella di lavoro e si apre nel browser con un doppio clic, anche offline.
 3. **Chiedi sempre** se pubblicarlo come Artifact, con questa informazione: la pagina va su claude.ai e contiene importi, età e proiezioni del piano; resta privata finché l'utente non la condivide; si può cancellare. Le singole posizioni dell'estratto (ISIN, descrizioni) non ci sono. **Senza un sì esplicito non pubblicare.**
 4. Se l'utente dice sì:

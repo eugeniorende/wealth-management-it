@@ -985,6 +985,7 @@ def piano_json(plan, ordini):
         "risultante": plan["risultante"],
         "zainetto": plan["zainetto"],
         "ordini": ordini,
+        "dati_esempio": DATI_ESEMPIO,   # come la riga NOTA del CSV: il JSON può circolare da solo
     }
 
 

@@ -242,8 +242,24 @@ def _fiscalita(br):
                                       "plus_realizzabili_a_costo_zero", "imposta_risparmiabile"), f, f"analisi.per_broker.{nome}")
     zainetto = [estrai(z, ("broker", "anno", "scade_il", "stato", "importo_26_equivalente"), f, f"zainetto[{i}]")
                 for i, z in enumerate(lista_di(d, "zainetto", f))]
-    return {"totali": totali, "per_broker": per_broker, "zainetto": zainetto,
-            "avvisi": [str(a) for a in d.get("avvisi") or []]}
+    avvisi, omessi = _avvisi_senza_posizioni(d, per_broker)
+    return {"totali": totali, "per_broker": per_broker, "zainetto": zainetto, "avvisi": avvisi, "avvisi_omessi": omessi}
+
+
+def _avvisi_senza_posizioni(d, per_broker):
+    """Gli avvisi dell'importatore che possono entrare nella pagina: quelli dello zainetto e dei broker, mai
+    quelli che nominano una posizione (descrizione o ISIN) o una riga dell'estratto. Ritorna (avvisi, omessi)."""
+    nomi = [str(p.get(k)) for p in d.get("posizioni") or [] if isinstance(p, dict)
+            for k in ("isin", "descrizione") if p.get(k)]
+    tenuti, omessi = [], 0
+    for a in d.get("avvisi") or []:
+        a = str(a)
+        di_broker = any(a.startswith(f"{b}: ") for b in per_broker)
+        if (a.startswith("zainetto") or di_broker) and not any(n in a for n in nomi):
+            tenuti.append(a)
+        else:
+            omessi += 1
+    return tenuti, omessi
 
 
 def _ribilanciamento(rib):
@@ -254,8 +270,10 @@ def _ribilanciamento(rib):
              for cl, dr in campo(d, "drift", f).items()}
     ordini = [estrai(o, ("broker", "operazione", "classe", "categoria_fiscale", "importo_eur", "imposta_eur", "nota"),
                      f, f"ordini[{i}]") for i, o in enumerate(lista_di(d, "ordini", f))]
+    # un JSON di prima della revisione finale non ha dati_esempio: vale come dati dell'utente
     return {k: numero_di(d, k, f) for k in ("totale", "totale_post", "imposta", "prelievo")} | {
-        "drift": drift, "risultante": campo(d, "risultante", f), "zainetto": campo(d, "zainetto", f), "ordini": ordini}
+        "drift": drift, "risultante": campo(d, "risultante", f), "zainetto": campo(d, "zainetto", f), "ordini": ordini,
+        "dati_esempio": d.get("dati_esempio") is True}
 
 
 def _indicatori(b):
@@ -304,10 +322,11 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - capitale_umano: voci [{nome, valore}], esposizione_finanziaria, esposizione_totale, proiezione
       [{eta, F (patrimonio finanziario), HC (capitale umano), esposizione, p10, p90}], eta_sorpasso, stato_sorpasso, settore {settore, quota_settore_fin,
       peso_mondo, sovrappeso} | None;
-    - fiscalita: totali, per_broker, zainetto [{broker, anno, scade_il, stato, importo_26_equivalente}], avvisi;
+    - fiscalita: totali, per_broker, zainetto [{broker, anno, scade_il, stato, importo_26_equivalente}], avvisi
+      (solo quelli di zainetto e broker), avvisi_omessi (quanti nominavano una posizione);
     - ribilanciamento: totale, totale_post, imposta, prelievo, drift {classe: {peso, target, drift, tight, wide,
       fuori_banda, esito, motivo}}, risultante, zainetto, ordini [{broker, operazione, classe,
-      categoria_fiscale, importo_eur, imposta_eur, nota}].
+      categoria_fiscale, importo_eur, imposta_eur, nota}], dati_esempio (il piano gira sull'esempio dello script).
     Una sezione senza fonte è None. ErroreDati per un campo mancante, con il file e la chiave."""
     s = sorgenti.get
     bundle = {

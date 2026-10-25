@@ -5368,6 +5368,56 @@ def t_t17_skill():
     assert "Artifact" in dati and "conferma" in dati, dati[-600:]
     for s in ("it-pianificazione-obiettivi", "it-pianificazione", "it-rebalance"):
         assert "/cruscotto" in open(skill_md(s), encoding="utf-8").read(), s
+    # revisione finale T17: i file di input degli script stanno nella stessa cartella e non si passano;
+    # due file dello stesso tipo sono una scelta dell'utente, non un file da rigenerare
+    for nome in ("piano.json", "capitale-umano.json", "ips.json"):
+        assert nome in passo, f"il passo 6 deve nominare l'input {nome} da non passare"
+    assert "stesso tipo" in passo and "chiedi all'utente" in passo.lower(), passo[:1500]
+    comando = open(os.path.join(ROOT, "commands", "cruscotto.md"), encoding="utf-8").read()
+    assert "--json" in comando and "input" in comando, comando
+
+
+@test("T17 cruscotto: gli avvisi dell'importatore che nominano le posizioni non entrano nella pagina")
+def t_t17_avvisi_posizioni():
+    # revisione finale T17: gli avvisi dell'importatore nominano la posizione (descrizione o ISIN), e il
+    # testo del consenso dice che le posizioni non ci sono. Restano solo gli avvisi di zainetto e broker.
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"),
+                             os.path.join(FIXTURES, "estratto-pubblici-etc.csv"), "--broker", "Fineco",
+                             "--anno", "2026", "--json", "b.json", cwd=tmp)
+        assert rc == 0, out[-300:]
+        broker = json.load(open(os.path.join(tmp, "b.json"), encoding="utf-8"))
+        nomi = [p[k] for p in broker["posizioni"] for k in ("isin", "descrizione") if p.get(k)]
+        assert any(n in a for a in broker["avvisi"] for n in nomi), "la fixture deve produrre avvisi sulle posizioni"
+        rc, so, se, b, html = _cruscotto(os.path.join(tmp, "b.json"))
+        assert rc == 0, se[-300:]
+        for n in nomi:
+            assert n not in html and n not in json.dumps(b, ensure_ascii=False), n
+        assert b["fiscalita"]["avvisi_omessi"] >= 1, b["fiscalita"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T17 cruscotto: il ribilanciamento sui dati d'esempio lo dice nel JSON e nella pagina")
+def t_t17_dati_esempio():
+    js = _json_esempio()
+    assert json.load(open(js["piano.json"], encoding="utf-8"))["dati_esempio"] is True
+    rc, so, se, b, html = _cruscotto(js["piano.json"])
+    assert rc == 0 and b["ribilanciamento"]["dati_esempio"] is True, se[-300:]
+    # un piano da --dati non è d'esempio
+    m, piano = _ribilancia(DATI_ESEMPIO=False)
+    assert m.piano_json(piano, m.genera_ordini(piano))["dati_esempio"] is False
+    sync_playwright, lancia = browser()
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            for sez in ("#sez-ribilanciamento", "#sez-allocazione"):
+                assert "dati di esempio" in page.inner_text(sez).lower(), sez
+        finally:
+            br.close()
 
 
 # ══════════════════════ freshness · json · guardia ══════════════════════
