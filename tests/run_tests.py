@@ -5054,6 +5054,169 @@ def t_ce_lettura():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _xlsx_emittente(tipo, cartella):
+    """File delle posizioni sintetico con il layout reale dell'emittente (preambolo, riga d'intestazione,
+    disclaimer, pesi in frazione o percento, righe non classificate): i file veri non si ridistribuiscono.
+    Il nome del file non contiene l'emittente, così il riconoscimento passa dal preambolo."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    if tipo == "xtrackers":
+        ws.title = "2026-10-25"
+        ws.append([None])
+        ws.append(["Although information in this document has been obtained from sources believed to be reliable, "
+                   "DWS does not guarantee its accuracy, completeness or fairness."])
+        ws.append([None])
+        ws.append([None, "Name", "ISIN", "Country", "Currency", "Type of Security", "Industry Classification", "Weighting"])
+        for n, (nome, settore, paese, tipo_titolo, peso) in enumerate((
+                ("A", "Information Technology", "United States", "Equities", 0.40),
+                ("B", "Financials", "Japan", "Equities", 0.25),
+                ("C", "Health Care", "Germany", "Equities", 0.20),
+                ("D", "Materials", "Switzerland", "Equities", 0.12),
+                ("E", "unknown", "Germany", "Equities", 0.02),
+                ("F", "Health Care", "United Arab Emirates", "Equities", "N/A"),
+                ("G", "unknown", "Germany", "Future", 0.01)), 1):
+            ws.append([n, nome, f"XX000000000{n}", paese, "USD", tipo_titolo, settore, peso])
+    elif tipo == "spdr":
+        ws.title = "holdings"
+        for riga in (("Fund Name:", "State Street SPDR MSCI ACWI IMI UCITS ETF"), ("ISIN:", "IE00B3YLTY66"),
+                     ("Ticker Symbol:", "SPYI GY"), ("Holdings As Of:", "22-Oct-2026"), (None,)):
+            ws.append(list(riga))
+        ws.append(["ISIN", "Security Name", "Percent of Fund", "Trade Country Name", "Sector Classification",
+                   "Industry Classification"])
+        for riga in (("US0000000001", "A", 50.0, "United States", "Information Technology", "Semiconductors"),
+                     ("TW0000000002", "B", 30.0, "Taiwan", "Consumer Discretionary", "Broadline Retail"),
+                     ("HK0000000003", "C", 15.0, "Hong Kong", "Communication Services", "Interactive Media"),
+                     ("Unassigned", "D", 5.04, "Unassigned", "Unassigned", "Unassigned"),
+                     ("Unassigned", "CNY:HKD 20250930", -0.04, "Unassigned", "Unassigned", "Unassigned")):
+            ws.append(list(riga))
+        ws.append([None])
+        ws.append(["Marketing communication. The performance data quoted represents past performance."])
+    elif tipo == "vanguard":
+        ws.append(["Vanguard FTSE All-World UCITS ETF"])
+        ws.append(["As at 30 Sep 2026"])
+        ws.append([None])
+        ws.append(["Holding name", "Sector", "Country", "% of net assets"])
+        for riga in (("A", "Technology", "United States", 40), ("B", "Financials", "Japan", 30),
+                     ("C", "Telecommunications", "France", 10), ("D", "Basic Materials", "Australia", 20)):
+            ws.append(list(riga))
+    elif tipo == "amundi":
+        ws.append(["Amundi MSCI Europe UCITS ETF"])
+        ws.append(["Dati al", "30/09/2026"])
+        ws.append([None])
+        ws.append(["Nome", "Settore", "Paese", "Peso (%)"])
+        for riga in (("A", "Beni di prima necessità", "Francia", 50), ("B", "Servizi di pubblica utilità", "Italia", 30),
+                     ("C", "Immobiliare", "Paesi Bassi", 20)):
+            ws.append(list(riga))
+    else:
+        raise ValueError(tipo)
+    path = os.path.join(cartella, f"posizioni-{('xtrackers', 'spdr', 'vanguard', 'amundi').index(tipo)}.xlsx")
+    wb.save(path)
+    return path
+
+
+@test("T16 composizione ETF: valori chiusi per emittente, riconoscimento ed esclusioni")
+def t_ce_composizione():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    en = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "ETF MSCI World")
+    it = m.componi(os.path.join(FIXTURES, "composizione-ishares-it.csv"), "ETF MSCI World")
+    for c in (en, it):
+        assert c["emittente"] == "ishares" and c["riconosciuto_da"] == "preambolo" and c["classificazione"] == "GICS", c
+        assert c["data_posizioni"] == "2026-09-30" and c["titoli"] == 6, c
+        assert r2(c["settori"]) == {"Information Technology": 40.40, "Financials": 20.20, "Health Care": 15.15,
+                                    "Industrials": 15.15, "Energy": 9.09}, c["settori"]
+        assert r2(c["paesi"]) == {"US": 50.51, "JP": 15.15, "GB": 15.15, "KR": 10.10, "CA": 9.09}, c["paesi"]
+        assert abs(c["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and c["avvisi"] == [], c
+    assert list(en["settori"]) == list(it["settori"]) and en["settori"] == it["settori"]   # stesso ordine e valori
+    assert list(en["settori"])[0] == "Information Technology"                             # peso decrescente
+    tmp = tempfile.mkdtemp()
+    try:
+        x = m.componi(_xlsx_emittente("xtrackers", tmp), "X")
+        assert x["emittente"] == "xtrackers" and x["data_posizioni"] == "2026-10-25" and x["titoli"] == 5, x
+        assert r2(x["settori"]) == {"Information Technology": 41.24, "Financials": 25.77, "Health Care": 20.62,
+                                    "Materials": 12.37}, x["settori"]
+        assert r2(x["paesi"]) == {"US": 40.40, "JP": 25.25, "DE": 22.22, "CH": 12.12}, x["paesi"]
+        assert abs(x["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9
+        assert abs(x["esclusi"]["settore_non_classificato"] - 0.02) < 1e-9 and x["esclusi"]["paese_non_classificato"] == 0
+        s = m.componi(_xlsx_emittente("spdr", tmp), "S")
+        assert s["emittente"] == "spdr" and s["data_posizioni"] == "2026-10-22", s
+        assert s["colonne"]["settore"] == "Sector Classification" and s["colonne"]["paese"] == "Trade Country Name"
+        assert r2(s["settori"]) == {"Information Technology": 52.63, "Consumer Discretionary": 31.58,
+                                    "Communication Services": 15.79}, s["settori"]
+        assert r2(s["paesi"]) == {"US": 52.63, "TW": 31.58, "HK": 15.79}, s["paesi"]
+        assert abs(s["esclusi"]["liquidita_derivati"] - 0.0004) < 1e-9, s["esclusi"]
+        assert any("non classificat" in a and "5%" in a for a in s["avvisi"]), s["avvisi"]   # 5,04% > 5%
+        v = m.componi(_xlsx_emittente("vanguard", tmp), "V")
+        assert v["emittente"] == "vanguard" and v["classificazione"] == "ICB" and v["settori"] == {}, v
+        assert r2(v["paesi"]) == {"US": 40.0, "JP": 30.0, "AU": 20.0, "FR": 10.0} and v["data_posizioni"] == "2026-09-30", v
+        assert any("ICB" in a for a in v["avvisi"]), v["avvisi"]
+        a = m.componi(_xlsx_emittente("amundi", tmp), "A")
+        assert a["emittente"] == "amundi" and a["data_posizioni"] == "2026-09-30", a
+        assert r2(a["settori"]) == {"Consumer Staples": 50.0, "Utilities": 30.0, "Real Estate": 20.0}, a["settori"]
+        assert r2(a["paesi"]) == {"FR": 50.0, "IT": 30.0, "NL": 20.0}, a["paesi"]
+        # riconoscimento: --emittente vince sul preambolo; dal nome del file; nessuno con colonne note → avviso
+        f = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "Z", "spdr")
+        assert f["riconosciuto_da"] == "--emittente" and f["emittente"] == "spdr"
+        g = os.path.join(tmp, "posizioni.csv")
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Country,Weight\nA,Energy,Italy,100\n")
+        c = m.componi(g, "G")
+        assert c["emittente"] is None and c["riconosciuto_da"] == "nessuno", c
+        assert any("regole generiche" in w for w in c["avvisi"]), c["avvisi"]
+        os.rename(g, os.path.join(tmp, "SWDA_holdings_ishares.csv"))
+        c = m.componi(os.path.join(tmp, "SWDA_holdings_ishares.csv"), "G")
+        assert c["riconosciuto_da"] == "nome del file" and c["emittente"] == "ishares", c
+        # ETF obbligazionario, settore vuoto ovunque → solo paesi, con l'avviso
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Asset Class,Location,Weight (%)\nBTP 2030,-,Fixed Income,Italy,60\n"
+                     "OAT 2031,-,Fixed Income,France,40\n")
+        c = m.componi(g, "B")
+        assert c["settori"] == {} and r2(c["paesi"]) == {"IT": 60.0, "FR": 40.0}, c
+        assert any("settore" in w for w in c["avvisi"]), c["avvisi"]
+        # liquidità sopra il 5% → avviso; Telecommunication Services → Communication Services con avviso
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Asset Class,Location,Weight (%)\nA,Telecommunication Services,Equity,Italy,94\n"
+                     "CASH,Cash and/or Derivatives,Cash,Italy,6\n")
+        c = m.componi(g, "C")
+        assert c["settori"] == {"Communication Services": 1.0}, c["settori"]
+        assert any("liquidit" in w for w in c["avvisi"]) and any("Telecommunication" in w for w in c["avvisi"]), c["avvisi"]
+        # sotto le soglie nessun avviso (l'iShares sopra: 1% di liquidità)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    assert m.SETTORI_GICS == carica_modulo(asset(*CU)).SETTORI_GICS
+
+
+@test("T16 composizione ETF: nomi sconosciuti, somme incoerenti e classificazione mista respinti")
+def t_ce_errori():
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Energy;100\n")
+        prima = (open(out, encoding="utf-8").read(), os.path.getmtime(out))
+        casi = (
+            ("Name,Sector,Location,Weight (%)\nA,Spazio,Atlantide,30\nB,Energy,Lemuria,20\nC,Energy,Italy,50\n",
+             ("Atlantide", "Lemuria", "Spazio", "segnala")),
+            ("Name,Sector,Location,Weight (%)\nA,Energy,Italy,40\nB,Energy,France,20\n", ("sommano a 60",)),
+            ("Name,Sector,Location,Weight (%)\nA,Energy,Italy,abc\nB,Energy,France,100\n", ("abc", "riga")),
+            ("Name,Sector,Location,Weight (%)\nA,Technology,Italy,50\nB,Information Technology,France,50\n", ("mista",)),
+            ("Name,Sector,Asset Class,Location,Weight (%)\nCASH,Cash and/or Derivatives,Cash,Italy,100\n", ("nessuna riga",)),
+        )
+        for n, (testo, attesi) in enumerate(casi):
+            p = os.path.join(tmp, f"caso{n}.csv")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(testo)
+            rc, so, se = run_script_split(asset(*CE), "--file", p, "--strumento", "X", "--out", out, cwd=tmp)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and "Traceback" not in se, (n, rc, se[-400:])
+            assert "ERRORE:" not in so, (n, so[-200:])
+            for parola in attesi:
+                assert parola in se, (n, parola, se[-400:])
+            assert (open(out, encoding="utf-8").read(), os.path.getmtime(out)) == prima, n
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
 
 def _righe_csv_ordini(cartella):
