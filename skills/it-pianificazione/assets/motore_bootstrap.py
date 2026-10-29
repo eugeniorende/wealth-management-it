@@ -170,7 +170,8 @@ def cli(descrizione, spazio=None, argomenti=(), json=False, da_json=None, argv=N
         finti_argv = [ap.prog]
         for espr in args.set:
             finti_argv += ["--set", espr]
-        applica_override(spazio, finti_argv)
+        # con --json - stdout è il JSON: l'elenco degli override va su stderr
+        applica_override(spazio, finti_argv, sys.stderr if json and args.json == "-" else None)
     return args
 
 
@@ -267,7 +268,7 @@ def pctl(a, p):
     return float(np.percentile(a, p))
 
 
-def applica_override(spazio, argv=None):
+def applica_override(spazio, argv=None, flusso=None):
     """Override '--set NOME=VALORE' delle costanti top-level, senza modificare il file.
 
     Mantiene il pattern "costanti in testa allo script" aggiungendo la via non
@@ -279,7 +280,8 @@ def applica_override(spazio, argv=None):
       costante numerica non accetta una stringa (RAL_ATTUALE=abc → ERRORE, rc 1)
     - dagli script si usa tramite cli(), che raccoglie i --set con argparse e li passa
       qui; chiamato da solo legge e RIMUOVE i --set da argv
-    Gli override applicati vengono stampati: il run resta documentato e ripetibile.
+    Gli override applicati vengono stampati: il run resta documentato e ripetibile. Su stdout, o su `flusso`:
+    cli() passa stderr quando stdout è riservato al JSON (`--json -`).
     """
     if argv is None:
         argv = sys.argv
@@ -310,7 +312,7 @@ def applica_override(spazio, argv=None):
         spazio[nome] = nuovo
         applicati.append(f"{nome}={spazio[nome]!r}")
     if applicati:
-        print("[override] " + ", ".join(applicati))
+        print("[override] " + ", ".join(applicati), file=flusso or sys.stdout)
     return applicati
 
 

@@ -31,8 +31,9 @@ python "${CLAUDE_SKILL_DIR}/assets/capitale-umano.py" --dati capitale-umano.json
 - `--strumento` va scritto **esattamente** come il campo `strumento` delle posizioni nel JSON del capitale umano (maiuscole e spazi compresi). Se non coincide, lo strumento finisce tra quelli «senza composizione» e il report del capitale umano lo elenca per nome.
 - Se `composizione.csv` esiste già, si sostituiscono solo le righe degli strumenti importati; le altre, comprese quelle compilate a mano, restano. Un file nel vecchio formato `strumento;settore;peso` viene convertito nel nuovo, con gli stessi pesi.
 - `--emittente ishares|xtrackers|vanguard|amundi|spdr` forza la scheda dell'emittente quando il riconoscimento automatico (dal preambolo del file o dal suo nome) non basta.
-- `--json FILE` scrive anche il risultato strutturato (pesi in frazione); `--json -` lo stampa da solo su stdout.
-- Un errore (file sbagliato, nome sconosciuto, pesi che non tornano) ferma lo script con `ERRORE:` e lascia `composizione.csv` com'era.
+- `--json FILE` scrive anche il risultato strutturato (pesi in frazione); `--json -` lo stampa da solo su stdout (gli eventuali `--set` si annotano su stderr).
+- Un errore (file sbagliato, nome sconosciuto, pesi che non tornano, `--out` o `--json` in una cartella che non esiste) ferma lo script con `ERRORE:` prima di scrivere: `composizione.csv` resta com'era e il JSON non nasce.
+- `--set` cambia le tabelle in testa allo script (per esempio `--set "VALORI_LIQUIDITA=('cash', 'margin')"`); serve una tupla, con la virgola finale anche per un solo nome: `('cash',)`.
 
 ## Dove si scarica il file delle posizioni
 
@@ -56,7 +57,8 @@ Si escludono, con la quota riportata nel report e nel commento del CSV:
 
 1. **liquidità e derivati**: asset class o settore come `Cash`, `Cash and/or Derivatives`, `Futures`, `FX`, `Forward`, `Swap`, `Liquidità`, e ogni riga con **peso negativo** (contratti di cambio). Escluse da settori e paesi;
 2. **righe non classificate**, separatamente per dimensione: `unknown`, `Unassigned`, `-`, `Other`, «European Union», «Supranational». Una riga con il paese e senza settore conta nei paesi;
-3. le righe con peso `N/A`, che non hanno peso.
+3. le righe con peso `N/A`, che non hanno peso;
+4. **il settore delle obbligazioni**: per le righe con asset class a reddito fisso (`Fixed Income`, `Bond`, `Reddito fisso`, `Obbligazioni`) il settore è quello di una tassonomia obbligazionaria («Treasuries», «Banking», «Titoli di Stato»), non GICS: non entra nei settori, mentre il paese conta. Un ETF obbligazionario dà quindi solo i paesi, uno misto i settori della sua parte azionaria; la quota sta nel commento come «obbligazioni senza settore GICS».
 
 I pesi rimasti si **rinormalizzano a 100** per dimensione. Se meno della metà dei titoli ha il settore (o il paese), quella dimensione non si scrive: il 3% del fondo rinormalizzato a 100 descriverebbe un fondo che non esiste. Avvisi: righe non classificate oltre il 5% del fondo in una dimensione; liquidità e derivati oltre il 5% (per un ETF sintetico il file può contenere il paniere di collaterale e non l'esposizione); emittente non riconosciuto; «Telecommunication Services» (GICS prima del 2018) letto come Communication Services.
 
@@ -88,7 +90,7 @@ UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decima
 ## Limiti
 
 - **Posizioni del fondo, non dell'indice**: un ETF a replica campionaria espone posizioni diverse dall'indice; un ETF sintetico (swap) può pubblicare il paniere di collaterale.
-- **Fotografia a una data**: la composizione cambia; la data delle posizioni è nel commento del CSV e va riguardata a ogni revisione annuale.
+- **Fotografia a una data**: la composizione cambia; la data delle posizioni è nel commento del CSV e va riguardata a ogni revisione annuale. Una data numerica sotto un'etichetta inglese con giorno e mese entrambi fino a 12 («Holdings as of 03/04/2026») è ambigua tra il formato britannico e quello statunitense: non si scrive, con un avviso. Con un numero oltre il 12 («10/24/2026») o un'etichetta italiana («Posizioni al») la data si legge senza dubbi.
 - **Solo GICS** per i settori; nessuna conversione da ICB.
 - **Paese secondo l'emittente**: domicilio, paese di rischio o di negoziazione, a seconda del file; il report dice quale colonna ha letto.
 - Lingue: italiano e inglese. Niente PDF né XLS del vecchio Excel: si esporta in XLSX o CSV.

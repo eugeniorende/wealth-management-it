@@ -5424,6 +5424,133 @@ def t_ce_revisione():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T16 composizione ETF: il report dice «1 strumento importato» e nomina le colonne senza chiavi tecniche")
+def t_ce_report():
+    tmp = tempfile.mkdtemp()
+    try:
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", cwd=tmp)
+        assert rc == 0, se[-300:]
+        assert "1 strumento importato" in so and "1 strumenti" not in so, so[-400:]
+        assert "asset class «Asset Class»" in so and "asset_class «" not in so, so
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--file", en, "--strumento", "B",
+                                      cwd=tmp)
+        assert rc == 0 and "2 strumenti importati" in so, (so[-400:], se[-300:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: --out e --json verificati prima di scrivere, nessuno dei due a metà")
+def t_ce_destinazioni():
+    tmp = tempfile.mkdtemp()
+    try:
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Energy;100\n")
+        prima = open(out, encoding="utf-8").read()
+        # --json in una cartella che non esiste: composizione.csv resta com'era
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B", "--out", out,
+                                      "--json", os.path.join(tmp, "non-esiste", "c.json"), cwd=tmp)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, se[-300:]
+        assert "Traceback" not in se and open(out, encoding="utf-8").read() == prima
+        # --out in una cartella che non esiste: il JSON non nasce
+        pj = os.path.join(tmp, "c.json")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B",
+                                      "--out", os.path.join(tmp, "non-esiste", "c.csv"), "--json", pj, cwd=tmp)
+        assert rc == 1 and "impossibile scrivere" in se and not os.path.exists(pj), se[-300:]
+        # --out che è una cartella: errore chiaro, niente traceback
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B", "--out", tmp, cwd=tmp)
+        assert rc == 1 and "cartella" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: data delle posizioni giorno/mese o mese/giorno, l'ambigua non si scrive")
+def t_ce_date():
+    m = carica_modulo(asset(*CE))
+    tmp = tempfile.mkdtemp()
+    try:
+        g = os.path.join(tmp, "posizioni.csv")
+        casi = (("Fund Holdings as of,10/24/2026", ",", "2026-10-24", False),   # mese/giorno, file statunitense
+                ("Fund Holdings as of,24/10/2026", ",", "2026-10-24", False),   # giorno/mese, file britannico
+                ("Fund Holdings as of,03/04/2026", ",", None, True),            # inglese e ambigua: non si indovina
+                ("Posizioni al;03/04/2026", ";", "2026-04-03", False))          # etichetta italiana: giorno/mese
+        for preambolo, sep, attesa, ambigua in casi:
+            with open(g, "w", encoding="utf-8") as f:
+                f.write(f"{preambolo}\n\n{sep.join(['Name', 'Sector', 'Location', 'Weight (%)'])}\n"
+                        f"{sep.join(['A', 'Energy', 'Italy', '100'])}\n")
+            c = m.componi(g, "D")
+            assert c["data_posizioni"] == attesa, (preambolo, c["data_posizioni"])
+            assert any("ambigua" in a for a in c["avvisi"]) is ambigua, (preambolo, c["avvisi"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: ETF obbligazionari con settori propri, solo paesi e la parte azionaria dei misti")
+def t_ce_obbligazioni():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    tmp = tempfile.mkdtemp()
+    try:
+        g = os.path.join(tmp, "posizioni.csv")
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nBTP 2030,Treasuries,Fixed Income,Italy,50\n"
+                    "OAT 2031,Government,Fixed Income,France,30\nBANCA 2029,Banking,Fixed Income,Germany,20\n")
+        c = m.componi(g, "O")
+        assert c["settori"] == {} and r2(c["paesi"]) == {"IT": 50.0, "FR": 30.0, "DE": 20.0}, c
+        assert abs(c["esclusi"]["settore_obbligazionario"] - 1.0) < 1e-9, c["esclusi"]
+        assert c["esclusi"]["settore_non_classificato"] == 0, c["esclusi"]
+        assert any("obbligazionar" in a and "settore" in a for a in c["avvisi"]), c["avvisi"]
+        assert not any("sopra la soglia" in a for a in c["avvisi"]), c["avvisi"]
+        # misto 60/40 dal sito italiano: i settori sono quelli della parte azionaria
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Nome;Settore;Asset class;Area geografica;Ponderazione (%)\n"
+                    "ALPHA;Informatica;Azionario;Stati Uniti;60,0\nBTP;Titoli di Stato;Reddito fisso;Italia;40,0\n")
+        c = m.componi(g, "M")
+        assert c["settori"] == {"Information Technology": 1.0} and r2(c["paesi"]) == {"US": 60.0, "IT": 40.0}, c
+        assert abs(c["esclusi"]["settore_obbligazionario"] - 0.4) < 1e-9, c["esclusi"]
+        assert "obbligazioni" in m.righe_strumento(c, "29/10/2026")[0], m.righe_strumento(c, "29/10/2026")[0]
+        # un settore sconosciuto su un titolo azionario resta un errore
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nA,Treasuries,Equity,Italy,100\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", g, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "Treasuries" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: --set sulle tabelle ha effetto, una tupla senza virgola è respinta, --json - resta JSON")
+def t_ce_set():
+    tmp = tempfile.mkdtemp()
+    try:
+        v = os.path.join(tmp, "v.csv")
+        with open(v, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Location,Weight (%)\nA,Telecommunications,Italy,60\nB,Financials,France,40\n")
+        # una tupla (anche con le maiuscole) al posto dell'insieme di default: niente traceback, stessa classificazione
+        rc, so, se = run_script_split(asset(*CE), "--file", v, "--strumento", "V", "--json", "-",
+                                      "--set", "NOMI_ICB_ESCLUSIVI=('Telecommunications',)", cwd=tmp)
+        assert rc == 0 and "Traceback" not in se, se[-400:]
+        d = json.loads(so)                                   # stdout è solo JSON: l'override va su stderr
+        assert d["strumenti"][0]["classificazione"] == "ICB" and "[override]" in se, (d, se)
+        # la stringa al posto della tupla (manca la virgola finale) è il refuso più comune
+        rc, so, se = run_script_split(asset(*CE), "--file", v, "--strumento", "V",
+                                      "--set", "NOMI_ICB_ESCLUSIVI=('telecommunications')", cwd=tmp)
+        assert rc == 1 and "tupla" in se and "Traceback" not in se, se[-300:]
+        # ETICHETTE_DATA vale anche per un emittente riconosciuto
+        p = os.path.join(tmp, "i.csv")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("iShares Core MSCI World UCITS ETF\nValido al;30/09/2026\n\n"
+                    "Nome;Settore;Area geografica;Ponderazione (%)\nA;Energia;Italia;100,0\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", p, "--strumento", "I", "--json", "-",
+                                      "--set", "ETICHETTE_DATA=('valido al',)", cwd=tmp)
+        assert rc == 0, se[-300:]
+        s = json.loads(so)["strumenti"][0]
+        assert s["emittente"] == "ishares" and s["data_posizioni"] == "2026-09-30", s
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
 
 def _righe_csv_ordini(cartella):

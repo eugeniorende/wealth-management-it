@@ -19,6 +19,7 @@ nomi diversi, segnala i nomi da aggiungere: lo script si ferma e li elenca, non 
 Regole applicate (references/composizione-etf.md):
 - liquidità e derivati (asset class «Cash», «Futures», «FX»…, o peso negativo) si escludono da tutto;
 - le righe senza settore o senza paese («unknown», «Unassigned», «-») si escludono solo da quella dimensione;
+- per le obbligazioni (asset class «Fixed Income», «Reddito fisso»…) il settore non è GICS: contano solo nei paesi;
 - i pesi rimasti si rinormalizzano a 100 per dimensione; la quota esclusa è nel report, nel CSV e nel JSON;
 - settori: gli 11 GICS con il nome inglese, come in capitale-umano.py; paesi: codice ISO 3166-1 alpha-2;
 - un file in classificazione ICB (FTSE) dà solo i paesi: ICB → GICS non si converte senza errore.
@@ -369,6 +370,10 @@ PAESI = {codice: (italiano, tuple(varianti.split("|")))
 VALORI_LIQUIDITA = ("cash", "cash and/or derivatives", "cash and derivatives", "cash collateral and margins",
                     "money market", "fx", "futures", "future", "forward", "forwards", "swap", "swaps",
                     "liquidità", "liquidità e/o derivati", "derivati", "contanti")
+# Asset class a reddito fisso: il settore di un'obbligazione («Treasuries», «Banking», «Titoli di Stato») non è
+# GICS e non entra nei settori; il paese sì. Così un ETF obbligazionario dà i paesi e uno misto i settori azionari.
+VALORI_OBBLIGAZIONARI = ("fixed income", "bond", "bonds", "obbligazionario", "obbligazioni", "obbligazione",
+                         "reddito fisso", "titoli a reddito fisso")
 # Settore o paese assente: la riga resta nell'altra dimensione
 # («European Union», «Supranational»: emittenti sovranazionali o liquidità in euro, nessun paese ISO; «NA» qui è
 # un segnaposto, non la Namibia, come nei pesi)
@@ -381,20 +386,20 @@ VALORI_NON_CLASSIFICATI = ("unknown", "unassigned", "other", "-", "n/a", "na", "
 ETICHETTE_DATA = ("fund holdings as of", "holdings as of", "as of", "posizioni al", "dati al")
 SCHEDE = {
     "ishares": {"nome": "iShares", "riconosci": ("ishares", "blackrock"), "classificazione": "GICS",
-                "etichette_data": ETICHETTE_DATA, "data_nel_foglio": False, "liquidita": (),
+                "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
                 "verificato": "da confermare"},
     "xtrackers": {"nome": "Xtrackers", "riconosci": ("xtrackers", "dws"), "classificazione": "GICS",
-                  "etichette_data": ETICHETTE_DATA, "data_nel_foglio": True, "liquidita": ("warrants",),
+                  "etichette_extra": (), "data_nel_foglio": True, "liquidita": ("warrants",),
                   "verificato": "2026-10, file reale (sito britannico, XLSX)"},
     # Vanguard: GICS o ICB secondo l'indice (FTSE usa ICB); finché un file reale non lo conferma, dai nomi
     "vanguard": {"nome": "Vanguard", "riconosci": ("vanguard",), "classificazione": None,
-                 "etichette_data": ETICHETTE_DATA + ("as at",), "data_nel_foglio": False, "liquidita": (),
+                 "etichette_extra": ("as at",), "data_nel_foglio": False, "liquidita": (),
                  "verificato": "da confermare"},
     "amundi": {"nome": "Amundi", "riconosci": ("amundi", "lyxor"), "classificazione": "GICS",
-               "etichette_data": ETICHETTE_DATA, "data_nel_foglio": False, "liquidita": (),
+               "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
                "verificato": "da confermare"},
     "spdr": {"nome": "SPDR", "riconosci": ("spdr", "state street", "ssga"), "classificazione": "GICS",
-             "etichette_data": ETICHETTE_DATA, "data_nel_foglio": False, "liquidita": (),
+             "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
              "verificato": "2026-10, file reale (sito EMEA, XLSX)"},
 }
 
@@ -500,8 +505,18 @@ def trova_intestazione(righe):
            "posizioni (holdings), non la scheda prodotto né il KID")
 
 
+def _tabella(nome):
+    """Una tabella in testa allo script (SEGNAPOSTO, VALORI_LIQUIDITA, NOMI_ICB_ESCLUSIVI…), letta al momento
+    dell'uso così che --set abbia effetto, e normalizzata. Una stringa al posto della tupla è il refuso più
+    comune: --set "NOME=('a')" senza la virgola finale darebbe le singole lettere."""
+    valore = globals()[nome]
+    if isinstance(valore, str) or not isinstance(valore, (tuple, list, set, frozenset)):
+        errore(f"--set {nome}: serve una tupla di nomi, per esempio ('{valore}',) con la virgola finale")
+    return {normalizza(v) for v in valore}
+
+
 def _segnaposto(cella):
-    return normalizza(cella) in {normalizza(s) for s in SEGNAPOSTO}
+    return normalizza(cella) in _tabella("SEGNAPOSTO")
 
 
 def _sembra_numero(cella):
@@ -574,9 +589,16 @@ MESI = {"jan": 1, "gen": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "mag": 5, "j
         "lug": 7, "aug": 8, "ago": 8, "sep": 9, "set": 9, "oct": 10, "ott": 10, "nov": 11, "dec": 12, "dic": 12}
 
 
-def _data(valore):
+class DataAmbigua(Exception):
+    """Una data numerica con giorno e mese entrambi fino a 12 sotto un'etichetta inglese: «03/04/2026» è il
+    3 aprile nel Regno Unito e il 4 marzo negli Stati Uniti, e il file non dice quale dei due."""
+
+
+def _data(valore, giorno_prima=True):
     """Una data da una cella: datetime di openpyxl, «2026-09-30», «30/09/2026», «30/set/2026», «22-Oct-2026»,
-    «30 Sep 2026», «Sep 30, 2026». None se la cella non ne contiene una."""
+    «30 Sep 2026», «Sep 30, 2026». None se la cella non ne contiene una. Una data numerica si legge giorno/mese,
+    o mese/giorno se il secondo numero supera 12 («10/24/2026»); con entrambi fino a 12 vale giorno_prima,
+    e senza (etichetta inglese) solleva DataAmbigua."""
     if isinstance(valore, (datetime.datetime, datetime.date)):
         return valore.strftime("%Y-%m-%d")
     testo = str(valore or "")
@@ -586,7 +608,13 @@ def _data(valore):
         tentativi.append((int(m[1]), int(m[2]), int(m[3])))
     m = re.search(r"\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b", testo)
     if m:
-        tentativi.append((int(m[3]), int(m[2]), int(m[1])))
+        primo, secondo, anno = int(m[1]), int(m[2]), int(m[3])
+        if primo > 12 or (secondo <= 12 and giorno_prima):
+            tentativi.append((anno, secondo, primo))
+        elif secondo > 12:
+            tentativi.append((anno, primo, secondo))
+        elif not tentativi:
+            raise DataAmbigua(m[0])
     m = re.search(r"\b(\d{1,2})[\s/.-]+([A-Za-z]{3})[A-Za-z]*\.?[\s/.,-]+(\d{4})\b", testo)
     if m and m[2].lower() in MESI:
         tentativi.append((int(m[3]), MESI[m[2].lower()], int(m[1])))
@@ -602,19 +630,29 @@ def _data(valore):
 
 
 def data_posizioni(preambolo, titolo_foglio, scheda):
-    """La data delle posizioni in ISO, se il file la riporta: nel titolo del foglio (Xtrackers) o accanto a
-    un'etichetta del preambolo («Fund Holdings as of», «Posizioni al»…), nella stessa cella o nella successiva."""
+    """(data delle posizioni in ISO o None, avviso o None), se il file la riporta: nel titolo del foglio
+    (Xtrackers) o accanto a un'etichetta del preambolo («Fund Holdings as of», «Posizioni al»…), nella stessa
+    cella o nella successiva. Sotto un'etichetta inglese («… as of», «as at») una data come 03/04/2026 è ambigua:
+    meglio nessuna data che una sbagliata."""
     if scheda and scheda["data_nel_foglio"] and _data(titolo_foglio):
-        return _data(titolo_foglio)
-    etichette = scheda["etichette_data"] if scheda else ETICHETTE_DATA
+        return _data(titolo_foglio), None
+    etichette = _tabella("ETICHETTE_DATA") | {normalizza(e) for e in (scheda["etichette_extra"] if scheda else ())}
     for riga in preambolo:
         for j, cella in enumerate(riga):
             n = normalizza(cella)
-            if any(n == e or n.startswith(e + " ") for e in etichette):
-                for candidata in [cella] + [c for c in riga[j + 1:] if not _vuota(c)][:1]:
-                    if _data(candidata):
-                        return _data(candidata)
-    return None
+            etichetta = next((e for e in etichette if n == e or n.startswith(e + " ")), None)
+            if etichetta is None:
+                continue
+            inglese = etichetta.split()[-1] in ("of", "at", "on")
+            for candidata in [cella] + [c for c in riga[j + 1:] if not _vuota(c)][:1]:
+                try:
+                    data = _data(candidata, giorno_prima=not inglese)
+                except DataAmbigua as e:
+                    return None, (f"data delle posizioni ambigua («{e}»: giorno/mese o mese/giorno?), non scritta: "
+                                  "controllala sul sito dell'emittente")
+                if data:
+                    return data, None
+    return None, None
 
 
 # ── Composizione di un file ─────────────────────────────────────────────────
@@ -658,9 +696,11 @@ def componi(path, strumento, forzato=None):
         errore(f"{file}: i pesi sommano a {numero(totale, 2)}, né circa 1 né circa 100: file troncato o colonna sbagliata?")
 
     # le tabelle si leggono qui e non all'import: --set VALORI_LIQUIDITA=… ha effetto
-    liquidita = {normalizza(v) for v in tuple(VALORI_LIQUIDITA) + (scheda["liquidita"] if scheda else ())}
-    non_classificati = {normalizza(v) for v in VALORI_NON_CLASSIFICATI}
-    esclusi = {"liquidita_derivati": 0.0, "settore_non_classificato": 0.0, "paese_non_classificato": 0.0}
+    liquidita = _tabella("VALORI_LIQUIDITA") | {normalizza(v) for v in (scheda["liquidita"] if scheda else ())}
+    non_classificati = _tabella("VALORI_NON_CLASSIFICATI")
+    obbligazionari = _tabella("VALORI_OBBLIGAZIONARI")
+    esclusi = {"liquidita_derivati": 0.0, "settore_obbligazionario": 0.0, "settore_non_classificato": 0.0,
+               "paese_non_classificato": 0.0}
     grezzi = {"settore": [], "paese": []}            # (nome normalizzato, nome originale, peso) per dimensione
     n_titoli = 0
     for r, peso in titoli:
@@ -673,6 +713,9 @@ def componi(path, strumento, forzato=None):
         for dim, _ in _DIMENSIONI:
             if dim not in col:
                 continue
+            if dim == "settore" and classe in obbligazionari:
+                esclusi["settore_obbligazionario"] += peso
+                continue
             valore = cella(r, dim)
             if normalizza(valore) in non_classificati:
                 esclusi[f"{dim}_non_classificato"] += peso
@@ -683,7 +726,7 @@ def componi(path, strumento, forzato=None):
     nomi_settori = {n for n, _, _ in grezzi["settore"]}
     classificazione = scheda["classificazione"] if scheda and scheda["classificazione"] else None
     if classificazione is None:
-        icb, gics = nomi_settori & NOMI_ICB_ESCLUSIVI, nomi_settori & NOMI_GICS_ESCLUSIVI
+        icb, gics = nomi_settori & _tabella("NOMI_ICB_ESCLUSIVI"), nomi_settori & _tabella("NOMI_GICS_ESCLUSIVI")
         if icb and gics:
             errore(f"{file}: classificazione mista GICS e ICB nei settori ({', '.join(sorted(icb | gics))}): "
                    "controlla di aver scaricato un solo fondo")
@@ -737,17 +780,25 @@ def componi(path, strumento, forzato=None):
         elif dim in scartate:
             avvisi.append(f"solo {pct(scartate[dim], 2)} dei titoli ha il {dim}, meno del "
                           f"{numero(SOGLIA_CLASSIFICATI * 100)}%: {plurale} non scritti, quella quota non descrive il fondo")
-        elif not risultato[plurale] and not (dim == "settore" and classificazione == "ICB"):
+        elif not risultato[plurale] and not (dim == "settore" and (classificazione == "ICB"
+                                                                   or esclusi["settore_obbligazionario"] > 0)):
             avvisi.append(f"nessun titolo con il {dim}: {plurale} non scritti")
         if esclusi[f"{dim}_non_classificato"] > SOGLIA_AVVISO:
             avvisi.append(f"{dim} non classificato per {pct(esclusi[f'{dim}_non_classificato'], 2)} del fondo, sopra "
                           f"la soglia del 5%: i pesi per {dim} descrivono solo il resto")
+    if esclusi["settore_obbligazionario"] > 0:
+        avvisi.append(f"titoli obbligazionari per {pct(esclusi['settore_obbligazionario'], 2)} del fondo: il loro "
+                      "settore non è GICS e non entra nei settori" + ("" if risultato["settori"] else
+                                                                         ", quindi settori non scritti"))
     if esclusi["liquidita_derivati"] > SOGLIA_AVVISO:
         avvisi.append(f"liquidità e derivati pesano {pct(esclusi['liquidita_derivati'], 2)}, sopra il 5%: per un ETF "
                       "sintetico il file può contenere il paniere di collaterale, non l'esposizione")
 
+    data, avviso_data = data_posizioni(righe[:i], foglio, scheda)
+    if avviso_data:
+        avvisi.append(avviso_data)
     return {"strumento": strumento, "emittente": chiave, "riconosciuto_da": riconosciuto_da, "file": file,
-            "data_posizioni": data_posizioni(righe[:i], foglio, scheda), "classificazione": classificazione,
+            "data_posizioni": data, "classificazione": classificazione,
             "colonne": {k: v for k, v in testi.items() if k != "nome"}, "titoli": n_titoli, "esclusi": esclusi,
             "settori": risultato["settori"], "paesi": risultato["paesi"], "avvisi": avvisi}
 
@@ -840,7 +891,8 @@ def _esclusi(c):
     (un file reale ne ha spesso: righe di diritti o di valuta allo 0,0001%)."""
     quota = lambda x: pct(x, 2) if x >= 0.00005 else "< 0,01%"  # noqa: E731
     return [f"{etichetta} {quota(c['esclusi'][k])}" for k, etichetta in (
-        ("liquidita_derivati", "liquidità e derivati"), ("settore_non_classificato", "settore non classificato"),
+        ("liquidita_derivati", "liquidità e derivati"), ("settore_obbligazionario", "obbligazioni senza settore GICS"),
+        ("settore_non_classificato", "settore non classificato"),
         ("paese_non_classificato", "paese non classificato")) if c["esclusi"][k] > 0]
 
 
@@ -877,6 +929,18 @@ def scrivi_out(path, testa, blocchi, nuovi, oggi):
         errore(f"impossibile scrivere {path}: {e.strerror}")
 
 
+def verifica_destinazione(path, opzione):
+    """Prima di leggere o scrivere qualsiasi cosa: la destinazione è un file in una cartella che esiste ed è
+    scrivibile. Così un --json sbagliato non lascia composizione.csv già riscritto, né un --out sbagliato il JSON."""
+    if os.path.isdir(path):
+        errore(f"{opzione} {path}: è una cartella, serve il percorso di un file")
+    cartella = os.path.dirname(os.path.abspath(path))
+    if not os.path.isdir(cartella):
+        errore(f"impossibile scrivere {path}: la cartella {cartella} non esiste")
+    if not os.access(path if os.path.exists(path) else cartella, os.W_OK):
+        errore(f"impossibile scrivere {path}: permesso negato")
+
+
 # ── Report ──────────────────────────────────────────────────────────────────
 
 def stampa(composizioni, out, conservati, vecchio):
@@ -888,7 +952,7 @@ def stampa(composizioni, out, conservati, vecchio):
                 "nessuno": "regole generiche"}[c["riconosciuto_da"]]
         print(f"\n{c['strumento']} — {nome} ({come}), {c['file']}")
         data = f"posizioni al {_data_italiana(c['data_posizioni'])}" if c["data_posizioni"] else "data delle posizioni non indicata nel file"
-        colonne = ", ".join(f"{r} «{t}»" for r, t in c["colonne"].items())
+        colonne = ", ".join(f"{r.replace('_', ' ')} «{t}»" for r, t in c["colonne"].items())
         print(f"   {data}; {c['titoli']} titoli; classificazione {c['classificazione']}; colonne lette: {colonne}")
         print(f"   Esclusi: {', '.join(_esclusi(c)) or 'nessuno'}")
         if c["settori"]:
@@ -897,7 +961,8 @@ def stampa(composizioni, out, conservati, vecchio):
             print("   Paesi: " + " · ".join(f"{PAESI[k][0]} {pct(v, 2)}" for k, v in list(c["paesi"].items())[:5]))
         for a in c["avvisi"]:
             print(f"   ⚠️  {a}")
-    print(f"\nScritto {out}: {len(composizioni)} strumenti importati"
+    importati = "1 strumento importato" if len(composizioni) == 1 else f"{len(composizioni)} strumenti importati"
+    print(f"\nScritto {out}: {importati}"
           + (f"; conservati senza modifiche: {', '.join(conservati)}" if conservati else ""))
     if vecchio:
         print("   Il file esistente era nel vecchio formato strumento;settore;peso: convertito nel nuovo, stessi pesi.")
@@ -925,6 +990,9 @@ def main():
         args.parser.error(f"--strumento ripetuto: {', '.join(doppi)}")
 
     # tutto letto e validato prima di scrivere: un errore lascia composizione.csv com'era
+    verifica_destinazione(args.out, "--out")
+    if args.json and args.json != "-":
+        verifica_destinazione(args.json, "--json")
     testa, blocchi, vecchio = leggi_out(args.out)
     composizioni = [componi(path, strumento, args.emittente) for path, strumento in zip(args.file, args.strumento)]
     scrivi_out(args.out, testa, blocchi, composizioni, datetime.date.today().strftime("%d/%m/%Y"))
