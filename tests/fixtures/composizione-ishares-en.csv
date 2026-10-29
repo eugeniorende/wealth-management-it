@@ -1,0 +1,16 @@
+iShares Core MSCI World UCITS ETF
+Fund Holdings as of,"Sep 30, 2026"
+Inception Date,"Sep 25, 2009"
+Shares Outstanding,"1,000,000.00"
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Location,Exchange,Currency
+AAA,ALPHA CORP,Information Technology,Equity,"3,000.00",30.00,"3,000.00",United States,NASDAQ,USD
+BBB,BETA BANK,Financials,Equity,"2,000.00",20.00,"2,000.00",United States,New York Stock Exchange Inc.,USD
+CCC,GAMMA PHARMA,Health Care,Equity,"1,500.00",15.00,"1,500.00",Japan,Tokyo Stock Exchange,JPY
+DDD,DELTA INDUSTRIES,Industrials,Equity,"1,500.00",15.00,"1,500.00",United Kingdom,London Stock Exchange,GBP
+EEE,EPSILON SOFT,Information Technology,Equity,"1,000.00",10.00,"1,000.00","Korea (South)",Korea Exchange,KRW
+FFF,ZETA ENERGY,Energy,Equity,900.00,9.00,900.00,Canada,Toronto Stock Exchange,CAD
+USD,USD CASH,Cash and/or Derivatives,Cash,80.00,0.80,80.00,United States,-,USD
+ESZ6,S&P500 EMINI DEC 26,Cash and/or Derivatives,Futures,20.00,0.20,"5,000.00",United States,Chicago Mercantile Exchange,USD
+
+"The content contained herein is owned or licensed by BlackRock and/or its third-party information providers."

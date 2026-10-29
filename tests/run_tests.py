@@ -12,8 +12,10 @@ regressione di un bug reale), non l'output cosmetico. La suite protegge i
 refactor: se passa, la meccanica di calcolo non è cambiata.
 """
 
+import csv
 import glob
 import importlib.util
+import io
 import json
 import os
 import re
@@ -339,6 +341,7 @@ SCRIPT_CLI = [
     ("it-pianificazione-obiettivi", "allocatore-capitale.py"),
     ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
     ("it-pianificazione-obiettivi", "capitale-umano.py"),
+    ("it-pianificazione-obiettivi", "importa-composizione-etf.py"),
     ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
@@ -353,6 +356,8 @@ ARGOMENTI_DEFAULT = {
                               os.path.join(FIXTURES, "storico-fondo-test.csv")),
     "importa-estratto-broker.py": (os.path.join(FIXTURES, "estratto-broker-test.csv"),),
     "genera-cruscotto.py": ("--from", os.path.join(FIXTURES, "cruscotto-allocatore.json")),
+    "importa-composizione-etf.py": ("--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                    "--strumento", "ETF MSCI World"),
 }
 _OUTPUT_CP1252 = {}
 
@@ -375,7 +380,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 16 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 17 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -408,6 +413,8 @@ def t_cli_help():
     errore_pulito(asset("it-pianificazione", "proiezione-inps.py"), "--json", "/non/esiste/x.json", atteso="impossibile scrivere")
     errore_pulito(asset("it-revisione", "genera-ips.py"), os.path.join(tempfile.gettempdir(), "cartella-inesistente", "x.docx"), atteso="impossibile scrivere")
     errore_pulito(asset("it-tax-optimization", "importa-estratto-broker.py"), "/non/esiste.csv", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione-obiettivi", "importa-composizione-etf.py"), "--file", "/non/esiste.csv",
+                  "--strumento", "X", atteso="non trovato")
     # niente abbreviazioni dei flag: «--se» non è «--set»
     rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--se", "RAL_FINALE_LORDA=1")
     assert rc == 2 and "usage:" in out, (rc, out[-200:])
@@ -422,9 +429,11 @@ def t_cli_utf8():
         assert rc == 0, f"{nome} da una cartella esterna con cp1252: rc {rc}, {out[-400:]}"
         assert "UnicodeEncodeError" not in out and "Traceback" not in out, f"{nome}: {out[-400:]}"
         assert "serie storica non trovata" not in out, f"{nome}: serie storica non trovata"
-        # lo stdout resta UTF-8: ogni script stampa almeno un «€», e senza reconfigure il simbolo
-        # uscirebbe in cp1252 (qui decodificato come «\ufffd») anche dove non va in crash
-        assert "€" in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
+        # lo stdout resta UTF-8: ogni script stampa almeno un «€» (l'importatore della composizione, che non
+        # stampa importi, una «à»), e senza reconfigure il carattere uscirebbe in cp1252 (qui decodificato
+        # come «\ufffd») anche dove non va in crash
+        carattere = "à" if nome == "importa-composizione-etf.py" else "€"
+        assert carattere in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
     # nessuna open() senza encoding negli script e nel runner: su Windows leggerebbero in cp1252
     cartelle = [os.path.join(SKILLS, s, "assets") for s in sorted(os.listdir(SKILLS))] + \
                [os.path.join(ROOT, "scripts"), os.path.join(ROOT, "tests")]
@@ -4977,6 +4986,567 @@ def t_cu_report():
         rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "r.json"), refuso), cwd=tmp)
         assert rc == 0 and "liquidta" in so and "persona.netto_anuo" in so, so[:1200]
         assert "_nota" not in so and "broker" not in so
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ═══════════════════════════ T16: composizione degli ETF ═══════════════════════════
+
+CE = ("it-pianificazione-obiettivi", "importa-composizione-etf.py")
+
+
+@test("T16 composizione ETF: lettura della tabella (intestazione, preambolo, fine, numeri, formati di file)")
+def t_ce_lettura():
+    m = carica_modulo(asset(*CE))
+    for nome, sep in (("composizione-ishares-en.csv", ","), ("composizione-ishares-it.csv", ";")):
+        righe, foglio = m.leggi_righe(os.path.join(FIXTURES, nome))
+        i, col, testi = m.trova_intestazione(righe)
+        assert i == 5 and foglio is None, (nome, i)
+        assert set(col) == {"peso", "settore", "paese", "asset_class", "nome"}, col
+        dati = m.righe_dati(righe, i, col["peso"])
+        assert len(dati) == 8, (nome, len(dati))                 # il disclaimer in fondo non entra
+        v = m.virgola_decimale([r[col["peso"]] for r in dati])
+        assert v is (sep == ";")
+        assert [m.peso_numerico(r[col["peso"]], v) for r in dati] == [30, 20, 15, 15, 10, 9, 0.8, 0.2]
+    assert testi["peso"] == "Ponderazione (%)" and testi["paese"] == "Area geografica"
+    assert m.peso_numerico("1.234,5", True) == 1234.5 and m.peso_numerico("1,234.5", False) == 1234.5
+    assert m.peso_numerico("4,46%", True) == 4.46 and m.peso_numerico("N/A", False) is None
+    assert m.peso_numerico(0.0565, False) == 0.0565
+    # precedenza tra due candidate: «Sector Classification» batte «Industry Classification»
+    _, col, testi = m.trova_intestazione([["ISIN", "Percent of Fund", "Trade Country Name",
+                                           "Industry Classification", "Sector Classification"]])
+    assert testi["settore"] == "Sector Classification" and col["settore"] == 4
+    tmp = tempfile.mkdtemp()
+    try:
+        # CSV risalvato da Excel italiano: cp1252, «;», righe di soli «;»
+        p = os.path.join(tmp, "excel.csv")
+        with open(p, "w", encoding="cp1252") as f:
+            f.write("Fondo;;;\nPosizioni al;30/09/2026;;\n;;;\nNome;Settore;Area geografica;Ponderazione (%)\n"
+                    "ALPHA;Informatica;Stati Uniti;60,0\nBETA;Sanità;Giappone;40,0\n;;;\n")
+        righe, _ = m.leggi_righe(p)
+        i, col, _ = m.trova_intestazione(righe)
+        assert i == 3 and len(m.righe_dati(righe, i, col["peso"])) == 2
+        assert righe[5][1] == "Sanità"
+        # XLSX con l'intestazione alla riga 4 e il titolo del foglio
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "2026-10-25"
+        ws.append([None])
+        ws.append(["Although information in this document…"])
+        ws.append([None])
+        ws.append([None, "Name", "ISIN", "Country", "Type of Security", "Industry Classification", "Weighting"])
+        ws.append([1, "ALPHA", "US0000000001", "United States", "Equities", "Information Technology", 0.6])
+        px = os.path.join(tmp, "x.xlsx")
+        wb.save(px)
+        righe, foglio = m.leggi_righe(px)
+        i, col, _ = m.trova_intestazione(righe)
+        assert foglio == "2026-10-25" and i == 3 and col["peso"] == 6
+        # errori: pagina HTML, file mancante, scheda prodotto, estensione
+        ph = os.path.join(tmp, "pagina.csv")
+        with open(ph, "w", encoding="utf-8") as f:
+            f.write("  <!DOCTYPE html><html><head><title>iShares</title></head></html>")
+        for percorso, atteso in ((ph, "pagina HTML"), ("/non/esiste.csv", "non trovato")):
+            rc, so, se = run_script_split(asset(*CE), "--file", percorso, "--strumento", "X", cwd=tmp)
+            assert rc == 1 and se.startswith("ERRORE:") and atteso in se and "Traceback" not in se, se[-300:]
+        ps = os.path.join(tmp, "scheda.csv")
+        with open(ps, "w", encoding="utf-8") as f:
+            f.write("Caratteristiche principali\nTER,0.20%\nValuta,USD\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", ps, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "file delle posizioni" in se and "TER" in se, se[-300:]
+        pp = os.path.join(tmp, "f.pdf")
+        with open(pp, "w", encoding="ascii") as f:    # non «wb»: t_cli_utf8 vuole encoding= o «rb» in ogni open()
+            f.write("%PDF-1.4")
+        rc, so, se = run_script_split(asset(*CE), "--file", pp, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "XLSX o CSV" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _xlsx_emittente(tipo, cartella):
+    """File delle posizioni sintetico con il layout reale dell'emittente (preambolo, riga d'intestazione,
+    disclaimer, pesi in frazione o percento, righe non classificate): i file veri non si ridistribuiscono.
+    Il nome del file non contiene l'emittente, così il riconoscimento passa dal preambolo."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    if tipo == "xtrackers":
+        ws.title = "2026-10-25"
+        ws.append([None])
+        ws.append(["Although information in this document has been obtained from sources believed to be reliable, "
+                   "DWS does not guarantee its accuracy, completeness or fairness."])
+        ws.append([None])
+        ws.append([None, "Name", "ISIN", "Country", "Currency", "Type of Security", "Industry Classification", "Weighting"])
+        for n, (nome, settore, paese, tipo_titolo, peso) in enumerate((
+                ("A", "Information Technology", "United States", "Equities", 0.40),
+                ("B", "Financials", "Japan", "Equities", 0.25),
+                ("C", "Health Care", "Germany", "Equities", 0.20),
+                ("D", "Materials", "Switzerland", "Equities", 0.12),
+                ("E", "unknown", "Germany", "Equities", 0.02),
+                ("F", "Health Care", "United Arab Emirates", "Equities", "N/A"),
+                ("G", "unknown", "Germany", "Future", 0.01)), 1):
+            ws.append([n, nome, f"XX000000000{n}", paese, "USD", tipo_titolo, settore, peso])
+    elif tipo == "spdr":
+        ws.title = "holdings"
+        for riga in (("Fund Name:", "State Street SPDR MSCI ACWI IMI UCITS ETF"), ("ISIN:", "IE00B3YLTY66"),
+                     ("Ticker Symbol:", "SPYI GY"), ("Holdings As Of:", "22-Oct-2026"), (None,)):
+            ws.append(list(riga))
+        ws.append(["ISIN", "Security Name", "Percent of Fund", "Trade Country Name", "Sector Classification",
+                   "Industry Classification"])
+        for riga in (("US0000000001", "A", 50.0, "United States", "Information Technology", "Semiconductors"),
+                     ("TW0000000002", "B", 30.0, "Taiwan", "Consumer Discretionary", "Broadline Retail"),
+                     ("HK0000000003", "C", 15.0, "Hong Kong", "Communication Services", "Interactive Media"),
+                     ("Unassigned", "D", 5.04, "Unassigned", "Unassigned", "Unassigned"),
+                     ("Unassigned", "CNY:HKD 20250930", -0.04, "Unassigned", "Unassigned", "Unassigned")):
+            ws.append(list(riga))
+        ws.append([None])
+        ws.append(["Marketing communication. The performance data quoted represents past performance."])
+    elif tipo == "vanguard":
+        ws.append(["Vanguard FTSE All-World UCITS ETF"])
+        ws.append(["As at 30 Sep 2026"])
+        ws.append([None])
+        ws.append(["Holding name", "Sector", "Country", "% of net assets"])
+        for riga in (("A", "Technology", "United States", 40), ("B", "Financials", "Japan", 30),
+                     ("C", "Telecommunications", "France", 10), ("D", "Basic Materials", "Australia", 20)):
+            ws.append(list(riga))
+    elif tipo == "amundi":
+        ws.append(["Amundi MSCI Europe UCITS ETF"])
+        ws.append(["Dati al", "30/09/2026"])
+        ws.append([None])
+        ws.append(["Nome", "Settore", "Paese", "Peso (%)"])
+        for riga in (("A", "Beni di prima necessità", "Francia", 50), ("B", "Servizi di pubblica utilità", "Italia", 30),
+                     ("C", "Immobiliare", "Paesi Bassi", 20)):
+            ws.append(list(riga))
+    else:
+        raise ValueError(tipo)
+    path = os.path.join(cartella, f"posizioni-{('xtrackers', 'spdr', 'vanguard', 'amundi').index(tipo)}.xlsx")
+    wb.save(path)
+    return path
+
+
+@test("T16 composizione ETF: valori chiusi per emittente, riconoscimento ed esclusioni")
+def t_ce_composizione():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    en = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "ETF MSCI World")
+    it = m.componi(os.path.join(FIXTURES, "composizione-ishares-it.csv"), "ETF MSCI World")
+    for c in (en, it):
+        assert c["emittente"] == "ishares" and c["riconosciuto_da"] == "preambolo" and c["classificazione"] == "GICS", c
+        assert c["data_posizioni"] == "2026-09-30" and c["titoli"] == 6, c
+        assert r2(c["settori"]) == {"Information Technology": 40.40, "Financials": 20.20, "Health Care": 15.15,
+                                    "Industrials": 15.15, "Energy": 9.09}, c["settori"]
+        assert r2(c["paesi"]) == {"US": 50.51, "JP": 15.15, "GB": 15.15, "KR": 10.10, "CA": 9.09}, c["paesi"]
+        assert abs(c["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and c["avvisi"] == [], c
+    assert list(en["settori"]) == list(it["settori"]) and en["settori"] == it["settori"]   # stesso ordine e valori
+    assert list(en["settori"])[0] == "Information Technology"                             # peso decrescente
+    tmp = tempfile.mkdtemp()
+    try:
+        x = m.componi(_xlsx_emittente("xtrackers", tmp), "X")
+        assert x["emittente"] == "xtrackers" and x["data_posizioni"] == "2026-10-25" and x["titoli"] == 5, x
+        assert r2(x["settori"]) == {"Information Technology": 41.24, "Financials": 25.77, "Health Care": 20.62,
+                                    "Materials": 12.37}, x["settori"]
+        assert r2(x["paesi"]) == {"US": 40.40, "JP": 25.25, "DE": 22.22, "CH": 12.12}, x["paesi"]
+        assert abs(x["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9
+        assert abs(x["esclusi"]["settore_non_classificato"] - 0.02) < 1e-9 and x["esclusi"]["paese_non_classificato"] == 0
+        s = m.componi(_xlsx_emittente("spdr", tmp), "S")
+        assert s["emittente"] == "spdr" and s["data_posizioni"] == "2026-10-22", s
+        assert s["colonne"]["settore"] == "Sector Classification" and s["colonne"]["paese"] == "Trade Country Name"
+        assert r2(s["settori"]) == {"Information Technology": 52.63, "Consumer Discretionary": 31.58,
+                                    "Communication Services": 15.79}, s["settori"]
+        assert r2(s["paesi"]) == {"US": 52.63, "TW": 31.58, "HK": 15.79}, s["paesi"]
+        assert abs(s["esclusi"]["liquidita_derivati"] - 0.0004) < 1e-9, s["esclusi"]
+        assert any("non classificat" in a and "5%" in a for a in s["avvisi"]), s["avvisi"]   # 5,04% > 5%
+        v = m.componi(_xlsx_emittente("vanguard", tmp), "V")
+        assert v["emittente"] == "vanguard" and v["classificazione"] == "ICB" and v["settori"] == {}, v
+        assert r2(v["paesi"]) == {"US": 40.0, "JP": 30.0, "AU": 20.0, "FR": 10.0} and v["data_posizioni"] == "2026-09-30", v
+        assert any("ICB" in a for a in v["avvisi"]), v["avvisi"]
+        a = m.componi(_xlsx_emittente("amundi", tmp), "A")
+        assert a["emittente"] == "amundi" and a["data_posizioni"] == "2026-09-30", a
+        assert r2(a["settori"]) == {"Consumer Staples": 50.0, "Utilities": 30.0, "Real Estate": 20.0}, a["settori"]
+        assert r2(a["paesi"]) == {"FR": 50.0, "IT": 30.0, "NL": 20.0}, a["paesi"]
+        # riconoscimento: --emittente vince sul preambolo; dal nome del file; nessuno con colonne note → avviso
+        f = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "Z", "spdr")
+        assert f["riconosciuto_da"] == "--emittente" and f["emittente"] == "spdr"
+        g = os.path.join(tmp, "posizioni.csv")
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Country,Weight\nA,Energy,Italy,100\n")
+        c = m.componi(g, "G")
+        assert c["emittente"] is None and c["riconosciuto_da"] == "nessuno", c
+        assert any("regole generiche" in w for w in c["avvisi"]), c["avvisi"]
+        os.rename(g, os.path.join(tmp, "SWDA_holdings_ishares.csv"))
+        c = m.componi(os.path.join(tmp, "SWDA_holdings_ishares.csv"), "G")
+        assert c["riconosciuto_da"] == "nome del file" and c["emittente"] == "ishares", c
+        # ETF obbligazionario, settore vuoto ovunque → solo paesi, con l'avviso
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Asset Class,Location,Weight (%)\nBTP 2030,-,Fixed Income,Italy,60\n"
+                     "OAT 2031,-,Fixed Income,France,40\n")
+        c = m.componi(g, "B")
+        assert c["settori"] == {} and r2(c["paesi"]) == {"IT": 60.0, "FR": 40.0}, c
+        assert any("settore" in w for w in c["avvisi"]), c["avvisi"]
+        # liquidità sopra il 5% → avviso; Telecommunication Services → Communication Services con avviso
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Asset Class,Location,Weight (%)\nA,Telecommunication Services,Equity,Italy,94\n"
+                     "CASH,Cash and/or Derivatives,Cash,Italy,6\n")
+        c = m.componi(g, "C")
+        assert c["settori"] == {"Communication Services": 1.0}, c["settori"]
+        assert any("liquidit" in w for w in c["avvisi"]) and any("Telecommunication" in w for w in c["avvisi"]), c["avvisi"]
+        # dai file reali: paesi minori (Zambia in un MSCI World), «European Union» e «NA» come non classificati,
+        # quote escluse minime scritte «< 0,01%» e non «0,00%»
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Location,Weight (%)\nA,Materials,Zambia,0.02\nB,Financials,European Union,0.003\n"
+                     "C,Energy,NA,0.001\nD,Energy,Italy,99.976\n")
+        c = m.componi(g, "R")
+        assert set(c["paesi"]) == {"ZM", "IT"}, c["paesi"]
+        assert abs(c["esclusi"]["paese_non_classificato"] - 0.00004) < 1e-12, c["esclusi"]
+        assert all(len(m.PAESI[k]) == 2 for k in m.PAESI) and len(m.PAESI) == 249     # ISO 3166-1 completo
+        assert "paese non classificato < 0,01%" in m.righe_strumento(c, "25/10/2026")[0], m.righe_strumento(c, "x")[0]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    assert m.SETTORI_GICS == carica_modulo(asset(*CU)).SETTORI_GICS
+
+
+@test("T16 composizione ETF: nomi sconosciuti, somme incoerenti e classificazione mista respinti")
+def t_ce_errori():
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Energy;100\n")
+        prima = (open(out, encoding="utf-8").read(), os.path.getmtime(out))
+        casi = (
+            ("Name,Sector,Location,Weight (%)\nA,Spazio,Atlantide,30\nB,Energy,Lemuria,20\nC,Energy,Italy,50\n",
+             ("Atlantide", "Lemuria", "Spazio", "segnala")),
+            ("Name,Sector,Location,Weight (%)\nA,Energy,Italy,40\nB,Energy,France,20\n", ("sommano a 60",)),
+            ("Name,Sector,Location,Weight (%)\nA,Energy,Italy,abc\nB,Energy,France,100\n", ("abc", "riga")),
+            ("Name,Sector,Location,Weight (%)\nA,Technology,Italy,50\nB,Information Technology,France,50\n", ("mista",)),
+            ("Name,Sector,Asset Class,Location,Weight (%)\nCASH,Cash and/or Derivatives,Cash,Italy,100\n", ("nessuna riga",)),
+        )
+        for n, (testo, attesi) in enumerate(casi):
+            p = os.path.join(tmp, f"caso{n}.csv")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(testo)
+            rc, so, se = run_script_split(asset(*CE), "--file", p, "--strumento", "X", "--out", out, cwd=tmp)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and "Traceback" not in se, (n, rc, se[-400:])
+            assert "ERRORE:" not in so, (n, so[-200:])
+            for parola in attesi:
+                assert parola in se, (n, parola, se[-400:])
+            assert (open(out, encoding="utf-8").read(), os.path.getmtime(out)) == prima, n
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: CSV fuso con l'esistente, formato, --json e report")
+def t_ce_uscita():
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:     # vecchio formato, scritto a mano, con un commento libero
+            f.write("# compilato a mano\nstrumento;settore;peso\nETF Europa;Financials;0,6\nETF Europa;Industrials;0,4\n"
+                    "ETF MSCI World;Energy;100\n")
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        uscite = []
+        for _ in range(2):                             # reimportare due volte non duplica
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "ETF MSCI World",
+                                          "--out", out, "--json", os.path.join(tmp, "c.json"), cwd=tmp)
+            assert rc == 0, se[-400:]
+            uscite.append(so)
+        assert "convertito" in uscite[0] and "convertito" not in uscite[1], uscite   # solo il primo trova il vecchio formato
+        testo = open(out, encoding="utf-8-sig").read()
+        with open(out, "rb") as f:
+            assert f.read().startswith(b"\xef\xbb\xbf")
+        righe = testo.splitlines()
+        assert righe[0] == "# compilato a mano" and righe[1] == "strumento;dimensione;voce;peso", righe[:3]
+        assert righe[2:4] == ["ETF Europa;settore;Financials;60,00", "ETF Europa;settore;Industrials;40,00"], righe[2:4]
+        assert sum(1 for r in righe if r.startswith("# ETF MSCI World:")) == 1, righe
+        commento = next(r for r in righe if r.startswith("# ETF MSCI World:"))
+        assert re.fullmatch(r"# ETF MSCI World: iShares, composizione-ishares-en\.csv, posizioni al 30/09/2026, "
+                            r"importato il \d\d/\d\d/\d{4}; esclusi liquidità e derivati 1,00%", commento), commento
+        mw = [r for r in righe if r.startswith("ETF MSCI World;")]
+        assert mw[0] == "ETF MSCI World;settore;Information Technology;40,40" and "ETF MSCI World;paese;KR;10,10" in mw, mw
+        assert len(mw) == 10 and not any(";Energy;100" in r for r in righe), mw
+        for dim in ("settore", "paese"):
+            tot = sum(float(r.split(";")[3].replace(",", ".")) for r in mw if r.split(";")[1] == dim)
+            assert abs(tot - 100) <= 0.05, (dim, tot)
+        so = uscite[1]
+        assert "ETF Europa" in so, so                                        # il report dice cosa ha conservato
+        assert "Tecnologia dell'informazione" in so and "Corea del Sud" in so and "Weight (%)" in so, so
+        d = json.load(open(os.path.join(tmp, "c.json"), encoding="utf-8"))
+        assert d["out"] == out and [s["strumento"] for s in d["strumenti"]] == ["ETF MSCI World"], d
+        s = d["strumenti"][0]
+        assert {"strumento", "emittente", "riconosciuto_da", "file", "data_posizioni", "classificazione", "colonne",
+                "titoli", "esclusi", "settori", "paesi", "avvisi"} == set(s), set(s)
+        assert abs(sum(s["settori"].values()) - 1) < 1e-9 and abs(sum(s["paesi"].values()) - 1) < 1e-9
+        # --json - : solo JSON su stdout, --out scritto lo stesso
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "Y", "--out", out, "--json", "-", cwd=tmp)
+        assert rc == 0 and json.loads(so)["strumenti"][0]["strumento"] == "Y", (so[:300], se[-300:])
+        assert "Y;paese;US;50,51" in open(out, encoding="utf-8-sig").read()
+        # due file in una chiamata; riga di comando spaiata o ripetuta → rc 2
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--file",
+                                      os.path.join(FIXTURES, "composizione-ishares-it.csv"), "--strumento", "B",
+                                      "--out", out, cwd=tmp)
+        assert rc == 0 and "A;settore;Energy;9,09" in open(out, encoding="utf-8-sig").read(), se[-300:]
+        assert "B;paese;KR;10,10" in open(out, encoding="utf-8-sig").read()
+        for args in (("--file", en, "--file", en, "--strumento", "A"),
+                     ("--file", en, "--strumento", "A", "--file", en, "--strumento", "A")):
+            rc, so, se = run_script_split(asset(*CE), *args, "--out", out, cwd=tmp)
+            assert rc == 2 and "usage:" in se, (args, rc, se[-300:])
+        # un --out con colonne sconosciute non si sovrascrive
+        strano = os.path.join(tmp, "strano.csv")
+        with open(strano, "w", encoding="utf-8") as f:
+            f.write("isin;quota\nIE00;1\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--out", strano, cwd=tmp)
+        assert rc == 1 and open(strano, encoding="utf-8").read() == "isin;quota\nIE00;1\n", se[-300:]
+        # il CSV scritto si rilegge con csv senza perdite: quattro campi per riga dati
+        dati = [r for r in csv.reader(io.StringIO(open(out, encoding="utf-8-sig").read()), delimiter=";")
+                if r and not r[0].startswith("#")]
+        assert all(len(r) == 4 for r in dati), dati
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: capitale-umano legge i due formati, catena dall'importatore")
+def t_ce_capitale_umano():
+    cu = carica_modulo(asset(*CU))
+    vecchio = cu.leggi_composizione(asset("it-pianificazione-obiettivi", "esempio-composizione.csv"))
+    assert abs(vecchio["ETF MSCI World"]["Information Technology"] - 0.27) < 1e-12, vecchio   # invariato
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--strumento", "ETF MSCI World", "--file", _xlsx_emittente("vanguard", tmp),
+                                      "--strumento", "ETF FTSE", "--out", out, cwd=tmp)
+        assert rc == 0, se[-300:]
+        comp = cu.leggi_composizione(out)
+        assert set(comp) == {"ETF MSCI World"}, comp                             # il Vanguard in ICB non ha settori
+        assert abs(comp["ETF MSCI World"]["Information Technology"] - 0.4040) < 1e-9, comp
+        dati = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+        dati["persona"]["settore"] = "Information Technology"
+        dati["posizioni"] = [{"asset_class": "azionario", "valore": 60000, "strumento": "ETF MSCI World"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "ETF FTSE"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "etf msci world"}]
+        pd_ = os.path.join(tmp, "cu.json")
+        with open(pd_, "w", encoding="utf-8") as f:
+            json.dump(dati, f)
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out,
+                                      "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        z = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))["settore"]
+        assert abs(z["quota_settore_fin"] - 0.4040) < 1e-4, z                   # solo la posizione con la composizione
+        assert z["mancanti"] == ["ETF FTSE", "etf msci world"], z["mancanti"]  # il refuso di maiuscole è visibile
+        assert "etf msci world" in so
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("ETF MSCI World;valuta;USD;100\n")
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out, cwd=tmp)
+        assert rc == 1 and "valuta" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: skill, reference, comando e revisione allineati")
+def t_ce_documentazione():
+    ob = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    skill = open(os.path.join(ob, "SKILL.md"), encoding="utf-8").read()
+    step8 = skill.split("Step 8")[1]
+    assert "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" in step8 and "--strumento" in step8
+    assert step8.index("importa-composizione-etf.py") < step8.index("capitale-umano.py\" --dati"), step8[:600]
+    assert "references/composizione-etf.md" in skill and 'version: "0.23"' in skill
+    ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
+    for parola in ("iShares", "Xtrackers", "Vanguard", "Amundi", "SPDR", "ICB", "da confermare", "non si ridistribuisc",
+                   "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py"):
+        assert parola in ref, parola
+    assert "importa-composizione-etf.py" in open(os.path.join(ob, "references", "capitale-umano.md"), encoding="utf-8").read()
+    # il comando è un alias e non nomina script (t_dove_lavorare): rimanda all'importatore della skill
+    assert "importatore della composizione" in open(os.path.join(ROOT, "commands", "capitale-umano.md"), encoding="utf-8").read()
+    rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    assert "importa-composizione-etf.py" in rev.split("### Contratto di input")[1].split("\n## ")[0]
+    t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
+    assert "composizione-etf" in t16 and "Look-through" in t16 and "tedesc" in t16, t16[:400]
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "Tutti i 17 script" in readme and "importa-composizione-etf.py" in readme
+    assert "importatore della composizione" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().lower()
+
+
+@test("T16 composizione ETF: revisione finale (CSV italiano lungo, --strumento con spazi, poche righe classificate, commenti liberi)")
+def t_ce_revisione():
+    m = carica_modulo(asset(*CE))
+    tmp = tempfile.mkdtemp()
+    try:
+        # 1. CSV italiano di lunghezza reale: con molte righe la virgola decimale sembra un separatore coerente
+        righe = open(os.path.join(FIXTURES, "composizione-ishares-it.csv"), encoding="utf-8").read().splitlines()
+        testa, dati = righe[:6], righe[6:14]
+        lungo = os.path.join(tmp, "lungo.csv")
+        with open(lungo, "w", encoding="utf-8") as f:
+            f.write("\n".join(testa) + "\n")
+            for _ in range(5):
+                for r in dati:
+                    c = r.split(";")
+                    c[5] = m.numero(float(c[5].replace(",", ".")) / 5, 2)
+                    f.write(";".join(c) + "\n")
+            f.write("\nIl contenuto è di proprietà di BlackRock e dei suoi fornitori di informazioni\n")
+        c = m.componi(lungo, "L")
+        assert round(c["settori"]["Information Technology"] * 100, 2) == 40.40 and c["titoli"] == 30, c
+        # lo stesso risalvato da Excel italiano: cp1252, ogni riga riempita di «;», disclaimer senza virgolette
+        excel = os.path.join(tmp, "excel-lungo.csv")
+        testo = open(lungo, encoding="utf-8").read().splitlines()
+        with open(excel, "w", encoding="cp1252") as f:
+            for r in testo:
+                f.write(r + ";" * max(0, 9 - r.count(";")) + "\n")      # dieci colonne su ogni riga
+        c = m.componi(excel, "E")
+        assert round(c["paesi"]["US"] * 100, 2) == 50.51, c["paesi"]
+        # 2. --strumento con uno spazio in più: stesso strumento, nessun blocco doppio; vuoto o ripetuto → rc 2
+        out = os.path.join(tmp, "composizione.csv")
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        for nome in ("ETF World", "ETF World "):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", nome, "--out", out, cwd=tmp)
+            assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert sum(r.startswith("# ETF World") for r in testo.splitlines()) == 1, testo
+        assert sum(r.startswith("ETF World") and ";settore;Energy;" in r for r in testo.splitlines()) == 1, testo
+        for args in (("--strumento", "A", "--file", en, "--strumento", "A "), ("--strumento", "  ")):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, *args, "--out", out, cwd=tmp)
+            assert rc == 2 and "usage:" in se, (args, rc, se[-300:])
+        # 3. poche righe classificate: il 3% del fondo non diventa il 100% dei settori
+        g = os.path.join(tmp, "pochi.csv")
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nA,-,Equity,United States,97\nB,Financials,Equity,Italy,3\n")
+        c = m.componi(g, "P")
+        assert c["settori"] == {} and set(c["paesi"]) == {"US", "IT"}, c
+        assert any("settori non scritti" in a for a in c["avvisi"]), c["avvisi"]
+        # 4. un commento libero resta anche dopo due reimport
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("# nota finale dell'utente\n")
+        for _ in range(2):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "ETF World", "--out", out, cwd=tmp)
+            assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert testo.count("# nota finale dell'utente") == 1 and testo.count("# ETF World:") == 1, testo
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: il report dice «1 strumento importato» e nomina le colonne senza chiavi tecniche")
+def t_ce_report():
+    tmp = tempfile.mkdtemp()
+    try:
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", cwd=tmp)
+        assert rc == 0, se[-300:]
+        assert "1 strumento importato" in so and "1 strumenti" not in so, so[-400:]
+        assert "asset class «Asset Class»" in so and "asset_class «" not in so, so
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--file", en, "--strumento", "B",
+                                      cwd=tmp)
+        assert rc == 0 and "2 strumenti importati" in so, (so[-400:], se[-300:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: --out e --json verificati prima di scrivere, nessuno dei due a metà")
+def t_ce_destinazioni():
+    tmp = tempfile.mkdtemp()
+    try:
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Energy;100\n")
+        prima = open(out, encoding="utf-8").read()
+        # --json in una cartella che non esiste: composizione.csv resta com'era
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B", "--out", out,
+                                      "--json", os.path.join(tmp, "non-esiste", "c.json"), cwd=tmp)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, se[-300:]
+        assert "Traceback" not in se and open(out, encoding="utf-8").read() == prima
+        # --out in una cartella che non esiste: il JSON non nasce
+        pj = os.path.join(tmp, "c.json")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B",
+                                      "--out", os.path.join(tmp, "non-esiste", "c.csv"), "--json", pj, cwd=tmp)
+        assert rc == 1 and "impossibile scrivere" in se and not os.path.exists(pj), se[-300:]
+        # --out che è una cartella: errore chiaro, niente traceback
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B", "--out", tmp, cwd=tmp)
+        assert rc == 1 and "cartella" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: data delle posizioni giorno/mese o mese/giorno, l'ambigua non si scrive")
+def t_ce_date():
+    m = carica_modulo(asset(*CE))
+    tmp = tempfile.mkdtemp()
+    try:
+        g = os.path.join(tmp, "posizioni.csv")
+        casi = (("Fund Holdings as of,10/24/2026", ",", "2026-10-24", False),   # mese/giorno, file statunitense
+                ("Fund Holdings as of,24/10/2026", ",", "2026-10-24", False),   # giorno/mese, file britannico
+                ("Fund Holdings as of,03/04/2026", ",", None, True),            # inglese e ambigua: non si indovina
+                ("Posizioni al;03/04/2026", ";", "2026-04-03", False))          # etichetta italiana: giorno/mese
+        for preambolo, sep, attesa, ambigua in casi:
+            with open(g, "w", encoding="utf-8") as f:
+                f.write(f"{preambolo}\n\n{sep.join(['Name', 'Sector', 'Location', 'Weight (%)'])}\n"
+                        f"{sep.join(['A', 'Energy', 'Italy', '100'])}\n")
+            c = m.componi(g, "D")
+            assert c["data_posizioni"] == attesa, (preambolo, c["data_posizioni"])
+            assert any("ambigua" in a for a in c["avvisi"]) is ambigua, (preambolo, c["avvisi"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: ETF obbligazionari con settori propri, solo paesi e la parte azionaria dei misti")
+def t_ce_obbligazioni():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    tmp = tempfile.mkdtemp()
+    try:
+        g = os.path.join(tmp, "posizioni.csv")
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nBTP 2030,Treasuries,Fixed Income,Italy,50\n"
+                    "OAT 2031,Government,Fixed Income,France,30\nBANCA 2029,Banking,Fixed Income,Germany,20\n")
+        c = m.componi(g, "O")
+        assert c["settori"] == {} and r2(c["paesi"]) == {"IT": 50.0, "FR": 30.0, "DE": 20.0}, c
+        assert abs(c["esclusi"]["settore_obbligazionario"] - 1.0) < 1e-9, c["esclusi"]
+        assert c["esclusi"]["settore_non_classificato"] == 0, c["esclusi"]
+        assert any("obbligazionar" in a and "settore" in a for a in c["avvisi"]), c["avvisi"]
+        assert not any("sopra la soglia" in a for a in c["avvisi"]), c["avvisi"]
+        # misto 60/40 dal sito italiano: i settori sono quelli della parte azionaria
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Nome;Settore;Asset class;Area geografica;Ponderazione (%)\n"
+                    "ALPHA;Informatica;Azionario;Stati Uniti;60,0\nBTP;Titoli di Stato;Reddito fisso;Italia;40,0\n")
+        c = m.componi(g, "M")
+        assert c["settori"] == {"Information Technology": 1.0} and r2(c["paesi"]) == {"US": 60.0, "IT": 40.0}, c
+        assert abs(c["esclusi"]["settore_obbligazionario"] - 0.4) < 1e-9, c["esclusi"]
+        assert "obbligazioni" in m.righe_strumento(c, "29/10/2026")[0], m.righe_strumento(c, "29/10/2026")[0]
+        # un settore sconosciuto su un titolo azionario resta un errore
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nA,Treasuries,Equity,Italy,100\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", g, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "Treasuries" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: --set sulle tabelle ha effetto, una tupla senza virgola è respinta, --json - resta JSON")
+def t_ce_set():
+    tmp = tempfile.mkdtemp()
+    try:
+        v = os.path.join(tmp, "v.csv")
+        with open(v, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Location,Weight (%)\nA,Telecommunications,Italy,60\nB,Financials,France,40\n")
+        # una tupla (anche con le maiuscole) al posto dell'insieme di default: niente traceback, stessa classificazione
+        rc, so, se = run_script_split(asset(*CE), "--file", v, "--strumento", "V", "--json", "-",
+                                      "--set", "NOMI_ICB_ESCLUSIVI=('Telecommunications',)", cwd=tmp)
+        assert rc == 0 and "Traceback" not in se, se[-400:]
+        d = json.loads(so)                                   # stdout è solo JSON: l'override va su stderr
+        assert d["strumenti"][0]["classificazione"] == "ICB" and "[override]" in se, (d, se)
+        # la stringa al posto della tupla (manca la virgola finale) è il refuso più comune
+        rc, so, se = run_script_split(asset(*CE), "--file", v, "--strumento", "V",
+                                      "--set", "NOMI_ICB_ESCLUSIVI=('telecommunications')", cwd=tmp)
+        assert rc == 1 and "tupla" in se and "Traceback" not in se, se[-300:]
+        # ETICHETTE_DATA vale anche per un emittente riconosciuto
+        p = os.path.join(tmp, "i.csv")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("iShares Core MSCI World UCITS ETF\nValido al;30/09/2026\n\n"
+                    "Nome;Settore;Area geografica;Ponderazione (%)\nA;Energia;Italia;100,0\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", p, "--strumento", "I", "--json", "-",
+                                      "--set", "ETICHETTE_DATA=('valido al',)", cwd=tmp)
+        assert rc == 0, se[-300:]
+        s = json.loads(so)["strumenti"][0]
+        assert s["emittente"] == "ishares" and s["data_posizioni"] == "2026-09-30", s
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
