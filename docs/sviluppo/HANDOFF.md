@@ -87,10 +87,10 @@ Le evolutive annotate nella ROADMAP a valle dei tre temi: look-through del porta
 Ordine di lavoro deciso dal proprietario l'1/11/2026 per il ciclo 0.12.0, dopo la revisione dello stato del repository (suite locale 168/168 con i 4 test del browser saltati senza Playwright):
 
 1. **Igiene documentale** (questo file e l'intestazione della ROADMAP): fatto.
-2. **Look-through del portafoglio** (T16 C), il tema principale: spec `docs/sviluppo/specs/2026-11-01-look-through-design.md` e piano `docs/sviluppo/piani/2026-11-01-look-through.md`; settori, paesi e primi titoli aggregati sugli ETF posseduti, pesati per controvalore, con l'ISIN come chiave, `--json` per it-revisione e una sezione del cruscotto.
-3. **Ponte pensione e riscatto della laurea nel cruscotto** (sviluppo di T17): i due JSON oggi sono in `IGNORATI` di `genera-cruscotto.py`.
-4. **Lingue tedesca e francese** dell'importatore della composizione: solo tabelle di sinonimi, con fixture.
-5. **Rilascio 0.12.0**, quando il proprietario lo decide: stessa procedura della 0.11.0 (§ 1), con il tag dato dal proprietario. Dentro: T13, T15, T16, T17 e il ciclo qui sopra.
+2. **Look-through del portafoglio** (T16 C): fatto sul branch `claude/awesome-albattani-gkn0qc` (spec `docs/sviluppo/specs/2026-11-01-look-through-design.md`, piano `docs/sviluppo/piani/2026-11-01-look-through.md`, esito `docs/sviluppo/revisioni/esito-t16c.json`): `look-through-portafoglio.py`, righe `titolo` e `--isin` dell'importatore, `chiave_composizione()` nel capitale umano, sezione «Look-through» del cruscotto, Step 8, passo 3 e contratto di input di it-revisione.
+3. **Ponte pensione e riscatto della laurea nel cruscotto** (sviluppo di T17): fatto sullo stesso branch, nella sezione Pensione.
+4. **Lingue tedesca e francese** dell'importatore della composizione: fatto sullo stesso branch, solo tabelle, con le fixture `composizione-xtrackers-de.csv` e `composizione-amundi-fr.csv`.
+5. **Merge del branch su develop** (PR del proprietario, dopo la CI) e **rilascio 0.12.0**, quando il proprietario lo decide: stessa procedura della 0.11.0 (§ 1), con il tag dato dal proprietario. Dentro: T13, T15, T16, T17 e il ciclo qui sopra. Le skill sono a it-pianificazione-obiettivi 0.24 e it-revisione 0.9; la suite conta 181 test.
 
 Rinviati a dopo la legge di bilancio 2027, quando si riapre comunque la calibrazione: le fonti dati a priorità media e bassa di T16 (R_F dalla BCE, `p_u` e durata da ISTAT e INPS, NASpI nella freshness, `sigma_h`, rendimenti europei, `PESI_MONDO`), i quattro sviluppi del capitale umano (secondo reddito, volatilità personale dall'estratto INPS, aggiustamento dei target, polizza vita) e gli altri due del cruscotto (confronto tra due revisioni, versione anonimizzata).
 
