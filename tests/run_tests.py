@@ -5821,6 +5821,12 @@ def _json_esempio():
             ("broker.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
              [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
             ("piano.json", asset("it-rebalance", "ribilanciamento-multibroker.py"), ["--out", "ordini"]),
+            # il look-through gira sulla sua fixture (due ETF con composizione): broker-lt.json è il suo input e NON entra
+            # in _tutti_i_json(), perché sarebbe un secondo JSON di tipo «broker»
+            ("broker-lt.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
+             [os.path.join(FIXTURES, "estratto-look-through.csv"), "--anno", "2026"]),
+            ("lt.json", OB("look-through-portafoglio.py"),
+             ["--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"), "--posizioni", "broker-lt.json"]),
         ]
         for nome, script, args in lanci:
             rc, out = run_script(script, *args, "--json", nome, cwd=tmp)
@@ -5856,7 +5862,8 @@ def t_t17_riconosci():
     js = _json_esempio()
     attesi = {"alloc.json": "allocatore", "glide.json": "glide_path", "mco.json": "mc_obiettivi", "inps.json": "inps",
               "mc.json": "mc_pensione", "netto.json": "netto_pensione", "cu.json": "capitale_umano",
-              "broker.json": "broker", "piano.json": "ribilanciamento", "dati.json": "ignorato:importa-previdenza"}
+              "broker.json": "broker", "piano.json": "ribilanciamento", "dati.json": "ignorato:importa-previdenza",
+              "lt.json": "look_through", "broker-lt.json": "broker"}
     for nome, tipo in attesi.items():
         d = json.load(open(js[nome], encoding="utf-8"))
         assert mod.riconosci(d) == tipo, (nome, mod.riconosci(d))
@@ -5883,13 +5890,13 @@ def t_t17_bundle():
     js = _json_esempio()
     L = lambda n: json.load(open(js[n], encoding="utf-8"))
     tutti = [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
-                             "broker.json", "piano.json")]
+                             "broker.json", "piano.json", "lt.json")]
     rc, so, se, b, html = _cruscotto(*tutti)
     assert rc == 0, (so[-300:], se[-300:])
     mco, mc, netto, cu, broker, piano = (L(n) for n in ("mco.json", "mc.json", "netto.json", "cu.json", "broker.json", "piano.json"))
     assert b["generato_il"] == "2026-10-25" and b["versione"] == 1
     assert b["plugin"] == json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
-    assert [f["tipo"] for f in b["fonti"]] == ["allocatore", "glide_path", "mc_obiettivi", "inps", "mc_pensione",
+    assert [f["tipo"] for f in b["fonti"]] == ["allocatore", "look_through", "glide_path", "mc_obiettivi", "inps", "mc_pensione",
                                               "netto_pensione", "capitale_umano", "broker", "ribilanciamento"], b["fonti"]
     assert b["obiettivi"]["obiettivi"][0]["probabilita_successo"] == mco["obiettivi"][0]["probabilita_successo"]
     assert b["obiettivi"]["obiettivi"][1]["capitale_finale"] == mco["obiettivi"][1]["capitale_finale"]
@@ -5909,7 +5916,8 @@ def t_t17_bundle():
     assert ind["valore_portafoglio"]["valore"] == broker["analisi"]["totale_valore"]
     assert b["ribilanciamento"]["drift"]["azionario"]["drift"] == piano["drift"]["azionario"]["drift"]
     assert len(b["ribilanciamento"]["ordini"]) == len(piano["ordini"]) > 0
-    for p in broker["posizioni"]:
+    # anche le posizioni dell'estratto da cui viene il look-through (T16): nel bundle passano solo gli aggregati
+    for p in broker["posizioni"] + L("broker-lt.json")["posizioni"]:
         assert p["isin"] not in html and p["descrizione"] not in html and p["isin"] not in json.dumps(b), p["isin"]
     # stdout: percorso, tipi riconosciuti, sezioni e indicatori in formato italiano
     assert "Cruscotto:" in so and "mc.json → mc_pensione" in so and "Sezioni:" in so and "€130.000" in so, so[-800:]
@@ -6035,13 +6043,14 @@ def _apri_cruscotto(pagina, html, schema="light", larghezza=1200):
     return page, errori, eccezioni, richieste
 
 
-SEZIONI_CRUSCOTTO = ("allocazione", "obiettivi", "glide_path", "pensione", "capitale_umano", "fiscalita", "ribilanciamento")
+SEZIONI_CRUSCOTTO = ("allocazione", "look_through", "obiettivi", "glide_path", "pensione", "capitale_umano", "fiscalita",
+                     "ribilanciamento")
 
 
 def _tutti_i_json():
     js = _json_esempio()
     return [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
-                            "broker.json", "piano.json")]
+                            "broker.json", "piano.json", "lt.json")]
 
 
 @test("T17 cruscotto nel browser: si apre senza errori, ogni sezione col suo SVG, nessuna richiesta di rete")
@@ -6140,6 +6149,38 @@ def t_t17_skill():
     assert "stesso tipo" in passo and "chiedi all'utente" in passo.lower(), passo[:1500]
     comando = open(os.path.join(ROOT, "commands", "cruscotto.md"), encoding="utf-8").read()
     assert "--json" in comando and "input" in comando, comando
+
+
+@test("T16 look-through: il cruscotto riconosce il JSON, il bundle non porta posizioni né ISIN, la sezione in pagina")
+def t_lt_cruscotto():
+    js = _json_esempio()
+    rc, so, se, b, html = _cruscotto(js["alloc.json"], js["lt.json"])
+    assert rc == 0, se[-300:]
+    lt, r = b["look_through"], json.load(open(js["lt.json"], encoding="utf-8"))
+    assert set(lt) == {"copertura", "settori", "paesi", "titoli", "quota_primi_titoli", "n_posizioni", "n_senza_composizione",
+                       "quota_senza_composizione"}, set(lt)
+    assert lt["settori"][0] == {"nome": "Finanza", "peso": r["settori"][0]["peso"]} and lt["n_senza_composizione"] == 1
+    assert lt["paesi"][0]["nome"] == "Stati Uniti" and lt["titoli"][0]["nome"] == "Apple Inc." and lt["n_posizioni"] == 4
+    for vietato in ("IE00B4L5Y983", "DE0007164600", "SAP SE", "iShares Core MSCI World", "BTP Futura"):
+        assert vietato not in html, vietato
+    assert "lt.json → look_through" in so and "look_through" in so.split("Sezioni:")[1], so
+    # Review Focus 5: un JSON di prima di una modifica delle chiavi si rifiuta con «manca …», senza traceback
+    def senza(d):
+        del d["quota_primi_titoli"]
+    rc, so, se, _, _ = _cruscotto(_json_variante("lt.json", senza))
+    assert rc == 1 and "manca quota_primi_titoli" in se and "variante-lt.json" in se and "Traceback" not in se, se[-300:]
+    sync_playwright, lancia = browser()
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert page.locator("#sez-look_through svg").count() >= 2
+            testo = page.inner_text("#sez-look_through")
+            assert "1 posizione senza composizione" in testo and "minimo della concentrazione" in testo, testo[:800]
+            assert formato_it_percento(lt["copertura"]["settori"]) in testo, testo[:800]
+        finally:
+            br.close()
 
 
 @test("T17 cruscotto: gli avvisi dell'importatore che nominano le posizioni non entrano nella pagina")

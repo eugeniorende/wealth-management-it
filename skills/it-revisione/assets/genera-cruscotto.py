@@ -3,8 +3,9 @@
 """
 genera-cruscotto.py — il cruscotto grafico del piano, in un file HTML autosufficiente.
 
-Legge i JSON che gli script del plugin scrivono con --json (allocatore, glide path, Monte Carlo
-degli obiettivi, catena della pensione, capitale umano, importatore dei broker, ribilanciamento),
+Legge i JSON che gli script del plugin scrivono con --json (allocatore, look-through del portafoglio,
+glide path, Monte Carlo degli obiettivi, catena della pensione, capitale umano, importatore dei broker,
+ribilanciamento),
 ne riconosce il tipo dalle chiavi, ne estrae solo i campi che la pagina mostra (il «bundle») e li
 incorpora nel template cruscotto.html accanto a questo script. La pagina disegna i grafici nel
 browser, senza librerie né risorse esterne: si apre dal disco, offline, e si può pubblicare come
@@ -63,6 +64,7 @@ def _primo(d, chiave):
 # se uno script cambia le sue chiavi, quel test fallisce e la riga qui va aggiornata.
 FIRME = [
     ("allocatore",      lambda d: _ha(d, "aggregato", "capitale") and "allocato" in _primo(d, "obiettivi")),
+    ("look_through",    lambda d: _ha(d, "copertura", "settori", "paesi", "titoli", "controvalore_totale")),
     ("glide_path",      lambda d: _ha(d, "anni", "portafoglio", "finestra") and "quota_azionaria" in _primo(d, "obiettivi")),
     ("mc_obiettivi",    lambda d: _ha(d, "n_sim") and "probabilita_successo" in _primo(d, "obiettivi")),
     ("inps",            lambda d: _ha(d, "pensione_inps_lorda_annua", "coefficiente_trasformazione")),
@@ -159,6 +161,27 @@ def _allocazione(alloc, rib):
             riga["risultante"] = risultante.get(classe) if isinstance(risultante, dict) else None
             sezione["classi"].append(riga)
     return sezione
+
+
+def _look_through(lt):
+    """Solo gli aggregati del look-through: le posizioni dell'utente (nomi, ISIN) restano fuori dalla pagina,
+    ne passa il numero e la quota di quelle senza composizione. Paesi oltre i primi dieci sommati in «altri»."""
+    if not lt:
+        return None
+    f, d = lt
+    voci = lambda chiave: [estrai(x, ("nome", "peso"), f, f"{chiave}[{i}]") for i, x in enumerate(lista_di(d, chiave, f))]  # noqa: E731
+    paesi, altri = voci("paesi")[:10], voci("paesi")[10:]
+    if altri:
+        paesi.append({"nome": f"altri {len(altri)} paesi", "peso": sum(p["peso"] for p in altri)})
+    senza = lista_di(d, "senza_composizione", f)
+    return {
+        "copertura": {k: numero_di(d, f"copertura.{k}", f) for k in ("settori", "paesi", "titoli")},
+        "settori": voci("settori"), "paesi": paesi, "titoli": voci("titoli")[:10],
+        "quota_primi_titoli": numero_di(d, "quota_primi_titoli", f),
+        "n_posizioni": len(lista_di(d, "posizioni", f)) + len(senza),
+        "n_senza_composizione": len(senza),
+        "quota_senza_composizione": sum(numero_di(x, "quota", f, dove=f"senza_composizione[{i}].") for i, x in enumerate(senza)),
+    }
 
 
 def _obiettivi(mco):
@@ -311,6 +334,8 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - allocazione: target_aggregato {azioni, obbligazioni, liquidita, totale} | None, capitale, obiettivi
       [{nome, profilo, tipo, richiesto, allocato, peso_az}], classi [{classe, peso, target, tight, wide,
       fuori_banda, risultante}] | None (dal ribilanciamento);
+    - look_through: copertura {settori, paesi, titoli}, settori e titoli [{nome, peso}], paesi [{nome, peso}] con «altri N
+      paesi» oltre i primi dieci, quota_primi_titoli, n_posizioni, n_senza_composizione, quota_senza_composizione;
     - obiettivi: modello, n_sim, obiettivi [{nome, profilo, priorita, anni, target_oggi, target_nominale, gia,
       probabilita_successo, capitale_finale {p10, mediana, p90}, versamento_deterministico,
       versamento_confidenza, confidenza}], totale_versamento_deterministico, totale_versamento_confidenza;
@@ -335,6 +360,7 @@ def componi_bundle(sorgenti, data, versione_plugin):
         "plugin": versione_plugin,
         "fonti": [{"file": sorgenti[t][0], "tipo": t} for t in ORDINE if t in sorgenti],
         "allocazione": _allocazione(s("allocatore"), s("ribilanciamento")),
+        "look_through": _look_through(s("look_through")),
         "obiettivi": _obiettivi(s("mc_obiettivi")),
         "glide_path": _glide_path(s("glide_path")),
         "pensione": _pensione(s("inps"), s("mc_pensione"), s("netto_pensione")),
@@ -377,8 +403,9 @@ def leggi_sorgenti(percorsi):
         tipo = riconosci(dati)
         if tipo is None:
             raise ErroreDati(f"«{nome}» non è un output riconosciuto. Tipi accettati: {', '.join(ORDINE)} "
-                             "(i --json di allocatore, glide path, Monte Carlo degli obiettivi, proiezione INPS, "
-                             "Monte Carlo e netto della pensione, capitale umano, importatore dei broker, ribilanciamento)")
+                             "(i --json di allocatore, look-through del portafoglio, glide path, Monte Carlo degli "
+                             "obiettivi, proiezione INPS, Monte Carlo e netto della pensione, capitale umano, importatore "
+                             "dei broker, ribilanciamento)")
         if tipo.startswith("ignorato:"):
             ignorati.append((nome, tipo.split(":", 1)[1]))
             continue
@@ -453,8 +480,8 @@ def main(argv=None):
         print(f"  {fonte['file']} → {fonte['tipo']}")
     for nome, script in ignorati:
         print(f"  ℹ {nome} ({script}) ignorato: il cruscotto non lo usa")
-    sezioni = [k for k in ("allocazione", "obiettivi", "glide_path", "pensione", "capitale_umano", "fiscalita",
-                           "ribilanciamento") if bundle[k]]
+    sezioni = [k for k in ("allocazione", "look_through", "obiettivi", "glide_path", "pensione", "capitale_umano",
+                           "fiscalita", "ribilanciamento") if bundle[k]]
     print(f"Sezioni: {', '.join(sezioni)}")
     for ind in bundle["indicatori"]:
         nota = f" ({ind['nota']})" if ind["nota"] else ""
