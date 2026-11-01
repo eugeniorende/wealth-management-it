@@ -342,6 +342,7 @@ SCRIPT_CLI = [
     ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
     ("it-pianificazione-obiettivi", "capitale-umano.py"),
     ("it-pianificazione-obiettivi", "importa-composizione-etf.py"),
+    ("it-pianificazione-obiettivi", "look-through-portafoglio.py"),
     ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
@@ -358,6 +359,8 @@ ARGOMENTI_DEFAULT = {
     "genera-cruscotto.py": ("--from", os.path.join(FIXTURES, "cruscotto-allocatore.json")),
     "importa-composizione-etf.py": ("--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
                                     "--strumento", "ETF MSCI World"),
+    "look-through-portafoglio.py": ("--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"),
+                                    "--posizioni", asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json")),
 }
 _OUTPUT_CP1252 = {}
 
@@ -380,7 +383,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 17 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 18 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -415,6 +418,8 @@ def t_cli_help():
     errore_pulito(asset("it-tax-optimization", "importa-estratto-broker.py"), "/non/esiste.csv", atteso="non trovato")
     errore_pulito(asset("it-pianificazione-obiettivi", "importa-composizione-etf.py"), "--file", "/non/esiste.csv",
                   "--strumento", "X", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione-obiettivi", "look-through-portafoglio.py"), "--composizione", "/non/esiste.csv",
+                  "--posizioni", "/non/esiste.json", atteso="non trovato")
     # niente abbreviazioni dei flag: «--se» non è «--set»
     rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--se", "RAL_FINALE_LORDA=1")
     assert rc == 2 and "usage:" in out, (rc, out[-200:])
@@ -5620,6 +5625,123 @@ def t_lt_capitale_umano_isin():
         assert "27,0%" in sezione and "Senza composizione" not in sezione, sezione   # trovato per nome, nessun mancante
         es = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
         assert all(re.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}\d", p["isin"]) for p in es["posizioni"]), es["posizioni"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _broker_look_through(tmp, estratto="estratto-look-through.csv"):
+    """Il JSON dell'importatore dei broker sulla fixture del look-through (due ETF, uno su due broker, un BTP, un'azione)."""
+    rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"), os.path.join(FIXTURES, estratto),
+                         "--anno", "2026", "--json", "broker.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    return os.path.join(tmp, "broker.json")
+
+
+@test("T16 look-through: chiave dei titoli (suffissi, classi, accenti) e nomi che restano vuoti")
+def t_lt_chiave_titolo():
+    m = carica_modulo(asset(*LT))
+    for a, b in (("Apple Inc.", "APPLE INC"), ("ALPHABET INC CLASS A", "Alphabet Inc Class C"),
+                 ("Microsoft Corp", "MICROSOFT CORPORATION"), ("Nestlé SA", "NESTLE S.A."),
+                 ("Taiwan Semiconductor Manufacturing", "TAIWAN SEMICONDUCTOR MANUFACTURING CO LTD"),
+                 ("Samsung Electronics Co Ltd", "SAMSUNG ELECTRONICS"), ("Eni SpA", "ENI S.P.A."),
+                 ("Prologis REIT Inc", "PROLOGIS")):
+        assert m.chiave_titolo(a) == m.chiave_titolo(b) != "", (a, b, m.chiave_titolo(a), m.chiave_titolo(b))
+    for a, b in (("Bank of America", "Bank of Montreal"), ("Nvidia", "Novartis"), ("Shell", "Shell Midstream")):
+        assert m.chiave_titolo(a) != m.chiave_titolo(b), (a, b)
+    # Review Focus 4: un nome che dopo la pulizia non ha più niente non diventa una chiave vuota
+    assert m.chiave_titolo("S.A.") == "" and m.chiave_titolo("-") == "" and m.chiave_titolo("Co") == ""
+
+
+@test("T16 look-through: valori chiusi sulle fixture, due broker sommati, BTP solo nei paesi, senza composizione")
+def t_lt_valori_chiusi():
+    tmp = tempfile.mkdtemp()
+    try:
+        comp = os.path.join(FIXTURES, "composizione-look-through.csv")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", comp, "--posizioni", _broker_look_through(tmp),
+                                      "--json", "lt.json", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.load(open(os.path.join(tmp, "lt.json"), encoding="utf-8"))
+        tot = 9200 + 19500 + 3800 + 2850 + 1500                                   # 36.850
+        assert r["controvalore_totale"] == tot
+        pos = {p["chiave"]: p for p in r["posizioni"]}
+        assert pos["IE00B4L5Y983"]["valore"] == 13000 and pos["IE00B4L5Y983"]["nome"] == "iShares Core MSCI World"   # Review Focus 1: due broker
+        assert pos["IT0005454241"] == {"chiave": "IT0005454241", "nome": "BTP Futura 2037", "valore": 2850,
+                                       "quota": 2850 / tot, "settori": False, "paesi": True, "titoli": False}
+        assert r["senza_composizione"] == [{"chiave": "DE0007164600", "nome": "SAP SE", "valore": 1500, "quota": 1500 / tot}]
+        V_s = 13000 + 19500                                                         # settori e titoli: i due ETF
+        assert abs(r["copertura"]["settori"] - V_s / tot) < 1e-12 and abs(r["copertura"]["titoli"] - V_s / tot) < 1e-12
+        assert abs(r["copertura"]["paesi"] - (V_s + 2850) / tot) < 1e-12
+        settori = {s["voce"]: s["peso"] for s in r["settori"]}
+        assert abs(settori["Information Technology"] - (13000 * .30 + 19500 * .40) / V_s) < 1e-12
+        assert abs(settori["Financials"] - (13000 * .20 + 19500 * .60) / V_s) < 1e-12
+        assert abs(settori["Health Care"] - 13000 * .50 / V_s) < 1e-12 and abs(sum(settori.values()) - 1) < 1e-12
+        assert r["settori"][0]["voce"] == "Financials" and r["settori"][0]["nome"] == "Finanza"   # ordinati per peso
+        paesi = {p["voce"]: p["peso"] for p in r["paesi"]}
+        V_p = V_s + 2850
+        assert abs(paesi["US"] - (13000 * .60 + 19500) / V_p) < 1e-12 and abs(paesi["IT"] - 2850 / V_p) < 1e-12
+        assert r["paesi"][0]["nome"] == "Stati Uniti"
+        titoli = {t["nome"]: t for t in r["titoli"]}
+        assert abs(titoli["Apple Inc."]["peso"] - (13000 * .05 + 19500 * .07) / V_s) < 1e-12      # sommati, nome dal maggiore
+        assert titoli["Apple Inc."]["da"] == ["IE00B5BMR087", "IE00B4L5Y983"]
+        assert abs(titoli["MICROSOFT CORP"]["peso"] - 19500 * .06 / V_s) < 1e-12 and titoli["NESTLE SA"]["da"] == ["IE00B4L5Y983"]
+        assert r["n_titoli_aggregati"] == 3 and abs(r["quota_primi_titoli"] - sum(t["peso"] for t in r["titoli"])) < 1e-12
+        assert "SAP SE (DE0007164600)" in so and "minimo della concentrazione" in so and "€36.850" in so, so
+        assert "Finanza" in so and "Stati Uniti" in so and "Apple Inc." in so, so
+        # Review Focus 2: una posizione che ha solo l'ISIN mentre il CSV ha il nome
+        with open(os.path.join(tmp, "nome.csv"), "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nETF MSCI World;Information Technology;100\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(tmp, "nome.csv"),
+                                      "--posizioni", os.path.join(tmp, "broker.json"), cwd=tmp)
+        assert rc == 1 and "nessuna posizione ha una composizione" in se and "ISIN" in se, se[-300:]
+        # Review Focus 3: uno strumento con sole righe titolo conta solo nei titoli
+        with open(os.path.join(tmp, "solo-titoli.csv"), "w", encoding="utf-8") as f:
+            f.write("strumento;dimensione;voce;peso\nDE0007164600;titolo;SAP SE;100\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(tmp, "solo-titoli.csv"),
+                                      "--posizioni", os.path.join(tmp, "broker.json"), "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.loads(so)
+        assert r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 1500 / tot} and r["settori"] == [] and r["titoli"][0]["peso"] == 1.0
+        # il --dati del capitale umano come sorgente, con --posizioni ripetuto che somma
+        dati = {"persona": {"profilo": "privato_stabile", "eta": 35},
+                "posizioni": [{"asset_class": "azionario", "valore": 1000, "isin": "IE00B5BMR087"},
+                              {"asset_class": "obbligazionario", "valore": 500, "strumento": "IT0005454241"}]}
+        with open(os.path.join(tmp, "cu.json"), "w", encoding="utf-8") as f:
+            json.dump(dati, f)
+        rc, so, se = run_script_split(asset(*LT), "--composizione", comp, "--posizioni", os.path.join(tmp, "cu.json"),
+                                      "--posizioni", os.path.join(tmp, "cu.json"), "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.loads(so)
+        assert r["controvalore_totale"] == 3000 and {p["chiave"]: p["valore"] for p in r["posizioni"]} == {"IE00B5BMR087": 2000, "IT0005454241": 1000}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 look-through: errori con rc 1 (CSV, posizioni, valori), avvisi sul valore zero")
+def t_lt_errori():
+    tmp = tempfile.mkdtemp()
+    try:
+        comp = os.path.join(FIXTURES, "composizione-look-through.csv")
+        broker = _broker_look_through(tmp)
+        def caso(*args):
+            rc, so, se = run_script_split(asset(*LT), *args, cwd=tmp)
+            assert rc == 1 and se.startswith("ERRORE:") and "ERRORE" not in so and "Traceback" not in se, (rc, se[-300:])
+            return se
+        def scrivi(nome, testo):
+            with open(os.path.join(tmp, nome), "w", encoding="utf-8") as f:
+                f.write(testo)
+            return os.path.join(tmp, nome)
+        assert "non trovato" in caso("--composizione", os.path.join(tmp, "no.csv"), "--posizioni", broker)
+        assert "colonne" in caso("--composizione", scrivi("colonne.csv", "isin;settore;peso\nX;Energy;100\n"), "--posizioni", broker)
+        assert "valuta" in caso("--composizione", scrivi("dim.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;valuta;USD;100\n"),
+                                "--posizioni", broker)
+        assert "manca la lista posizioni" in caso("--composizione", comp, "--posizioni", scrivi("senza.json", '{"persona": {}}'))
+        assert "posizioni[0]" in caso("--composizione", comp, "--posizioni",
+                                      scrivi("neg.json", '{"posizioni": [{"isin": "IE00B4L5Y983", "valore": -1}]}'))
+        assert "controvalore totale" in caso("--composizione", comp, "--posizioni",
+                                             scrivi("zero.json", '{"posizioni": [{"isin": "IE00B4L5Y983", "valore": 0}]}'))
+        unozero = scrivi("unozero.json", '{"posizioni": [{"isin": "IE00B4L5Y983", "valore": 0}, {"isin": "IE00B5BMR087", "valore": 100}]}')
+        rc, so, se = run_script_split(asset(*LT), "--composizione", comp, "--posizioni", unozero, cwd=tmp)
+        assert rc == 0 and "valore zero" in so and "IE00B4L5Y983" in so, (so[-400:], se[-300:])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
