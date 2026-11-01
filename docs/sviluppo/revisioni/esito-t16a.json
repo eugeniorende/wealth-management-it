@@ -1,0 +1,84 @@
+{
+  "branch": "claude/happy-faraday-eydaph",
+  "data": "2026-10-25",
+  "applicati": [
+    "importa-composizione-etf.py: lettura di CSV e XLSX, riga d'intestazione da sinonimi italiani e inglesi, preambolo e disclaimer scartati, formato e scala dei pesi per file",
+    "Composizione per settore GICS e paese ISO 3166-1 (elenco completo), esclusione di liquidità, derivati, pesi negativi e righe non classificate, rinormalizzazione per dimensione, ICB senza conversione",
+    "composizione.csv fuso con l'esistente (vecchio formato convertito), --json, report; capitale-umano.py legge i due formati",
+    "Dai file reali di Xtrackers e SPDR (25/10/2026): Zambia nell'elenco dei paesi, «European Union» non classificato, quote minime scritte «< 0,01%»"
+  ],
+  "non_applicati": [
+    "Prova su file reali di iShares, Vanguard e Amundi: dalla sessione cloud i siti non restituiscono il file; schede «da confermare»"
+  ],
+  "mutanti": [
+    {
+      "mutante": "rinormalizzazione tolta (pesi in quota del fondo, non delle righe classificate)",
+      "uccisi_da": [
+        "T16 valori chiusi per emittente",
+        "T16 CSV fuso",
+        "T16 capitale-umano legge i due formati"
+      ],
+      "esito": "ucciso"
+    },
+    {
+      "mutante": "pesi negativi non esclusi",
+      "uccisi_da": [
+        "T16 valori chiusi per emittente (SPDR, contratto di cambio a -0,04%)"
+      ],
+      "esito": "ucciso"
+    },
+    {
+      "mutante": "scala frazione/percento invertita",
+      "uccisi_da": [
+        "T16 valori chiusi per emittente",
+        "T16 CSV fuso"
+      ],
+      "esito": "ucciso"
+    },
+    {
+      "mutante": "precedenza tra colonne candidate rovesciata (vince Industry Classification in SPDR)",
+      "uccisi_da": [
+        "T16 lettura della tabella",
+        "T16 valori chiusi per emittente"
+      ],
+      "esito": "ucciso"
+    }
+  ],
+  "revisione": {
+    "esito": "With fixes",
+    "corretti": [
+      "Critico: separatore del CSV dalla riga d'intestazione (un file italiano lungo e il suo risalvataggio da Excel venivano respinti)",
+      "--strumento senza spazi ai bordi e non vuoto (un nome con uno spazio duplicava il blocco al reimport)",
+      "Dimensione non scritta sotto il 50% di titoli classificati (il 3% del fondo diventava il 100% dei settori)",
+      "Commenti liberi di composizione.csv conservati ai reimport"
+    ],
+    "rinviati": [],
+    "test": "T16 composizione ETF: revisione finale (CSV italiano lungo, --strumento con spazi, poche righe classificate, commenti liberi)",
+    "minori_corretti": {
+      "data": "2026-10-29",
+      "voci": [
+        {
+          "minore": "--set di NOMI_*_ESCLUSIVI con una tupla in traceback; --json - con --set stampava «[override]» prima del JSON; --set ETICHETTE_DATA senza effetto per un emittente riconosciuto",
+          "test": "T16 composizione ETF: --set sulle tabelle ha effetto, una tupla senza virgola è respinta, --json - resta JSON"
+        },
+        {
+          "minore": "ETF obbligazionari con tassonomia di settore propria fermati sui settori sconosciuti",
+          "test": "T16 composizione ETF: ETF obbligazionari con settori propri, solo paesi e la parte azionaria dei misti"
+        },
+        {
+          "minore": "--json FILE scritto dopo --out (e --out che è una cartella in traceback)",
+          "test": "T16 composizione ETF: --out e --json verificati prima di scrivere, nessuno dei due a metà"
+        },
+        {
+          "minore": "date del preambolo 03/04/2026 lette giorno/mese anche sotto un'etichetta inglese",
+          "test": "T16 composizione ETF: data delle posizioni giorno/mese o mese/giorno, l'ambigua non si scrive"
+        },
+        {
+          "minore": "«1 strumenti importati» e la chiave «asset_class» nel report",
+          "test": "T16 composizione ETF: il report dice «1 strumento importato» e nomina le colonne senza chiavi tecniche"
+        }
+      ],
+      "metodo": "TDD: ogni test scritto prima e visto fallire per il motivo atteso, poi la correzione"
+    }
+  }
+}
