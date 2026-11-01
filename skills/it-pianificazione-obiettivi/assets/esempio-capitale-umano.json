@@ -1,5 +1,5 @@
 {
-  "_nota": "Dati d'esempio di capitale-umano.py: uno sviluppatore di 35 anni, dipendente nel privato, settore tecnologico. Copia il file nella cartella di lavoro e sostituisci i valori con i tuoi.",
+  "_nota": "Dati d'esempio di capitale-umano.py: uno sviluppatore di 35 anni, dipendente nel privato, settore tecnologico. Copia il file nella cartella di lavoro e sostituisci i valori con i tuoi. Gli ISIN delle posizioni sono d'esempio (due ETF), servono a provare la chiave con composizione.csv e non sono una raccomandazione.",
   "persona": {
     "profilo": "privato_ciclico",
     "settore": "Information Technology",

@@ -5601,6 +5601,11 @@ def t_ce_lingue():
         assert d["data_posizioni"] == "2026-10-30" and list(d["settori"]) == ["Financials"], d
         assert {k: round(v, 3) for k, v in d["paesi"].items()} == {"DE": 0.556, "IT": 0.444}, d["paesi"]
         assert abs(d["esclusi"]["settore_obbligazionario"] - 0.4) < 1e-9 and abs(d["esclusi"]["settore_non_classificato"] - 0.1) < 1e-9, d["esclusi"]
+        # revisione finale M1: «Secteur» vince su «Industrie» (il livello sotto), come «Sector» su «Industry Classification»
+        f2 = m.componi(file("f2.csv", "Nom;Secteur;Industrie;Pays;Poids (%)\nA;Finance;Banques;France;60\nB;Santé;Pharmacie;Suisse;40\n"), "F")
+        assert f2["colonne"]["settore"] == "Secteur" and set(f2["settori"]) == {"Financials", "Health Care"}, f2
+        # M2: mesi con accento o dieresi
+        assert m._data("31 déc. 2026") == "2026-12-31" and m._data("1. März 2026") == "2026-03-01" and m._data("15 août 2026") == "2026-08-15"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -5791,6 +5796,22 @@ def t_lt_errori():
         unozero = scrivi("unozero.json", '{"posizioni": [{"isin": "IE00B4L5Y983", "valore": 0}, {"isin": "IE00B5BMR087", "valore": 100}]}')
         rc, so, se = run_script_split(asset(*LT), "--composizione", comp, "--posizioni", unozero, cwd=tmp)
         assert rc == 0 and "valore zero" in so and "IE00B4L5Y983" in so, (so[-400:], se[-300:])
+        # revisione finale I3: titoli scritti a mano in frazione accanto a settori in percento, e sole righe titolo sotto 1
+        fraz = scrivi("fraz.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;settore;Financials;100,00\n"
+                                  "IE00B4L5Y983;titolo;APPLE INC;0,05\nIE00B5BMR087;titolo;MICROSOFT CORP;0,8\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", fraz, "--posizioni", broker, "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.loads(so)
+        assert sum(1 for a in r["avvisi"] if "IE00B4L5Y983" in a and "percento" in a) == 1, r["avvisi"]
+        assert sum(1 for a in r["avvisi"] if "IE00B5BMR087" in a and "frazione" in a) == 1, r["avvisi"]
+        # M5: un titolo il cui nome resta vuoto non diventa una chiave vuota; M7: chiavi del CSV senza posizione nel report
+        vuoto = scrivi("vuoto.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;titolo;S.A.;5\nIE00B4L5Y983;titolo;APPLE INC;5\n"
+                                    "LU0000000001;settore;Energy;100\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", vuoto, "--posizioni", broker, cwd=tmp)
+        assert rc == 0 and "«S.A.»" in so and "senza posizione: LU0000000001" in so, (so[-500:], se[-300:])
+        rc, so, se = run_script_split(asset(*LT), "--composizione", vuoto, "--posizioni", broker, "--json", "-", cwd=tmp)
+        assert [t["nome"] for t in json.loads(so)["titoli"]] == ["APPLE INC"] and json.loads(so)["composizioni_senza_posizione"] == ["LU0000000001"]
+        assert "tupla" in caso("--composizione", comp, "--posizioni", broker, "--set", "SUFFISSI_SOCIETARI=('spa')")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -6201,12 +6222,35 @@ def t_lt_cruscotto():
     assert rc == 0, se[-300:]
     lt, r = b["look_through"], json.load(open(js["lt.json"], encoding="utf-8"))
     assert set(lt) == {"copertura", "settori", "paesi", "titoli", "quota_primi_titoli", "n_posizioni", "n_senza_composizione",
-                       "quota_senza_composizione"}, set(lt)
+                       "quota_senza_composizione", "n_titoli_diretti"}, set(lt)
     assert lt["settori"][0] == {"nome": "Finanza", "peso": r["settori"][0]["peso"]} and lt["n_senza_composizione"] == 1
     assert lt["paesi"][0]["nome"] == "Stati Uniti" and lt["titoli"][0]["nome"] == "Apple Inc." and lt["n_posizioni"] == 4
     for vietato in ("IE00B4L5Y983", "DE0007164600", "SAP SE", "iShares Core MSCI World", "BTP Futura"):
         assert vietato not in html, vietato
     assert "lt.json → look_through" in so and "look_through" in so.split("Sezioni:")[1], so
+    # revisione finale I1: una posizione diretta descritta a mano con una riga «titolo» è una posizione dell'utente e non
+    # entra nella pagina; M3: N_TITOLI_REPORT taglia la lista e la quota insieme
+    tmp = os.path.dirname(js["lt.json"])
+    with open(os.path.join(FIXTURES, "composizione-look-through.csv"), encoding="utf-8") as f, \
+         open(os.path.join(tmp, "comp-dirette.csv"), "w", encoding="utf-8") as g:
+        g.write(f.read() + "IT0005454241;titolo;BTP Futura 2037;100\nDE0007164600;paese;DE;100\nDE0007164600;titolo;SAP SE;100\n")
+    rc, out = run_script(asset(*LT), "--composizione", "comp-dirette.csv", "--posizioni", "broker-lt.json", "--json", "lt-dirette.json",
+                         "--set", "N_TITOLI_REPORT=2", cwd=tmp)
+    assert rc == 0 and "BTP Futura 2037" in out, out[-400:]                       # nel report a terminale sì
+    r = json.load(open(os.path.join(tmp, "lt-dirette.json"), encoding="utf-8"))
+    diretti = {t["nome"]: t["diretto"] for t in r["titoli"]}
+    assert diretti == {"Apple Inc.": False, "MICROSOFT CORP": False, "NESTLE SA": False, "BTP Futura 2037": True, "SAP SE": True}, diretti
+    assert r["n_titoli_report"] == 2 and abs(r["quota_primi_titoli"] - sum(t["peso"] for t in r["titoli"][:2])) < 1e-12
+    rc, _, se, b_d, html_dirette = _cruscotto(os.path.join(tmp, "lt-dirette.json"))   # html resta la pagina di lt.json
+    assert rc == 0, se[-300:]
+    assert [t["nome"] for t in b_d["look_through"]["titoli"]] == [t["nome"] for t in r["titoli"] if not t["diretto"]][:2]
+    assert b_d["look_through"]["n_titoli_diretti"] == 2 and abs(b_d["look_through"]["quota_primi_titoli"] - r["quota_primi_titoli"]) < 1e-12
+    for vietato in ("BTP Futura", "SAP SE", "IT0005454241", "DE0007164600"):
+        assert vietato not in html_dirette, vietato
+    def peso_testo(d):
+        d["titoli"][0]["peso"] = "5"
+    rc, _, se, _, _ = _cruscotto(_json_variante("lt.json", peso_testo))
+    assert rc == 1 and "non è un numero" in se, se[-300:]
     # Review Focus 5: un JSON di prima di una modifica delle chiavi si rifiuta con «manca …», senza traceback
     def senza(d):
         del d["quota_primi_titoli"]
@@ -6222,6 +6266,9 @@ def t_lt_cruscotto():
             testo = page.inner_text("#sez-look_through")
             assert "1 posizione senza composizione" in testo and "minimo della concentrazione" in testo, testo[:800]
             assert formato_it_percento(lt["copertura"]["settori"]) in testo, testo[:800]
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_dirette)
+            testo = page.inner_text("#sez-look_through")
+            assert errori == [] and "2 titoli di posizioni dirette non mostrati" in testo and "BTP" not in testo, testo[-600:]
         finally:
             br.close()
 
@@ -6269,6 +6316,13 @@ def t_t17_ponte_riscatto():
     assert r["onere_agevolato"] == ris["onere_agevolato"] and r["onere_ordinario"] == ris["onere_ordinario"]
     assert r["costo_netto"] == ris["costo_netto"] and r["anni_per_rientrare"] == ris["anni_per_rientrare"]
     assert r["eta_anticipata_con_riscatto"] == ris["eta_anticipata_con_riscatto"] and r["modalita"] == "agevolato"
+    assert r["rate_mensili"] == ris["rate_mensili"] == 120                      # revisione finale I2: le rate dal JSON
+    tmp = os.path.dirname(js["ris.json"])
+    rc, out = run_script(asset("it-pianificazione", "riscatto-laurea.py"), "--from", "dati.json", "--from", "inps.json",
+                         "--set", "RATE_MENSILI=1", "--json", "ris-unica.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    rc, _, se, b1, html_unica = _cruscotto(os.path.join(tmp, "ris-unica.json"))
+    assert rc == 0 and b1["pensione"]["riscatto"]["rate_mensili"] == 1, se[-300:]
     # un JSON di prima di una modifica delle chiavi si rifiuta con «manca …»
     def senza(d):
         del d["capitale_necessario"]
@@ -6285,9 +6339,12 @@ def t_t17_ponte_riscatto():
             assert "Ponte pensionistico" in testo and "uscita a 62" in testo and "69" in testo, testo[:600]
             assert formato_it_percento(ponte["probabilita_successo"]) in testo and "€120.704" in testo, testo[:900]
             assert "RITA" in testo and "Riscatto della laurea" in testo and "€31.033" in testo and "19,1 anni" in testo, testo[-900:]
-            assert "73,3" in testo and "78,3" in testo, testo[-600:]
+            assert "73,3" in testo and "78,3" in testo and "in 120 rate" in testo, testo[-600:]
             for brutto in ("NaN", "undefined", "null"):
                 assert brutto not in testo, brutto
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_unica)
+            testo = page.inner_text("#sez-pensione")
+            assert errori == [] and "Unica soluzione" in testo and "120" not in testo, testo[-600:]
         finally:
             br.close()
 
@@ -6544,6 +6601,9 @@ def t_contratto_revisione():
                     ["--composizione", asset("it-pianificazione-obiettivi", "esempio-composizione.csv")]),
         "imp.json": (asset("it-tax-optimization", "importa-estratto-broker.py"),
                      [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
+        "lt.json": (asset("it-pianificazione-obiettivi", "look-through-portafoglio.py"),
+                    ["--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"),
+                     "--posizioni", asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json")]),
     }
     try:
         js = {}
@@ -6580,7 +6640,8 @@ def t_contratto_revisione():
                   ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"),
                   ("cu.json", "esposizione_finanziaria"), ("cu.json", "esposizione_totale"),
                   ("cu.json", "settore.quota_settore_fin"), ("cu.json", "settore.sovrappeso"), ("cu.json", "eta_sorpasso"),
-                  ("cu.json", "stato_sorpasso"))
+                  ("cu.json", "stato_sorpasso"), ("lt.json", "settori[].peso"), ("lt.json", "paesi[].nome"), ("lt.json", "titoli[].peso"),
+                  ("lt.json", "copertura.settori"), ("lt.json", "quota_primi_titoli"), ("lt.json", "senza_composizione[].nome"))
         for nome, percorso in attese:
             assert percorso.replace("[]", "[") .split("[")[0].split(".")[-1] in tabella or percorso in tabella, \
                 f"la tabella del contratto non nomina «{percorso}»"

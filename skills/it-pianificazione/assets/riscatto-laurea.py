@@ -274,6 +274,7 @@ def main():
             "onere_agevolato": round(agev["onere"], 2),
             "onere_ordinario": round(ordi["onere"], 2),
             "rata_mensile": round(scelto["rata"], 2),
+            "rate_mensili": int(RATE_MENSILI),
             "costo_netto": round(scelto["netto"], 2),
             "coefficiente_trasformazione": round(coeff, 5),
             "delta_montante_al_pensionamento": round(scelto["delta_montante"], 2),

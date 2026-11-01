@@ -66,10 +66,20 @@ DIMENSIONI = ("settori", "paesi", "titoli")
 
 # ── Chiave dei titoli ────────────────────────────────────────────────────────
 
+def _tabella(nome):
+    """Una tabella in testa allo script, letta al momento dell'uso (--set ha effetto) e normalizzata. Una stringa
+    al posto della tupla è il refuso più comune (--set "NOME=('spa')" senza la virgola finale)."""
+    valore = globals()[nome]
+    if isinstance(valore, str) or not isinstance(valore, (tuple, list, set, frozenset)):
+        errore(f"--set {nome}: serve una tupla di nomi, per esempio ('{valore}',) con la virgola finale")
+    return tuple(normalizza(v) for v in valore)
+
+
 def chiave_titolo(nome):
     """La chiave con cui lo stesso titolo si somma tra ETF diversi: maiuscole, senza accenti né punteggiatura,
     senza le classi di azioni (ovunque) e i suffissi societari (in coda, ripetutamente). «Apple Inc.» e «APPLE INC»
     danno APPLE; «ALPHABET INC CLASS A» e «Alphabet Inc Class C» danno ALPHABET. Stringa vuota se non resta nulla."""
+    suffissi, classi = _tabella("SUFFISSI_SOCIETARI"), _tabella("CLASSI_AZIONI")
     parole = normalizza(nome).split()
     cambiato = True
     while cambiato and parole:
@@ -78,7 +88,7 @@ def chiave_titolo(nome):
             if len(parole) >= len(sigla) and tuple(parole[-len(sigla):]) == sigla:
                 parole = parole[:-len(sigla)]
                 cambiato = True
-        for classe in CLASSI_AZIONI:
+        for classe in classi:
             seq = classe.split()
             i = 0
             while i <= len(parole) - len(seq):
@@ -87,7 +97,7 @@ def chiave_titolo(nome):
                     cambiato = True
                 else:
                     i += 1
-        if parole and parole[-1] in SUFFISSI_SOCIETARI:
+        if parole and parole[-1] in suffissi:
             parole = parole[:-1]
             cambiato = True
     return " ".join(parole).upper()
@@ -99,12 +109,14 @@ def _numero_csv(testo):
     return float(testo.strip().rstrip("%").replace(",", "."))
 
 
-def leggi_composizione(path):
+def leggi_composizione(path, avvisi=None):
     """{chiave: {"settori": {GICS: frazione}, "paesi": {ISO: frazione}, "titoli": {nome: frazione}}} dal CSV
     dell'importatore (strumento;dimensione;voce;peso) o dal vecchio strumento;settore;peso (solo settori).
     Pesi in percento o in frazione, per strumento e dimensione: settori e paesi come in capitale-umano.py (somma
     sopra 1,5 → percento); i titoli seguono la scala delle altre dimensioni dello strumento, o sono percento se
-    uno supera 1. Colonne, dimensioni, settori, paesi o pesi non riconosciuti fermano lo script."""
+    uno supera 1; nei casi in cui la scala dei titoli è un'inferenza (pesi tutti fino a 1) un avviso lo dice.
+    Colonne, dimensioni, settori, paesi o pesi non riconosciuti fermano lo script."""
+    avvisi = [] if avvisi is None else avvisi
     if not os.path.exists(path):
         errore(f"--composizione: file non trovato: {path}")
     with open(path, "rb") as f:
@@ -167,8 +179,15 @@ def leggi_composizione(path):
                 errore(f"--composizione: i pesi dei {dim} di {strumento!r} sommano a {pct(totale)}, non a 100%")
         titoli = dims["titoli"]
         if titoli:
-            in_percento = percento.get((strumento, "titoli")) or (scala_nota if scala_nota is not None
-                                                                   else max(titoli.values()) > 1)
+            esplicito = percento.get((strumento, "titoli"))
+            in_percento = esplicito or (scala_nota if scala_nota is not None else max(titoli.values()) > 1)
+            if not esplicito and max(titoli.values()) <= 1:
+                if scala_nota:
+                    avvisi.append(f"{strumento}: i pesi dei titoli non superano 1 e sono letti in percento come i settori e i "
+                                  "paesi dello strumento (0,05 = 0,05%): se li hai scritti in frazione, scrivili in percento")
+                elif scala_nota is None:
+                    avvisi.append(f"{strumento}: sole righe «titolo» con pesi fino a 1, letti come frazione (0,8 = 80%): "
+                                  "se intendevi il percento, scrivi «0,8%» o usa valori sopra 1")
             if in_percento:
                 for k in titoli:
                     titoli[k] /= 100
@@ -250,6 +269,12 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
                "come --strumento (--isin di importa-composizione-etf.py), o compila le righe a mano con l'ISIN "
                "della posizione come chiave")
 
+    # una posizione diretta descritta a mano: una sola riga «titolo» al 100% (è la posizione stessa, non un titolo
+    # di un ETF): nel JSON «diretto», così il cruscotto non la mostra
+    diretti = {chiave for chiave, c in composizione.items() if len(c["titoli"]) == 1 and max(c["titoli"].values()) >= 0.999}
+    usate = {v["chiave"] for v, _ in con}
+    senza_posizione = sorted(k for k in composizione if k not in usate)
+
     copertura, pesi = {}, {}
     for d in DIMENSIONI:
         coperte = [(v, c) for v, c in con if v[d]]
@@ -280,11 +305,13 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
             t["nomi"][nome] = t["nomi"].get(nome, 0.0) + contributo
             t["da"][v["chiave"]] = t["da"].get(v["chiave"], 0.0) + contributo
     lista_titoli = [{"nome": max(t["nomi"], key=t["nomi"].get), "peso": t["peso"],
-                     "da": [s for s, _ in sorted(t["da"].items(), key=lambda kv: -kv[1])]}
+                     "da": [s for s, _ in sorted(t["da"].items(), key=lambda kv: -kv[1])],
+                     "diretto": all(s in diretti for s in t["da"])}
                     for t in sorted(titoli.values(), key=lambda t: -t["peso"])]
     return {"controvalore_totale": totale, "posizioni": [v for v, _ in con], "senza_composizione": senza,
+            "composizioni_senza_posizione": senza_posizione,
             "copertura": copertura, "settori": settori, "paesi": paesi, "titoli": lista_titoli,
-            "quota_primi_titoli": sum(t["peso"] for t in lista_titoli[:n_report]),
+            "n_titoli_report": n_report, "quota_primi_titoli": sum(t["peso"] for t in lista_titoli[:n_report]),
             "n_titoli_aggregati": len(lista_titoli), "avvisi": avvisi}
 
 
@@ -305,6 +332,9 @@ def stampa(r):
     if r["senza_composizione"]:
         print("   Senza composizione (importa il file delle posizioni con l'ISIN, o compila le righe a mano): "
               + "; ".join(f"{_nome_chiave(v)} {euro(v['valore'])}, {pct(v['quota'])}" for v in r["senza_composizione"]))
+    if r["composizioni_senza_posizione"]:
+        print("   Composizioni senza posizione: " + ", ".join(r["composizioni_senza_posizione"])
+              + " (chiavi del CSV che nessuna posizione usa, né per ISIN né per nome)")
     for a in r["avvisi"]:
         print(f"   ⚠️  {a}")
 
@@ -337,9 +367,10 @@ def main():
                           (("--posizioni",), {"action": "append", "required": True, "metavar": "FILE",
                                               "help": "JSON con la lista posizioni: il --json di importa-estratto-broker.py "
                                                       "o il --dati del capitale umano (ripetibile, un file per broker)"})])
-    composizione = leggi_composizione(args.composizione)
-    posizioni, avvisi = leggi_posizioni(args.posizioni)
-    r = aggrega(posizioni, composizione, args.composizione, avvisi)
+    avvisi = []
+    composizione = leggi_composizione(args.composizione, avvisi)
+    posizioni, avvisi_posizioni = leggi_posizioni(args.posizioni)
+    r = aggrega(posizioni, composizione, args.composizione, avvisi + avvisi_posizioni)
     if args.json == "-":
         print(json.dumps(r, ensure_ascii=False, indent=2))
         return

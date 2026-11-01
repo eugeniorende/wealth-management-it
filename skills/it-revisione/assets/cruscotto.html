@@ -532,7 +532,9 @@ footer .fonti { color: var(--muto); }
       // barre e non tabella: la tabella ha una larghezza minima pensata per sei colonne e su un telefono scorrerebbe
       s.appendChild(barre(l.titoli.map(function (t) { return { nome: t.nome, valore: t.peso }; }), fmt, "Primi titoli aggregati del portafoglio"));
       s.appendChild(el("p", { class: "nota", testo: "I primi " + l.titoli.length + " titoli pesano " + pct(l.quota_primi_titoli) +
-        " della parte coperta. Sono i primi di ogni ETF per peso: un minimo della concentrazione, non il totale." }));
+        " della parte coperta. Sono i primi di ogni ETF per peso: un minimo della concentrazione, non il totale." +
+        (l.n_titoli_diretti ? " " + l.n_titoli_diretti + (l.n_titoli_diretti === 1 ? " titolo di posizione diretta non mostrato" :
+          " titoli di posizioni dirette non mostrati") + ": sono posizioni tue, non titoli di un ETF." : "") }));
     } else {
       s.appendChild(el("p", { class: "nota", testo: "Nessuna posizione con i titoli nella composizione." }));
     }
@@ -642,7 +644,8 @@ footer .fonti { color: var(--muto); }
                            { nome: "Onere ordinario", valore: k.onere_ordinario, colore: "var(--muto)" },
                            { nome: "Costo netto (" + k.modalita + ")", valore: k.costo_netto }],
                           euro, "Onere del riscatto, agevolato contro ordinario, e costo netto"));
-      s.appendChild(el("p", { class: "nota", testo: "Rata mensile " + euro(k.rata_mensile) + " per 120 mesi; pensione lorda in più " +
+      s.appendChild(el("p", { class: "nota", testo: (k.rate_mensili > 1 ? "Rata mensile " + euro(k.rata_mensile) + " in " + nf0.format(k.rate_mensili) + " rate" :
+        "Unica soluzione " + euro(k.rata_mensile)) + "; pensione lorda in più " +
         euro(k.delta_pensione_lorda_annua) + " l'anno a " + anni(k.eta_pensionamento) + " anni; rientro in " + anni(k.anni_per_rientrare) +
         " anni di pensione. Pensione anticipata ordinaria: da " + anni(k.eta_anticipata_senza_riscatto) + " a " +
         anni(k.eta_anticipata_con_riscatto) + " anni." }));

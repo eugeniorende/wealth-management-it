@@ -225,7 +225,7 @@ python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv 
 python "${CLAUDE_SKILL_DIR}/assets/capitale-umano.py" --dati capitale-umano.json --composizione composizione.csv --json capitale-umano-out.json
 ```
 
-La composizione per la diagnosi 4 si importa dal **file delle posizioni** di ogni ETF, scaricato dalla pagina del fondo sul sito dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, in italiano, inglese, tedesco o francese): l'importatore scrive `composizione.csv` per settore GICS e paese, con le esclusioni dichiarate. `--strumento` va scritto come il campo `strumento` delle posizioni, altrimenti lo strumento finisce tra quelli senza composizione. Formati, esclusioni e limiti in `references/composizione-etf.md`; la compilazione a mano di `composizione.csv` resta possibile.
+La composizione per la diagnosi 4 si importa dal **file delle posizioni** di ogni ETF, scaricato dalla pagina del fondo sul sito dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, in italiano, inglese, tedesco o francese): l'importatore scrive `composizione.csv` per settore GICS, paese e primi titoli, con le esclusioni dichiarate. `--strumento` (o `--isin`) va scritto come l'`isin` o il campo `strumento` delle posizioni, altrimenti lo strumento finisce tra quelli senza composizione. Formati, esclusioni e limiti in `references/composizione-etf.md`; la compilazione a mano di `composizione.csv` resta possibile.
 
 Il JSON ha la forma di `assets/esempio-capitale-umano.json` (persona, pensione, posizioni con lo schema di `it-rebalance`); età di pensione e pensione netta possono arrivare con `--from` dai JSON di `proiezione-inps.py` e `netto-pensione.py`. Le cinque diagnosi:
 

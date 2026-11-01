@@ -60,8 +60,9 @@ SINONIMI_COLONNE = {
              "gewichtung (%)", "gewichtung", "gewicht (%)", "gewicht", "anteil (%)", "anteil", "% des nettovermögens",
              "% des fondsvermögens", "pondération (%)", "pondération", "poids (%)", "poids", "% de l'actif net",
              "% de l'actif"),
+    # l'ordine conta: «secteur» prima di «industrie» (il livello sotto), come «sector» prima di «industry classification»
     "settore": ("sector", "gics sector", "sector classification", "industry classification", "settore",
-                "settore gics", "branche", "sektor", "industrie", "secteur", "secteur gics", "classification sectorielle"),
+                "settore gics", "secteur", "secteur gics", "classification sectorielle", "branche", "sektor", "industrie"),
     "paese": ("location", "country", "trade country name", "country of risk", "domicile", "area geografica",
               "paese", "nazione", "land", "standort", "sitzland", "pays", "localisation", "pays de risque"),
     "asset_class": ("asset class", "type of security", "security type", "asset type", "classe di attivo",
@@ -706,7 +707,9 @@ def _data(valore, giorno_prima=True):
     e senza (etichetta inglese) solleva DataAmbigua."""
     if isinstance(valore, (datetime.datetime, datetime.date)):
         return valore.strftime("%Y-%m-%d")
-    testo = str(valore or "")
+    # senza accenti né dieresi, così «déc.», «août» e «März» entrano nelle regex dei mesi
+    testo = unicodedata.normalize("NFKD", str(valore or ""))
+    testo = "".join(c for c in testo if not unicodedata.combining(c))
     tentativi = []
     m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", testo)
     if m:

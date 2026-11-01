@@ -41,8 +41,28 @@
     }
   ],
   "revisione": {
-    "esito": "in corso: revisione finale dell'intero branch del ciclo 0.12.0 (look-through, ponte e riscatto nel cruscotto, lingue) a fine ciclo",
-    "corretti": [],
-    "rinviati": []
+    "esito": "With fixes (revisore fresco sull'intero branch del ciclo 0.12.0, 1/11/2026; sostituisce il workflow review-tema-roadmap.js, non richiesto in questa sessione)",
+    "corretti": [
+      "I1: il titolo di una posizione diretta (riga «titolo» al 100% scritta a mano) finiva nel cruscotto: ora «diretto» nel JSON, escluso dalla pagina e contato",
+      "I2: «per 120 mesi» fisso nel cruscotto del riscatto: riscatto-laurea.py scrive rate_mensili, la pagina dice «in N rate» o «Unica soluzione»",
+      "I3: pesi dei titoli scritti a mano in frazione divisi per 100 in silenzio: avviso quando la scala è inferita, reference con la regola «sempre in percento»",
+      "M1: «Industrie» vinceva su «Secteur» tra i sinonimi del settore",
+      "M2: mesi con accento o dieresi («déc.», «août», «März») non letti: accenti tolti prima delle regex",
+      "M3: N_TITOLI_REPORT nel JSON (n_titoli_report), usato dal cruscotto per tagliare la lista",
+      "M5: test sul nome vuoto nel CSV (avviso, nessuna chiave vuota) e riga Look-through nel test del contratto di input",
+      "M6: README, Step 8 e _nota dell'esempio allineati al codice",
+      "M7: --set delle tabelle del look-through con la guardia sulla tupla; pesi del JSON controllati come numeri nel cruscotto; chiavi del CSV senza posizione nel report e nel JSON"
+    ],
+    "rinviati": [
+      "M4: l'avviso «titoli senza riga titolo» tolto dalla spec (un CSV di soli settori è il caso normale del vecchio formato)",
+      "M7: unire per nome una posizione senza ISIN con la stessa posizione con ISIN su un altro broker (caso raro: gli estratti dei broker italiani hanno l'ISIN)"
+    ],
+    "test": [
+      "T16 look-through: il cruscotto riconosce il JSON… (posizioni dirette, N_TITOLI_REPORT, peso non numerico)",
+      "T17 cruscotto: ponte pensione e riscatto della laurea… (rate_mensili, unica soluzione)",
+      "T16 look-through: errori… (pesi in frazione, nome vuoto, --set senza tupla, composizioni senza posizione)",
+      "T16 composizione ETF: lingue tedesca e francese (Secteur/Industrie, mesi con accento)",
+      "T9 contratto di input della revisione (riga Look-through)"
+    ]
   }
 }

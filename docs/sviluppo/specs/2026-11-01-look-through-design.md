@@ -94,7 +94,7 @@ IE00B4L5Y983;titolo;APPLE INC;4,60
 
 - `quota` di una posizione è sul controvalore totale; i `peso` di settori, paesi e titoli sono sulla **parte coperta** di quella dimensione (sommano a 1 per settori e paesi; per i titoli sommano alla quota coperta dai primi N di ogni ETF, che è un **minimo** della concentrazione vera).
 - `quota_primi_titoli`: somma dei pesi dei primi `N_TITOLI_REPORT` titoli aggregati.
-- `titoli[].da`: le chiavi degli strumenti che contribuiscono (per capire da dove viene una concentrazione); `nome` è quello dello strumento che contribuisce di più.
+- `titoli[].da`: le chiavi degli strumenti che contribuiscono (per capire da dove viene una concentrazione); `nome` è quello dello strumento che contribuisce di più; `titoli[].diretto` è vero quando tutti gli strumenti che contribuiscono sono posizioni dirette descritte a mano (una sola riga `titolo` al 100%): il cruscotto non li mostra. `n_titoli_report` dice quanti titoli contano in `quota_primi_titoli`.
 - `senza_composizione` e `posizioni` portano nomi e ISIN: servono al report e a `it-revisione`, **non** entrano nel cruscotto (§4).
 - Chiavi di primo livello che fanno da firma per il cruscotto: `copertura`, `settori`, `paesi`, `titoli`, `controvalore_totale`.
 
@@ -134,7 +134,7 @@ LOOK-THROUGH DEL PORTAFOGLIO — cosa possiedi sommando gli ETF (pesato per cont
 Non è consulenza: è la fotografia delle composizioni alla data dei file degli emittenti, da riguardare a ogni revisione.
 ```
 
-Tutti i numeri con `numero()`, `euro()`, `pct()` del motore. Gli avvisi (posizioni a valore zero, titoli senza riga `titolo` in uno strumento che ha i settori) dopo la testata con «⚠️».
+Tutti i numeri con `numero()`, `euro()`, `pct()` del motore. Gli avvisi (posizioni a valore zero, pesi dei titoli scritti a mano con una scala inferita, nomi di titolo vuoti dopo la pulizia) dopo la testata con «⚠️», e le chiavi del CSV che nessuna posizione usa («Composizioni senza posizione»). (Revisione finale: l'avviso «titoli senza riga `titolo`» previsto all'inizio non si implementa, un CSV di soli settori è il caso normale del vecchio formato.)
 
 ## 4. Cruscotto
 

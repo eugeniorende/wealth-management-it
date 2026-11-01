@@ -169,14 +169,20 @@ def _look_through(lt):
     if not lt:
         return None
     f, d = lt
-    voci = lambda chiave: [estrai(x, ("nome", "peso"), f, f"{chiave}[{i}]") for i, x in enumerate(lista_di(d, chiave, f))]  # noqa: E731
+    def voci(chiave):
+        return [{"nome": str(campo(x, "nome", f, f"{chiave}[{i}].")), "peso": numero_di(x, "peso", f, dove=f"{chiave}[{i}].")}
+                for i, x in enumerate(lista_di(d, chiave, f))]
     paesi, altri = voci("paesi")[:10], voci("paesi")[10:]
     if altri:
         paesi.append({"nome": f"altri {len(altri)} paesi", "peso": sum(p["peso"] for p in altri)})
     senza = lista_di(d, "senza_composizione", f)
+    # i titoli «diretti» sono posizioni dell'utente descritte a mano: restano fuori dalla pagina, se ne dice il numero
+    n_report = numero_di(d, "n_titoli_report", f)
+    titoli = [t for t, x in zip(voci("titoli"), lista_di(d, "titoli", f)) if not x.get("diretto")]
     return {
         "copertura": {k: numero_di(d, f"copertura.{k}", f) for k in ("settori", "paesi", "titoli")},
-        "settori": voci("settori"), "paesi": paesi, "titoli": voci("titoli")[:10],
+        "settori": voci("settori"), "paesi": paesi, "titoli": titoli[:n_report],
+        "n_titoli_diretti": len(voci("titoli")) - len(titoli),
         "quota_primi_titoli": numero_di(d, "quota_primi_titoli", f),
         "n_posizioni": len(lista_di(d, "posizioni", f)) + len(senza),
         "n_senza_composizione": len(senza),
@@ -243,8 +249,8 @@ def _pensione(inps, mc, netto, ponte=None, riscatto=None):
         f, d = riscatto
         sezione["riscatto"] = {"modalita": campo(d, "modalita", f)}
         sezione["riscatto"].update({k: numero_di(d, k, f) for k in ("anni_riscatto", "onere_agevolato", "onere_ordinario",
-                                                                    "costo_netto", "rata_mensile", "delta_pensione_lorda_annua",
-                                                                    "eta_pensionamento")})
+                                                                    "costo_netto", "rata_mensile", "rate_mensili",
+                                                                    "delta_pensione_lorda_annua", "eta_pensionamento")})
         sezione["riscatto"].update({k: numero_di(d, k, f, nullo=True) for k in ("anni_per_rientrare", "eta_anticipata_senza_riscatto",
                                                                                 "eta_anticipata_con_riscatto")})
     return sezione
@@ -351,8 +357,9 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - allocazione: target_aggregato {azioni, obbligazioni, liquidita, totale} | None, capitale, obiettivi
       [{nome, profilo, tipo, richiesto, allocato, peso_az}], classi [{classe, peso, target, tight, wide,
       fuori_banda, risultante}] | None (dal ribilanciamento);
-    - look_through: copertura {settori, paesi, titoli}, settori e titoli [{nome, peso}], paesi [{nome, peso}] con «altri N
-      paesi» oltre i primi dieci, quota_primi_titoli, n_posizioni, n_senza_composizione, quota_senza_composizione;
+    - look_through: copertura {settori, paesi, titoli}, settori e titoli [{nome, peso}] (i titoli delle posizioni dirette
+      esclusi, contati in n_titoli_diretti), paesi [{nome, peso}] con «altri N paesi» oltre i primi dieci,
+      quota_primi_titoli, n_posizioni, n_senza_composizione, quota_senza_composizione;
     - obiettivi: modello, n_sim, obiettivi [{nome, profilo, priorita, anni, target_oggi, target_nominale, gia,
       probabilita_successo, capitale_finale {p10, mediana, p90}, versamento_deterministico,
       versamento_confidenza, confidenza}], totale_versamento_deterministico, totale_versamento_confidenza;
@@ -363,7 +370,7 @@ def componi_bundle(sorgenti, data, versione_plugin):
       tasso_sostituzione_netto, tasso_sostituzione_lordo}]} | None, ponte {eta_uscita, eta_pensione_vecchiaia,
       anni_ponte, capitale_ponte, probabilita_successo, capitale_necessario {85%, 95%}, rita {attiva, eta_inizio,
       rata_netta}, costo_permanente_lordo_annuo} | None, riscatto {modalita, anni_riscatto, onere_agevolato,
-      onere_ordinario, costo_netto, rata_mensile, delta_pensione_lorda_annua, eta_pensionamento, anni_per_rientrare,
+      onere_ordinario, costo_netto, rata_mensile, rate_mensili, delta_pensione_lorda_annua, eta_pensionamento, anni_per_rientrare,
       eta_anticipata_senza_riscatto, eta_anticipata_con_riscatto} | None;
     - capitale_umano: voci [{nome, valore}], esposizione_finanziaria, esposizione_totale, proiezione
       [{eta, F (patrimonio finanziario), HC (capitale umano), esposizione, p10, p90}], eta_sorpasso, stato_sorpasso, settore {settore, quota_settore_fin,
