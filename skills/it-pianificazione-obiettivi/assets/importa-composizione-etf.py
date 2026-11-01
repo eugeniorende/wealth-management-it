@@ -22,17 +22,20 @@ Regole applicate (references/composizione-etf.md):
 - per le obbligazioni (asset class «Fixed Income», «Reddito fisso»…) il settore non è GICS: contano solo nei paesi;
 - i pesi rimasti si rinormalizzano a 100 per dimensione; la quota esclusa è nel report, nel CSV e nel JSON;
 - settori: gli 11 GICS con il nome inglese, come in capitale-umano.py; paesi: codice ISO 3166-1 alpha-2;
-- un file in classificazione ICB (FTSE) dà solo i paesi: ICB → GICS non si converte senza errore.
+- un file in classificazione ICB (FTSE) dà solo i paesi: ICB → GICS non si converte senza errore;
+- i primi N_TITOLI titoli per peso (liquidità e derivati esclusi) si scrivono come righe «titolo», con il peso
+  nel fondo NON rinormalizzato: servono al look-through del portafoglio (look-through-portafoglio.py).
 
 Limiti dichiarati: le posizioni sono quelle del fondo a una data (per un ETF sintetico il paniere di collaterale,
 non l'esposizione); il paese è quello che l'emittente riporta (domicilio, rischio o negoziazione); niente PDF né
 XLS del vecchio Excel; niente lingue diverse da italiano e inglese.
 
 Uso:
-    python importa-composizione-etf.py --file FILE --strumento NOME [--file FILE --strumento NOME ...]
+    python importa-composizione-etf.py --file FILE --strumento NOME|ISIN [--file FILE --isin ISIN ...]
                                        [--emittente NOME] [--out composizione.csv] [--json FILE|-]
-    (--strumento va scritto come il campo «strumento» delle posizioni del capitale umano; se --out esiste,
-     si sostituiscono solo le righe degli strumenti importati)
+    (--strumento, o il suo alias --isin, è la chiave con cui le posizioni trovano la composizione: l'ISIN
+     quando le posizioni vengono dall'estratto del broker, altrimenti il campo «strumento» delle posizioni del
+     capitale umano; se --out esiste, si sostituiscono solo le righe degli strumenti importati)
 """
 import csv
 import datetime
@@ -59,12 +62,14 @@ SINONIMI_COLONNE = {
     "asset_class": ("asset class", "type of security", "security type", "asset type", "classe di attivo",
                     "tipo di strumento"),
     "nome": ("name", "security name", "holding name", "nome", "titolo", "emittente"),
+    "isin": ("isin", "codice isin", "isin code"),
 }
 RIGHE_INTESTAZIONE = 40   # la riga d'intestazione si cerca nelle prime N righe
 SEGNAPOSTO = ("", "-", "n/a", "na", "n.d.", "nd")   # peso o nome assente
 SOGLIA_AVVISO = 0.05      # avviso se le righe non classificate, o liquidità e derivati, superano il 5% del fondo
 SOGLIA_CLASSIFICATI = 0.5  # sotto questa quota dei titoli classificati la dimensione non si scrive: il 3% del fondo
                            # rinormalizzato a 100 descriverebbe un fondo che non esiste
+N_TITOLI = 10              # i primi titoli per peso scritti come righe «titolo» (per il look-through del portafoglio)
 
 # ── Settori GICS ────────────────────────────────────────────────────────────
 # Gli 11 settori con il nome inglese degli emittenti e quello italiano del report: gli stessi di SETTORI_GICS in
@@ -703,6 +708,10 @@ def componi(path, strumento, forzato=None):
                "paese_non_classificato": 0.0}
     grezzi = {"settore": [], "paese": []}            # (nome normalizzato, nome originale, peso) per dimensione
     n_titoli = 0
+    candidati = []                                   # (nome, isin, peso) delle righe non escluse, per i primi titoli
+    n_primi = globals()["N_TITOLI"]                  # letto qui: --set N_TITOLI=… ha effetto
+    if isinstance(n_primi, bool) or not isinstance(n_primi, int) or n_primi < 1:
+        errore(f"N_TITOLI = {n_primi!r}: serve un intero positivo (i primi titoli da scrivere)")
     for r, peso in titoli:
         peso /= scala
         classe, settore = normalizza(cella(r, "asset_class")), normalizza(cella(r, "settore"))
@@ -710,6 +719,12 @@ def componi(path, strumento, forzato=None):
             esclusi["liquidita_derivati"] += abs(peso)
             continue
         n_titoli += 1
+        nome_titolo = cella(r, "nome")
+        if "nome" in col and not _vuota(nome_titolo) and not _segnaposto(nome_titolo):
+            isin_titolo = cella(r, "isin")
+            candidati.append((str(nome_titolo).strip(),
+                              None if _vuota(isin_titolo) or _segnaposto(isin_titolo) else str(isin_titolo).strip(),
+                              peso))
         for dim, _ in _DIMENSIONI:
             if dim not in col:
                 continue
@@ -794,13 +809,19 @@ def componi(path, strumento, forzato=None):
         avvisi.append(f"liquidità e derivati pesano {pct(esclusi['liquidita_derivati'], 2)}, sopra il 5%: per un ETF "
                       "sintetico il file può contenere il paniere di collaterale, non l'esposizione")
 
+    # i primi titoli per peso, con il peso nel fondo (non rinormalizzato): un minimo della concentrazione
+    if "nome" not in col:
+        avvisi.append("il file non ha la colonna del nome: titoli non scritti")
+    primi = [{"nome": n, "isin": isin_t, "peso": p}
+             for n, isin_t, p in sorted(candidati, key=lambda t: -t[2])[:n_primi]]
+
     data, avviso_data = data_posizioni(righe[:i], foglio, scheda)
     if avviso_data:
         avvisi.append(avviso_data)
     return {"strumento": strumento, "emittente": chiave, "riconosciuto_da": riconosciuto_da, "file": file,
             "data_posizioni": data, "classificazione": classificazione,
             "colonne": {k: v for k, v in testi.items() if k != "nome"}, "titoli": n_titoli, "esclusi": esclusi,
-            "settori": risultato["settori"], "paesi": risultato["paesi"], "avvisi": avvisi}
+            "settori": risultato["settori"], "paesi": risultato["paesi"], "primi_titoli": primi, "avvisi": avvisi}
 
 
 # ── composizione.csv ────────────────────────────────────────────────────────
@@ -909,6 +930,7 @@ def righe_strumento(c, oggi):
     righe = [commento]
     for dim, plurale in _DIMENSIONI:
         righe += [_linea([c["strumento"], dim, voce, numero(peso * 100, 2)]) for voce, peso in c[plurale].items()]
+    righe += [_linea([c["strumento"], "titolo", t["nome"], numero(t["peso"] * 100, 2)]) for t in c["primi_titoli"]]
     return righe
 
 
@@ -959,6 +981,9 @@ def stampa(composizioni, out, conservati, vecchio):
             print("   Settori: " + " · ".join(f"{SETTORI_GICS[k]} {pct(v, 2)}" for k, v in list(c["settori"].items())[:5]))
         if c["paesi"]:
             print("   Paesi: " + " · ".join(f"{PAESI[k][0]} {pct(v, 2)}" for k, v in list(c["paesi"].items())[:5]))
+        if c["primi_titoli"]:
+            print("   Primi titoli: " + " · ".join(f"{t['nome']} {pct(t['peso'], 2)}" for t in c["primi_titoli"][:5])
+                  + " (peso nel fondo)")
         for a in c["avvisi"]:
             print(f"   ⚠️  {a}")
     importati = "1 strumento importato" if len(composizioni) == 1 else f"{len(composizioni)} strumenti importati"
@@ -973,8 +998,9 @@ def main():
     args = cli(__doc__.strip().splitlines()[0].split("— ", 1)[1], spazio=globals(), json=True,
                argomenti=[(("--file",), {"action": "append", "required": True, "metavar": "FILE",
                                          "help": "file delle posizioni dell'emittente, CSV o XLSX (ripetibile)"}),
-                          (("--strumento",), {"action": "append", "required": True, "metavar": "NOME",
-                                              "help": "nome dello strumento, come nelle posizioni (uno per --file)"}),
+                          (("--strumento", "--isin"), {"action": "append", "required": True, "metavar": "NOME|ISIN",
+                                                        "help": "nome o ISIN dello strumento, come nelle posizioni (uno per "
+                                                                "--file); con le posizioni dell'estratto del broker usa l'ISIN"}),
                           (("--emittente",), {"choices": sorted(SCHEDE),
                                               "help": "forza la scheda dell'emittente per tutti i file"}),
                           (("--out",), {"default": "composizione.csv", "metavar": "FILE",

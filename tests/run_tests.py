@@ -5263,7 +5263,7 @@ def t_ce_uscita():
                             r"importato il \d\d/\d\d/\d{4}; esclusi liquidità e derivati 1,00%", commento), commento
         mw = [r for r in righe if r.startswith("ETF MSCI World;")]
         assert mw[0] == "ETF MSCI World;settore;Information Technology;40,40" and "ETF MSCI World;paese;KR;10,10" in mw, mw
-        assert len(mw) == 10 and not any(";Energy;100" in r for r in righe), mw
+        assert len(mw) == 16 and not any(";Energy;100" in r for r in righe), mw   # 5 settori, 5 paesi, 6 titoli (look-through)
         for dim in ("settore", "paese"):
             tot = sum(float(r.split(";")[3].replace(",", ".")) for r in mw if r.split(";")[1] == dim)
             assert abs(tot - 100) <= 0.05, (dim, tot)
@@ -5274,7 +5274,7 @@ def t_ce_uscita():
         assert d["out"] == out and [s["strumento"] for s in d["strumenti"]] == ["ETF MSCI World"], d
         s = d["strumenti"][0]
         assert {"strumento", "emittente", "riconosciuto_da", "file", "data_posizioni", "classificazione", "colonne",
-                "titoli", "esclusi", "settori", "paesi", "avvisi"} == set(s), set(s)
+                "titoli", "esclusi", "settori", "paesi", "primi_titoli", "avvisi"} == set(s), set(s)
         assert abs(sum(s["settori"].values()) - 1) < 1e-9 and abs(sum(s["paesi"].values()) - 1) < 1e-9
         # --json - : solo JSON su stdout, --out scritto lo stesso
         rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "Y", "--out", out, "--json", "-", cwd=tmp)
@@ -5547,6 +5547,79 @@ def t_ce_set():
         assert rc == 0, se[-300:]
         s = json.loads(so)["strumenti"][0]
         assert s["emittente"] == "ishares" and s["data_posizioni"] == "2026-09-30", s
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ═══════════════════════════ T16: look-through del portafoglio ═══════════════════════════
+
+LT = ("it-pianificazione-obiettivi", "look-through-portafoglio.py")
+
+
+@test("T16 look-through: l'importatore scrive i primi titoli, --isin è --strumento, il JSON porta l'ISIN dei titoli")
+def t_lt_importatore_titoli():
+    tmp = tempfile.mkdtemp()
+    try:
+        out, js = os.path.join(tmp, "composizione.csv"), os.path.join(tmp, "c.json")
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--isin", "IE00B4L5Y983", "--out", out, "--json", js, cwd=tmp)
+        assert rc == 0, se[-300:]
+        righe = [r for r in open(out, encoding="utf-8-sig").read().splitlines() if ";titolo;" in r]
+        # pesi nel fondo, non rinormalizzati; liquidità e future fuori; ordine per peso
+        assert righe == ["IE00B4L5Y983;titolo;ALPHA CORP;30,00", "IE00B4L5Y983;titolo;BETA BANK;20,00",
+                         "IE00B4L5Y983;titolo;GAMMA PHARMA;15,00", "IE00B4L5Y983;titolo;DELTA INDUSTRIES;15,00",
+                         "IE00B4L5Y983;titolo;EPSILON SOFT;10,00", "IE00B4L5Y983;titolo;ZETA ENERGY;9,00"], righe
+        s = json.load(open(js, encoding="utf-8"))["strumenti"][0]
+        assert s["strumento"] == "IE00B4L5Y983" and s["primi_titoli"][0] == {"nome": "ALPHA CORP", "isin": None, "peso": 0.30}, s["primi_titoli"][:1]
+        assert "Primi titoli: ALPHA CORP 30,00%" in so, so[-600:]
+        # --set N_TITOLI=2 e un XLSX con la colonna ISIN (Xtrackers): isin nel JSON, titoli di prima conservati
+        rc, so, se = run_script_split(asset(*CE), "--file", _xlsx_emittente("xtrackers", tmp), "--strumento", "XD",
+                                      "--out", out, "--json", js, "--set", "N_TITOLI=2", cwd=tmp)
+        assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert testo.count("XD;titolo;") == 2 and testo.count("IE00B4L5Y983;titolo;") == 6, testo
+        t = json.load(open(js, encoding="utf-8"))["strumenti"][0]["primi_titoli"]
+        assert [x["isin"] for x in t] == ["XX0000000001", "XX0000000002"] and t[0]["peso"] == 0.40, t
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--strumento", "A", "--out", out, "--set", "N_TITOLI=0", cwd=tmp)
+        assert rc == 1 and "N_TITOLI" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 look-through: capitale-umano ignora le righe titolo e confronta le posizioni per ISIN")
+def t_lt_capitale_umano_isin():
+    cu = carica_modulo(asset(*CU))
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--isin", "IE00B4L5Y983", "--out", out, cwd=tmp)
+        assert rc == 0, se[-300:]
+        comp = cu.leggi_composizione(out)
+        assert set(comp) == {"IE00B4L5Y983"} and abs(comp["IE00B4L5Y983"]["Information Technology"] - 0.4040) < 1e-9, comp
+        assert cu.chiave_composizione({"isin": "IE00B4L5Y983", "strumento": "ETF World"}, comp) == "IE00B4L5Y983"
+        assert cu.chiave_composizione({"strumento": "IE00B4L5Y983"}, comp) == "IE00B4L5Y983"
+        assert cu.chiave_composizione({"isin": "IE00B4L5Y984", "strumento": "ETF World"}, comp) is None
+        dati = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+        dati["persona"]["settore"] = "Information Technology"
+        dati["posizioni"] = [{"asset_class": "azionario", "valore": 60000, "isin": "IE00B4L5Y983"},
+                             {"asset_class": "azionario", "valore": 20000, "isin": "IE00B4L5Y984"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "ETF FTSE", "isin": "IE00B3RBWM25"}]
+        pd_ = os.path.join(tmp, "cu.json")
+        with open(pd_, "w", encoding="utf-8") as f:
+            json.dump(dati, f)
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out, "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        z = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))["settore"]
+        assert abs(z["quota_settore_fin"] - 0.4040) < 1e-4 and z["mancanti"] == ["IE00B4L5Y984", "ETF FTSE"], z
+        # l'esempio del plugin ha gli ISIN e gira ancora sull'esempio-composizione.csv (vecchio formato, per nome)
+        rc, out_es = run_script(asset(*CU), "--composizione", asset("it-pianificazione-obiettivi", "esempio-composizione.csv"))
+        assert rc == 0, out_es[-300:]
+        sezione = out_es.split("SOVRAPPOSIZIONE")[1].split("SENSIBILIT")[0]
+        assert "27,0%" in sezione and "Senza composizione" not in sezione, sezione   # trovato per nome, nessun mancante
+        es = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+        assert all(re.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}\d", p["isin"]) for p in es["posizioni"]), es["posizioni"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

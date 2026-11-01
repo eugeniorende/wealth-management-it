@@ -14,8 +14,8 @@
   },
   "pensione": {"netta_annua": 18000, "eta_fine": 90},
   "posizioni": [
-    {"asset_class": "azionario", "valore": 60000, "strumento": "ETF MSCI World"},
-    {"asset_class": "obbligazionario", "valore": 20000, "strumento": "ETF obbligazionario euro"}
+    {"asset_class": "azionario", "valore": 60000, "strumento": "ETF MSCI World", "isin": "IE00B4L5Y983"},
+    {"asset_class": "obbligazionario", "valore": 20000, "strumento": "ETF obbligazionario euro", "isin": "IE00B3F81R35"}
   ],
   "fondo_pensione": {"valore": 15000, "quota_azionaria": 0.6},
   "tfr_maturato_azienda": 8000,
