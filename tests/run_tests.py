@@ -5354,7 +5354,7 @@ def t_ce_documentazione():
     step8 = skill.split("Step 8")[1]
     assert "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" in step8 and "--strumento" in step8
     assert step8.index("importa-composizione-etf.py") < step8.index("capitale-umano.py\" --dati"), step8[:600]
-    assert "references/composizione-etf.md" in skill and 'version: "0.23"' in skill
+    assert "references/composizione-etf.md" in skill and 'version: "0.24"' in skill
     ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
     for parola in ("iShares", "Xtrackers", "Vanguard", "Amundi", "SPDR", "ICB", "da confermare", "non si ridistribuisc",
                    "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py"):
@@ -5367,7 +5367,7 @@ def t_ce_documentazione():
     t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
     assert "composizione-etf" in t16 and "Look-through" in t16 and "tedesc" in t16, t16[:400]
     readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
-    assert "Tutti i 17 script" in readme and "importa-composizione-etf.py" in readme
+    assert "Tutti i 18 script" in readme and "importa-composizione-etf.py" in readme
     assert "importatore della composizione" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().lower()
 
 
@@ -6181,6 +6181,31 @@ def t_lt_cruscotto():
             assert formato_it_percento(lt["copertura"]["settori"]) in testo, testo[:800]
         finally:
             br.close()
+
+
+@test("T16 look-through: skill, reference, revisione, README, CHANGELOG e ROADMAP allineati")
+def t_lt_documentazione():
+    ob = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    skill = open(os.path.join(ob, "SKILL.md"), encoding="utf-8").read()
+    step8 = skill.split("Step 8")[1]
+    assert "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" in step8 and "--posizioni" in step8 and "--isin" in step8
+    assert 'version: "0.24"' in skill and "look-through-portafoglio.py" in skill.split("## Riferimenti")[1]
+    ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
+    for parola in ("look-through", "titolo", "ISIN", "a mano", "copertura", "minimo"):
+        assert parola in ref, parola
+    assert "isin" in open(os.path.join(ob, "references", "capitale-umano.md"), encoding="utf-8").read()
+    rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    assert 'version: "0.9"' in rev
+    contratto = rev.split("### Contratto di input")[1].split("\n## ")[0]
+    assert "look-through-portafoglio.py" in contratto and "senza_composizione" in contratto
+    assert "look-through" in rev.split("### 3. Avanzamento")[1].split("### 4.")[0].lower()
+    assert "look-through" in rev.split("### 6. Cruscotto grafico")[1].split("\n## ")[0].lower()
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "Tutti i 18 script" in readme and "look-through-portafoglio.py" in readme
+    assert "look-through" in readme.split("### Dove vanno i tuoi dati")[1].split("\n### ")[0].lower()
+    assert "look-through" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.11.0")[0].lower()
+    t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
+    assert "[x] **Look-through del portafoglio**" in t16 and "2026-11-01-look-through" in t16, t16[:1200]
 
 
 @test("T17 cruscotto: gli avvisi dell'importatore che nominano le posizioni non entrano nella pagina")

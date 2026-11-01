@@ -10,13 +10,14 @@
 - Cosa legge e cosa esclude
 - Il file composizione.csv
 - Stato dei formati
+- Il look-through del portafoglio
 - Limiti
 - Licenza dei file
 - Se un nome non è riconosciuto
 
 ## A cosa serve
 
-La diagnosi 4 del capitale umano confronta il settore del proprio lavoro con la parte azionaria del portafoglio (vedi `capitale-umano.md`). Serve sapere quanto pesa ogni settore dentro ciascun ETF. L'importatore lo ricava dal **file delle posizioni** del fondo, cioè l'elenco completo dei titoli con il loro peso, che ogni emittente pubblica nella pagina dell'ETF. Lo script aggrega i titoli per **settore GICS** e per **paese** (codice ISO 3166-1 alpha-2) e scrive `composizione.csv`. I paesi oggi non entrano in nessun calcolo: sono la base di un futuro look-through del portafoglio.
+La diagnosi 4 del capitale umano confronta il settore del proprio lavoro con la parte azionaria del portafoglio (vedi `capitale-umano.md`). Serve sapere quanto pesa ogni settore dentro ciascun ETF. L'importatore lo ricava dal **file delle posizioni** del fondo, cioè l'elenco completo dei titoli con il loro peso, che ogni emittente pubblica nella pagina dell'ETF. Lo script aggrega i titoli per **settore GICS** e per **paese** (codice ISO 3166-1 alpha-2), tiene i **primi dieci titoli** per peso e scrive `composizione.csv`. Paesi e titoli servono al look-through del portafoglio (sezione in fondo), i settori anche alla diagnosi 4.
 
 ## Come si usa
 
@@ -28,7 +29,7 @@ python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv 
 python "${CLAUDE_SKILL_DIR}/assets/capitale-umano.py" --dati capitale-umano.json --composizione composizione.csv
 ```
 
-- `--strumento` va scritto **esattamente** come il campo `strumento` delle posizioni nel JSON del capitale umano (maiuscole e spazi compresi). Se non coincide, lo strumento finisce tra quelli «senza composizione» e il report del capitale umano lo elenca per nome.
+- `--strumento` è la **chiave** con cui le posizioni trovano la composizione: l'**ISIN** (alias `--isin`) quando le posizioni vengono dall'estratto del broker, altrimenti il testo **esatto** del campo `strumento` delle posizioni nel JSON del capitale umano (maiuscole e spazi compresi). Il confronto avviene prima per ISIN e poi per nome; se nessuno coincide, lo strumento finisce tra quelli «senza composizione» e i report lo elencano per nome.
 - Se `composizione.csv` esiste già, si sostituiscono solo le righe degli strumenti importati; le altre, comprese quelle compilate a mano, restano. Un file nel vecchio formato `strumento;settore;peso` viene convertito nel nuovo, con gli stessi pesi.
 - `--emittente ishares|xtrackers|vanguard|amundi|spdr` forza la scheda dell'emittente quando il riconoscimento automatico (dal preambolo del file o dal suo nome) non basta.
 - `--json FILE` scrive anche il risultato strutturato (pesi in frazione); `--json -` lo stampa da solo su stdout (gli eventuali `--set` si annotano su stderr).
@@ -71,9 +72,10 @@ I pesi rimasti si **rinormalizzano a 100** per dimensione. Se meno della metà d
 strumento;dimensione;voce;peso
 ETF MSCI World;settore;Information Technology;26,84
 ETF MSCI World;paese;US;71,20
+ETF MSCI World;titolo;NVIDIA CORP;5,12
 ```
 
-UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decimali: si apre in Excel italiano. `capitale-umano.py` legge le righe `settore`; accetta anche il vecchio formato `strumento;settore;peso` compilato a mano.
+UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decimali: si apre in Excel italiano. Le righe `settore` e `paese` sono rinormalizzate a 100; le righe `titolo` (i primi `N_TITOLI`, dieci, per peso, liquidità e derivati esclusi) portano il **peso nel fondo** così com'è, e sommate danno la quota del fondo coperta dai primi titoli. `capitale-umano.py` legge le righe `settore` e salta le altre; accetta anche il vecchio formato `strumento;settore;peso` compilato a mano.
 
 ## Stato dei formati
 
@@ -86,6 +88,23 @@ UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decima
 | Amundi | — | da confermare su un file reale |
 
 «Da confermare» vuol dire che i sinonimi coprono i formati documentati ma nessun file reale è ancora passato dall'importatore: se qualcosa non torna, lo script si ferma e dice cosa ha visto.
+
+## Il look-through del portafoglio
+
+`look-through-portafoglio.py` somma le composizioni di tutti gli ETF posseduti, **pesate per controvalore**, e risponde a «cosa possiedo davvero?»:
+
+```
+python "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" --composizione composizione.csv \
+    --posizioni broker.json [--posizioni broker-2.json] [--json look-through.json]
+```
+
+- **Posizioni**: il `--json` di `importa-estratto-broker.py` (un file per broker; la stessa posizione su due broker è un'unica esposizione e si somma) oppure il `--dati` del capitale umano. Ogni posizione si confronta con il CSV per **ISIN** e poi per nome: con l'estratto del broker si importa ogni ETF con `--isin`.
+- **Copertura**: per ogni dimensione (settori, paesi, titoli) contano solo le posizioni che la hanno nel CSV; i pesi sono rinormalizzati sulla **parte coperta** e la copertura (quota del controvalore totale) sta sempre accanto. Niente «altro» inventato: ciò che non si sa non entra nei pesi.
+- **Titoli**: sono i primi dieci di ogni ETF, quindi la concentrazione sui titoli è un **minimo**, non il totale. Lo stesso titolo scritto in modo diverso da due emittenti («Apple Inc.», «APPLE INC») si somma con una chiave normalizzata del nome (senza punteggiatura, suffissi societari come Inc, Corp, SpA, SA, e classi di azioni); `da` nel JSON elenca gli ETF che contribuiscono, per accorgersi di quelli rimasti separati.
+- **Posizioni dirette** (una singola azione, un BTP): non hanno un file delle posizioni; si compilano **a mano** nel CSV con l'ISIN della posizione come chiave, per esempio `IT0005454241;paese;IT;100` e, se si vuole il titolo tra i primi, `IT0005454241;titolo;BTP Futura 2037;100`. Lo script non deduce il paese dall'ISIN: un ISIN irlandese può essere un ETF di titoli americani.
+- **Senza composizione**: le posizioni senza riscontro restano fuori dai pesi e il report le elenca per nome (e ISIN), con il controvalore: si importa il file dell'emittente, o si aggiungono le righe.
+- Il JSON (`controvalore_totale`, `posizioni`, `senza_composizione`, `copertura`, `settori`, `paesi`, `titoli`, `quota_primi_titoli`) entra nel passo 3 di `it-revisione` e nel cruscotto grafico, dove passano solo gli aggregati: niente nomi né ISIN delle posizioni.
+- Ogni ETF ha la data del suo file (nel commento del CSV): il look-through non le allinea. Il fondo pensione non entra, perché la sua composizione non è disponibile.
 
 ## Limiti
 
