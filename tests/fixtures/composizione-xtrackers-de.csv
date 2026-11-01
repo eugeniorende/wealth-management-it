@@ -1,0 +1,14 @@
+Xtrackers MSCI World UCITS ETF 1C
+Stand;30.09.2026
+
+Name;ISIN;Land;Währung;Wertpapierart;Branche;Gewichtung (%)
+ALPHA CORP;US0000000001;Vereinigte Staaten;USD;Aktien;Informationstechnologie;30,00
+BETA BANK;US0000000002;Vereinigte Staaten;USD;Aktien;Finanzen;20,00
+GAMMA PHARMA;JP0000000003;Japan;JPY;Aktien;Gesundheitswesen;15,00
+DELTA INDUSTRIES;GB0000000004;Vereinigtes Königreich;GBP;Aktien;Industrie;15,00
+EPSILON SOFT;KR0000000005;Südkorea;KRW;Aktien;Informationstechnologie;10,00
+ZETA ENERGY;CA0000000006;Kanada;CAD;Aktien;Energie;9,00
+EUR CASH;-;Deutschland;EUR;Barmittel;Sonstige;0,80
+DAX FUTURE DEC 26;-;Deutschland;EUR;Derivate;Sonstige;0,20
+
+"Die hierin enthaltenen Informationen stammen aus Quellen, die DWS für zuverlässig hält."

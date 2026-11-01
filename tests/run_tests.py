@@ -5556,6 +5556,55 @@ def t_ce_set():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T16 composizione ETF: lingue tedesca e francese (intestazioni, settori, paesi, esclusioni, data)")
+def t_ce_lingue():
+    m = carica_modulo(asset(*CE))
+    en = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "EN")
+    de = m.componi(os.path.join(FIXTURES, "composizione-xtrackers-de.csv"), "DE")
+    fr = m.componi(os.path.join(FIXTURES, "composizione-amundi-fr.csv"), "FR")
+    assert de["emittente"] == "xtrackers" and fr["emittente"] == "amundi", (de["emittente"], fr["emittente"])
+    for c in (de, fr):
+        # stessi titoli e pesi del file inglese: stessi settori e paesi al bit, stessa data, stesse esclusioni
+        assert c["data_posizioni"] == "2026-09-30" and c["titoli"] == 6 and c["classificazione"] == "GICS", c
+        assert c["settori"] == en["settori"] and c["paesi"] == en["paesi"], (c["settori"], c["paesi"])
+        assert abs(c["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and c["avvisi"] == [], c
+    assert de["colonne"]["settore"] == "Branche" and de["colonne"]["paese"] == "Land" and de["colonne"]["peso"] == "Gewichtung (%)"
+    assert fr["colonne"]["settore"] == "Secteur" and fr["colonne"]["asset_class"] == "Classe d'actifs"
+    assert [t["isin"] for t in fr["primi_titoli"]][:2] == ["US0000000001", "US0000000002"]   # «Code ISIN»
+    tmp = tempfile.mkdtemp()
+    try:
+        def file(nome, testo):
+            path = os.path.join(tmp, nome)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(testo)
+            return path
+        # ICB in tedesco e in francese: solo i paesi, con l'avviso; il vecchio GICS tedesco e francese con il suo avviso
+        icb = m.componi(file("icb.csv", "Name;Sektor;Land;Gewichtung\nA;Technologie;Deutschland;60\nB;Grundstoffe;Frankreich;40\n"), "I")
+        assert icb["classificazione"] == "ICB" and icb["settori"] == {} and {k: round(v, 2) for k, v in icb["paesi"].items()} == {"DE": 0.6, "FR": 0.4}, icb
+        icb_fr = m.componi(file("icb-fr.csv", "Nom;Secteur;Pays;Poids\nA;Technologie;Allemagne;60\nB;Matériaux de base;Suisse;40\n"), "I")
+        assert icb_fr["classificazione"] == "ICB" and {k: round(v, 2) for k, v in icb_fr["paesi"].items()} == {"DE": 0.6, "CH": 0.4}, icb_fr
+        vecchio = m.componi(file("v.csv", "Name;Sektor;Land;Gewichtung\nA;Telekommunikationsdienste;Österreich;100\n"), "V")
+        assert list(vecchio["settori"]) == ["Communication Services"] and any("2018" in a for a in vecchio["avvisi"]), vecchio
+        # settori e paesi in tedesco e francese con le varianti più comuni dei file reali
+        misto = m.componi(file("m.csv", "Nom;Secteur;Pays;Poids (%)\nA;Consommation discrétionnaire;Pays-Bas;20\n"
+                                        "B;Biens de consommation de base;Suède;20\nC;Services aux collectivités;Espagne;20\n"
+                                        "D;Matériaux;Hong Kong;20\nE;Immobilier;Taïwan;20\n"), "M")
+        assert set(misto["settori"]) == {"Consumer Discretionary", "Consumer Staples", "Utilities", "Materials", "Real Estate"}, misto
+        assert set(misto["paesi"]) == {"NL", "SE", "ES", "HK", "TW"}, misto["paesi"]
+        misto_de = m.componi(file("md.csv", "Name;Branche;Land;Gewichtung (%)\nA;Nicht-Basiskonsumgüter;Niederlande;25\n"
+                                            "B;Basiskonsumgüter;Schweden;25\nC;Versorger;Spanien;25\nD;Roh-, Hilfs- & Betriebsstoffe;Hongkong;25\n"), "M")
+        assert set(misto_de["settori"]) == {"Consumer Discretionary", "Consumer Staples", "Utilities", "Materials"}, misto_de
+        assert set(misto_de["paesi"]) == {"NL", "SE", "ES", "HK"}, misto_de["paesi"]
+        # la data tedesca con il mese abbreviato e l'etichetta «Stichtag»; obbligazioni e righe non classificate in tedesco
+        d = m.componi(file("d.csv", "Stichtag;30. Okt. 2026\n\nName;Branche;Land;Wertpapierart;Gewichtung (%)\n"
+                                    "A;Finanzen;Deutschland;Aktien;50\nB;Staatsanleihen;Italien;Anleihen;40\nC;Unbekannt;Nicht zugeordnet;Aktien;10\n"), "D")
+        assert d["data_posizioni"] == "2026-10-30" and list(d["settori"]) == ["Financials"], d
+        assert {k: round(v, 3) for k, v in d["paesi"].items()} == {"DE": 0.556, "IT": 0.444}, d["paesi"]
+        assert abs(d["esclusi"]["settore_obbligazionario"] - 0.4) < 1e-9 and abs(d["esclusi"]["settore_non_classificato"] - 0.1) < 1e-9, d["esclusi"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════ T16: look-through del portafoglio ═══════════════════════════
 
 LT = ("it-pianificazione-obiettivi", "look-through-portafoglio.py")

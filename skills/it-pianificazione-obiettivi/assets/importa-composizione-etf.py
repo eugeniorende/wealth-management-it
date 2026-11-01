@@ -10,7 +10,8 @@ POSIZIONI (holdings) di ogni fondo, che scarichi tu dalla pagina dell'ETF (pulsa
 GICS e per paese e scrive composizione.csv, che capitale-umano.py legge con --composizione. Il file
 dell'emittente resta tuo: il plugin non lo scarica e non lo ridistribuisce. Non è consulenza finanziaria.
 
-Formati: CSV o XLSX di iShares, Xtrackers, Vanguard, Amundi e SPDR, in italiano o in inglese. Il motore è unico:
+Formati: CSV o XLSX di iShares, Xtrackers, Vanguard, Amundi e SPDR, in italiano, inglese, tedesco o francese (i siti
+tedesco e francese di Xtrackers e Amundi). Il motore è unico:
 cerca la riga d'intestazione con tabelle di sinonimi (SINONIMI_COLONNE), quindi il preambolo sopra la tabella e
 il disclaimer sotto non contano; una scheda per emittente (SCHEDE) dice solo quello che il motore non deduce
 (classificazione dei settori, etichette della data, valori che indicano liquidità e derivati). Se il tuo file usa
@@ -28,7 +29,7 @@ Regole applicate (references/composizione-etf.md):
 
 Limiti dichiarati: le posizioni sono quelle del fondo a una data (per un ETF sintetico il paniere di collaterale,
 non l'esposizione); il paese è quello che l'emittente riporta (domicilio, rischio o negoziazione); niente PDF né
-XLS del vecchio Excel; niente lingue diverse da italiano e inglese.
+XLS del vecchio Excel; niente lingue diverse da italiano, inglese, tedesco e francese.
 
 Uso:
     python importa-composizione-etf.py --file FILE --strumento NOME|ISIN [--file FILE --isin ISIN ...]
@@ -54,15 +55,21 @@ from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 # «Industry Classification» il livello GICS sotto; in Xtrackers «Industry Classification» è il settore).
 SINONIMI_COLONNE = {
     "peso": ("weight (%)", "weight", "weighting", "percent of fund", "% of net assets", "% of fund",
-             "market value weight", "ponderazione (%)", "ponderazione", "peso (%)", "peso", "% del patrimonio"),
+             "market value weight", "ponderazione (%)", "ponderazione", "peso (%)", "peso", "% del patrimonio",
+             # tedesco e francese (siti di Xtrackers e Amundi)
+             "gewichtung (%)", "gewichtung", "gewicht (%)", "gewicht", "anteil (%)", "anteil", "% des nettovermögens",
+             "% des fondsvermögens", "pondération (%)", "pondération", "poids (%)", "poids", "% de l'actif net",
+             "% de l'actif"),
     "settore": ("sector", "gics sector", "sector classification", "industry classification", "settore",
-                "settore gics"),
+                "settore gics", "branche", "sektor", "industrie", "secteur", "secteur gics", "classification sectorielle"),
     "paese": ("location", "country", "trade country name", "country of risk", "domicile", "area geografica",
-              "paese", "nazione"),
+              "paese", "nazione", "land", "standort", "sitzland", "pays", "localisation", "pays de risque"),
     "asset_class": ("asset class", "type of security", "security type", "asset type", "classe di attivo",
-                    "tipo di strumento"),
-    "nome": ("name", "security name", "holding name", "nome", "titolo", "emittente"),
-    "isin": ("isin", "codice isin", "isin code"),
+                    "tipo di strumento", "anlageklasse", "wertpapierart", "wertpapiertyp", "classe d'actifs",
+                    "type de titre", "type d'actif"),
+    "nome": ("name", "security name", "holding name", "nome", "titolo", "emittente", "bezeichnung", "wertpapier",
+             "nom", "libellé", "titre"),
+    "isin": ("isin", "codice isin", "isin code", "code isin"),
 }
 RIGHE_INTESTAZIONE = 40   # la riga d'intestazione si cerca nelle prime N righe
 SEGNAPOSTO = ("", "-", "n/a", "na", "n.d.", "nd")   # peso o nome assente
@@ -90,27 +97,50 @@ SETTORI_GICS = {
 # Nomi italiani e varianti inglesi dei file, verso il nome GICS (confronto con normalizza())
 _VARIANTI_SETTORI = {
     "Information Technology": ("informatica", "tecnologia dell'informazione", "tecnologie dell'informazione",
-                               "tecnologie informatiche", "it"),
-    "Financials": ("finanza", "finanziari", "finanziario", "financial"),
-    "Health Care": ("sanità", "salute", "healthcare", "assistenza sanitaria", "sanitario"),
+                               "tecnologie informatiche", "it", "informationstechnologie", "informationstechnik",
+                               "technologies de l'information", "technologie de l'information"),
+    "Financials": ("finanza", "finanziari", "finanziario", "financial", "finanzen", "finanzwesen", "finanzwerte",
+                   "finanzdienstleistungen", "finance", "services financiers", "financières", "valeurs financières"),
+    "Health Care": ("sanità", "salute", "healthcare", "assistenza sanitaria", "sanitario", "gesundheitswesen",
+                    "gesundheit", "santé", "soins de santé"),
     "Consumer Discretionary": ("beni voluttuari", "beni di consumo discrezionali", "consumi discrezionali",
-                               "beni di consumo voluttuari", "beni di consumo ciclici"),
+                               "beni di consumo voluttuari", "beni di consumo ciclici", "nicht-basiskonsumgüter",
+                               "zyklische konsumgüter", "konsumgüter (zyklisch)", "zyklischer konsum",
+                               "consommation discrétionnaire", "biens de consommation cycliques",
+                               "biens de consommation discrétionnaire"),
     "Communication Services": ("servizi di comunicazione", "comunicazioni", "servizi per le comunicazioni",
-                               "communication"),
-    "Industrials": ("industriali", "industria", "industriale", "beni industriali"),
+                               "communication", "kommunikationsdienste", "kommunikationsdienstleistungen",
+                               "services de communication"),
+    "Industrials": ("industriali", "industria", "industriale", "beni industriali", "industrie", "industriewerte",
+                    "industriels", "industriegüter"),
     "Consumer Staples": ("beni di prima necessità", "beni di consumo di base", "consumi di base",
-                         "beni di consumo primari", "beni di consumo non ciclici"),
-    "Energy": ("energia", "energetico"),
-    "Materials": ("materiali", "materie prime"),
-    "Utilities": ("servizi di pubblica utilità", "pubblica utilità", "utility", "servizi pubblici"),
-    "Real Estate": ("immobiliare", "immobili", "settore immobiliare"),
+                         "beni di consumo primari", "beni di consumo non ciclici", "basiskonsumgüter",
+                         "nichtzyklische konsumgüter", "nicht-zyklische konsumgüter", "konsumgüter (nicht-zyklisch)",
+                         "nichtzyklischer konsum", "biens de consommation de base", "consommation de base",
+                         "biens de consommation non cycliques", "consommation courante"),
+    "Energy": ("energia", "energetico", "energie", "énergie"),
+    "Materials": ("materiali", "materie prime", "roh-, hilfs- & betriebsstoffe", "roh-, hilfs- und betriebsstoffe",
+                  "rohstoffe", "materialien", "matériaux"),
+    "Utilities": ("servizi di pubblica utilità", "pubblica utilità", "utility", "servizi pubblici", "versorger",
+                  "versorgungsbetriebe", "versorgungsunternehmen", "services aux collectivités", "services publics",
+                  "services collectifs"),
+    "Real Estate": ("immobiliare", "immobili", "settore immobiliare", "immobilien", "immobilier"),
 }
 # GICS prima del 2018: il settore è diventato Communication Services, con un perimetro diverso (avviso)
 SETTORI_GICS_VECCHI = {"telecommunication services": "Communication Services",
-                       "servizi di telecomunicazione": "Communication Services"}
-# Nomi che esistono in un solo sistema: decidono tra GICS e ICB (molti altri sono uguali nei due)
-NOMI_ICB_ESCLUSIVI = {"technology", "telecommunications", "basic materials"}
-NOMI_GICS_ESCLUSIVI = {"information technology", "communication services", "materials"}
+                       "servizi di telecomunicazione": "Communication Services",
+                       "telekommunikationsdienste": "Communication Services",
+                       "services de telecommunication": "Communication Services",
+                       "services de telecommunications": "Communication Services"}
+# Nomi che esistono in un solo sistema: decidono tra GICS e ICB (molti altri sono uguali nei due).
+# In tedesco e francese «Technologie», «Telekommunikation»/«Télécommunications» e «Grundstoffe»/«Matériaux de base»
+# sono i nomi ICB (FTSE); «Informationstechnologie»/«Technologies de l'information», «Kommunikationsdienste»/«Services
+# de communication» e «Roh-, Hilfs- & Betriebsstoffe»/«Matériaux» quelli GICS (MSCI).
+NOMI_ICB_ESCLUSIVI = {"technology", "telecommunications", "basic materials", "technologie", "telekommunikation",
+                      "télécommunications", "grundstoffe", "matériaux de base"}
+NOMI_GICS_ESCLUSIVI = {"information technology", "communication services", "materials", "informationstechnologie",
+                       "kommunikationsdienste", "technologies de l'information", "services de communication",
+                       "roh-, hilfs- & betriebsstoffe", "matériaux"}
 
 # ── Paesi ───────────────────────────────────────────────────────────────────
 # Tutti i codici ISO 3166-1 alpha-2, una riga per paese: codice;nome italiano;nome inglese|varianti dei file.
@@ -369,26 +399,93 @@ ZW;Zimbabwe;Zimbabwe
 """
 PAESI = {codice: (italiano, tuple(varianti.split("|")))
          for codice, italiano, varianti in (r.split(";") for r in _ELENCO_PAESI.strip().splitlines())}
+# Nomi tedeschi e francesi dei paesi che compaiono nei file reali (i siti tedesco e francese di Xtrackers e Amundi):
+# codice;nomi separati da |. I paesi assenti qui si leggono comunque dal codice ISO o dal nome inglese o italiano.
+_ELENCO_PAESI_DE_FR = """
+AE;Vereinigte Arabische Emirate|Émirats arabes unis
+AR;Argentinien|Argentine
+AT;Österreich|Autriche
+AU;Australien|Australie
+BE;Belgien|Belgique
+BR;Brasilien|Brésil
+CA;Kanada
+CH;Schweiz|Suisse
+CL;Chile|Chili
+CN;China|Chine|Volksrepublik China|Chine continentale
+CO;Kolumbien|Colombie
+CZ;Tschechien|Tschechische Republik|Tchéquie|République tchèque
+DE;Deutschland|Allemagne
+DK;Dänemark|Danemark
+EG;Ägypten|Égypte
+ES;Spanien|Espagne
+FI;Finnland|Finlande
+FR;Frankreich
+GB;Vereinigtes Königreich|Großbritannien|Grossbritannien|Royaume-Uni|Grande-Bretagne
+GR;Griechenland|Grèce
+HK;Hongkong
+HU;Ungarn|Hongrie
+ID;Indonesien|Indonésie
+IE;Irland|Irlande
+IL;Israel|Israël
+IN;Indien|Inde
+IT;Italien|Italie
+JP;Japan|Japon
+KR;Südkorea|Korea|Korea, Republik|Republik Korea|Corée du Sud|Corée|Corée, République de|République de Corée
+KW;Kuwait|Koweït
+LU;Luxemburg
+MX;Mexiko|Mexique
+MY;Malaysia|Malaisie
+NL;Niederlande|Pays-Bas
+NO;Norwegen|Norvège
+NZ;Neuseeland|Nouvelle-Zélande
+PE;Peru|Pérou
+PH;Philippinen
+PL;Polen|Pologne
+PT;Portugal
+QA;Katar
+RU;Russland|Russie
+SA;Saudi-Arabien|Arabie saoudite
+SE;Schweden|Suède
+SG;Singapur|Singapour
+TH;Thailand|Thaïlande
+TR;Türkei|Turquie
+TW;Taiwan|Taïwan
+US;Vereinigte Staaten|Vereinigte Staaten von Amerika|USA|États-Unis|Etats-Unis|États-Unis d'Amérique
+ZA;Südafrika|Afrique du Sud
+"""
+_PAESI_DE_FR = {codice: tuple(nomi.split("|")) for codice, nomi in
+                (r.split(";") for r in _ELENCO_PAESI_DE_FR.strip().splitlines())}
 
 # ── Righe da escludere ──────────────────────────────────────────────────────
 # Asset class o settore che indicano liquidità e derivati: esclusi da tutte e due le dimensioni
 VALORI_LIQUIDITA = ("cash", "cash and/or derivatives", "cash and derivatives", "cash collateral and margins",
                     "money market", "fx", "futures", "future", "forward", "forwards", "swap", "swaps",
-                    "liquidità", "liquidità e/o derivati", "derivati", "contanti")
+                    "liquidità", "liquidità e/o derivati", "derivati", "contanti",
+                    "barmittel", "kasse", "kassenbestand", "liquidität", "derivate", "devisentermingeschäft",
+                    "devisentermingeschäfte", "termingeschäft", "geldmarkt",
+                    "liquidités", "trésorerie", "dérivés", "produits dérivés", "contrat à terme", "contrats à terme",
+                    "change à terme", "monétaire")
 # Asset class a reddito fisso: il settore di un'obbligazione («Treasuries», «Banking», «Titoli di Stato») non è
 # GICS e non entra nei settori; il paese sì. Così un ETF obbligazionario dà i paesi e uno misto i settori azionari.
 VALORI_OBBLIGAZIONARI = ("fixed income", "bond", "bonds", "obbligazionario", "obbligazioni", "obbligazione",
-                         "reddito fisso", "titoli a reddito fisso")
+                         "reddito fisso", "titoli a reddito fisso", "anleihen", "anleihe", "renten", "rentenpapiere",
+                         "festverzinslich", "festverzinsliche wertpapiere", "obligations", "obligation", "taux",
+                         "revenu fixe", "titres à revenu fixe")
 # Settore o paese assente: la riga resta nell'altra dimensione
 # («European Union», «Supranational»: emittenti sovranazionali o liquidità in euro, nessun paese ISO; «NA» qui è
 # un segnaposto, non la Namibia, come nei pesi)
 VALORI_NON_CLASSIFICATI = ("unknown", "unassigned", "other", "-", "n/a", "na", "n.d.", "non classificato", "altro",
                            "", "not classified", "european union", "unione europea", "supranational",
-                           "sovranazionale", "multinational", "multinazionale")
+                           "sovranazionale", "multinational", "multinazionale",
+                           "unbekannt", "nicht zugeordnet", "nicht klassifiziert", "sonstige", "andere", "k.a.",
+                           "europäische union", "inconnu", "non classé", "non attribué", "autre", "autres",
+                           "union européenne")
 
 # ── Schede degli emittenti ──────────────────────────────────────────────────
 # Solo quello che il motore non deduce. «verificato»: mese e fonte della verifica del layout su un file reale.
-ETICHETTE_DATA = ("fund holdings as of", "holdings as of", "as of", "posizioni al", "dati al")
+ETICHETTE_DATA = ("fund holdings as of", "holdings as of", "as of", "posizioni al", "dati al",
+                  "stand", "stand per", "stichtag", "positionen per", "bestände per", "daten per",
+                  "positions au", "données au", "composition au", "portefeuille au", "date au")
 SCHEDE = {
     "ishares": {"nome": "iShares", "riconosci": ("ishares", "blackrock"), "classificazione": "GICS",
                 "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
@@ -419,7 +516,8 @@ def normalizza(testo):
 _SINONIMI_NORM = {ruolo: tuple(normalizza(s) for s in nomi) for ruolo, nomi in SINONIMI_COLONNE.items()}
 # Tabelle di confronto: nome normalizzato → settore GICS, → codice ISO
 SINONIMI_SETTORI = {normalizza(n): g for g in SETTORI_GICS for n in (g,) + _VARIANTI_SETTORI[g]}
-SINONIMI_PAESI = {normalizza(n): codice for codice, (it, varianti) in PAESI.items() for n in (codice, it) + varianti}
+SINONIMI_PAESI = {normalizza(n): codice for codice, (it, varianti) in PAESI.items()
+                  for n in (codice, it) + varianti + _PAESI_DE_FR.get(codice, ())}
 
 
 def _vuota(cella):
@@ -591,7 +689,9 @@ def riconosci_emittente(preambolo, nome_file, forzato=None):
 
 
 MESI = {"jan": 1, "gen": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "mag": 5, "jun": 6, "giu": 6, "jul": 7,
-        "lug": 7, "aug": 8, "ago": 8, "sep": 9, "set": 9, "oct": 10, "ott": 10, "nov": 11, "dec": 12, "dic": 12}
+        "lug": 7, "aug": 8, "ago": 8, "sep": 9, "set": 9, "oct": 10, "ott": 10, "nov": 11, "dec": 12, "dic": 12,
+        # tedesco e francese («30. Okt. 2026», «30 avr. 2026»); «jui» non si aggiunge: juin e juillet iniziano uguale
+        "mrz": 3, "mai": 5, "okt": 10, "dez": 12, "fev": 2, "avr": 4, "aou": 8}
 
 
 class DataAmbigua(Exception):

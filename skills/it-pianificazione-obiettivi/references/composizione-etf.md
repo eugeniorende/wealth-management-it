@@ -43,16 +43,16 @@ Sempre dalla pagina del singolo ETF sul sito dell'emittente, nella sezione delle
 | Emittente | Formato tipico | Note |
 |---|---|---|
 | iShares (BlackRock) | CSV | Preambolo di qualche riga con nome del fondo e data («Fund Holdings as of», «Posizioni al»); dal sito italiano intestazioni e settori in italiano, con la virgola decimale |
-| Xtrackers (DWS) | XLSX | Disclaimer in testa, intestazione alla riga 4, peso in frazione, data nel nome del foglio |
+| Xtrackers (DWS) | XLSX | Disclaimer in testa, intestazione alla riga 4, peso in frazione, data nel nome del foglio; dal sito tedesco intestazioni (`Branche`, `Land`, `Gewichtung`) e settori in tedesco |
 | Vanguard | XLSX o CSV | Per gli ETF su indici FTSE la classificazione dei settori può essere ICB: vedi sotto |
-| Amundi | XLSX | Intestazioni nella lingua del sito |
+| Amundi | XLSX | Intestazioni nella lingua del sito: italiano, inglese, tedesco o francese (`Secteur`, `Pays`, `Poids (%)`) |
 | SPDR (State Street) | XLSX | Preambolo con «Holdings As Of», paese di negoziazione («Trade Country Name»), righe «Unassigned» per i contratti di cambio |
 
 Se il sito apre la pagina invece di scaricare il file (capita quando si copia il link del pulsante), l'importatore riconosce l'HTML e chiede di usare il pulsante di download.
 
 ## Cosa legge e cosa esclude
 
-La riga d'intestazione si cerca nelle prime 40 righe con tabelle di sinonimi in italiano e in inglese: peso (`Weight (%)`, `Weighting`, `Percent of Fund`, `Ponderazione (%)`, `Peso`…), settore (`Sector`, `Sector Classification`, `Industry Classification`, `Settore`…), paese (`Location`, `Country`, `Trade Country Name`, `Area geografica`, `Paese`…), asset class (`Asset Class`, `Type of Security`…). Il preambolo sopra e il disclaimer sotto non contano. La scala dei pesi (frazione o percento) si deduce dalla somma.
+La riga d'intestazione si cerca nelle prime 40 righe con tabelle di sinonimi in italiano, inglese, tedesco e francese: peso (`Weight (%)`, `Weighting`, `Percent of Fund`, `Ponderazione (%)`, `Peso`, `Gewichtung (%)`, `Poids (%)`…), settore (`Sector`, `Sector Classification`, `Industry Classification`, `Settore`, `Branche`, `Secteur`…), paese (`Location`, `Country`, `Trade Country Name`, `Area geografica`, `Paese`, `Land`, `Pays`…), asset class (`Asset Class`, `Type of Security`, `Wertpapierart`, `Classe d'actifs`…). Le stesse tabelle coprono i nomi dei settori GICS (`Informationstechnologie`, `Technologies de l'information`…), le esclusioni (`Barmittel`, `Liquidités`, `Anleihen`, `Obligations`, `Unbekannt`, `Non classé`…), le etichette della data (`Stand`, `Stichtag`, `Données au`…) e i nomi tedeschi e francesi dei paesi dei file reali; un paese assente nelle tabelle si legge dal codice ISO. In tedesco e francese `Technologie`, `Telekommunikation`/`Télécommunications` e `Grundstoffe`/`Matériaux de base` sono nomi ICB, `Informationstechnologie`/`Technologies de l'information`, `Kommunikationsdienste`/`Services de communication` e `Roh-, Hilfs- & Betriebsstoffe`/`Matériaux` nomi GICS. Il preambolo sopra e il disclaimer sotto non contano. La scala dei pesi (frazione o percento) si deduce dalla somma.
 
 Si escludono, con la quota riportata nel report e nel commento del CSV:
 
@@ -112,7 +112,7 @@ python "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" --composizione c
 - **Fotografia a una data**: la composizione cambia; la data delle posizioni è nel commento del CSV e va riguardata a ogni revisione annuale. Una data numerica sotto un'etichetta inglese con giorno e mese entrambi fino a 12 («Holdings as of 03/04/2026») è ambigua tra il formato britannico e quello statunitense: non si scrive, con un avviso. Con un numero oltre il 12 («10/24/2026») o un'etichetta italiana («Posizioni al») la data si legge senza dubbi.
 - **Solo GICS** per i settori; nessuna conversione da ICB.
 - **Paese secondo l'emittente**: domicilio, paese di rischio o di negoziazione, a seconda del file; il report dice quale colonna ha letto.
-- Lingue: italiano e inglese. Niente PDF né XLS del vecchio Excel: si esporta in XLSX o CSV.
+- Lingue: italiano, inglese, tedesco e francese (i siti tedesco e francese di Xtrackers e Amundi, verificati su file sintetici con il loro layout, non su file reali). Niente PDF né XLS del vecchio Excel: si esporta in XLSX o CSV.
 
 ## Licenza dei file
 
