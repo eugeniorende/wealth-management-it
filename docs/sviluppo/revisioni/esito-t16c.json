@@ -1,0 +1,48 @@
+{
+  "branch": "claude/awesome-albattani-gkn0qc",
+  "data": "2026-11-01",
+  "tema": "T16 C, look-through del portafoglio (spec docs/sviluppo/specs/2026-11-01-look-through-design.md)",
+  "applicati": [
+    "importa-composizione-etf.py: righe «titolo» (primi N_TITOLI per peso, peso nel fondo non rinormalizzato, liquidità e derivati esclusi), --isin alias di --strumento, colonna ISIN dei titoli, primi_titoli nel --json",
+    "capitale-umano.py: chiave_composizione() (ISIN poi nome), righe «titolo» saltate, esempio con gli ISIN",
+    "look-through-portafoglio.py: lettura dei tre formati del CSV, posizioni dal JSON del broker o dal --dati del capitale umano unite per ISIN, copertura per dimensione, pesi sulla parte coperta, titoli sommati con chiave_titolo(), senza_composizione per nome, report e --json",
+    "genera-cruscotto.py e cruscotto.html: firma look_through, bundle con i soli aggregati, sezione «Look-through» (barre dei settori, dei paesi e dei primi titoli, copertura, posizioni senza composizione)",
+    "Step 8 di it-pianificazione-obiettivi, reference composizione-etf.md e capitale-umano.md, passo 3, passo 6 e contratto di input di it-revisione, README, CHANGELOG, ROADMAP"
+  ],
+  "rulings": [
+    "La lista dei primi titoli nel JSON dell'importatore si chiama primi_titoli: «titoli» era già il conteggio dei titoli letti (spec §3.1 diceva titoli)",
+    "n_posizioni del bundle = posizioni con composizione + senza (il JSON mette in «posizioni» solo quelle con chiave; spec §4 diceva len(posizioni))",
+    "I primi titoli nel cruscotto sono barre e non una tabella: la tabella ha min-width 520px e a 375px nascondeva la colonna del peso"
+  ],
+  "non_applicati": [],
+  "mutanti": [
+    {
+      "mutante": "copertura ignorata: i pesi divisi per il controvalore totale invece che per la parte coperta (/ V_d → / totale)",
+      "uccisi_da": [
+        "T16 look-through: valori chiusi sulle fixture"
+      ],
+      "esito": "ucciso"
+    },
+    {
+      "mutante": "chiave_titolo() senza i suffissi societari (Apple Inc. e APPLE INC restano separati)",
+      "uccisi_da": [
+        "T16 look-through: chiave dei titoli",
+        "T16 look-through: il cruscotto riconosce il JSON (titoli[0] non è più Apple Inc.)"
+      ],
+      "esito": "ucciso"
+    },
+    {
+      "mutante": "le posizioni dell'utente lasciate nel bundle del cruscotto",
+      "uccisi_da": [
+        "T17 cruscotto: il bundle porta i valori dei JSON di origine e nessuna posizione dell'estratto",
+        "T16 look-through: il cruscotto riconosce il JSON, il bundle non porta posizioni né ISIN"
+      ],
+      "esito": "ucciso"
+    }
+  ],
+  "revisione": {
+    "esito": "in corso: revisione finale dell'intero branch del ciclo 0.12.0 (look-through, ponte e riscatto nel cruscotto, lingue) a fine ciclo",
+    "corretti": [],
+    "rinviati": []
+  }
+}
