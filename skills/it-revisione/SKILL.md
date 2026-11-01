@@ -61,11 +61,11 @@ Si produce il **report della revisione** come deliverable (vedi Formato output).
 ### 6. Cruscotto grafico
 Una pagina HTML con i grafici del piano: allocazione attuale contro target con le bande, probabilità e capitale finale degli obiettivi, glide path, pensione lorda e netta, capitale umano, zainetto per scadenza, drift e ordini del ribilanciamento. I numeri vengono **solo** dai JSON che gli script scrivono con `--json` (quelli del «Contratto di input» più `ribilanciamento-multibroker.py --json`): la pagina li disegna, non li ricalcola, e tu non li riscrivi.
 
-1. Dalla cartella di lavoro, lancia il generatore sui JSON **scritti dagli script con `--json`** (`--from` ripetibile, l'ordine non conta; quelli di `importa-previdenza.py`, `ponte-pensione.py` e `riscatto-laurea.py` si riconoscono e si saltano; del look-through passano solo gli aggregati, mai le posizioni). Non passare i file di **input** che stanno nella stessa cartella: `piano.json` (il `--dati` del ribilanciamento), `capitale-umano.json` (il `--dati` del capitale umano), `ips.json` (il `--dati` dell'IPS):
+1. Dalla cartella di lavoro, lancia il generatore sui JSON **scritti dagli script con `--json`** (`--from` ripetibile, l'ordine non conta; quello di `importa-previdenza.py` si riconosce e si salta; `ponte-pensione.py` e `riscatto-laurea.py` entrano nella sezione Pensione; del look-through passano solo gli aggregati, mai le posizioni). Non passare i file di **input** che stanno nella stessa cartella: `piano.json` (il `--dati` del ribilanciamento), `capitale-umano.json` (il `--dati` del capitale umano), `ips.json` (il `--dati` dell'IPS):
    ```bash
    python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from glide.json --from mco.json \
        --from inps.json --from mc.json --from netto.json --from capitale-umano-out.json \
-       --from broker.json --from ribilancia.json --from look-through.json -o cruscotto.html
+       --from broker.json --from ribilancia.json --from look-through.json [--from ponte.json --from riscatto.json] -o cruscotto.html
    ```
    Se un JSON manca, dillo e genera il cruscotto con quelli che ci sono: le sezioni senza dati non compaiono. Gli errori fermano lo script con `ERRORE:`; secondo il messaggio:
    - «non è un output riconosciuto»: è un file di input o di un altro programma, toglilo dai `--from`;

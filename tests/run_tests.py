@@ -5823,6 +5823,10 @@ def _json_esempio():
             ("piano.json", asset("it-rebalance", "ribilanciamento-multibroker.py"), ["--out", "ordini"]),
             # il look-through gira sulla sua fixture (due ETF con composizione): broker-lt.json è il suo input e NON entra
             # in _tutti_i_json(), perché sarebbe un secondo JSON di tipo «broker»
+            # ponte e riscatto (T17, sviluppo successivo): mc-uscita.json è un secondo mc_pensione e NON entra in _tutti_i_json()
+            ("ris.json", PE("riscatto-laurea.py"), ["--from", "dati.json", "--from", "inps.json"]),
+            ("mc-uscita.json", PE("montecarlo-pensione.py"), ["--from", "dati.json", "--from", "inps.json", "--set", "ANNI=25", "--set", "N_SIM=500"]),
+            ("ponte.json", PE("ponte-pensione.py"), ["--from", "inps.json", "--from", "mc-uscita.json", "--set", "ETA_USCITA=62"]),
             ("broker-lt.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
              [os.path.join(FIXTURES, "estratto-look-through.csv"), "--anno", "2026"]),
             ("lt.json", OB("look-through-portafoglio.py"),
@@ -5863,26 +5867,16 @@ def t_t17_riconosci():
     attesi = {"alloc.json": "allocatore", "glide.json": "glide_path", "mco.json": "mc_obiettivi", "inps.json": "inps",
               "mc.json": "mc_pensione", "netto.json": "netto_pensione", "cu.json": "capitale_umano",
               "broker.json": "broker", "piano.json": "ribilanciamento", "dati.json": "ignorato:importa-previdenza",
-              "lt.json": "look_through", "broker-lt.json": "broker"}
+              "lt.json": "look_through", "broker-lt.json": "broker", "ris.json": "riscatto", "ponte.json": "ponte",
+              "mc-uscita.json": "mc_pensione"}
     for nome, tipo in attesi.items():
         d = json.load(open(js[nome], encoding="utf-8"))
         assert mod.riconosci(d) == tipo, (nome, mod.riconosci(d))
         assert sum(1 for _, firma in mod.FIRME if firma(d)) <= 1, nome
     assert {t for t, _ in mod.FIRME} == {t for t in attesi.values() if not t.startswith("ignorato")}
     assert mod.riconosci({"a": 1}) is None
-    # ponte e riscatto si riconoscono e si ignorano: la catena previdenziale si passa intera
-    tmp = os.path.dirname(js["inps.json"])
-    PE = lambda n: asset("it-pianificazione", n)
-    rc, out = run_script(PE("riscatto-laurea.py"), "--from", "dati.json", "--from", "inps.json", "--json", "ris.json", cwd=tmp)
-    assert rc == 0, out[-300:]
-    rc, out = run_script(PE("montecarlo-pensione.py"), "--from", "dati.json", "--from", "inps.json", "--set", "ANNI=25",
-                         "--set", "N_SIM=500", "--json", "mc-uscita.json", cwd=tmp)
-    assert rc == 0, out[-300:]
-    rc, out = run_script(PE("ponte-pensione.py"), "--from", "inps.json", "--from", "mc-uscita.json", "--set", "ETA_USCITA=62",
-                         "--json", "ponte.json", cwd=tmp)
-    assert rc == 0, out[-300:]
-    assert mod.riconosci(json.load(open(os.path.join(tmp, "ris.json"), encoding="utf-8"))) == "ignorato:riscatto-laurea"
-    assert mod.riconosci(json.load(open(os.path.join(tmp, "ponte.json"), encoding="utf-8"))) == "ignorato:ponte-pensione"
+    # l'importatore della previdenza resta l'unico ignorato: la catena previdenziale si passa intera
+    assert [n for n, _ in mod.IGNORATI] == ["importa-previdenza"]
 
 
 @test("T17 cruscotto: il bundle porta i valori dei JSON di origine e nessuna posizione dell'estratto")
@@ -5890,14 +5884,14 @@ def t_t17_bundle():
     js = _json_esempio()
     L = lambda n: json.load(open(js[n], encoding="utf-8"))
     tutti = [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
-                             "broker.json", "piano.json", "lt.json")]
+                             "broker.json", "piano.json", "lt.json", "ponte.json", "ris.json")]
     rc, so, se, b, html = _cruscotto(*tutti)
     assert rc == 0, (so[-300:], se[-300:])
     mco, mc, netto, cu, broker, piano = (L(n) for n in ("mco.json", "mc.json", "netto.json", "cu.json", "broker.json", "piano.json"))
     assert b["generato_il"] == "2026-10-25" and b["versione"] == 1
     assert b["plugin"] == json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
     assert [f["tipo"] for f in b["fonti"]] == ["allocatore", "look_through", "glide_path", "mc_obiettivi", "inps", "mc_pensione",
-                                              "netto_pensione", "capitale_umano", "broker", "ribilanciamento"], b["fonti"]
+                                              "netto_pensione", "ponte", "riscatto", "capitale_umano", "broker", "ribilanciamento"], b["fonti"]
     assert b["obiettivi"]["obiettivi"][0]["probabilita_successo"] == mco["obiettivi"][0]["probabilita_successo"]
     assert b["obiettivi"]["obiettivi"][1]["capitale_finale"] == mco["obiettivi"][1]["capitale_finale"]
     assert b["pensione"]["tasso_lordo"]["mediana"] == mc["tasso_sostituzione_lordo"]["mediana"]
@@ -6050,7 +6044,7 @@ SEZIONI_CRUSCOTTO = ("allocazione", "look_through", "obiettivi", "glide_path", "
 def _tutti_i_json():
     js = _json_esempio()
     return [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
-                            "broker.json", "piano.json", "lt.json")]
+                            "broker.json", "piano.json", "lt.json", "ponte.json", "ris.json")]
 
 
 @test("T17 cruscotto nel browser: si apre senza errori, ogni sezione col suo SVG, nessuna richiesta di rete")
@@ -6206,6 +6200,47 @@ def t_lt_documentazione():
     assert "look-through" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.11.0")[0].lower()
     t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
     assert "[x] **Look-through del portafoglio**" in t16 and "2026-11-01-look-through" in t16, t16[:1200]
+
+
+@test("T17 cruscotto: ponte pensione e riscatto della laurea nella sezione Pensione")
+def t_t17_ponte_riscatto():
+    js = _json_esempio()
+    L = lambda n: json.load(open(js[n], encoding="utf-8"))
+    ponte, ris = L("ponte.json"), L("ris.json")
+    # da soli bastano a far nascere la sezione Pensione
+    rc, so, se, b, html = _cruscotto(js["ponte.json"], js["ris.json"])
+    assert rc == 0, se[-300:]
+    p, r = b["pensione"]["ponte"], b["pensione"]["riscatto"]
+    assert b["pensione"]["inps"] is None and "pensione" in so.split("Sezioni:")[1]
+    assert p["eta_uscita"] == ponte["eta_uscita"] and p["anni_ponte"] == ponte["anni_ponte"] == 7
+    assert p["capitale_ponte"] == ponte["capitale_ponte"] and p["probabilita_successo"] == ponte["probabilita_successo"]
+    assert p["capitale_necessario"] == {"85%": ponte["capitale_necessario"]["85%"], "95%": ponte["capitale_necessario"]["95%"]}
+    assert p["rita"] == {k: ponte["rita"][k] for k in ("attiva", "eta_inizio", "rata_netta")}
+    assert p["costo_permanente_lordo_annuo"] == ponte["costo_permanente_lordo_annuo"]
+    assert r["onere_agevolato"] == ris["onere_agevolato"] and r["onere_ordinario"] == ris["onere_ordinario"]
+    assert r["costo_netto"] == ris["costo_netto"] and r["anni_per_rientrare"] == ris["anni_per_rientrare"]
+    assert r["eta_anticipata_con_riscatto"] == ris["eta_anticipata_con_riscatto"] and r["modalita"] == "agevolato"
+    # un JSON di prima di una modifica delle chiavi si rifiuta con «manca …»
+    def senza(d):
+        del d["capitale_necessario"]
+    rc, _, se, _, _ = _cruscotto(_json_variante("ponte.json", senza))
+    assert rc == 1 and "manca capitale_necessario" in se and "Traceback" not in se, se[-300:]
+    sync_playwright, lancia = browser()
+    with sync_playwright() as pw:
+        br = lancia(pw)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            testo = page.inner_text("#sez-pensione")
+            assert page.locator("#sez-pensione svg").count() >= 2, page.locator("#sez-pensione svg").count()
+            assert "Ponte pensionistico" in testo and "uscita a 62" in testo and "69" in testo, testo[:600]
+            assert formato_it_percento(ponte["probabilita_successo"]) in testo and "€120.704" in testo, testo[:900]
+            assert "RITA" in testo and "Riscatto della laurea" in testo and "€31.033" in testo and "19,1 anni" in testo, testo[-900:]
+            assert "73,3" in testo and "78,3" in testo, testo[-600:]
+            for brutto in ("NaN", "undefined", "null"):
+                assert brutto not in testo, brutto
+        finally:
+            br.close()
 
 
 @test("T17 cruscotto: gli avvisi dell'importatore che nominano le posizioni non entrano nella pagina")

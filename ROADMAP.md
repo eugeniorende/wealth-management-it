@@ -207,7 +207,8 @@ Prese il 20/10/2026.
   - [x] Test in Chromium con Playwright, obbligatori in CI.
   - [x] Passo 6 di it-revisione e comando `/cruscotto`, con la conferma prima di pubblicare l'Artifact.
   - [ ] Prova manuale della pubblicazione in claude.ai e in Cowork alla prossima release.
-  - Sviluppi successivi, da decidere: confronto tra due revisioni; ponte pensione e riscatto della laurea nel cruscotto; versione anonimizzata per la condivisione.
+  - [x] Ponte pensione e riscatto della laurea nella sezione Pensione del cruscotto (1/11/2026): i due JSON, prima riconosciuti e saltati, disegnano probabilità e capitale del ponte, RITA e costo permanente, oneri e rientro del riscatto.
+  - Sviluppi successivi, da decidere: confronto tra due revisioni; versione anonimizzata per la condivisione.
 - [ ] **T16 Fonti dati esterne e connettori** (P2). Principio: gli script di calcolo restano offline; il dato si procura a parte (importatore su file, o Claude che lo scarica nella cartella di lavoro) e lo script legge un file locale. Per ogni fonte si annotano licenza (quelle a pagamento non si ridistribuiscono nel repository) e mese di verifica.
 
   - [x] **Composizione degli ETF** (alta priorità): spec `docs/sviluppo/specs/2026-10-25-composizione-etf-design.md`, piano `docs/sviluppo/piani/2026-10-25-composizione-etf.md`. `importa-composizione-etf.py` legge i file delle posizioni di iShares, Xtrackers, Vanguard, Amundi e SPDR (CSV o XLSX, italiano o inglese) e scrive `composizione.csv` per settore GICS e paese ISO; `capitale-umano.py` lo legge per la diagnosi 4, accanto al vecchio formato compilato a mano. Layout di Xtrackers e SPDR verificati su file reali; iShares, Vanguard e Amundi da confermare su un file reale.
