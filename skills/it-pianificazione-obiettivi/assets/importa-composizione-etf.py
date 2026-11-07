@@ -114,7 +114,7 @@ _VARIANTI_SETTORI = {
                                "communication", "kommunikationsdienste", "kommunikationsdienstleistungen",
                                "services de communication"),
     "Industrials": ("industriali", "industria", "industriale", "beni industriali", "industrie", "industriewerte",
-                    "industriels", "industriegüter",
+                    "industriels", "industriegüter", "industrieunternehmen",
                     "industrali"),   # refuso nel file «Composizione dell'indice» di Amundi (sito italiano, 11/2026)
     "Consumer Staples": ("beni di prima necessità", "beni di consumo di base", "consumi di base",
                          "beni di consumo primari", "beni di consumo non ciclici", "generi di largo consumo",
@@ -124,7 +124,7 @@ _VARIANTI_SETTORI = {
                          "biens de consommation non cycliques", "consommation courante"),
     "Energy": ("energia", "energetico", "energie", "énergie"),
     "Materials": ("materiali", "materie prime", "roh-, hilfs- & betriebsstoffe", "roh-, hilfs- und betriebsstoffe",
-                  "rohstoffe", "materialien", "matériaux"),
+                  "rohstoffe", "materialien", "material", "matériaux"),
     "Utilities": ("servizi di pubblica utilità", "pubblica utilità", "utility", "servizi pubblici",
                   "imprese di servizi di pubblica utilità", "versorger",
                   "versorgungsbetriebe", "versorgungsunternehmen", "services aux collectivités", "services publics",
@@ -425,7 +425,7 @@ EG;Ägypten|Égypte
 ES;Spanien|Espagne
 FI;Finnland|Finlande
 FR;Frankreich
-GB;Vereinigtes Königreich|Großbritannien|Grossbritannien|Royaume-Uni|Grande-Bretagne
+GB;Vereinigtes Königreich|Großbritannien|Großbritannien (UK)|Grossbritannien|Royaume-Uni|Grande-Bretagne
 GR;Griechenland|Grèce
 HK;Hongkong
 HU;Ungarn|Hongrie
@@ -435,7 +435,7 @@ IL;Israel|Israël
 IN;Indien|Inde
 IT;Italien|Italie
 JP;Japan|Japon
-KR;Südkorea|Korea|Korea, Republik|Republik Korea|Corée du Sud|Corée|Corée, République de|République de Corée
+KR;Südkorea|Süd Korea|Korea|Korea, Republik|Republik Korea|Corée du Sud|Corée|Corée, République de|République de Corée
 KW;Kuwait|Koweït
 LU;Luxemburg
 MX;Mexiko|Mexique
@@ -457,6 +457,55 @@ TR;Türkei|Turquie
 TW;Taiwan|Taïwan
 US;Vereinigte Staaten|Vereinigte Staaten von Amerika|USA|États-Unis|Etats-Unis|États-Unis d'Amérique
 ZA;Südafrika|Afrique du Sud
+ZM;Sambia|Zambie
+KY;Kaimaninseln|Kaiman Inseln|Îles Caïmans|Iles Caimans
+BM;Bermudas|Bermudes
+VG;Britische Jungferninseln|Îles Vierges britanniques
+CW;Curaçao
+JE;Jersey
+GG;Guernsey|Guernesey
+IM;Isle of Man|Île de Man
+LI;Liechtenstein
+MC;Monaco
+MT;Malta|Malte
+CY;Zypern|Chypre
+IS;Island|Islande
+EE;Estland|Estonie
+LV;Lettland|Lettonie
+LT;Litauen|Lituanie
+RO;Rumänien|Roumanie
+HR;Kroatien|Croatie
+SI;Slowenien|Slovénie
+BG;Bulgarien|Bulgarie
+RS;Serbien|Serbie
+UA;Ukraine
+KZ;Kasachstan|Kazakhstan
+GE;Georgien|Géorgie
+MA;Marokko|Maroc
+TN;Tunesien|Tunisie
+NG;Nigeria|Nigéria
+KE;Kenia|Kenya
+MU;Mauritius|Maurice
+BH;Bahrain|Bahreïn
+OM;Oman
+JO;Jordanien|Jordanie
+PK;Pakistan
+LK;Sri Lanka
+BD;Bangladesch|Bangladesh
+VN;Vietnam|Viêt Nam|Viet Nam
+MO;Macao|Macau
+PR;Puerto Rico|Porto Rico
+PA;Panama
+UY;Uruguay
+BS;Bahamas
+CR;Costa Rica
+EC;Ecuador|Équateur
+BO;Bolivien|Bolivie
+VE;Venezuela
+JM;Jamaika|Jamaïque
+DO;Dominikanische Republik|République dominicaine
+TT;Trinidad und Tobago|Trinité-et-Tobago
+PG;Papua-Neuguinea|Papouasie-Nouvelle-Guinée
 """
 _PAESI_DE_FR = {codice: tuple(nomi.split("|")) for codice, nomi in
                 (r.split(";") for r in _ELENCO_PAESI_DE_FR.strip().splitlines())}
@@ -498,14 +547,15 @@ SCHEDE = {
                 "verificato": "2026-11, file reale (sito italiano, CSV)"},
     "xtrackers": {"nome": "Xtrackers", "riconosci": ("xtrackers", "dws"), "classificazione": "GICS",
                   "etichette_extra": (), "data_nel_foglio": True, "liquidita": ("warrants",),
-                  "verificato": "2026-10, file reale (sito britannico, XLSX)"},
+                  "verificato": "2026-10 sito britannico e 2026-11 sito tedesco (XLSX, intestazioni inglesi e valori tedeschi)"},
     # Vanguard: GICS o ICB secondo l'indice (FTSE usa ICB); finché un file reale non lo conferma, dai nomi
     "vanguard": {"nome": "Vanguard", "riconosci": ("vanguard",), "classificazione": None,
                  "etichette_extra": ("as at",), "data_nel_foglio": False, "liquidita": (),
                  "verificato": "2026-11, file reale (sito italiano, XLSX): FTSE All-World in ICB, solo paesi"},
     "amundi": {"nome": "Amundi", "riconosci": ("amundi", "lyxor"), "classificazione": "GICS",
-               "etichette_extra": ("dati ritenuti esatti al",), "data_nel_foglio": False, "liquidita": (),
-               "verificato": "2026-11, file reale (sito italiano, «Composizione dell'indice»: ripartizione per settore e paese)"},
+               "etichette_extra": ("dati ritenuti esatti al", "data correct as at"), "data_nel_foglio": False, "liquidita": (),
+               "giorno_prima": True,   # «04/11/2026» è il 4 novembre anche sotto «as at» (nome del file e sito lo confermano)
+               "verificato": "2026-11, file reali (sito italiano): «Composizione dell'indice» (ripartizione) e «Fund Holdings» (ETF a swap)"},
     "spdr": {"nome": "SPDR", "riconosci": ("spdr", "state street", "ssga"), "classificazione": "GICS",
              "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
              "verificato": "2026-10, file reale (sito EMEA, XLSX)"},
@@ -605,7 +655,10 @@ def _apri_xlsx(path, grezzo, avvisi):
 
 
 def _righe_xlsx(path, grezzo, avvisi=None):
-    wb = _apri_xlsx(path, grezzo, [] if avvisi is None else avvisi)
+    return _righe_da_wb(path, _apri_xlsx(path, grezzo, [] if avvisi is None else avvisi))
+
+
+def _righe_da_wb(path, wb):
     for ws in wb.worksheets:
         righe = [list(r) for r in ws.iter_rows(values_only=True)]
         if any(not _vuota(c) for r in righe for c in r):
@@ -658,6 +711,8 @@ def leggi_file(path, avvisi):
             ripartizione = leggi_ripartizione(wb)
             if ripartizione:
                 return None, None, ripartizione
+            righe, foglio = _righe_da_wb(path, wb)      # lo stesso workbook: l'avviso sugli stili una volta sola
+            return righe, foglio, None
     righe, foglio = leggi_righe(path, avvisi)
     return righe, foglio, None
 
@@ -843,14 +898,18 @@ def data_posizioni(preambolo, titolo_foglio, scheda):
     meglio nessuna data che una sbagliata."""
     if scheda and scheda["data_nel_foglio"] and _data(titolo_foglio):
         return _data(titolo_foglio), None
-    etichette = _tabella("ETICHETTE_DATA") | {normalizza(e) for e in (scheda["etichette_extra"] if scheda else ())}
+    extra = {normalizza(e) for e in (scheda["etichette_extra"] if scheda else ())}
+    etichette = _tabella("ETICHETTE_DATA") | extra
     for riga in preambolo:
         for j, cella in enumerate(riga):
             n = normalizza(cella)
-            etichetta = next((e for e in etichette if n == e or n.startswith(e + " ")), None)
+            # le etichette della scheda valgono anche dentro una frase («Please note … Data correct as at 04/11/2026»)
+            etichetta = next((e for e in etichette if n == e or n.startswith(e + " ") or (e in extra and f" {e} " in f" {n} ")), None)
             if etichetta is None:
                 continue
             inglese = etichetta.split()[-1] in ("of", "at", "on")
+            if scheda and scheda.get("giorno_prima") is not None:
+                inglese = not scheda["giorno_prima"]   # Amundi scrive gg/mm anche sotto un'etichetta inglese
             for candidata in [cella] + [c for c in riga[j + 1:] if not _vuota(c)][:1]:
                 try:
                     data = _data(candidata, giorno_prima=not inglese)
@@ -1076,10 +1135,18 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
     data, avviso_data = data_posizioni(preambolo, foglio, scheda)
     if avviso_data:
         avvisi.append(avviso_data)
+    # replica sintetica dichiarata nel preambolo («Replication method: Synthetic»): le posizioni sono il paniere di
+    # collaterale dello swap, non l'esposizione all'indice (un S&P 500 a swap può tenere titoli europei)
+    testo_preambolo = " ".join(normalizza(c) for r in preambolo for c in r if not _vuota(c))
+    sintetica = any(f" {parola}" in f" {testo_preambolo}" for parola in ("synthetic", "sintetic", "synthetisch", "synthetique"))
+    if sintetica:
+        avvisi.append("replica sintetica dichiarata nel file: le posizioni sono il paniere di collaterale dello swap, non "
+                      "l'esposizione all'indice; settori, paesi e titoli descrivono il collaterale")
     return {"strumento": strumento, "emittente": chiave, "riconosciuto_da": riconosciuto_da, "file": file,
             "data_posizioni": data, "classificazione": classificazione,
             "colonne": {k: v for k, v in testi.items() if k != "nome"}, "titoli": n_titoli, "esclusi": esclusi,
-            "settori": risultato["settori"], "paesi": risultato["paesi"], "primi_titoli": primi, "avvisi": avvisi}
+            "settori": risultato["settori"], "paesi": risultato["paesi"], "primi_titoli": primi,
+            "replica_sintetica": sintetica, "avvisi": avvisi}
 
 
 # ── composizione.csv ────────────────────────────────────────────────────────
@@ -1185,6 +1252,8 @@ def righe_strumento(c, oggi):
     esclusi = _esclusi(c)
     if esclusi:
         commento += "; esclusi " + ", ".join(esclusi)
+    if c["replica_sintetica"]:
+        commento += "; replica sintetica: posizioni del collaterale, non esposizione all'indice"
     righe = [commento]
     for dim, plurale in _DIMENSIONI:
         righe += [_linea([c["strumento"], dim, voce, numero(peso * 100, 2)]) for voce, peso in c[plurale].items()]

@@ -94,7 +94,7 @@ Ordine di lavoro deciso dal proprietario l'1/11/2026 per il ciclo 0.12.0, dopo l
 
 Rinviati a dopo la legge di bilancio 2027, quando si riapre comunque la calibrazione: le fonti dati a priorità media e bassa di T16 (R_F dalla BCE, `p_u` e durata da ISTAT e INPS, NASpI nella freshness, `sigma_h`, rendimenti europei, `PESI_MONDO`), i quattro sviluppi del capitale umano (secondo reddito, volatilità personale dall'estratto INPS, aggiustamento dei target, polizza vita) e gli altri due del cruscotto (confronto tra due revisioni, versione anonimizzata).
 
-Restano al proprietario: le due prove di installazione del § 2.6 (account senza accesso e upload dello zip in Cowork), la prova manuale della pubblicazione del cruscotto come Artifact in claude.ai e in Cowork, il tag della 0.12.0. I layout iShares, Vanguard e Amundi sono stati confermati il 7/11/2026 su file reali forniti dal proprietario (siti italiani; Amundi come file di ripartizione dell'indice); restano da confermare iShares dal sito britannico, un file delle posizioni di Amundi e i siti tedesco e francese.
+Restano al proprietario: le due prove di installazione del § 2.6 (account senza accesso e upload dello zip in Cowork), la prova manuale della pubblicazione del cruscotto come Artifact in claude.ai e in Cowork, il tag della 0.12.0. I layout iShares, Vanguard e Amundi sono stati confermati il 7/11/2026 su file reali forniti dal proprietario (siti italiani; Amundi come file di ripartizione dell'indice); poi anche il «Fund Holdings» di Amundi (ETF a swap) e il «Constituent» di Xtrackers dal sito tedesco; restano da confermare iShares dal sito britannico e Amundi dai siti tedesco e francese.
 
 Con il calendario del README («Freshness fiscale»):
 

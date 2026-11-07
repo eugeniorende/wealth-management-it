@@ -43,14 +43,16 @@ Sempre dalla pagina del singolo ETF sul sito dell'emittente, nella sezione delle
 | Emittente | Formato tipico | Note |
 |---|---|---|
 | iShares (BlackRock) | CSV | Preambolo di qualche riga con nome del fondo e data («Fund Holdings as of», «Posizioni al»); dal sito italiano (file `iShare_<ticker>_holdings.csv`) solo «Al» e la data, una riga vuota, intestazioni e settori in italiano abbreviati («IT», «Comunicazione», «Generi di largo consumo»), campi tra virgolette con la virgola decimale |
-| Xtrackers (DWS) | XLSX | Disclaimer in testa, intestazione alla riga 4, peso in frazione, data nel nome del foglio; dal sito tedesco intestazioni (`Branche`, `Land`, `Gewichtung`) e settori in tedesco |
+| Xtrackers (DWS) | XLSX | Disclaimer in testa, intestazione alla riga 2 o 4, peso in frazione, data nel nome del foglio; dal sito tedesco («Constituent_<ISIN>.xlsx») le intestazioni restano in inglese e i valori sono in tedesco («Industrieunternehmen», «Vereinigte Staaten von Amerika», «Aktien», «unbekannt») |
 | Vanguard | XLSX o CSV | Dal sito italiano («Dati delle partecipazioni»): «Al 30 set 2026» nel preambolo, pesi come testo con «%», colonna «Regione» con i codici ISO; per gli ETF su indici FTSE la classificazione dei settori è ICB: vedi sotto |
-| Amundi | XLSX | Il sito italiano scarica la **«Composizione dell'indice»**: non l'elenco dei titoli ma la ripartizione per settore e per paese su fogli separati («Ripartizione Settoriale», «Ripartizione Geografica»), con uno stile Excel non valido. L'importatore la legge come **file di ripartizione** (vedi sotto). Intestazioni nella lingua del sito (`Secteur`, `Pays`, `Poids (%)`) |
+| Amundi | XLSX | Due file dalla pagina dell'ETF. La **«Composizione dell'indice»** non elenca i titoli ma la ripartizione per settore e per paese su fogli separati («Ripartizione Settoriale», «Ripartizione Geografica»): l'importatore la legge come **file di ripartizione** (vedi sotto). Il **«Fund Holdings»** è l'elenco dei titoli, con intestazioni in inglese («ISIN code», «Name», «Asset class», «Weight», «Sector», «Country») e la data dd/mm/aaaa anche sotto l'etichetta inglese; per un ETF a swap sono il **collaterale**, e il file lo dichiara («Replication method: Synthetic»). Entrambi hanno uno stile Excel non valido, che l'importatore aggira |
 | SPDR (State Street) | XLSX | Preambolo con «Holdings As Of», paese di negoziazione («Trade Country Name»), righe «Unassigned» per i contratti di cambio |
 
 Se il sito apre la pagina invece di scaricare il file (capita quando si copia il link del pulsante), l'importatore riconosce l'HTML e chiede di usare il pulsante di download.
 
-**File di ripartizione.** Un XLSX con fogli chiamati «Ripartizione Settoriale» e «Ripartizione Geografica» (o «Sector breakdown», «Répartition sectorielle», «Sektoraufteilung»…) non elenca i titoli: ogni foglio ha una tabella «nome;peso» già aggregata. L'importatore la legge così com'è, con le stesse esclusioni delle righe non classificate («Altro»), e scrive settori e paesi ma nessuna riga `titolo`; lo dice con un avviso, perché i pesi sono quelli dell'**indice** (non del fondo) e per i primi titoli serve il file delle posizioni. Se il foglio di stile dell'XLSX non è valido (il file di Amundi del novembre 2026), lo rilegge senza stili e lo dice.
+**File di ripartizione.** Un XLSX con fogli chiamati «Ripartizione Settoriale» e «Ripartizione Geografica» (o «Sector breakdown», «Répartition sectorielle», «Sektoraufteilung»…) non elenca i titoli: ogni foglio ha una tabella «nome;peso» già aggregata. L'importatore la legge così com'è, con le stesse esclusioni delle righe non classificate («Altro»), e scrive settori e paesi ma nessuna riga `titolo`; lo dice con un avviso, perché i pesi sono quelli dell'**indice** (non del fondo) e per i primi titoli serve il file delle posizioni. Se il foglio di stile dell'XLSX non è valido (i file di Amundi del novembre 2026), lo rilegge senza stili e lo dice.
+
+**Replica sintetica.** Se il preambolo dichiara la replica sintetica («Replication method: Synthetic», «replica sintetica»), le posizioni sono il paniere di collaterale dello swap e non l'esposizione all'indice: l'importatore le scrive lo stesso, ma lo dice nel report, nel JSON (`replica_sintetica`) e nel commento del CSV, perché settori, paesi e titoli descrivono il collaterale. Per l'esposizione vera serve la composizione dell'indice.
 
 ## Cosa legge e cosa esclude
 
@@ -89,8 +91,9 @@ UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decima
 | iShares | CSV dal sito britannico | da confermare su un file reale |
 | Vanguard | XLSX dal sito italiano («Dati delle partecipazioni», FTSE All-World, ICB: solo paesi) | file reale, 7/11/2026 |
 | Amundi | XLSX dal sito italiano («Composizione dell'indice»: file di ripartizione, senza titoli) | file reale, 7/11/2026 |
-| Amundi | file delle posizioni (elenco dei titoli), se il sito lo offre | da confermare su un file reale |
-| Xtrackers e Amundi | siti tedesco e francese | da confermare su un file reale (fixture sintetiche) |
+| Amundi | XLSX «Fund Holdings» (elenco dei titoli, intestazioni inglesi; ETF a swap: collaterale) | file reale, 7/11/2026 |
+| Xtrackers | XLSX dal sito tedesco («Constituent_<ISIN>.xlsx», intestazioni inglesi e valori tedeschi) | file reale, 7/11/2026 |
+| Amundi | sito tedesco e francese; Xtrackers con le intestazioni in tedesco | da confermare su un file reale (fixture sintetiche) |
 
 «Da confermare» vuol dire che i sinonimi coprono i formati documentati ma nessun file reale è ancora passato dall'importatore: se qualcosa non torna, lo script si ferma e dice cosa ha visto. I file reali non entrano nel repository: le fixture dei test ne riproducono il layout.
 

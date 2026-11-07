@@ -5279,7 +5279,7 @@ def t_ce_uscita():
         assert d["out"] == out and [s["strumento"] for s in d["strumenti"]] == ["ETF MSCI World"], d
         s = d["strumenti"][0]
         assert {"strumento", "emittente", "riconosciuto_da", "file", "data_posizioni", "classificazione", "colonne",
-                "titoli", "esclusi", "settori", "paesi", "primi_titoli", "avvisi"} == set(s), set(s)
+                "titoli", "esclusi", "settori", "paesi", "primi_titoli", "replica_sintetica", "avvisi"} == set(s), set(s)
         assert abs(sum(s["settori"].values()) - 1) < 1e-9 and abs(sum(s["paesi"].values()) - 1) < 1e-9
         # --json - : solo JSON su stdout, --out scritto lo stesso
         rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "Y", "--out", out, "--json", "-", cwd=tmp)
@@ -5633,6 +5633,51 @@ def _xlsx_reale(tipo, cartella):
         path = os.path.join(cartella, "Dati_delle_partecipazioni_-_Vanguard_FTSE_All-World.xlsx")
         wb.save(path)
         return path
+    if tipo == "xtrackers-de":
+        # intestazioni in inglese, valori in tedesco, foglio con la data, pesi in frazione (anche in notazione
+        # scientifica) e «N/A», disclaimer alla riga 1 con «DWS»
+        ws = wb.active
+        ws.title = "2026-11-07"
+        ws.append(["Obwohl die Informationen in diesem Dokument aus Quellen stammen, die als zuverlässig gelten, garantiert DWS "
+                   "ihre Richtigkeit, Vollständigkeit oder Fairness nicht."])
+        ws.append([None, "Name", "ISIN", "Country", "Currency", "Exchange", "Type of Security", "Rating", "Primary Listing",
+                   "Industry Classification", "Weighting"])
+        for n, riga in enumerate((("APPLE", "US0378331005", "Vereinigte Staaten von Amerika", "USD", "NASDAQ", "Aktien", "Aa1", "NASDAQ", "Informationstechnologie", 0.40),
+                                  ("SIEMENS", "DE0007236101", "Deutschland", "EUR", "Xetra", "Aktien", "A1", "DAX", "Industrieunternehmen", 0.25),
+                                  ("RIO TINTO", "GB0007188757", "Großbritannien (UK)", "GBP", "LSE", "Aktien", "A2", "FTSE 100", "Material", 0.20),
+                                  ("SAMSUNG ELECTRONICS", "KR7005930003", "Süd Korea", "KRW", "KRX", "Aktien", "-", "KOSPI", "Informationstechnologie", 0.10),
+                                  ("ZCCM", "ZM0000000037", "Sambia", "ZMW", "-", "Aktien", "-", "-", "Material", 2e-2),
+                                  ("EUR CASH", "-", "Deutschland", "EUR", "-", "Cash", "-", "-", "unbekannt", 0.02),
+                                  ("MSCI WORLD INDEX  DEC26", "___ADI2VD0J5", "Deutschland", "USD", "-", "Future", "-", "-", "unbekannt", "N/A"),
+                                  ("KAIMAN HOLDING", "KYG000000001", "Kaiman Inseln", "USD", "-", "Aktien", "-", "-", "Finanzen", 9.98013e-03)), 1):
+            ws.append([n, *riga])
+        path = os.path.join(cartella, "Constituent_IE00BJ0KDQ92.xlsx")
+        wb.save(path)
+        return path
+    if tipo == "amundi-holdings-swap":
+        ws = wb.active
+        ws.title = "Fund Holdings"
+        for _ in range(5):
+            ws.append([None, None])
+        for riga in (["Amundi ETF"], ["FUND HOLDINGS"], ["Name of the fund", "Amundi Core S&P 500 Swap UCITS ETF USD Dist"],
+                     ["ISIN code", "LU0496786657"], ["Replication method", "Synthetic"], ["", ""],
+                     ["Fund Assets Under Management as at 04/11/2026", "32,749.14 M USD"], ["Reference currency", "USD"], ["", ""],
+                     ["Name of the swap counterparty(ies)", "Société Générale,Morgan Stanley"],
+                     ["Please note that holdings data can change daily. Data correct as at 04/11/2026. Please refer to the website for the latest information."]):
+            ws.append([None, *riga])
+        ws.append(["", "ISIN code", "Name", "Asset class", "Currency", "Weight", "Sector", "Country"])
+        for riga in (("US0231351067", "AMAZON.COM INC", "EQUITY", "USD", 0.50, "Consumer Discretionary", "United States"),
+                     ("DE0007164600", "SAP SE", "EQUITY", "EUR", 0.30, "Information Technology", "Germany"),
+                     ("CH0038863350", "NESTLE SA", "EQUITY", "CHF", 0.19, "Consumer Staples", "Switzerland"),
+                     (None, None, "CASH", "EUR", 0.01, " ", " ")):
+            ws.append(["", *riga])
+        ws.append([None, None])
+        ws.append([None, "Source: Amundi Asset Management"])
+        ws.append([None, "Synthetic/Indirect replication :\nThe Fund is managed, using a synthetic replication method."])
+        path = os.path.join(cartella, "Fund_Holdings_Amundi_Core_SP_500_Swap_LU0496786657.xlsx")
+        wb.save(path)
+        _rompi_stili(path)
+        return path
     if tipo == "amundi-ripartizione":
         wb.remove(wb.active)
         for titolo, etichetta, righe in (
@@ -5664,18 +5709,22 @@ def _xlsx_reale(tipo, cartella):
             ws.append([None, "Informazioni promozionali e non contrattuali, che non devono essere considerate come un consiglio."])
         path = os.path.join(cartella, "Composizione_dellindice_Amundi_MSCI_EM_Asia_LU1781541849.xlsx")
         wb.save(path)
-        # lo stile non valido del file reale («Colors must be aRGB hex values»): un colore rgb che non è esadecimale
-        import zipfile
-        with zipfile.ZipFile(path) as z:
-            membri = {n: z.read(n) for n in z.namelist()}
-        stili = membri["xl/styles.xml"].decode("utf-8")
-        assert 'theme="1"' in stili, stili[:300]
-        membri["xl/styles.xml"] = stili.replace('<color theme="1"/>', '<color rgb="0xffffff"/>', 1).encode("utf-8")
-        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-            for n, b in membri.items():
-                z.writestr(n, b)
+        _rompi_stili(path)
         return path
     raise ValueError(tipo)
+
+
+def _rompi_stili(path):
+    """Lo stile non valido dei file reali di Amundi («Colors must be aRGB hex values»): un colore rgb non esadecimale."""
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        membri = {n: z.read(n) for n in z.namelist()}
+    stili = membri["xl/styles.xml"].decode("utf-8")
+    assert 'theme="1"' in stili, stili[:300]
+    membri["xl/styles.xml"] = stili.replace('<color theme="1"/>', '<color rgb="0xffffff"/>', 1).encode("utf-8")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for n, b in membri.items():
+            z.writestr(n, b)
 
 
 @test("T16 composizione ETF: file reali di novembre 2026 (iShares e Vanguard dai siti italiani, ripartizione dell'indice Amundi)")
@@ -5729,6 +5778,27 @@ def t_ce_file_reali():
         rc, so, se = run_script_split(asset(*CE), "--file", path, "--isin", "LU1781541849", "--out", out, cwd=tmp)
         assert rc == 0 and "ripartizione" in so and "LU1781541849;paese;TW;" in open(out, encoding="utf-8-sig").read(), (so[-400:], se[-300:])
         assert ";titolo;" not in open(out, encoding="utf-8-sig").read()
+        # Xtrackers dal sito tedesco: intestazioni inglesi, valori tedeschi («Industrieunternehmen», «Material»,
+        # «Großbritannien (UK)», «Süd Korea», «Sambia», «Kaiman Inseln»), foglio con la data, pesi in frazione
+        x = m.componi(_xlsx_reale("xtrackers-de", tmp), "X")
+        assert x["emittente"] == "xtrackers" and x["riconosciuto_da"] == "preambolo" and x["data_posizioni"] == "2026-11-07", x
+        assert r2(x["settori"]) == {"Information Technology": 51.02, "Industrials": 25.51, "Materials": 22.45, "Financials": 1.02}, x["settori"]
+        assert r2(x["paesi"]) == {"US": 40.82, "DE": 25.51, "GB": 20.41, "KR": 10.20, "ZM": 2.04, "KY": 1.02}, x["paesi"]
+        assert x["titoli"] == 6 and abs(x["esclusi"]["liquidita_derivati"] - 0.02) < 1e-9 and x["colonne"]["settore"] == "Industry Classification", x
+        # Amundi «Fund Holdings» di un ETF a swap: stili rotti, intestazioni inglesi, replica sintetica dichiarata nel
+        # preambolo (le posizioni sono il collaterale), data dd/mm sotto un'etichetta inglese perché Amundi scrive così
+        sw = m.componi(_xlsx_reale("amundi-holdings-swap", tmp), "S")
+        assert sw["emittente"] == "amundi" and sw["data_posizioni"] == "2026-11-04" and sw["replica_sintetica"] is True, sw
+        assert r2(sw["settori"]) == {"Consumer Discretionary": 50.51, "Information Technology": 30.30, "Consumer Staples": 19.19}, sw["settori"]
+        assert r2(sw["paesi"]) == {"US": 50.51, "DE": 30.30, "CH": 19.19} and abs(sw["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9, sw
+        assert sw["primi_titoli"][0] == {"nome": "AMAZON.COM INC", "isin": "US0231351067", "peso": 0.5}, sw["primi_titoli"]
+        assert any("sintetica" in a and "collaterale" in a for a in sw["avvisi"]), sw["avvisi"]
+        assert sum(1 for a in sw["avvisi"] if "stili" in a) == 1, sw["avvisi"]     # il file si apre una volta sola
+        assert a["replica_sintetica"] is False and it["replica_sintetica"] is False
+        rc, so, se = run_script_split(asset(*CE), "--file", _xlsx_reale("amundi-holdings-swap", tmp), "--isin", "LU0496786657",
+                                      "--out", os.path.join(tmp, "sw.csv"), cwd=tmp)
+        commento = next(r for r in open(os.path.join(tmp, "sw.csv"), encoding="utf-8-sig").read().splitlines() if r.startswith("# LU0496786657"))
+        assert rc == 0 and "replica sintetica" in commento, (rc, commento, se[-300:])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
