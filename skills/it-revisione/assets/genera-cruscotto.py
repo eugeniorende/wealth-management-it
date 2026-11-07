@@ -3,8 +3,9 @@
 """
 genera-cruscotto.py — il cruscotto grafico del piano, in un file HTML autosufficiente.
 
-Legge i JSON che gli script del plugin scrivono con --json (allocatore, glide path, Monte Carlo
-degli obiettivi, catena della pensione, capitale umano, importatore dei broker, ribilanciamento),
+Legge i JSON che gli script del plugin scrivono con --json (allocatore, look-through del portafoglio,
+glide path, Monte Carlo degli obiettivi, catena della pensione con ponte e riscatto della laurea, capitale
+umano, importatore dei broker, ribilanciamento),
 ne riconosce il tipo dalle chiavi, ne estrae solo i campi che la pagina mostra (il «bundle») e li
 incorpora nel template cruscotto.html accanto a questo script. La pagina disegna i grafici nel
 browser, senza librerie né risorse esterne: si apre dal disco, offline, e si può pubblicare come
@@ -63,11 +64,14 @@ def _primo(d, chiave):
 # se uno script cambia le sue chiavi, quel test fallisce e la riga qui va aggiornata.
 FIRME = [
     ("allocatore",      lambda d: _ha(d, "aggregato", "capitale") and "allocato" in _primo(d, "obiettivi")),
+    ("look_through",    lambda d: _ha(d, "copertura", "settori", "paesi", "titoli", "controvalore_totale")),
     ("glide_path",      lambda d: _ha(d, "anni", "portafoglio", "finestra") and "quota_azionaria" in _primo(d, "obiettivi")),
     ("mc_obiettivi",    lambda d: _ha(d, "n_sim") and "probabilita_successo" in _primo(d, "obiettivi")),
     ("inps",            lambda d: _ha(d, "pensione_inps_lorda_annua", "coefficiente_trasformazione")),
     ("mc_pensione",     lambda d: _ha(d, "tasso_sostituzione_lordo", "montante_fp") and isinstance(d["tasso_sostituzione_lordo"], dict)),
     ("netto_pensione",  lambda d: _ha(d, "scenari", "netto_pensione_inps")),
+    ("ponte",           lambda d: _ha(d, "anni_ponte", "capitale_ponte")),
+    ("riscatto",        lambda d: _ha(d, "onere_riscatto", "anni_riscatto")),
     ("capitale_umano",  lambda d: _ha(d, "bilancio", "proiezione", "esposizione_totale")),
     ("broker",          lambda d: _ha(d, "posizioni", "zainetto", "analisi") and _ha(d["analisi"], "per_broker")),
     ("ribilanciamento", lambda d: _ha(d, "drift", "risultante", "ordini")),
@@ -75,8 +79,6 @@ FIRME = [
 # JSON di altri script del plugin che il cruscotto riconosce e salta (la catena si passa intera)
 IGNORATI = [
     ("importa-previdenza", lambda d: _ha(d, "montante_attuale", "ral_attuale", "fp_versamento_annuo")),
-    ("ponte-pensione",     lambda d: _ha(d, "anni_ponte", "capitale_ponte")),
-    ("riscatto-laurea",    lambda d: _ha(d, "onere_riscatto", "anni_riscatto")),
 ]
 ORDINE = [t for t, _ in FIRME]
 
@@ -161,6 +163,33 @@ def _allocazione(alloc, rib):
     return sezione
 
 
+def _look_through(lt):
+    """Solo gli aggregati del look-through: le posizioni dell'utente (nomi, ISIN) restano fuori dalla pagina,
+    ne passa il numero e la quota di quelle senza composizione. Paesi oltre i primi dieci sommati in «altri»."""
+    if not lt:
+        return None
+    f, d = lt
+    def voci(chiave):
+        return [{"nome": str(campo(x, "nome", f, f"{chiave}[{i}].")), "peso": numero_di(x, "peso", f, dove=f"{chiave}[{i}].")}
+                for i, x in enumerate(lista_di(d, chiave, f))]
+    paesi, altri = voci("paesi")[:10], voci("paesi")[10:]
+    if altri:
+        paesi.append({"nome": f"altri {len(altri)} paesi", "peso": sum(p["peso"] for p in altri)})
+    senza = lista_di(d, "senza_composizione", f)
+    # i titoli «diretti» sono posizioni dell'utente descritte a mano: restano fuori dalla pagina, se ne dice il numero
+    n_report = numero_di(d, "n_titoli_report", f)
+    titoli = [t for t, x in zip(voci("titoli"), lista_di(d, "titoli", f)) if not x.get("diretto")]
+    return {
+        "copertura": {k: numero_di(d, f"copertura.{k}", f) for k in ("settori", "paesi", "titoli")},
+        "settori": voci("settori"), "paesi": paesi, "titoli": titoli[:n_report],
+        "n_titoli_diretti": len(voci("titoli")) - len(titoli),
+        "quota_primi_titoli": numero_di(d, "quota_primi_titoli", f),
+        "n_posizioni": len(lista_di(d, "posizioni", f)) + len(senza),
+        "n_senza_composizione": len(senza),
+        "quota_senza_composizione": sum(numero_di(x, "quota", f, dove=f"senza_composizione[{i}].") for i, x in enumerate(senza)),
+    }
+
+
 def _obiettivi(mco):
     if not mco:
         return None
@@ -186,10 +215,11 @@ def _glide_path(gp):
                           for i, o in enumerate(lista_di(d, "obiettivi", f))]}
 
 
-def _pensione(inps, mc, netto):
-    if not (inps or mc or netto):
+def _pensione(inps, mc, netto, ponte=None, riscatto=None):
+    if not (inps or mc or netto or ponte or riscatto):
         return None
-    sezione = {"inps": None, "tasso_lordo": None, "target": None, "prob_target": None, "montante_fp": None, "netto": None}
+    sezione = {"inps": None, "tasso_lordo": None, "target": None, "prob_target": None, "montante_fp": None, "netto": None,
+               "ponte": None, "riscatto": None}
     if inps:
         f, d = inps
         sezione["inps"] = {k: numero_di(d, k, f) for k in ("pensione_inps_lorda_annua", "eta_pensionamento",
@@ -207,6 +237,22 @@ def _pensione(inps, mc, netto):
             "netto_pensione_inps": numero_di(d, "netto_pensione_inps", f),
             "scenari": [estrai(s, ("nome", "pensione_netta_totale", "tasso_sostituzione_netto", "tasso_sostituzione_lordo"),
                                f, f"scenari[{i}]") for i, s in enumerate(lista_di(d, "scenari", f))]}
+    if ponte:
+        f, d = ponte
+        sezione["ponte"] = {k: numero_di(d, k, f) for k in ("eta_uscita", "eta_pensione_vecchiaia", "anni_ponte", "capitale_ponte",
+                                                            "probabilita_successo", "costo_permanente_lordo_annuo")}
+        sezione["ponte"]["capitale_necessario"] = {k: numero_di(d, f"capitale_necessario.{k}", f) for k in ("85%", "95%")}
+        sezione["ponte"]["rita"] = {"attiva": campo(d, "rita.attiva", f),
+                                    "eta_inizio": numero_di(d, "rita.eta_inizio", f, nullo=True),
+                                    "rata_netta": numero_di(d, "rita.rata_netta", f, nullo=True)}
+    if riscatto:
+        f, d = riscatto
+        sezione["riscatto"] = {"modalita": campo(d, "modalita", f)}
+        sezione["riscatto"].update({k: numero_di(d, k, f) for k in ("anni_riscatto", "onere_agevolato", "onere_ordinario",
+                                                                    "costo_netto", "rata_mensile", "rate_mensili",
+                                                                    "delta_pensione_lorda_annua", "eta_pensionamento")})
+        sezione["riscatto"].update({k: numero_di(d, k, f, nullo=True) for k in ("anni_per_rientrare", "eta_anticipata_senza_riscatto",
+                                                                                "eta_anticipata_con_riscatto")})
     return sezione
 
 
@@ -311,6 +357,9 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - allocazione: target_aggregato {azioni, obbligazioni, liquidita, totale} | None, capitale, obiettivi
       [{nome, profilo, tipo, richiesto, allocato, peso_az}], classi [{classe, peso, target, tight, wide,
       fuori_banda, risultante}] | None (dal ribilanciamento);
+    - look_through: copertura {settori, paesi, titoli}, settori e titoli [{nome, peso}] (i titoli delle posizioni dirette
+      esclusi, contati in n_titoli_diretti), paesi [{nome, peso}] con «altri N paesi» oltre i primi dieci,
+      quota_primi_titoli, n_posizioni, n_senza_composizione, quota_senza_composizione;
     - obiettivi: modello, n_sim, obiettivi [{nome, profilo, priorita, anni, target_oggi, target_nominale, gia,
       probabilita_successo, capitale_finale {p10, mediana, p90}, versamento_deterministico,
       versamento_confidenza, confidenza}], totale_versamento_deterministico, totale_versamento_confidenza;
@@ -318,7 +367,11 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - pensione: inps {pensione_inps_lorda_annua, eta_pensionamento, anni_al_pensionamento, montante_finale,
       ral_finale} | None, tasso_lordo e montante_fp {p10, mediana, p90} | None, target, prob_target,
       netto {netto_ultimo_stipendio, netto_pensione_inps, scenari [{nome, pensione_netta_totale,
-      tasso_sostituzione_netto, tasso_sostituzione_lordo}]} | None;
+      tasso_sostituzione_netto, tasso_sostituzione_lordo}]} | None, ponte {eta_uscita, eta_pensione_vecchiaia,
+      anni_ponte, capitale_ponte, probabilita_successo, capitale_necessario {85%, 95%}, rita {attiva, eta_inizio,
+      rata_netta}, costo_permanente_lordo_annuo} | None, riscatto {modalita, anni_riscatto, onere_agevolato,
+      onere_ordinario, costo_netto, rata_mensile, rate_mensili, delta_pensione_lorda_annua, eta_pensionamento, anni_per_rientrare,
+      eta_anticipata_senza_riscatto, eta_anticipata_con_riscatto} | None;
     - capitale_umano: voci [{nome, valore}], esposizione_finanziaria, esposizione_totale, proiezione
       [{eta, F (patrimonio finanziario), HC (capitale umano), esposizione, p10, p90}], eta_sorpasso, stato_sorpasso, settore {settore, quota_settore_fin,
       peso_mondo, sovrappeso} | None;
@@ -335,9 +388,10 @@ def componi_bundle(sorgenti, data, versione_plugin):
         "plugin": versione_plugin,
         "fonti": [{"file": sorgenti[t][0], "tipo": t} for t in ORDINE if t in sorgenti],
         "allocazione": _allocazione(s("allocatore"), s("ribilanciamento")),
+        "look_through": _look_through(s("look_through")),
         "obiettivi": _obiettivi(s("mc_obiettivi")),
         "glide_path": _glide_path(s("glide_path")),
-        "pensione": _pensione(s("inps"), s("mc_pensione"), s("netto_pensione")),
+        "pensione": _pensione(s("inps"), s("mc_pensione"), s("netto_pensione"), s("ponte"), s("riscatto")),
         "capitale_umano": _capitale_umano(s("capitale_umano")),
         "fiscalita": _fiscalita(s("broker")),
         "ribilanciamento": _ribilanciamento(s("ribilanciamento")),
@@ -377,8 +431,9 @@ def leggi_sorgenti(percorsi):
         tipo = riconosci(dati)
         if tipo is None:
             raise ErroreDati(f"«{nome}» non è un output riconosciuto. Tipi accettati: {', '.join(ORDINE)} "
-                             "(i --json di allocatore, glide path, Monte Carlo degli obiettivi, proiezione INPS, "
-                             "Monte Carlo e netto della pensione, capitale umano, importatore dei broker, ribilanciamento)")
+                             "(i --json di allocatore, look-through del portafoglio, glide path, Monte Carlo degli "
+                             "obiettivi, proiezione INPS, Monte Carlo e netto della pensione, ponte pensione, riscatto della "
+                             "laurea, capitale umano, importatore dei broker, ribilanciamento)")
         if tipo.startswith("ignorato:"):
             ignorati.append((nome, tipo.split(":", 1)[1]))
             continue
@@ -453,8 +508,8 @@ def main(argv=None):
         print(f"  {fonte['file']} → {fonte['tipo']}")
     for nome, script in ignorati:
         print(f"  ℹ {nome} ({script}) ignorato: il cruscotto non lo usa")
-    sezioni = [k for k in ("allocazione", "obiettivi", "glide_path", "pensione", "capitale_umano", "fiscalita",
-                           "ribilanciamento") if bundle[k]]
+    sezioni = [k for k in ("allocazione", "look_through", "obiettivi", "glide_path", "pensione", "capitale_umano",
+                           "fiscalita", "ribilanciamento") if bundle[k]]
     print(f"Sezioni: {', '.join(sezioni)}")
     for ind in bundle["indicatori"]:
         nota = f" ({ind['nota']})" if ind["nota"] else ""

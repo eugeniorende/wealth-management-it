@@ -2,7 +2,7 @@
 name: it-revisione
 description: "Revisione periodica personale della situazione finanziaria complessiva: il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole «fare il punto», chiede una revisione annuale o di fine anno, dice «come sta andando il mio piano», «rivediamo il portafoglio», «check-up finanziario», «tiriamo le somme», o a novembre-dicembre vuole una verifica complessiva prima del 31/12; anche per l'Investment Policy Statement (IPS), il cruscotto patrimoniale e quello grafico del piano. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento), `it-tax-optimization` (minusvalenze di fine anno) e `it-rebalance` (deriva dell'allocazione). NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato."
 metadata:
-  version: "0.8"
+  version: "0.9"
 ---
 
 # Revisione periodica personale
@@ -45,7 +45,7 @@ Versamenti effettuati vs pianificati; andamento del periodo **separando il rendi
 - **Pensione** → `it-pianificazione` (dipendenti) o `it-pianificazione-autonomi` (P.IVA): il tasso di sostituzione proiettato è ancora in linea con l'obiettivo? C'è un **gap previdenziale**? Va aumentato il versamento al fondo pensione (verificando la deducibilità nel proprio regime)? Per il dipendente, qual è lo **spazio deducibile residuo** dell'anno: max(0, €5.300 − datore − dovuto − volontari già versati nell'anno), con il contributo del datore e quello minimo del lavoratore (il TFR non conta)? È il tetto fiscale dei volontari da versare ancora entro il 31/12, non un importo consigliato (foglio Complementare dell'Excel di `it-pianificazione`); per il forfettario la deduzione arriva solo fino agli altri redditi IRPEF (`it-pianificazione-autonomi`). Ciò che supera il plafond, o che il forfettario non deduce, va comunicato al fondo come non dedotto entro il 31/12 dell'anno dopo: senza comunicazione in uscita è tassato di nuovo, con una perdita del 9-15% su quella parte (23% se la posizione esce con un'anticipazione non sanitaria o un riscatto per altre cause).
 - **Obiettivi** → `it-pianificazione-obiettivi`: ogni obiettivo è **on track**? La **probabilità di successo** (Monte Carlo) è ancora adeguata? Il **glide path** richiede de-risking quest'anno? Va aggiustato il versamento mensile? La deriva per obiettivo si legge nel `tracker-secchielli.xlsx`, se l'utente lo tiene.
 - **Fiscalità** → `it-tax-optimization`: ci sono **minusvalenze in scadenza** (finestra 4 anni) da usare entro il 31/12? Plusvalenze da compensare? Opportunità di **harvesting**? (A fine anno questo passo ha priorità per via delle scadenze.)
-- **Allocazione** → `it-rebalance`: quanto è il **drift** rispetto al target? Va ribilanciato? Si può ribilanciare sfruttando le **minus in scadenza** per compensare le plus da vendita (coordinamento fiscale)?
+- **Allocazione** → `it-rebalance`: quanto è il **drift** rispetto al target? Va ribilanciato? Si può ribilanciare sfruttando le **minus in scadenza** per compensare le plus da vendita (coordinamento fiscale)? Con `composizione.csv` e il JSON dell'estratto, il **look-through** (`look-through-portafoglio.py --json`, it-pianificazione-obiettivi) dice cosa contengono gli ETF messi insieme: nel report i primi tre settori e paesi con la copertura, la quota dei primi dieci titoli (un minimo) e le posizioni senza composizione, da importare o compilare.
 
 ### 4. Azioni prioritizzate
 Si raccolgono le azioni emerse e si **ordinano**, secondo la logica di `references/metodo-revisione.md`:
@@ -61,11 +61,11 @@ Si produce il **report della revisione** come deliverable (vedi Formato output).
 ### 6. Cruscotto grafico
 Una pagina HTML con i grafici del piano: allocazione attuale contro target con le bande, probabilità e capitale finale degli obiettivi, glide path, pensione lorda e netta, capitale umano, zainetto per scadenza, drift e ordini del ribilanciamento. I numeri vengono **solo** dai JSON che gli script scrivono con `--json` (quelli del «Contratto di input» più `ribilanciamento-multibroker.py --json`): la pagina li disegna, non li ricalcola, e tu non li riscrivi.
 
-1. Dalla cartella di lavoro, lancia il generatore sui JSON **scritti dagli script con `--json`** (`--from` ripetibile, l'ordine non conta; quelli di `importa-previdenza.py`, `ponte-pensione.py` e `riscatto-laurea.py` si riconoscono e si saltano). Non passare i file di **input** che stanno nella stessa cartella: `piano.json` (il `--dati` del ribilanciamento), `capitale-umano.json` (il `--dati` del capitale umano), `ips.json` (il `--dati` dell'IPS):
+1. Dalla cartella di lavoro, lancia il generatore sui JSON **scritti dagli script con `--json`** (`--from` ripetibile, l'ordine non conta; quello di `importa-previdenza.py` si riconosce e si salta; `ponte-pensione.py` e `riscatto-laurea.py` entrano nella sezione Pensione; del look-through passano solo gli aggregati, mai le posizioni). Non passare i file di **input** che stanno nella stessa cartella: `piano.json` (il `--dati` del ribilanciamento), `capitale-umano.json` (il `--dati` del capitale umano), `ips.json` (il `--dati` dell'IPS):
    ```bash
    python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from glide.json --from mco.json \
        --from inps.json --from mc.json --from netto.json --from capitale-umano-out.json \
-       --from broker.json --from ribilancia.json -o cruscotto.html
+       --from broker.json --from ribilancia.json --from look-through.json [--from ponte.json --from riscatto.json] -o cruscotto.html
    ```
    Se un JSON manca, dillo e genera il cruscotto con quelli che ci sono: le sezioni senza dati non compaiono. Gli errori fermano lo script con `ERRORE:`; secondo il messaggio:
    - «non è un output riconosciuto»: è un file di input o di un altro programma, toglilo dai `--from`;
@@ -140,6 +140,7 @@ Ogni cella di input del cruscotto ha una fonte precisa. Dove la fonte è uno scr
 | Pensione, autonomi | `proiezione-pensione-autonomi.xlsx`, foglio Riepilogo (nessuno script) | `Riepilogo!B13`, «Tasso di sostituzione — totale» (non la B12, che è la sola obbligatoria), lordo; l'obiettivo sulla stessa base | `Sintesi!B12`; `B13` |
 | Fiscalità | `importa-estratto-broker.py --json` | `analisi.per_broker[broker].zainetto_in_scadenza` e `.plus_realizzabili_a_costo_zero` | foglio `Azioni`, righe di scadenza al 31/12 (nessuna cella numerica) |
 | Capitale umano | `capitale-umano.py --json` (it-pianificazione-obiettivi), con `--composizione` da `importa-composizione-etf.py` per il settore | `esposizione_finanziaria` contro `esposizione_totale`; `settore.quota_settore_fin` e `settore.sovrappeso` se c'è la composizione; `eta_sorpasso` con `stato_sorpasso` (`gia_superato`, `entro_la_proiezione`, `non_prima_della_fine`) | report, nessuna cella: è una lente, non un target |
+| Look-through | `look-through-portafoglio.py --json` (it-pianificazione-obiettivi), con `--composizione` e `--posizioni` dal `--json` di `importa-estratto-broker.py` | `settori[]`, `paesi[]` e `titoli[]` (`nome`, `peso` sulla parte coperta) con `copertura` accanto; `quota_primi_titoli` (un minimo); `senza_composizione[]` per nome | report, nessuna cella: fotografia delle composizioni alla data dei file |
 
 Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione; `--help` di ogni script elenca anche le chiavi che legge con `--from`.
 

@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 172 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007), l'importatore della composizione degli ETF (layout sintetici dei cinque emittenti, esclusioni, fusione del CSV) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 182 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007), l'importatore della composizione degli ETF (layout sintetici dei cinque emittenti, esclusioni, fusione del CSV), il look-through del portafoglio (valori chiusi, chiave dei titoli, sezione del cruscotto) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -80,36 +80,37 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 <!-- generata con: python tests/run_tests.py --tabella-test -->
 | Strumento | Test che lo esercitano |
 |---|---|
-| `it-pianificazione/assets/importa-previdenza.py` | 21: T12 fixture realistiche; T13 riscatto della laurea; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 catena --json → --from; T9 formati … |
-| `it-pianificazione/assets/montecarlo-pensione.py` | 17: T12 --json previdenziali; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 catena --json → --from; T9 contratto di input della revisione; T9 formati … |
+| `it-pianificazione/assets/importa-previdenza.py` | 23: T12 fixture realistiche; T13 riscatto della laurea; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 catena --json → --from … |
+| `it-pianificazione/assets/montecarlo-pensione.py` | 19: T12 --json previdenziali; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 catena --json → --from; T9 contratto di input della revisione … |
 | `it-pianificazione/assets/motore_bootstrap.py` | 12: T12 rami avanzati; T14 skill; T9 formati; T9 lettore unico del pianificatore; T9 «Dove lavorare»; motore bootstrap … |
-| `it-pianificazione/assets/netto-pensione.py` | 28: T12 --json previdenziali; T15 capitale umano ×2; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 catena --json → --from; T9 contratto di input della revisione … |
-| `it-pianificazione/assets/ponte-pensione.py` | 13: T12 --json previdenziali; T14 postura e fonti; T17 cruscotto; T9 catena --json → --from; T9 formati; T9 interfaccia ×2 … |
-| `it-pianificazione/assets/proiezione-inps.py` | 25: T12 rami avanzati; T13 riscatto della laurea; T15 capitale umano ×2; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 catena --json → --from … |
+| `it-pianificazione/assets/netto-pensione.py` | 30: T12 --json previdenziali; T15 capitale umano ×2; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 catena --json → --from … |
+| `it-pianificazione/assets/ponte-pensione.py` | 21: T12 --json previdenziali; T14 postura e fonti; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 catena --json → --from … |
+| `it-pianificazione/assets/proiezione-inps.py` | 27: T12 rami avanzati; T13 riscatto della laurea; T15 capitale umano ×2; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2 … |
 | `it-pianificazione/assets/proiezione-pensione.xlsx` | 13: T12 Excel; T15 capitale umano ×2; coerenza tra skill; proiezione-pensione-autonomi.xlsx; proiezione-pensione.xlsx ×8 |
 | `it-pianificazione/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
-| `it-pianificazione/assets/riscatto-laurea.py` | 10: T13 riscatto della laurea ×3; T14 skill; T17 cruscotto; T9 formati; T9 interfaccia ×2; freshness fiscale … |
+| `it-pianificazione/assets/riscatto-laurea.py` | 18: T13 riscatto della laurea ×3; T14 skill; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 formati … |
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 6: T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
-| `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 16: T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore … |
+| `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 18: T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
-| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 24: T15 capitale umano ×10; T16 composizione ETF ×3; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati … |
+| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 27: T15 capitale umano ×10; T16 composizione ETF ×3; T16 look-through ×2; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione … |
 | `it-pianificazione-obiettivi/assets/decumulo-obiettivi.py` | 9: T12 rami avanzati; T9 formati; T9 interfaccia ×2; decumulo-obiettivi; obiettivi; serie storica ×2 … |
-| `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 10: T15 capitale umano; T16 composizione ETF; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione |
-| `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 19: T12 rami avanzati; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati … |
-| `it-pianificazione-obiettivi/assets/importa-composizione-etf.py` | 15: T16 composizione ETF ×12; T9 formati; T9 interfaccia ×2 |
-| `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 23: T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
-| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 25: T12 Excel ×2; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 interfaccia; T9 lettore unico del pianificatore … |
+| `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 13: T15 capitale umano; T16 composizione ETF; T16 look-through ×2; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione |
+| `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 21: T12 rami avanzati; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione … |
+| `it-pianificazione-obiettivi/assets/importa-composizione-etf.py` | 19: T16 composizione ETF ×14; T16 look-through ×2; T9 formati; T9 interfaccia ×2 |
+| `it-pianificazione-obiettivi/assets/look-through-portafoglio.py` | 17: T16 look-through ×5; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 |
+| `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 25: T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati … |
+| `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 27: T12 Excel ×2; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 interfaccia … |
 | `it-pianificazione-obiettivi/assets/profili-capitale-umano.csv` | 1: T15 capitale umano |
 | `it-pianificazione-obiettivi/assets/rendimenti-storici.csv` | 7: obiettivi ×2; pensione; ponte-pensione; serie storica ×2; sincronia |
-| `it-rebalance/assets/ribilanciamento-multibroker.py` | 27: T1; T17 cruscotto ×5; T17 cruscotto nel browser ×2; T17 ribilanciamento --json; T7 ribilanciamento ×10; T9 formati ×2 … |
+| `it-rebalance/assets/ribilanciamento-multibroker.py` | 29: T1; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T17 ribilanciamento --json; T7 ribilanciamento ×10 … |
 | `it-revisione/assets/cruscotto-patrimoniale.xlsx` | 6: T12 Excel ×2; bande di ribilanciamento; cruscotto; cruscotto TWR; scadenze di fine anno |
-| `it-revisione/assets/genera-cruscotto.py` | 13: T17 cruscotto ×7; T17 cruscotto nel browser ×3; T9 formati; T9 interfaccia ×2 |
+| `it-revisione/assets/genera-cruscotto.py` | 15: T16 look-through; T17 cruscotto ×8; T17 cruscotto nel browser ×3; T9 formati; T9 interfaccia ×2 |
 | `it-revisione/assets/genera-ips.py` | 10: T14 postura e fonti; T9 formati; T9 input esterno; T9 interfaccia ×2; freshness fiscale; genera-ips ×2 … |
 | `it-revisione/assets/investment-policy-statement.xlsx` | 3: T12 Excel; bande di ribilanciamento; scadenze di fine anno |
 | `it-revisione/assets/tracker-secchielli.xlsx` | 4: T12 Excel ×2; bande di ribilanciamento; tracker-secchielli |
 | `it-tax-optimization/assets/esempio-estratto.csv` | 2: T2 importatore ×2 |
 | `it-tax-optimization/assets/esempio-zainetto.csv` | 2: T2 importatore ×2 |
-| `it-tax-optimization/assets/importa-estratto-broker.py` | 23: T14 postura e fonti; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T2 importatore ×6; T3; T9 contratto di input della revisione … |
+| `it-tax-optimization/assets/importa-estratto-broker.py` | 27: T14 postura e fonti; T16 look-through ×3; T17 cruscotto ×7; T17 cruscotto nel browser ×2; T2 importatore ×6; T3 … |
 
 ### Freshness fiscale
 
@@ -172,9 +173,9 @@ Ogni skill ha una versione propria, nel campo `metadata.version` del frontmatter
 | 1 | `tax-loss-harvesting` | `it-tax-optimization` | ✅ v0.11 (minus/plus, multi-broker, dichiarativo RT/RW/IVAFE, Tobin tax 2026, cripto: base + avanzata + casi speciali) + importatore estratti broker |
 | 2 | `financial-plan` | `it-pianificazione` | ✅ v0.13 (pensione dipendenti, importatore estratto INPS + fondo, proiezione INPS parametrica con sensibilità, Monte Carlo tasso sostituzione, riscatto della laurea) |
 | 2b | `financial-plan` | `it-pianificazione-autonomi` | ✅ v0.5 (pensione autonomi/forfettari, casse professionali, Excel, rivalsa e acconti del secondo anno) |
-| 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.23 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo, capitale umano, importatore della composizione degli ETF) |
+| 2c | `financial-plan` + `investment-proposal` | `it-pianificazione-obiettivi` | ✅ v0.24 (goals-based, allocatore di capitale con split + 6 profili, Monte Carlo onesto + leva di rischio, glide path, asset location, decumulo, capitale umano, importatore della composizione degli ETF, look-through del portafoglio) |
 | 3 | `portfolio-rebalance` | `it-rebalance` | ✅ v0.8 (tax-aware con versamenti, aliquota per posizione e rientro misto, multi-broker, bande 5/25, prelievo in decumulo, sequenza di liquidazione, ordini CSV, piano in JSON per il cruscotto) |
-| 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.8 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR, **cruscotto grafico** pubblicabile come Artifact) |
+| 4 | `client-review` + `client-report` + `investment-proposal` (IPS) | `it-revisione` | ✅ v0.9 (revisione di sintesi, template report, tracker azioni, **generatore IPS in Word**, Excel, TWR, **cruscotto grafico** pubblicabile come Artifact, con il look-through del portafoglio) |
 
 Le sei skill attive formano un sistema coordinato attorno a un flusso end-to-end: `it-pianificazione-obiettivi` definisce gli obiettivi e le allocazioni (a monte), le due skill previdenziali coprono il secchiello pensione, `it-rebalance` mantiene le allocazioni nel tempo, `it-tax-optimization` ottimizza la fiscalità delle vendite, e `it-revisione` è il **livello di sintesi** che una volta l'anno tiene insieme tutto in un quadro unico con azioni prioritizzate. Vedi la sezione "Architettura" sotto. Note: il goals-based, che nell'upstream è spezzato tra `financial-plan` (modellazione obiettivi) e `investment-proposal` (allocazione/IPS), nel fork è unificato in `it-pianificazione-obiettivi` con postura personale/educativa; e le skill upstream rivolte al consulente (`client-review`, `client-report`, in parte `investment-proposal`) sono riformulate per chi gestisce i propri soldi nell'unica `it-revisione`.
 
@@ -228,7 +229,7 @@ Cosa conviene sapere:
 - `importa-previdenza.py` legge l'estratto conto INPS e il prospetto del fondo pensione. Di default stampa intestatario e data di nascita, da cui calcola l'età; con `--anonimo` li omette e stampa l'età arrotondata all'anno. Le retribuzioni le stampa aggregate per anno, senza i datori di lavoro;
 - gli estratti dei broker contengono posizioni e importi; prima di passarli, togli quello che al calcolo non serve: intestatario, codice fiscale, IBAN, numero di dossier;
 - per i calcoli bastano età, importi e date: nomi e identificativi non servono a nessuno strumento del plugin;
-- `importa-composizione-etf.py` legge i file delle posizioni degli ETF che scarichi dal sito dell'emittente: restano nella cartella di lavoro, lo script non li invia a nessuno e il plugin non li ridistribuisce;
+- `importa-composizione-etf.py` legge i file delle posizioni degli ETF che scarichi dal sito dell'emittente: restano nella cartella di lavoro, lo script non li invia a nessuno e il plugin non li ridistribuisce; `look-through-portafoglio.py` li incrocia con il JSON dell'estratto del broker: il suo report e il suo JSON portano, oltre agli aggregati (settori, paesi, primi titoli), l'elenco delle posizioni con nome, ISIN e controvalore, per la revisione; nel cruscotto passano solo gli aggregati, e i titoli che descrivono una posizione diretta non si mostrano;
 - il cruscotto grafico (`genera-cruscotto.py`, comando `/cruscotto`) è un file HTML che resta nella cartella di lavoro e si apre offline. Pubblicarlo come Artifact lo mette su claude.ai, privato finché non lo condividi: Claude lo fa solo dopo una tua conferma esplicita, ogni volta. La pagina porta importi, età e proiezioni del piano, ma non ISIN né descrizioni delle singole posizioni.
 
 ### Verifica
@@ -258,7 +259,7 @@ Trigger automatico: ogni skill si attiva sui propri argomenti. `it-pianificazion
 
 ### Convenzioni degli script
 
-Tutti i 17 script del plugin seguono la stessa interfaccia, verificata dalla suite:
+Tutti i 18 script del plugin seguono la stessa interfaccia, verificata dalla suite:
 
 - `--help` descrive argomenti e opzioni; un argomento o un flag non riconosciuto ferma lo script con l'usage.
 - Codici d'uscita: **0** riuscito; **1** errore nei dati o nei parametri (file mancante o illeggibile, valori incoerenti, costante `--set` sconosciuta), con un messaggio che inizia per `ERRORE:` su stderr; **2** riga di comando non riconosciuta.
@@ -294,7 +295,7 @@ Ogni skill descrive il suo report nella sezione «Formato output» di `SKILL.md`
 2. **Opportunità identificate** — trade candidati con razionale fiscale
 3. **Calendario d'azione** — scadenze ordinate cronologicamente
 
-Gli script scrivono i loro output (JSON, CSV degli ordini, IPS in Word) nella cartella di lavoro. `/cruscotto` raccoglie i JSON in un cruscotto grafico: una pagina HTML con allocazione, obiettivi, glide path, pensione, capitale umano, fiscalità e ribilanciamento, da aprire nel browser o, su conferma, da pubblicare come Artifact.
+Gli script scrivono i loro output (JSON, CSV degli ordini, IPS in Word) nella cartella di lavoro. `/cruscotto` raccoglie i JSON in un cruscotto grafico: una pagina HTML con allocazione, look-through, obiettivi, glide path, pensione (con ponte e riscatto della laurea), capitale umano, fiscalità e ribilanciamento, da aprire nel browser o, su conferma, da pubblicare come Artifact.
 
 ## Cosa il plugin NON fa
 

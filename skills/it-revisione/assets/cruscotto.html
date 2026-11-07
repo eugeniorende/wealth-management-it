@@ -513,6 +513,34 @@ footer .fonti { color: var(--muto); }
     return s;
   }
 
+  function sezioneLookThrough(l) {
+    if (!l) return null;
+    var s = sezione("look_through", "Look-through",
+      "Cosa contengono gli ETF messi insieme, pesati per controvalore: settori, paesi e primi titoli. I pesi sono sulla parte coperta; la copertura è la quota del controvalore che ha quella dimensione.");
+    if (l.n_senza_composizione > 0) {
+      s.appendChild(el("p", { class: "nota", testo: l.n_senza_composizione + (l.n_senza_composizione === 1 ? " posizione senza composizione" : " posizioni senza composizione") +
+        " su " + l.n_posizioni + " (" + pct(l.quota_senza_composizione) + " del controvalore): non entra nei pesi." }));
+    }
+    var fmt = function (v) { return pct(v); };
+    [["Settori", "settori", "Settori aggregati del portafoglio"], ["Paesi", "paesi", "Paesi aggregati del portafoglio"]].forEach(function (d) {
+      s.appendChild(el("h3", { testo: d[0] + " (copertura " + pct(l.copertura[d[1]]) + ")" }));
+      if (l[d[1]].length) s.appendChild(barre(l[d[1]].map(function (x) { return { nome: x.nome, valore: x.peso }; }), fmt, d[2]));
+      else s.appendChild(el("p", { class: "nota", testo: "Nessuna posizione con " + d[0].toLowerCase() + " nella composizione." }));
+    });
+    s.appendChild(el("h3", { testo: "Primi titoli (copertura " + pct(l.copertura.titoli) + ")" }));
+    if (l.titoli.length) {
+      // barre e non tabella: la tabella ha una larghezza minima pensata per sei colonne e su un telefono scorrerebbe
+      s.appendChild(barre(l.titoli.map(function (t) { return { nome: t.nome, valore: t.peso }; }), fmt, "Primi titoli aggregati del portafoglio"));
+      s.appendChild(el("p", { class: "nota", testo: "I primi " + l.titoli.length + " titoli pesano " + pct(l.quota_primi_titoli) +
+        " della parte coperta. Sono i primi di ogni ETF per peso: un minimo della concentrazione, non il totale." +
+        (l.n_titoli_diretti ? " " + l.n_titoli_diretti + (l.n_titoli_diretti === 1 ? " titolo di posizione diretta non mostrato" :
+          " titoli di posizioni dirette non mostrati") + ": sono posizioni tue, non titoli di un ETF." : "") }));
+    } else {
+      s.appendChild(el("p", { class: "nota", testo: "Nessuna posizione con i titoli nella composizione." }));
+    }
+    return s;
+  }
+
   function sezioneObiettivi(o) {
     if (!o) return null;
     var s = sezione("obiettivi", "Obiettivi",
@@ -590,6 +618,37 @@ footer .fonti { color: var(--muto); }
       s.appendChild(el("p", { class: "nota", testo: "Pensione INPS lorda " + euro(p.inps.pensione_inps_lorda_annua) + " l'anno a " +
         anni(p.inps.eta_pensionamento) + " anni, tra " + anni(p.inps.anni_al_pensionamento) + " anni; montante contributivo " +
         euro(p.inps.montante_finale) + ", RAL finale " + euro(p.inps.ral_finale) + "." }));
+    }
+    if (p.ponte) {
+      var q = p.ponte, soglia = 0.85;
+      s.appendChild(el("h3", { testo: "Ponte pensionistico: uscita a " + anni(q.eta_uscita) + " anni, pensione a " +
+        anni(q.eta_pensione_vecchiaia) + " (" + anni(q.anni_ponte) + " anni da finanziare)" }));
+      var rp = el("div", { class: "riga" });
+      rp.appendChild(riga("Probabilità di coprire il ponte", el("span", { class: "valori" }, cifra(pct(q.probabilita_successo)),
+        " con " + euro(q.capitale_ponte) + " di capitale-ponte · soglia " + pct(soglia, 0))));
+      rp.appendChild(trackQuota(q.probabilita_successo, soglia, q.probabilita_successo >= soglia ? "var(--s1)" : "var(--serio)",
+        "Probabilità " + pct(q.probabilita_successo) + " contro la soglia " + pct(soglia, 0)));
+      s.appendChild(rp);
+      s.appendChild(barre([{ nome: "Capitale-ponte disponibile", valore: q.capitale_ponte },
+                           { nome: "Necessario per l'85%", valore: q.capitale_necessario["85%"], colore: "var(--muto)" },
+                           { nome: "Necessario per il 95%", valore: q.capitale_necessario["95%"], colore: "var(--muto)" }],
+                          euro, "Capitale-ponte disponibile contro necessario"));
+      s.appendChild(el("p", { class: "nota", testo: (q.rita.attiva ? "RITA dai " + anni(q.rita.eta_inizio) + " anni, rata netta " +
+        euro(q.rita.rata_netta) + " l'anno. " : "Senza RITA. ") + "Costo permanente dell'uscita anticipata: " +
+        euro(q.costo_permanente_lordo_annuo) + " l'anno di pensione lorda in meno, per sempre." }));
+    }
+    if (p.riscatto) {
+      var k = p.riscatto;
+      s.appendChild(el("h3", { testo: "Riscatto della laurea (" + anni(k.anni_riscatto) + " anni, " + k.modalita + ")" }));
+      s.appendChild(barre([{ nome: "Onere agevolato", valore: k.onere_agevolato },
+                           { nome: "Onere ordinario", valore: k.onere_ordinario, colore: "var(--muto)" },
+                           { nome: "Costo netto (" + k.modalita + ")", valore: k.costo_netto }],
+                          euro, "Onere del riscatto, agevolato contro ordinario, e costo netto"));
+      s.appendChild(el("p", { class: "nota", testo: (k.rate_mensili > 1 ? "Rata mensile " + euro(k.rata_mensile) + " in " + nf0.format(k.rate_mensili) + " rate" :
+        "Unica soluzione " + euro(k.rata_mensile)) + "; pensione lorda in più " +
+        euro(k.delta_pensione_lorda_annua) + " l'anno a " + anni(k.eta_pensionamento) + " anni; rientro in " + anni(k.anni_per_rientrare) +
+        " anni di pensione. Pensione anticipata ordinaria: da " + anni(k.eta_anticipata_senza_riscatto) + " a " +
+        anni(k.eta_anticipata_con_riscatto) + " anni." }));
     }
     return s;
   }
@@ -704,7 +763,7 @@ footer .fonti { color: var(--muto); }
     var main = document.getElementById("cruscotto");
     var sezioni = [
       B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori) : null,
-      sezioneAllocazione(B.allocazione), sezioneObiettivi(B.obiettivi), sezioneGlide(B.glide_path),
+      sezioneAllocazione(B.allocazione), sezioneLookThrough(B.look_through), sezioneObiettivi(B.obiettivi), sezioneGlide(B.glide_path),
       sezionePensione(B.pensione), sezioneCapitaleUmano(B.capitale_umano), sezioneFiscalita(B.fiscalita),
       sezioneRibilanciamento(B.ribilanciamento)
     ].filter(function (x) { return x; });

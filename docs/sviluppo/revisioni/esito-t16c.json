@@ -1,0 +1,68 @@
+{
+  "branch": "claude/awesome-albattani-gkn0qc",
+  "data": "2026-11-01",
+  "tema": "T16 C, look-through del portafoglio (spec docs/sviluppo/specs/2026-11-01-look-through-design.md)",
+  "applicati": [
+    "importa-composizione-etf.py: righe «titolo» (primi N_TITOLI per peso, peso nel fondo non rinormalizzato, liquidità e derivati esclusi), --isin alias di --strumento, colonna ISIN dei titoli, primi_titoli nel --json",
+    "capitale-umano.py: chiave_composizione() (ISIN poi nome), righe «titolo» saltate, esempio con gli ISIN",
+    "look-through-portafoglio.py: lettura dei tre formati del CSV, posizioni dal JSON del broker o dal --dati del capitale umano unite per ISIN, copertura per dimensione, pesi sulla parte coperta, titoli sommati con chiave_titolo(), senza_composizione per nome, report e --json",
+    "genera-cruscotto.py e cruscotto.html: firma look_through, bundle con i soli aggregati, sezione «Look-through» (barre dei settori, dei paesi e dei primi titoli, copertura, posizioni senza composizione)",
+    "Step 8 di it-pianificazione-obiettivi, reference composizione-etf.md e capitale-umano.md, passo 3, passo 6 e contratto di input di it-revisione, README, CHANGELOG, ROADMAP"
+  ],
+  "rulings": [
+    "La lista dei primi titoli nel JSON dell'importatore si chiama primi_titoli: «titoli» era già il conteggio dei titoli letti (spec §3.1 diceva titoli)",
+    "n_posizioni del bundle = posizioni con composizione + senza (il JSON mette in «posizioni» solo quelle con chiave; spec §4 diceva len(posizioni))",
+    "I primi titoli nel cruscotto sono barre e non una tabella: la tabella ha min-width 520px e a 375px nascondeva la colonna del peso"
+  ],
+  "non_applicati": [],
+  "mutanti": [
+    {
+      "mutante": "copertura ignorata: i pesi divisi per il controvalore totale invece che per la parte coperta (/ V_d → / totale)",
+      "uccisi_da": [
+        "T16 look-through: valori chiusi sulle fixture"
+      ],
+      "esito": "ucciso"
+    },
+    {
+      "mutante": "chiave_titolo() senza i suffissi societari (Apple Inc. e APPLE INC restano separati)",
+      "uccisi_da": [
+        "T16 look-through: chiave dei titoli",
+        "T16 look-through: il cruscotto riconosce il JSON (titoli[0] non è più Apple Inc.)"
+      ],
+      "esito": "ucciso"
+    },
+    {
+      "mutante": "le posizioni dell'utente lasciate nel bundle del cruscotto",
+      "uccisi_da": [
+        "T17 cruscotto: il bundle porta i valori dei JSON di origine e nessuna posizione dell'estratto",
+        "T16 look-through: il cruscotto riconosce il JSON, il bundle non porta posizioni né ISIN"
+      ],
+      "esito": "ucciso"
+    }
+  ],
+  "revisione": {
+    "esito": "With fixes (revisore fresco sull'intero branch del ciclo 0.12.0, 1/11/2026; sostituisce il workflow review-tema-roadmap.js, non richiesto in questa sessione)",
+    "corretti": [
+      "I1: il titolo di una posizione diretta (riga «titolo» al 100% scritta a mano) finiva nel cruscotto: ora «diretto» nel JSON, escluso dalla pagina e contato",
+      "I2: «per 120 mesi» fisso nel cruscotto del riscatto: riscatto-laurea.py scrive rate_mensili, la pagina dice «in N rate» o «Unica soluzione»",
+      "I3: pesi dei titoli scritti a mano in frazione divisi per 100 in silenzio: avviso quando la scala è inferita, reference con la regola «sempre in percento»",
+      "M1: «Industrie» vinceva su «Secteur» tra i sinonimi del settore",
+      "M2: mesi con accento o dieresi («déc.», «août», «März») non letti: accenti tolti prima delle regex",
+      "M3: N_TITOLI_REPORT nel JSON (n_titoli_report), usato dal cruscotto per tagliare la lista",
+      "M5: test sul nome vuoto nel CSV (avviso, nessuna chiave vuota) e riga Look-through nel test del contratto di input",
+      "M6: README, Step 8 e _nota dell'esempio allineati al codice",
+      "M7: --set delle tabelle del look-through con la guardia sulla tupla; pesi del JSON controllati come numeri nel cruscotto; chiavi del CSV senza posizione nel report e nel JSON"
+    ],
+    "rinviati": [
+      "M4: l'avviso «titoli senza riga titolo» tolto dalla spec (un CSV di soli settori è il caso normale del vecchio formato)",
+      "M7: unire per nome una posizione senza ISIN con la stessa posizione con ISIN su un altro broker (caso raro: gli estratti dei broker italiani hanno l'ISIN)"
+    ],
+    "test": [
+      "T16 look-through: il cruscotto riconosce il JSON… (posizioni dirette, N_TITOLI_REPORT, peso non numerico)",
+      "T17 cruscotto: ponte pensione e riscatto della laurea… (rate_mensili, unica soluzione)",
+      "T16 look-through: errori… (pesi in frazione, nome vuoto, --set senza tupla, composizioni senza posizione)",
+      "T16 composizione ETF: lingue tedesca e francese (Secteur/Industrie, mesi con accento)",
+      "T9 contratto di input della revisione (riga Look-through)"
+    ]
+  }
+}

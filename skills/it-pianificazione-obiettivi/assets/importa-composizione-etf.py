@@ -10,7 +10,8 @@ POSIZIONI (holdings) di ogni fondo, che scarichi tu dalla pagina dell'ETF (pulsa
 GICS e per paese e scrive composizione.csv, che capitale-umano.py legge con --composizione. Il file
 dell'emittente resta tuo: il plugin non lo scarica e non lo ridistribuisce. Non è consulenza finanziaria.
 
-Formati: CSV o XLSX di iShares, Xtrackers, Vanguard, Amundi e SPDR, in italiano o in inglese. Il motore è unico:
+Formati: CSV o XLSX di iShares, Xtrackers, Vanguard, Amundi e SPDR, in italiano, inglese, tedesco o francese (i siti
+tedesco e francese di Xtrackers e Amundi). Il motore è unico:
 cerca la riga d'intestazione con tabelle di sinonimi (SINONIMI_COLONNE), quindi il preambolo sopra la tabella e
 il disclaimer sotto non contano; una scheda per emittente (SCHEDE) dice solo quello che il motore non deduce
 (classificazione dei settori, etichette della data, valori che indicano liquidità e derivati). Se il tuo file usa
@@ -22,17 +23,20 @@ Regole applicate (references/composizione-etf.md):
 - per le obbligazioni (asset class «Fixed Income», «Reddito fisso»…) il settore non è GICS: contano solo nei paesi;
 - i pesi rimasti si rinormalizzano a 100 per dimensione; la quota esclusa è nel report, nel CSV e nel JSON;
 - settori: gli 11 GICS con il nome inglese, come in capitale-umano.py; paesi: codice ISO 3166-1 alpha-2;
-- un file in classificazione ICB (FTSE) dà solo i paesi: ICB → GICS non si converte senza errore.
+- un file in classificazione ICB (FTSE) dà solo i paesi: ICB → GICS non si converte senza errore;
+- i primi N_TITOLI titoli per peso (liquidità e derivati esclusi) si scrivono come righe «titolo», con il peso
+  nel fondo NON rinormalizzato: servono al look-through del portafoglio (look-through-portafoglio.py).
 
 Limiti dichiarati: le posizioni sono quelle del fondo a una data (per un ETF sintetico il paniere di collaterale,
 non l'esposizione); il paese è quello che l'emittente riporta (domicilio, rischio o negoziazione); niente PDF né
-XLS del vecchio Excel; niente lingue diverse da italiano e inglese.
+XLS del vecchio Excel; niente lingue diverse da italiano, inglese, tedesco e francese.
 
 Uso:
-    python importa-composizione-etf.py --file FILE --strumento NOME [--file FILE --strumento NOME ...]
+    python importa-composizione-etf.py --file FILE --strumento NOME|ISIN [--file FILE --isin ISIN ...]
                                        [--emittente NOME] [--out composizione.csv] [--json FILE|-]
-    (--strumento va scritto come il campo «strumento» delle posizioni del capitale umano; se --out esiste,
-     si sostituiscono solo le righe degli strumenti importati)
+    (--strumento, o il suo alias --isin, è la chiave con cui le posizioni trovano la composizione: l'ISIN
+     quando le posizioni vengono dall'estratto del broker, altrimenti il campo «strumento» delle posizioni del
+     capitale umano; se --out esiste, si sostituiscono solo le righe degli strumenti importati)
 """
 import csv
 import datetime
@@ -51,20 +55,30 @@ from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 # «Industry Classification» il livello GICS sotto; in Xtrackers «Industry Classification» è il settore).
 SINONIMI_COLONNE = {
     "peso": ("weight (%)", "weight", "weighting", "percent of fund", "% of net assets", "% of fund",
-             "market value weight", "ponderazione (%)", "ponderazione", "peso (%)", "peso", "% del patrimonio"),
+             "market value weight", "ponderazione (%)", "ponderazione", "peso (%)", "peso", "% del patrimonio",
+             "% del valore di mercato",
+             # tedesco e francese (siti di Xtrackers e Amundi)
+             "gewichtung (%)", "gewichtung", "gewicht (%)", "gewicht", "anteil (%)", "anteil", "% des nettovermögens",
+             "% des fondsvermögens", "pondération (%)", "pondération", "poids (%)", "poids", "% de l'actif net",
+             "% de l'actif"),
+    # l'ordine conta: «secteur» prima di «industrie» (il livello sotto), come «sector» prima di «industry classification»
     "settore": ("sector", "gics sector", "sector classification", "industry classification", "settore",
-                "settore gics"),
+                "settore gics", "secteur", "secteur gics", "classification sectorielle", "branche", "sektor", "industrie"),
     "paese": ("location", "country", "trade country name", "country of risk", "domicile", "area geografica",
-              "paese", "nazione"),
+              "paese", "nazione", "regione", "land", "standort", "sitzland", "pays", "localisation", "pays de risque"),
     "asset_class": ("asset class", "type of security", "security type", "asset type", "classe di attivo",
-                    "tipo di strumento"),
-    "nome": ("name", "security name", "holding name", "nome", "titolo", "emittente"),
+                    "tipo di strumento", "anlageklasse", "wertpapierart", "wertpapiertyp", "classe d'actifs",
+                    "type de titre", "type d'actif"),
+    "nome": ("name", "security name", "holding name", "nome", "nome delle partecipazioni", "titolo", "emittente",
+             "bezeichnung", "wertpapier", "nom", "libellé", "titre"),
+    "isin": ("isin", "codice isin", "isin code", "code isin"),
 }
 RIGHE_INTESTAZIONE = 40   # la riga d'intestazione si cerca nelle prime N righe
 SEGNAPOSTO = ("", "-", "n/a", "na", "n.d.", "nd")   # peso o nome assente
 SOGLIA_AVVISO = 0.05      # avviso se le righe non classificate, o liquidità e derivati, superano il 5% del fondo
 SOGLIA_CLASSIFICATI = 0.5  # sotto questa quota dei titoli classificati la dimensione non si scrive: il 3% del fondo
                            # rinormalizzato a 100 descriverebbe un fondo che non esiste
+N_TITOLI = 10              # i primi titoli per peso scritti come righe «titolo» (per il look-through del portafoglio)
 
 # ── Settori GICS ────────────────────────────────────────────────────────────
 # Gli 11 settori con il nome inglese degli emittenti e quello italiano del report: gli stessi di SETTORI_GICS in
@@ -85,27 +99,53 @@ SETTORI_GICS = {
 # Nomi italiani e varianti inglesi dei file, verso il nome GICS (confronto con normalizza())
 _VARIANTI_SETTORI = {
     "Information Technology": ("informatica", "tecnologia dell'informazione", "tecnologie dell'informazione",
-                               "tecnologie informatiche", "it"),
-    "Financials": ("finanza", "finanziari", "finanziario", "financial"),
-    "Health Care": ("sanità", "salute", "healthcare", "assistenza sanitaria", "sanitario"),
+                               "tecnologie informatiche", "it", "informationstechnologie", "informationstechnik",
+                               "technologies de l'information", "technologie de l'information"),
+    "Financials": ("finanza", "finanziari", "finanziario", "financial", "finanzen", "finanzwesen", "finanzwerte",
+                   "finanzdienstleistungen", "finance", "services financiers", "financières", "valeurs financières"),
+    "Health Care": ("sanità", "salute", "healthcare", "assistenza sanitaria", "sanitario", "gesundheitswesen",
+                    "gesundheit", "santé", "soins de santé"),
     "Consumer Discretionary": ("beni voluttuari", "beni di consumo discrezionali", "consumi discrezionali",
-                               "beni di consumo voluttuari", "beni di consumo ciclici"),
-    "Communication Services": ("servizi di comunicazione", "comunicazioni", "servizi per le comunicazioni",
-                               "communication"),
-    "Industrials": ("industriali", "industria", "industriale", "beni industriali"),
+                               "beni di consumo voluttuari", "beni di consumo ciclici", "nicht-basiskonsumgüter",
+                               "zyklische konsumgüter", "konsumgüter (zyklisch)", "zyklischer konsum",
+                               "consommation discrétionnaire", "biens de consommation cycliques",
+                               "biens de consommation discrétionnaire"),
+    "Communication Services": ("servizi di comunicazione", "comunicazioni", "comunicazione", "servizi per le comunicazioni",
+                               "communication", "kommunikationsdienste", "kommunikationsdienstleistungen",
+                               "services de communication"),
+    "Industrials": ("industriali", "industria", "industriale", "beni industriali", "industrie", "industriewerte",
+                    "industriels", "industriegüter", "industrieunternehmen",
+                    "industrali"),   # refuso nel file «Composizione dell'indice» di Amundi (sito italiano, 11/2026)
     "Consumer Staples": ("beni di prima necessità", "beni di consumo di base", "consumi di base",
-                         "beni di consumo primari", "beni di consumo non ciclici"),
-    "Energy": ("energia", "energetico"),
-    "Materials": ("materiali", "materie prime"),
-    "Utilities": ("servizi di pubblica utilità", "pubblica utilità", "utility", "servizi pubblici"),
-    "Real Estate": ("immobiliare", "immobili", "settore immobiliare"),
+                         "beni di consumo primari", "beni di consumo non ciclici", "generi di largo consumo",
+                         "basiskonsumgüter",
+                         "nichtzyklische konsumgüter", "nicht-zyklische konsumgüter", "konsumgüter (nicht-zyklisch)",
+                         "nichtzyklischer konsum", "biens de consommation de base", "consommation de base",
+                         "biens de consommation non cycliques", "consommation courante"),
+    "Energy": ("energia", "energetico", "energie", "énergie"),
+    "Materials": ("materiali", "materie prime", "roh-, hilfs- & betriebsstoffe", "roh-, hilfs- und betriebsstoffe",
+                  "rohstoffe", "materialien", "material", "matériaux"),
+    "Utilities": ("servizi di pubblica utilità", "pubblica utilità", "utility", "servizi pubblici",
+                  "imprese di servizi di pubblica utilità", "versorger",
+                  "versorgungsbetriebe", "versorgungsunternehmen", "services aux collectivités", "services publics",
+                  "services collectifs"),
+    "Real Estate": ("immobiliare", "immobili", "settore immobiliare", "immobilien", "immobilier"),
 }
 # GICS prima del 2018: il settore è diventato Communication Services, con un perimetro diverso (avviso)
 SETTORI_GICS_VECCHI = {"telecommunication services": "Communication Services",
-                       "servizi di telecomunicazione": "Communication Services"}
-# Nomi che esistono in un solo sistema: decidono tra GICS e ICB (molti altri sono uguali nei due)
-NOMI_ICB_ESCLUSIVI = {"technology", "telecommunications", "basic materials"}
-NOMI_GICS_ESCLUSIVI = {"information technology", "communication services", "materials"}
+                       "servizi di telecomunicazione": "Communication Services",
+                       "telekommunikationsdienste": "Communication Services",
+                       "services de telecommunication": "Communication Services",
+                       "services de telecommunications": "Communication Services"}
+# Nomi che esistono in un solo sistema: decidono tra GICS e ICB (molti altri sono uguali nei due).
+# In tedesco e francese «Technologie», «Telekommunikation»/«Télécommunications» e «Grundstoffe»/«Matériaux de base»
+# sono i nomi ICB (FTSE); «Informationstechnologie»/«Technologies de l'information», «Kommunikationsdienste»/«Services
+# de communication» e «Roh-, Hilfs- & Betriebsstoffe»/«Matériaux» quelli GICS (MSCI).
+NOMI_ICB_ESCLUSIVI = {"technology", "telecommunications", "basic materials", "technologie", "telekommunikation",
+                      "télécommunications", "grundstoffe", "matériaux de base"}
+NOMI_GICS_ESCLUSIVI = {"information technology", "communication services", "materials", "informationstechnologie",
+                       "kommunikationsdienste", "technologies de l'information", "services de communication",
+                       "roh-, hilfs- & betriebsstoffe", "matériaux"}
 
 # ── Paesi ───────────────────────────────────────────────────────────────────
 # Tutti i codici ISO 3166-1 alpha-2, una riga per paese: codice;nome italiano;nome inglese|varianti dei file.
@@ -233,7 +273,7 @@ KI;Kiribati;Kiribati
 KM;Comore;Comoros
 KN;Saint Kitts e Nevis;Saint Kitts and Nevis
 KP;Corea del Nord;North Korea|Korea (North)|Korea, Democratic People's Republic of
-KR;Corea del Sud;Korea (South)|Korea, Republic of|South Korea|Republic of Korea|Korea|Corea|Repubblica di Corea
+KR;Corea del Sud;Korea (South)|Korea, Republic of|South Korea|Republic of Korea|Korea|Corea|Repubblica di Corea|Sud Corea
 KW;Kuwait;Kuwait
 KY;Isole Cayman;Cayman Islands
 KZ;Kazakistan;Kazakhstan
@@ -329,7 +369,7 @@ TC;Isole Turks e Caicos;Turks and Caicos Islands
 TD;Ciad;Chad
 TF;Terre australi e antartiche francesi;French Southern Territories
 TG;Togo;Togo
-TH;Thailandia;Thailand
+TH;Thailandia;Thailand|Tailandia
 TJ;Tagikistan;Tajikistan
 TK;Tokelau;Tokelau
 TL;Timor Est;Timor-Leste|East Timor
@@ -364,43 +404,171 @@ ZW;Zimbabwe;Zimbabwe
 """
 PAESI = {codice: (italiano, tuple(varianti.split("|")))
          for codice, italiano, varianti in (r.split(";") for r in _ELENCO_PAESI.strip().splitlines())}
+# Nomi tedeschi e francesi dei paesi che compaiono nei file reali (i siti tedesco e francese di Xtrackers e Amundi):
+# codice;nomi separati da |. I paesi assenti qui si leggono comunque dal codice ISO o dal nome inglese o italiano.
+_ELENCO_PAESI_DE_FR = """
+AE;Vereinigte Arabische Emirate|Émirats arabes unis
+AR;Argentinien|Argentine
+AT;Österreich|Autriche
+AU;Australien|Australie
+BE;Belgien|Belgique
+BR;Brasilien|Brésil
+CA;Kanada
+CH;Schweiz|Suisse
+CL;Chile|Chili
+CN;China|Chine|Volksrepublik China|Chine continentale
+CO;Kolumbien|Colombie
+CZ;Tschechien|Tschechische Republik|Tchéquie|République tchèque
+DE;Deutschland|Allemagne
+DK;Dänemark|Danemark
+EG;Ägypten|Égypte
+ES;Spanien|Espagne
+FI;Finnland|Finlande
+FR;Frankreich
+GB;Vereinigtes Königreich|Großbritannien|Großbritannien (UK)|Grossbritannien|Royaume-Uni|Grande-Bretagne
+GR;Griechenland|Grèce
+HK;Hongkong
+HU;Ungarn|Hongrie
+ID;Indonesien|Indonésie
+IE;Irland|Irlande
+IL;Israel|Israël
+IN;Indien|Inde
+IT;Italien|Italie
+JP;Japan|Japon
+KR;Südkorea|Süd Korea|Korea|Korea, Republik|Republik Korea|Corée du Sud|Corée|Corée, République de|République de Corée
+KW;Kuwait|Koweït
+LU;Luxemburg
+MX;Mexiko|Mexique
+MY;Malaysia|Malaisie
+NL;Niederlande|Pays-Bas
+NO;Norwegen|Norvège
+NZ;Neuseeland|Nouvelle-Zélande
+PE;Peru|Pérou
+PH;Philippinen
+PL;Polen|Pologne
+PT;Portugal
+QA;Katar
+RU;Russland|Russie
+SA;Saudi-Arabien|Arabie saoudite
+SE;Schweden|Suède
+SG;Singapur|Singapour
+TH;Thailand|Thaïlande
+TR;Türkei|Turquie
+TW;Taiwan|Taïwan
+US;Vereinigte Staaten|Vereinigte Staaten von Amerika|USA|États-Unis|Etats-Unis|États-Unis d'Amérique
+ZA;Südafrika|Afrique du Sud
+ZM;Sambia|Zambie
+KY;Kaimaninseln|Kaiman Inseln|Îles Caïmans|Iles Caimans
+BM;Bermudas|Bermudes
+VG;Britische Jungferninseln|Îles Vierges britanniques
+CW;Curaçao
+JE;Jersey
+GG;Guernsey|Guernesey
+IM;Isle of Man|Île de Man
+LI;Liechtenstein
+MC;Monaco
+MT;Malta|Malte
+CY;Zypern|Chypre
+IS;Island|Islande
+EE;Estland|Estonie
+LV;Lettland|Lettonie
+LT;Litauen|Lituanie
+RO;Rumänien|Roumanie
+HR;Kroatien|Croatie
+SI;Slowenien|Slovénie
+BG;Bulgarien|Bulgarie
+RS;Serbien|Serbie
+UA;Ukraine
+KZ;Kasachstan|Kazakhstan
+GE;Georgien|Géorgie
+MA;Marokko|Maroc
+TN;Tunesien|Tunisie
+NG;Nigeria|Nigéria
+KE;Kenia|Kenya
+MU;Mauritius|Maurice
+BH;Bahrain|Bahreïn
+OM;Oman
+JO;Jordanien|Jordanie
+PK;Pakistan
+LK;Sri Lanka
+BD;Bangladesch|Bangladesh
+VN;Vietnam|Viêt Nam|Viet Nam
+MO;Macao|Macau
+PR;Puerto Rico|Porto Rico
+PA;Panama
+UY;Uruguay
+BS;Bahamas
+CR;Costa Rica
+EC;Ecuador|Équateur
+BO;Bolivien|Bolivie
+VE;Venezuela
+JM;Jamaika|Jamaïque
+DO;Dominikanische Republik|République dominicaine
+TT;Trinidad und Tobago|Trinité-et-Tobago
+PG;Papua-Neuguinea|Papouasie-Nouvelle-Guinée
+"""
+_PAESI_DE_FR = {codice: tuple(nomi.split("|")) for codice, nomi in
+                (r.split(";") for r in _ELENCO_PAESI_DE_FR.strip().splitlines())}
 
 # ── Righe da escludere ──────────────────────────────────────────────────────
 # Asset class o settore che indicano liquidità e derivati: esclusi da tutte e due le dimensioni
 VALORI_LIQUIDITA = ("cash", "cash and/or derivatives", "cash and derivatives", "cash collateral and margins",
                     "money market", "fx", "futures", "future", "forward", "forwards", "swap", "swaps",
-                    "liquidità", "liquidità e/o derivati", "derivati", "contanti")
+                    "liquidità", "liquidità e/o derivati", "derivati", "contanti",
+                    "barmittel", "kasse", "kassenbestand", "liquidität", "derivate", "devisentermingeschäft",
+                    "devisentermingeschäfte", "termingeschäft", "geldmarkt",
+                    "liquidités", "trésorerie", "dérivés", "produits dérivés", "contrat à terme", "contrats à terme",
+                    "change à terme", "monétaire")
 # Asset class a reddito fisso: il settore di un'obbligazione («Treasuries», «Banking», «Titoli di Stato») non è
 # GICS e non entra nei settori; il paese sì. Così un ETF obbligazionario dà i paesi e uno misto i settori azionari.
 VALORI_OBBLIGAZIONARI = ("fixed income", "bond", "bonds", "obbligazionario", "obbligazioni", "obbligazione",
-                         "reddito fisso", "titoli a reddito fisso")
+                         "reddito fisso", "titoli a reddito fisso", "anleihen", "anleihe", "renten", "rentenpapiere",
+                         "festverzinslich", "festverzinsliche wertpapiere", "obligations", "obligation", "taux",
+                         "revenu fixe", "titres à revenu fixe")
 # Settore o paese assente: la riga resta nell'altra dimensione
 # («European Union», «Supranational»: emittenti sovranazionali o liquidità in euro, nessun paese ISO; «NA» qui è
 # un segnaposto, non la Namibia, come nei pesi)
 VALORI_NON_CLASSIFICATI = ("unknown", "unassigned", "other", "-", "n/a", "na", "n.d.", "non classificato", "altro",
                            "", "not classified", "european union", "unione europea", "supranational",
-                           "sovranazionale", "multinational", "multinazionale")
+                           "sovranazionale", "multinational", "multinazionale",
+                           "unbekannt", "nicht zugeordnet", "nicht klassifiziert", "sonstige", "andere", "k.a.",
+                           "europäische union", "inconnu", "non classé", "non attribué", "autre", "autres",
+                           "union européenne")
 
 # ── Schede degli emittenti ──────────────────────────────────────────────────
 # Solo quello che il motore non deduce. «verificato»: mese e fonte della verifica del layout su un file reale.
-ETICHETTE_DATA = ("fund holdings as of", "holdings as of", "as of", "posizioni al", "dati al")
+ETICHETTE_DATA = ("fund holdings as of", "holdings as of", "as of", "posizioni al", "dati al", "al",
+                  "stand", "stand per", "stichtag", "positionen per", "bestände per", "daten per",
+                  "positions au", "données au", "composition au", "portefeuille au", "date au")
 SCHEDE = {
-    "ishares": {"nome": "iShares", "riconosci": ("ishares", "blackrock"), "classificazione": "GICS",
+    # «ishare»: il sito italiano scarica «iShare_<ticker>_holdings.csv», e il CSV italiano non ha il marchio nel preambolo
+    "ishares": {"nome": "iShares", "riconosci": ("ishares", "ishare", "blackrock"), "classificazione": "GICS",
                 "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
-                "verificato": "da confermare"},
+                "verificato": "2026-11, file reale (sito italiano, CSV)"},
     "xtrackers": {"nome": "Xtrackers", "riconosci": ("xtrackers", "dws"), "classificazione": "GICS",
                   "etichette_extra": (), "data_nel_foglio": True, "liquidita": ("warrants",),
-                  "verificato": "2026-10, file reale (sito britannico, XLSX)"},
+                  "verificato": "2026-10 sito britannico e 2026-11 sito tedesco (XLSX, intestazioni inglesi e valori tedeschi)"},
     # Vanguard: GICS o ICB secondo l'indice (FTSE usa ICB); finché un file reale non lo conferma, dai nomi
     "vanguard": {"nome": "Vanguard", "riconosci": ("vanguard",), "classificazione": None,
                  "etichette_extra": ("as at",), "data_nel_foglio": False, "liquidita": (),
-                 "verificato": "da confermare"},
+                 "verificato": "2026-11, file reale (sito italiano, XLSX): FTSE All-World in ICB, solo paesi"},
     "amundi": {"nome": "Amundi", "riconosci": ("amundi", "lyxor"), "classificazione": "GICS",
-               "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
-               "verificato": "da confermare"},
+               "etichette_extra": ("dati ritenuti esatti al", "data correct as at"), "data_nel_foglio": False, "liquidita": (),
+               "giorno_prima": True,   # «04/11/2026» è il 4 novembre anche sotto «as at» (nome del file e sito lo confermano)
+               "verificato": "2026-11, file reali (sito italiano): «Composizione dell'indice» (ripartizione) e «Fund Holdings» (ETF a swap)"},
     "spdr": {"nome": "SPDR", "riconosci": ("spdr", "state street", "ssga"), "classificazione": "GICS",
              "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
              "verificato": "2026-10, file reale (sito EMEA, XLSX)"},
+}
+
+
+# File di RIPARTIZIONE (Amundi, «Composizione dell'indice»): niente elenco dei titoli, ma un foglio con i pesi per
+# settore e uno con i pesi per paese. Si riconoscono dal nome del foglio; la tabella è «nome;peso».
+FOGLI_RIPARTIZIONE = {
+    "settore": ("ripartizione settoriale", "ripartizione per settore", "sector breakdown", "sector allocation",
+                "répartition sectorielle", "sektoraufteilung", "branchenaufteilung"),
+    "paese": ("ripartizione geografica", "ripartizione per paese", "geographic breakdown", "country breakdown",
+              "geographical breakdown", "répartition géographique", "länderaufteilung", "geografische aufteilung"),
 }
 
 
@@ -414,7 +582,8 @@ def normalizza(testo):
 _SINONIMI_NORM = {ruolo: tuple(normalizza(s) for s in nomi) for ruolo, nomi in SINONIMI_COLONNE.items()}
 # Tabelle di confronto: nome normalizzato → settore GICS, → codice ISO
 SINONIMI_SETTORI = {normalizza(n): g for g in SETTORI_GICS for n in (g,) + _VARIANTI_SETTORI[g]}
-SINONIMI_PAESI = {normalizza(n): codice for codice, (it, varianti) in PAESI.items() for n in (codice, it) + varianti}
+SINONIMI_PAESI = {normalizza(n): codice for codice, (it, varianti) in PAESI.items()
+                  for n in (codice, it) + varianti + _PAESI_DE_FR.get(codice, ())}
 
 
 def _vuota(cella):
@@ -423,7 +592,7 @@ def _vuota(cella):
 
 # ── Lettura del file ────────────────────────────────────────────────────────
 
-def leggi_righe(path):
+def leggi_righe(path, avvisi=None):
     """Tutte le righe del file come liste di celle, e il titolo del foglio (XLSX) o None.
     XLSX con openpyxl (i numeri arrivano già come numeri); CSV in UTF-8 con BOM o cp1252 (il «CSV» di Excel
     italiano), separatore riconosciuto tra «,», «;» e tab."""
@@ -437,26 +606,115 @@ def leggi_righe(path):
                "sul sito dell'emittente usa il pulsante di download delle posizioni (XLSX o CSV)")
     estensione = os.path.splitext(path)[1].lower()
     if estensione == ".xlsx":
-        return _righe_xlsx(path, grezzo)
+        return _righe_xlsx(path, grezzo, avvisi)
     if estensione in (".csv", ".txt"):
         return _righe_csv(grezzo), None
     errore(f"{os.path.basename(path)}: formato non supportato ({estensione or 'senza estensione'}): "
            "esporta le posizioni in XLSX o CSV")
 
 
-def _righe_xlsx(path, grezzo):
+def _stili_minimi():
+    """Il foglio di stile di un workbook vuoto di openpyxl: valido per costruzione, con il minimo che il lettore esige."""
     import openpyxl
-    try:
-        with warnings.catch_warnings():   # «Workbook contains no default style»: innocuo, negli export degli emittenti
-            warnings.simplefilter("ignore")
-            wb = openpyxl.load_workbook(io.BytesIO(grezzo), read_only=True, data_only=True)
-    except Exception as e:  # noqa: BLE001 — zip rotto, xls rinominato: qualunque errore di openpyxl è un file illeggibile
-        errore(f"{os.path.basename(path)}: XLSX illeggibile ({type(e).__name__}): riscaricalo o esportalo in CSV")
+    import zipfile
+    vuoto = io.BytesIO()
+    openpyxl.Workbook().save(vuoto)
+    with zipfile.ZipFile(io.BytesIO(vuoto.getvalue())) as z:
+        return z.read("xl/styles.xml")
+
+
+def _senza_stili(grezzo):
+    """Lo stesso XLSX con un foglio di stile minimo al posto di xl/styles.xml: il file «Composizione dell'indice»
+    di Amundi ha colori non esadecimali che openpyxl rifiuta, e gli stili non servono per leggere i valori."""
+    import zipfile
+    stili = _stili_minimi()
+    uscita = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(grezzo)) as z, zipfile.ZipFile(uscita, "w", zipfile.ZIP_DEFLATED) as w:
+        for nome in z.namelist():
+            w.writestr(nome, stili if nome == "xl/styles.xml" else z.read(nome))
+    return uscita.getvalue()
+
+
+def _apri_xlsx(path, grezzo, avvisi):
+    import openpyxl
+    for tentativo, dati in enumerate((grezzo, None)):
+        try:
+            with warnings.catch_warnings():   # «Workbook contains no default style»: innocuo, negli export degli emittenti
+                warnings.simplefilter("ignore")
+                return openpyxl.load_workbook(io.BytesIO(dati if tentativo == 0 else _senza_stili(grezzo)),
+                                              read_only=True, data_only=True)
+        except ValueError as e:
+            # stile non valido («Colors must be aRGB hex values», stylesheet illeggibile): si rilegge senza stili
+            if tentativo == 0 and ("style" in str(e).lower() or "color" in str(e).lower()):
+                avvisi.append("file letto senza gli stili Excel (il foglio di stile non è valido): una data in formato "
+                              "numerico di Excel potrebbe non essere riconosciuta")
+                continue
+            errore(f"{os.path.basename(path)}: XLSX illeggibile ({type(e).__name__}): riscaricalo o esportalo in CSV")
+        except Exception as e:  # noqa: BLE001 — zip rotto, xls rinominato: qualunque errore di openpyxl è un file illeggibile
+            errore(f"{os.path.basename(path)}: XLSX illeggibile ({type(e).__name__}): riscaricalo o esportalo in CSV")
+
+
+def _righe_xlsx(path, grezzo, avvisi=None):
+    return _righe_da_wb(path, _apri_xlsx(path, grezzo, [] if avvisi is None else avvisi))
+
+
+def _righe_da_wb(path, wb):
     for ws in wb.worksheets:
         righe = [list(r) for r in ws.iter_rows(values_only=True)]
         if any(not _vuota(c) for r in righe for c in r):
             return righe, ws.title
     errore(f"{os.path.basename(path)}: nessun foglio con dati")
+
+
+def leggi_ripartizione(wb):
+    """Le tabelle di un file di ripartizione: {"settore": [(nome, peso)], "paese": [...], "preambolo": righe sopra la
+    tabella del primo foglio} o None se nessun foglio ha un nome di FOGLI_RIPARTIZIONE. In ogni foglio la tabella
+    inizia alla riga che ha una cella di peso (sinonimi di «peso») e una cella di nome prima; finisce alla prima riga
+    senza un peso numerico."""
+    tabelle, preambolo = {}, None
+    for ws in wb.worksheets:
+        titolo = normalizza(ws.title)
+        dim = next((d for d, nomi in FOGLI_RIPARTIZIONE.items() if any(titolo == normalizza(n) for n in nomi)), None)
+        if dim is None:
+            continue
+        righe = [list(r) for r in ws.iter_rows(values_only=True)]
+        for i, r in enumerate(righe):
+            piene = [(j, c) for j, c in enumerate(r) if not _vuota(c)]
+            j_peso = next((j for j, c in piene if isinstance(c, str) and normalizza(c) in _SINONIMI_NORM["peso"]), None)
+            if j_peso is None or not any(j < j_peso for j, _ in piene):
+                continue
+            j_nome = max(j for j, _ in piene if j < j_peso)
+            voci = []
+            for r2 in righe[i + 1:]:
+                peso = r2[j_peso] if j_peso < len(r2) else None
+                if not _sembra_numero(peso):
+                    break
+                voci.append((str(r2[j_nome] if j_nome < len(r2) else "").strip(), peso))
+            tabelle[dim] = {"voci": voci, "testo": str(r[j_nome]).strip(), "peso": str(r[j_peso]).strip()}
+            if preambolo is None:
+                preambolo = righe[:i]
+            break
+    return {**tabelle, "preambolo": preambolo or []} if tabelle else None
+
+
+def leggi_file(path, avvisi):
+    """(righe, titolo del foglio, ripartizione): come leggi_righe, ma un XLSX di ripartizione (Amundi) torna come
+    tabelle per settore e paese al posto delle righe."""
+    if not os.path.isfile(path):
+        errore(f"--file: file non trovato: {path}")
+    with open(path, "rb") as f:
+        grezzo = f.read()
+    if os.path.splitext(path)[1].lower() == ".xlsx":
+        inizio = grezzo[:512].lstrip().lower()
+        if not inizio.startswith((b"<!doctype", b"<html", b"\xef\xbb\xbf<!doctype", b"\xef\xbb\xbf<html")):
+            wb = _apri_xlsx(path, grezzo, avvisi)
+            ripartizione = leggi_ripartizione(wb)
+            if ripartizione:
+                return None, None, ripartizione
+            righe, foglio = _righe_da_wb(path, wb)      # lo stesso workbook: l'avviso sugli stili una volta sola
+            return righe, foglio, None
+    righe, foglio = leggi_righe(path, avvisi)
+    return righe, foglio, None
 
 
 def _righe_csv(grezzo):
@@ -586,7 +844,9 @@ def riconosci_emittente(preambolo, nome_file, forzato=None):
 
 
 MESI = {"jan": 1, "gen": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "mag": 5, "jun": 6, "giu": 6, "jul": 7,
-        "lug": 7, "aug": 8, "ago": 8, "sep": 9, "set": 9, "oct": 10, "ott": 10, "nov": 11, "dec": 12, "dic": 12}
+        "lug": 7, "aug": 8, "ago": 8, "sep": 9, "set": 9, "oct": 10, "ott": 10, "nov": 11, "dec": 12, "dic": 12,
+        # tedesco e francese («30. Okt. 2026», «30 avr. 2026»); «jui» non si aggiunge: juin e juillet iniziano uguale
+        "mrz": 3, "mai": 5, "okt": 10, "dez": 12, "fev": 2, "avr": 4, "aou": 8}
 
 
 class DataAmbigua(Exception):
@@ -601,7 +861,9 @@ def _data(valore, giorno_prima=True):
     e senza (etichetta inglese) solleva DataAmbigua."""
     if isinstance(valore, (datetime.datetime, datetime.date)):
         return valore.strftime("%Y-%m-%d")
-    testo = str(valore or "")
+    # senza accenti né dieresi, così «déc.», «août» e «März» entrano nelle regex dei mesi
+    testo = unicodedata.normalize("NFKD", str(valore or ""))
+    testo = "".join(c for c in testo if not unicodedata.combining(c))
     tentativi = []
     m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", testo)
     if m:
@@ -636,14 +898,18 @@ def data_posizioni(preambolo, titolo_foglio, scheda):
     meglio nessuna data che una sbagliata."""
     if scheda and scheda["data_nel_foglio"] and _data(titolo_foglio):
         return _data(titolo_foglio), None
-    etichette = _tabella("ETICHETTE_DATA") | {normalizza(e) for e in (scheda["etichette_extra"] if scheda else ())}
+    extra = {normalizza(e) for e in (scheda["etichette_extra"] if scheda else ())}
+    etichette = _tabella("ETICHETTE_DATA") | extra
     for riga in preambolo:
         for j, cella in enumerate(riga):
             n = normalizza(cella)
-            etichetta = next((e for e in etichette if n == e or n.startswith(e + " ")), None)
+            # le etichette della scheda valgono anche dentro una frase («Please note … Data correct as at 04/11/2026»)
+            etichetta = next((e for e in etichette if n == e or n.startswith(e + " ") or (e in extra and f" {e} " in f" {n} ")), None)
             if etichetta is None:
                 continue
             inglese = etichetta.split()[-1] in ("of", "at", "on")
+            if scheda and scheda.get("giorno_prima") is not None:
+                inglese = not scheda["giorno_prima"]   # Amundi scrive gg/mm anche sotto un'etichetta inglese
             for candidata in [cella] + [c for c in riga[j + 1:] if not _vuota(c)][:1]:
                 try:
                     data = _data(candidata, giorno_prima=not inglese)
@@ -664,12 +930,14 @@ def componi(path, strumento, forzato=None):
     """La composizione di un file delle posizioni: la voce di «strumenti» del JSON (spec §3.4), pesi in frazione
     rinormalizzati a 1 per dimensione e ordinati per peso decrescente. Un errore nei dati ferma lo script."""
     file = os.path.basename(path)
-    righe, foglio = leggi_righe(path)
+    avvisi = []
+    righe, foglio, ripartizione = leggi_file(path, avvisi)
+    if ripartizione is not None:
+        return _componi_ripartizione(file, strumento, forzato, ripartizione, avvisi)
     i, col, testi = trova_intestazione(righe)
     dati = righe_dati(righe, i, col["peso"])
     chiave, riconosciuto_da = riconosci_emittente(righe[:i], file, forzato)
     scheda = SCHEDE.get(chiave)
-    avvisi = []
     if scheda is None:
         avvisi.append("emittente non riconosciuto: regole generiche, controlla le esclusioni")
     cella = lambda r, ruolo: r[col[ruolo]] if ruolo in col and col[ruolo] < len(r) else None  # noqa: E731
@@ -703,6 +971,10 @@ def componi(path, strumento, forzato=None):
                "paese_non_classificato": 0.0}
     grezzi = {"settore": [], "paese": []}            # (nome normalizzato, nome originale, peso) per dimensione
     n_titoli = 0
+    candidati = []                                   # (nome, isin, peso) delle righe non escluse, per i primi titoli
+    n_primi = globals()["N_TITOLI"]                  # letto qui: --set N_TITOLI=… ha effetto
+    if isinstance(n_primi, bool) or not isinstance(n_primi, int) or n_primi < 1:
+        errore(f"N_TITOLI = {n_primi!r}: serve un intero positivo (i primi titoli da scrivere)")
     for r, peso in titoli:
         peso /= scala
         classe, settore = normalizza(cella(r, "asset_class")), normalizza(cella(r, "settore"))
@@ -710,6 +982,12 @@ def componi(path, strumento, forzato=None):
             esclusi["liquidita_derivati"] += abs(peso)
             continue
         n_titoli += 1
+        nome_titolo = cella(r, "nome")
+        if "nome" in col and not _vuota(nome_titolo) and not _segnaposto(nome_titolo):
+            isin_titolo = cella(r, "isin")
+            candidati.append((str(nome_titolo).strip(),
+                              None if _vuota(isin_titolo) or _segnaposto(isin_titolo) else str(isin_titolo).strip(),
+                              peso))
         for dim, _ in _DIMENSIONI:
             if dim not in col:
                 continue
@@ -722,6 +1000,59 @@ def componi(path, strumento, forzato=None):
             else:
                 grezzi[dim].append((normalizza(valore), str(valore).strip(), peso))
 
+    return _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, n_titoli,
+                      candidati, n_primi, avvisi, righe[:i], foglio)
+
+
+def _componi_ripartizione(file, strumento, forzato, rip, avvisi):
+    """La composizione da un file di ripartizione: i pesi per settore e per paese sono già aggregati; nessun titolo."""
+    chiave, riconosciuto_da = riconosci_emittente(rip["preambolo"], file, forzato)
+    scheda = SCHEDE.get(chiave)
+    if scheda is None:
+        avvisi.append("emittente non riconosciuto: regole generiche, controlla le esclusioni")
+    non_classificati = _tabella("VALORI_NON_CLASSIFICATI")
+    esclusi = {"liquidita_derivati": 0.0, "settore_obbligazionario": 0.0, "settore_non_classificato": 0.0,
+               "paese_non_classificato": 0.0}
+    grezzi, col, testi = {"settore": [], "paese": []}, {}, {}
+    for dim in ("settore", "paese"):
+        if dim not in rip:
+            continue
+        col[dim], testi[dim] = 1, rip[dim]["testo"]
+        col["peso"], testi["peso"] = 2, rip[dim]["peso"]
+        voci = rip[dim]["voci"]
+        if not voci:
+            errore(f"{file}: il foglio della ripartizione per {dim} non ha righe con un peso numerico")
+        virgola = virgola_decimale([p for _, p in voci])
+        pesi = []
+        for nome, peso in voci:
+            try:
+                pesi.append((nome, peso_numerico(peso, virgola)))
+            except ValueError:
+                errore(f"{file}: peso {peso!r} non numerico nella ripartizione per {dim} ({nome})")
+        totale = sum(p for _, p in pesi if p is not None)
+        if 0.9 <= totale <= 1.1:
+            scala = 1.0
+        elif 90 <= totale <= 110:
+            scala = 100.0
+        else:
+            errore(f"{file}: i pesi della ripartizione per {dim} sommano a {numero(totale, 2)}, né circa 1 né circa 100")
+        for nome, peso in pesi:
+            if peso is None:
+                continue
+            peso /= scala
+            if normalizza(nome) in non_classificati:
+                esclusi[f"{dim}_non_classificato"] += peso
+            else:
+                grezzi[dim].append((normalizza(nome), nome, peso))
+    avvisi.append("file di ripartizione dell'indice per settore e paese, non elenco dei titoli: nessun titolo scritto "
+                  "(per i primi titoli serve il file delle posizioni) e pesi dell'indice, non del fondo")
+    return _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, 0, [],
+                      globals()["N_TITOLI"], avvisi, rip["preambolo"], None, ripartizione=True)
+
+
+def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, n_titoli, candidati,
+               n_primi, avvisi, preambolo, foglio, ripartizione=False):
+    """La coda comune: classificazione, sinonimi, rinormalizzazione, avvisi, primi titoli e data."""
     # classificazione: dalla scheda, o dai nomi esclusivi dei due sistemi
     nomi_settori = {n for n, _, _ in grezzi["settore"]}
     classificazione = scheda["classificazione"] if scheda and scheda["classificazione"] else None
@@ -763,7 +1094,8 @@ def componi(path, strumento, forzato=None):
         if totale_dim > 0 and totale_dim / con_dim < SOGLIA_CLASSIFICATI:
             scartate[dim] = totale_dim / con_dim
             totale_dim = 0
-        risultato[plurale] = {k: v / totale_dim for k, v in sorted(pesi[dim].items(), key=lambda kv: -kv[1])} \
+        # una voce a peso zero (posizioni allo 0,00% nei file di Vanguard) non si scrive
+        risultato[plurale] = {k: v / totale_dim for k, v in sorted(pesi[dim].items(), key=lambda kv: -kv[1]) if v > 0} \
             if totale_dim > 0 else {}
     if not risultato["settori"] and not risultato["paesi"]:
         errore(f"{file}: nessuna riga di titoli con settore o paese dopo le esclusioni (liquidità, derivati, "
@@ -794,13 +1126,27 @@ def componi(path, strumento, forzato=None):
         avvisi.append(f"liquidità e derivati pesano {pct(esclusi['liquidita_derivati'], 2)}, sopra il 5%: per un ETF "
                       "sintetico il file può contenere il paniere di collaterale, non l'esposizione")
 
-    data, avviso_data = data_posizioni(righe[:i], foglio, scheda)
+    # i primi titoli per peso, con il peso nel fondo (non rinormalizzato): un minimo della concentrazione
+    if "nome" not in col and not ripartizione:
+        avvisi.append("il file non ha la colonna del nome: titoli non scritti")
+    primi = [{"nome": n, "isin": isin_t, "peso": p}
+             for n, isin_t, p in sorted(candidati, key=lambda t: -t[2])[:n_primi]]
+
+    data, avviso_data = data_posizioni(preambolo, foglio, scheda)
     if avviso_data:
         avvisi.append(avviso_data)
+    # replica sintetica dichiarata nel preambolo («Replication method: Synthetic»): le posizioni sono il paniere di
+    # collaterale dello swap, non l'esposizione all'indice (un S&P 500 a swap può tenere titoli europei)
+    testo_preambolo = " ".join(normalizza(c) for r in preambolo for c in r if not _vuota(c))
+    sintetica = any(f" {parola}" in f" {testo_preambolo}" for parola in ("synthetic", "sintetic", "synthetisch", "synthetique"))
+    if sintetica:
+        avvisi.append("replica sintetica dichiarata nel file: le posizioni sono il paniere di collaterale dello swap, non "
+                      "l'esposizione all'indice; settori, paesi e titoli descrivono il collaterale")
     return {"strumento": strumento, "emittente": chiave, "riconosciuto_da": riconosciuto_da, "file": file,
             "data_posizioni": data, "classificazione": classificazione,
             "colonne": {k: v for k, v in testi.items() if k != "nome"}, "titoli": n_titoli, "esclusi": esclusi,
-            "settori": risultato["settori"], "paesi": risultato["paesi"], "avvisi": avvisi}
+            "settori": risultato["settori"], "paesi": risultato["paesi"], "primi_titoli": primi,
+            "replica_sintetica": sintetica, "avvisi": avvisi}
 
 
 # ── composizione.csv ────────────────────────────────────────────────────────
@@ -906,9 +1252,12 @@ def righe_strumento(c, oggi):
     esclusi = _esclusi(c)
     if esclusi:
         commento += "; esclusi " + ", ".join(esclusi)
+    if c["replica_sintetica"]:
+        commento += "; replica sintetica: posizioni del collaterale, non esposizione all'indice"
     righe = [commento]
     for dim, plurale in _DIMENSIONI:
         righe += [_linea([c["strumento"], dim, voce, numero(peso * 100, 2)]) for voce, peso in c[plurale].items()]
+    righe += [_linea([c["strumento"], "titolo", t["nome"], numero(t["peso"] * 100, 2)]) for t in c["primi_titoli"]]
     return righe
 
 
@@ -959,6 +1308,9 @@ def stampa(composizioni, out, conservati, vecchio):
             print("   Settori: " + " · ".join(f"{SETTORI_GICS[k]} {pct(v, 2)}" for k, v in list(c["settori"].items())[:5]))
         if c["paesi"]:
             print("   Paesi: " + " · ".join(f"{PAESI[k][0]} {pct(v, 2)}" for k, v in list(c["paesi"].items())[:5]))
+        if c["primi_titoli"]:
+            print("   Primi titoli: " + " · ".join(f"{t['nome']} {pct(t['peso'], 2)}" for t in c["primi_titoli"][:5])
+                  + " (peso nel fondo)")
         for a in c["avvisi"]:
             print(f"   ⚠️  {a}")
     importati = "1 strumento importato" if len(composizioni) == 1 else f"{len(composizioni)} strumenti importati"
@@ -973,8 +1325,9 @@ def main():
     args = cli(__doc__.strip().splitlines()[0].split("— ", 1)[1], spazio=globals(), json=True,
                argomenti=[(("--file",), {"action": "append", "required": True, "metavar": "FILE",
                                          "help": "file delle posizioni dell'emittente, CSV o XLSX (ripetibile)"}),
-                          (("--strumento",), {"action": "append", "required": True, "metavar": "NOME",
-                                              "help": "nome dello strumento, come nelle posizioni (uno per --file)"}),
+                          (("--strumento", "--isin"), {"action": "append", "required": True, "metavar": "NOME|ISIN",
+                                                        "help": "nome o ISIN dello strumento, come nelle posizioni (uno per "
+                                                                "--file); con le posizioni dell'estratto del broker usa l'ISIN"}),
                           (("--emittente",), {"choices": sorted(SCHEDE),
                                               "help": "forza la scheda dell'emittente per tutti i file"}),
                           (("--out",), {"default": "composizione.csv", "metavar": "FILE",
