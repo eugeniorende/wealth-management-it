@@ -12,8 +12,10 @@ regressione di un bug reale), non l'output cosmetico. La suite protegge i
 refactor: se passa, la meccanica di calcolo non è cambiata.
 """
 
+import csv
 import glob
 import importlib.util
+import io
 import json
 import os
 import re
@@ -190,6 +192,27 @@ def t_python_workflow():
             assert v in matrice, f"{nome}: Python {v} fuori dalla matrice {sorted(matrice)} di tests.yml"
 
 
+@test("igiene CI: il check «test» chiesto dal ruleset riassume la matrice e Windows e fallisce se uno fallisce")
+def t_check_ruleset():
+    # Il ruleset di main e develop (24/10/2026) chiede i check «test» e «validate». I job della matrice si chiamano
+    # «suite (3.11)» e «suite (3.14)»: senza un job che si chiami esattamente «test» la PR resterebbe bloccata
+    # anche con la CI verde, e con un «test» saltato (needs falliti, senza !cancelled()) passerebbe con la CI rossa.
+    ci = open(os.path.join(ROOT, ".github", "workflows", "tests.yml"), encoding="utf-8").read()
+    jobs = re.findall(r"^  ([\w-]+):\n", ci.split("\njobs:\n")[1], re.M)
+    assert {"suite", "test-windows", "test", "validate"} <= set(jobs), jobs
+    test = ci.split("\n  test:\n")[1].split("\n\n")[0]
+    assert "if: ${{ !cancelled() }}" in test and "needs: [suite, test-windows]" in test, test
+    righe = [r.strip() for r in test.split("run: |")[1].strip().splitlines()]
+    # l'ultimo comando decide l'esito: entrambi i job devono essere «success», in AND e senza vie d'uscita
+    assert righe[-1] == '[ "${{ needs.suite.result }}" = success ] && [ "${{ needs.test-windows.result }}" = success ]', righe
+    assert not any("||" in r or r == "true" for r in righe), righe
+    suite = ci.split("\n  suite:\n")[1].split("\n\n  #")[0]
+    assert "matrix:" in suite and "RICHIEDI_LIBREOFFICE" in suite, "la matrice con LibreOffice è il job suite"
+    # T17: il cruscotto si verifica in Chromium, obbligatorio nel job suite
+    assert "RICHIEDI_BROWSER" in suite and "playwright==1.55.0" in suite, "Playwright fissato e obbligatorio nel job suite"
+    assert "playwright install --with-deps chromium" in suite, "Chromium installato da Playwright nel job suite"
+
+
 @test("igiene CI: le action dei workflow sono fissate per SHA completo")
 def t_action_sha():
     # Supply chain: un tag (@v4) può essere spostato da chi controlla l'action, uno SHA no.
@@ -314,12 +337,17 @@ SCRIPT_CLI = [
     ("it-pianificazione", "netto-pensione.py"),
     ("it-pianificazione", "ponte-pensione.py"),
     ("it-pianificazione", "importa-previdenza.py"),
+    ("it-pianificazione", "riscatto-laurea.py"),
     ("it-pianificazione-obiettivi", "allocatore-capitale.py"),
     ("it-pianificazione-obiettivi", "asset-location-optimizer.py"),
+    ("it-pianificazione-obiettivi", "capitale-umano.py"),
+    ("it-pianificazione-obiettivi", "importa-composizione-etf.py"),
+    ("it-pianificazione-obiettivi", "look-through-portafoglio.py"),
     ("it-pianificazione-obiettivi", "decumulo-obiettivi.py"),
     ("it-pianificazione-obiettivi", "glidepath-obiettivi.py"),
     ("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"),
     ("it-rebalance", "ribilanciamento-multibroker.py"),
+    ("it-revisione", "genera-cruscotto.py"),
     ("it-revisione", "genera-ips.py"),
     ("it-tax-optimization", "importa-estratto-broker.py"),
 ]
@@ -328,6 +356,11 @@ ARGOMENTI_DEFAULT = {
     "importa-previdenza.py": (os.path.join(FIXTURES, "estratto-inps-test.xml"),
                               os.path.join(FIXTURES, "storico-fondo-test.csv")),
     "importa-estratto-broker.py": (os.path.join(FIXTURES, "estratto-broker-test.csv"),),
+    "genera-cruscotto.py": ("--from", os.path.join(FIXTURES, "cruscotto-allocatore.json")),
+    "importa-composizione-etf.py": ("--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                    "--strumento", "ETF MSCI World"),
+    "look-through-portafoglio.py": ("--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"),
+                                    "--posizioni", asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json")),
 }
 _OUTPUT_CP1252 = {}
 
@@ -350,7 +383,7 @@ def _tutti_gli_script_cp1252():
 @test("T9 interfaccia: ogni script ha --help (rc 0) e respinge un argomento ignoto con rc 2")
 def t_cli_help():
     tutti = [asset(s, n) for s, n in SCRIPT_CLI]
-    assert len(tutti) == 13 and all(os.path.exists(p) for p in tutti), tutti
+    assert len(tutti) == 18 and all(os.path.exists(p) for p in tutti), tutti
     sorgenti = {os.path.basename(p): open(p, encoding="utf-8").read() for p in tutti}
     for path in tutti:
         nome = os.path.basename(path)
@@ -383,6 +416,10 @@ def t_cli_help():
     errore_pulito(asset("it-pianificazione", "proiezione-inps.py"), "--json", "/non/esiste/x.json", atteso="impossibile scrivere")
     errore_pulito(asset("it-revisione", "genera-ips.py"), os.path.join(tempfile.gettempdir(), "cartella-inesistente", "x.docx"), atteso="impossibile scrivere")
     errore_pulito(asset("it-tax-optimization", "importa-estratto-broker.py"), "/non/esiste.csv", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione-obiettivi", "importa-composizione-etf.py"), "--file", "/non/esiste.csv",
+                  "--strumento", "X", atteso="non trovato")
+    errore_pulito(asset("it-pianificazione-obiettivi", "look-through-portafoglio.py"), "--composizione", "/non/esiste.csv",
+                  "--posizioni", "/non/esiste.json", atteso="non trovato")
     # niente abbreviazioni dei flag: «--se» non è «--set»
     rc, out = run_script(asset("it-pianificazione", "netto-pensione.py"), "--se", "RAL_FINALE_LORDA=1")
     assert rc == 2 and "usage:" in out, (rc, out[-200:])
@@ -397,9 +434,11 @@ def t_cli_utf8():
         assert rc == 0, f"{nome} da una cartella esterna con cp1252: rc {rc}, {out[-400:]}"
         assert "UnicodeEncodeError" not in out and "Traceback" not in out, f"{nome}: {out[-400:]}"
         assert "serie storica non trovata" not in out, f"{nome}: serie storica non trovata"
-        # lo stdout resta UTF-8: ogni script stampa almeno un «€», e senza reconfigure il simbolo
-        # uscirebbe in cp1252 (qui decodificato come «\ufffd») anche dove non va in crash
-        assert "€" in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
+        # lo stdout resta UTF-8: ogni script stampa almeno un «€» (l'importatore della composizione, che non
+        # stampa importi, una «à»), e senza reconfigure il carattere uscirebbe in cp1252 (qui decodificato
+        # come «\ufffd») anche dove non va in crash
+        carattere = "à" if nome == "importa-composizione-etf.py" else "€"
+        assert carattere in out and "\ufffd" not in out, f"{nome}: stdout non UTF-8 ({out[:200]!r})"
     # nessuna open() senza encoding negli script e nel runner: su Windows leggerebbero in cp1252
     cartelle = [os.path.join(SKILLS, s, "assets") for s in sorted(os.listdir(SKILLS))] + \
                [os.path.join(ROOT, "scripts"), os.path.join(ROOT, "tests")]
@@ -3883,6 +3922,221 @@ def t_t13_propagazione():
     assert not errori, "\n  ".join(errori[:10])
 
 
+# ══════════════════════ T13: riscatto della laurea (F055) ══════════════════════
+
+@test("T13 riscatto della laurea: onere agevolato e ordinario, netto, rata, pensione in più e anticipo, valori chiusi")
+def t_riscatto_laurea():
+    # F055: la description prometteva il riscatto e la skill rimandava al patronato senza l'ordine di grandezza.
+    # Agevolato: €18.808 × 33% = €6.206,64 l'anno (art. 2 c. 5-quater D.Lgs. 184/1997; Circ. INPS 14/2026)
+    P = asset("it-pianificazione", "riscatto-laurea.py")
+    tmp = tempfile.mkdtemp()
+    try:
+        j = os.path.join(tmp, "r.json")
+        rc, out = run_script(P, "--json", j)
+        assert rc == 0, out[-400:]
+        r = json.load(open(j, encoding="utf-8"))
+        assert r["onere_agevolato"] == 31033.2 and r["onere_ordinario"] == 59400.0, r      # 5 × 6.206,64; 5 × 36.000 × 33%
+        assert r["rata_mensile"] == 258.61 and r["costo_netto"] == 20792.24, r              # 120 rate; deduzione al 33%
+        assert r["delta_montante_al_pensionamento"] == 36403.28, r                          # × 1,005^32
+        assert r["delta_pensione_lorda_annua"] == 1751.46 and r["anni_per_rientrare"] == 19.1, r   # × 4,8113%; netto/(× 0,62)
+        assert r["coefficiente_trasformazione"] == 0.04811 and r["eta_pensionamento"] == 69.0, r
+        assert r["eta_anticipata_senza_riscatto"] == 68.33 and r["eta_anticipata_con_riscatto"] == 63.33, r
+        assert r["montante_attuale"] == 85000 + 31033.2 and r["modalita"] == "agevolato", r
+        for atteso in ("€ 6.206,64 (€ 18.808 × 33%)", "€ 31.033", "€ 59.400", "€ 258,61", "€ 20.792", "€ 1.751",
+                       "senza riscatto: a 68,3 anni", "con il riscatto: a 63,3 anni", "rendono allo stesso modo",
+                       "Deduzione dell'anno con 120 rate: € 3.103", "requisito uomini dal 2028"):
+            assert atteso in out, f"riscatto: manca «{atteso}»"
+        # le due modalità rendono uguale per euro versato: stessi anni per rientrare
+        assert re.search(r"rientrare\s+19,1\s+19,1", out), out
+        # ordinario sotto il minimale: costa meno, e lo script lo dice
+        rc, out = run_script(P, "--set", "RAL_ATTUALE=15_000")
+        assert rc == 0 and "sotto il minimale" in out, out[-300:]
+        # unica soluzione: rata = onere, deduzione dell'anno = onere
+        rc, out = run_script(P, "--set", "RATE_MENSILI=1", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["rata_mensile"] == r["onere_riscatto"] == 31033.2 and "unica soluzione" in out, out[-300:]
+        # revisione T13: la deduzione di un anno esce dallo scaglione del 33% e lo script lo dice
+        assert "Deduzione dell'anno con l'unica soluzione: € 31.033" in out and "il costo netto vero è più alto" in out, out[-600:]
+        # le donne: requisito di 42 anni e 1 mese, l'anticipata un anno prima
+        rc, out = run_script(P, "--set", "SESSO='F'", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["eta_anticipata_senza_riscatto"] == 67.33 and r["eta_anticipata_con_riscatto"] == 62.33, r
+        assert "requisito donne" in out, out[-900:]
+        # anni di corso prima del 1996: l'onere conta solo gli anni dal 1996, l'anzianità tutti
+        rc, out = run_script(P, "--set", "ANNI_PRIMA_DEL_1996=2", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["onere_agevolato"] == 18619.92 and r["anzianita_con_riscatto"] == 17.0, r
+        assert "cadono prima del 1996" in out and "riserva matematica" in out and "3 anni nel contributivo" in out, out[:900]
+        # modalità ordinaria nella catena: il montante porta l'onere ordinario
+        rc, out = run_script(P, "--set", "MODALITA='ordinario'", "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["onere_riscatto"] == 59400.0 and r["montante_attuale"] == 85000 + 59400.0, r
+        # posizione mista: l'agevolato solo per gli anni dal 1996, con l'avviso sull'opzione
+        rc, out = run_script(P, "--set", "CONTRIBUTI_SOLO_DAL_1996=True")
+        assert rc == 0 and "posizione mista" in out and "art. 1 c. 23 L. 335/1995" in out, out[:700]
+        # anche l'ordinario degli anni prima del 1996 non è stimabile qui (riserva matematica)
+        assert "art. 2 c. 4 D.Lgs. 184/1997, art. 13 L. 1338/1962" in out, out[:700]
+        # chi senza riscatto arriverebbe alla vecchiaia sotto i 20 anni di contributi
+        rc, out = run_script(P, "--set", "ANZIANITA_ATTUALE=0", "--set", "ETA_ATTUALE=52", "--set", "ETA_PENSIONAMENTO=67")
+        assert rc == 0 and "sotto i 20 della vecchiaia" in out, out[-500:]
+        # errori nei dati: rc 1 con ERRORE su stderr
+        for espr, atteso in (("ANNI_RISCATTO=0", "ANNI_RISCATTO"), ("RATE_MENSILI=121", "RATE_MENSILI"),
+                             ("MODALITA='gratis'", "MODALITA"), ("ALIQUOTA_MARGINALE_IRPEF=33", "frazione"),
+                             ("ETA_PENSIONAMENTO=30", "ETA_PENSIONAMENTO"), ("SESSO='X'", "SESSO"),
+                             ("ANNI_PRIMA_DEL_1996=6", "ANNI_PRIMA_DEL_1996")):
+            rc, so, se = run_script_split(P, "--set", espr)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and atteso in se and "Traceback" not in se, (espr, rc, se[-200:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T13 riscatto della laurea: catena importa-previdenza → riscatto → proiezione-inps, stessi numeri")
+def t_riscatto_catena():
+    P = lambda n: asset("it-pianificazione", n)
+    tmp = tempfile.mkdtemp()
+    try:
+        imp, inps, ris = (os.path.join(tmp, f) for f in ("imp.json", "inps.json", "ris.json"))
+        rc, out = run_script(P("importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-test.xml"), "--json", imp)
+        assert rc == 0 and "ANZIANITA_ATTUALE = 2.0" in out, out[-400:]
+        assert json.load(open(imp, encoding="utf-8"))["anzianita_contributiva"] == 2.0     # 104 settimane / 52
+        # revisione T13: due rapporti nello stesso anno contano una volta per il diritto (al massimo 52 settimane)
+        xml = open(os.path.join(FIXTURES, "estratto-inps-test.xml"), encoding="utf-8").read()
+        riga = re.findall(r"      <RigaContributi>.*?</RigaContributi>\n", xml, re.S)[-1]
+        doppio = os.path.join(tmp, "doppio.xml")
+        open(doppio, "w", encoding="utf-8").write(xml.replace(riga, riga + riga.replace("AZIENDA TEST SRL", "SECONDO DATORE SRL")))
+        rc, out = run_script(P("importa-previdenza.py"), doppio, "--json", os.path.join(tmp, "doppio.json"))
+        assert rc == 0 and "settimane utili: 156" in out and "ANZIANITA_ATTUALE = 2.0" in out, out[-600:]
+        rc, out = run_script(P("proiezione-inps.py"), "--from", imp, "--json", inps)
+        assert rc == 0, out[-300:]
+        base = json.load(open(inps, encoding="utf-8"))
+        rc, out = run_script(P("riscatto-laurea.py"), "--from", imp, "--from", inps, "--json", ris)
+        assert rc == 0 and "ANZIANITA_ATTUALE=2.0" in out and "COEFF_TRASFORMAZIONE=" in out, out[:600]
+        r = json.load(open(ris, encoding="utf-8"))
+        m0 = json.load(open(imp, encoding="utf-8"))["montante_attuale"]
+        assert r["montante_attuale"] == round(m0 + r["onere_riscatto"], 2) and r["anzianita_con_riscatto"] == 7.0, r
+        # l'anticipata arriva comunque dopo l'uscita ipotizzata: il riscatto non anticipa
+        assert "il riscatto non anticipa" in out and "posizione mista" not in out, out[-900:]
+        # revisione T13: la posizione mista attraversa la catena (importatore → riscatto → proiezione)
+        mista = os.path.join(tmp, "mista.json")
+        json.dump(dict(json.load(open(imp, encoding="utf-8")), contributi_solo_dal_1996=True), open(mista, "w", encoding="utf-8"))
+        rm = os.path.join(tmp, "ris-mista.json")
+        rc, out_m = run_script(P("riscatto-laurea.py"), "--from", mista, "--from", inps, "--json", rm)
+        assert rc == 0 and out_m.index("posizione mista") < out_m.index("Onere lordo"), out_m[:700]
+        assert json.load(open(rm, encoding="utf-8"))["contributi_solo_dal_1996"] is True
+        rc, out_m = run_script(P("proiezione-inps.py"), "--from", rm)
+        assert rc == 0 and out_m.index("posizione mista") < out_m.index("PENSIONE LORDA ANNUA"), out_m[:700]
+        # un --set di età dopo il JSON della proiezione: anni e coefficiente non valgono più, errore con il rimedio
+        for espr in ("ETA_PENSIONAMENTO=64", "ETA_ATTUALE=50"):
+            rc, so, se = run_script_split(P("riscatto-laurea.py"), "--from", imp, "--from", inps, "--set", espr)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and "proiezione-inps.py" in se and "Traceback" not in se, (espr, se[-300:])
+        rc, out = run_script(P("proiezione-inps.py"), "--from", ris, "--json", inps)
+        assert rc == 0, out[-300:]
+        con = json.load(open(inps, encoding="utf-8"))
+        # la proiezione completa con il riscatto e la pensione in più dello script coincidono (arrotondamenti)
+        delta = con["pensione_inps_lorda_annua"] - base["pensione_inps_lorda_annua"]
+        assert abs(delta - r["delta_pensione_lorda_annua"]) < 2, (delta, r["delta_pensione_lorda_annua"])
+        # senza il JSON della proiezione il coefficiente è quello di proiezione-inps.py alla stessa età di uscita,
+        # e la catena con un'uscita diversa dai default resta coerente (revisione T13: era fisso a 69 anni)
+        b64, r64, c64 = (os.path.join(tmp, f) for f in ("b64.json", "r64.json", "c64.json"))
+        rc, out = run_script(P("proiezione-inps.py"), "--from", imp, "--set", "ETA_PENSIONAMENTO=64", "--json", b64)
+        rc2, out2 = run_script(P("riscatto-laurea.py"), "--from", imp, "--set", "ETA_PENSIONAMENTO=64", "--json", r64)
+        assert rc == rc2 == 0, (out[-300:], out2[-300:])
+        r = json.load(open(r64, encoding="utf-8"))
+        assert r["coefficiente_trasformazione"] == json.load(open(b64, encoding="utf-8"))["coefficiente_trasformazione"], r
+        rc, out = run_script(P("proiezione-inps.py"), "--from", r64, "--json", c64)
+        assert rc == 0 and "ETA_PENSIONAMENTO=64" in out, out[:400]      # l'età di uscita viaggia nel JSON
+        delta = json.load(open(c64, encoding="utf-8"))["pensione_inps_lorda_annua"] - json.load(open(b64, encoding="utf-8"))["pensione_inps_lorda_annua"]
+        assert abs(delta - r["delta_pensione_lorda_annua"]) < 2, (delta, r["delta_pensione_lorda_annua"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T13 riscatto della laurea: reference e skill con lo stesso onere, fonti nel marcatore, description")
+def t_riscatto_testi():
+    ref = open(os.path.join(SKILLS, "it-pianificazione", "references", "previdenza-obbligatoria.md"), encoding="utf-8").read()
+    sezione = ref.split("\n## Riscatto della laurea\n")[1].split("\n## ")[0]
+    for atteso in ("€18.808 × 33% = **€6.206,64**", "120 rate mensili senza interessi", "art. 10 c. 1 lett. e TUIR",
+                   "dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026", "c. 5-quater", "art. 20 c. 6 DL 4/2019",
+                   "riserva matematica", "art. 1 c. 23 L. 335/1995", "€31.033", "€20.792", "€258,61", "€1.751",
+                   "circa 19 anni", "del 38%", "Circ. INPS 14/2026", "Verificato: 2026-10", "(c. 5-ter) e, poiché",
+                   "dal 2027 art. 10 c. 1 lett. u e art. 14 c. 1 lett. i D.Lgs. 117/2026", "per le donne 42 anni e 1 mese",
+                   "ripetuti"):
+        assert atteso in sezione, f"previdenza-obbligatoria.md, Riscatto della laurea: manca «{atteso}»"
+    # lo stesso minimale nella reference, nello script e nella Gestione Separata degli autonomi
+    sorgente = open(asset("it-pianificazione", "riscatto-laurea.py"), encoding="utf-8").read()
+    assert re.search(r"^MINIMALE_ARTIGIANI_COMMERCIANTI = 18_808\.0\b", sorgente, re.M)
+    gs = open(os.path.join(SKILLS, "it-pianificazione-autonomi", "references", "previdenza-gestione-separata.md"), encoding="utf-8").read()
+    assert "€18.808" in gs, "minimale 2026 diverso tra le reference"
+    skill = open(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"), encoding="utf-8").read()
+    assert "Pattern P7 — Riscattare la laurea" in skill and "assets/riscatto-laurea.py" in skill
+    assert "Non gestisce ricongiunzione, totalizzazione, riscatto laurea" not in skill
+    p7 = skill.split("**Pattern P7")[1].split("\n")[0]
+    for atteso in ("ANNI_RISCATTO", "ANNI_PRIMA_DEL_1996", "SESSO='F'", "RATE_MENSILI", "ANZIANITA_ATTUALE"):
+        assert atteso in p7, f"Pattern P7: manca «{atteso}» tra i dati da chiedere"
+    assert 'riscatto-laurea.py"     --from dati.json --from inps.json' in skill, "Step 1: il riscatto nella catena"
+    mappa = open(os.path.join(SKILLS, "it-tax-optimization", "references", "mappa-nuovo-tuir.md"), encoding="utf-8").read()
+    assert "art. 2 c. 5-bis D.Lgs. 184/1997, ultimo periodo" in mappa and "art. 10 c. 1 lett. u e art. 14 c. 1 lett. i" in mappa
+
+
+def _it(x, dec=2):
+    """Importo in formato italiano, come nelle reference: 17760.92 → «17.760,92»."""
+    return f"{x:,.{dec}f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+@test("T13 freelance: rivalsa del 4%, saldo e acconti, il secondo anno ricalcolato, eccedenza LM49 → RP21")
+def t_freelance_flussi():
+    # F063: rivalsa, shock del secondo anno ed eccedenza dei contributi non comparivano nella skill.
+    # L'esempio si ricalcola da capo: compensi €40.000, coefficiente 78%, Gestione Separata 26,07%,
+    # acconti dei contributi 40% + 40% (art. 1 c. 212 L. 662/1996), dell'imposta 50% + 50% (art. 58 DL 124/2019)
+    A = os.path.join(SKILLS, "it-pianificazione-autonomi")
+    gs = open(os.path.join(A, "references", "previdenza-gestione-separata.md"), encoding="utf-8").read()
+    sezione = gs.split("\n## Flussi di cassa: rivalsa del 4%, saldo e acconti\n")[1].split("\n## ")[0]
+    lordo = 40_000 * 0.78
+    contributi = round(lordo * 0.2607, 2)
+    rata_c = round(contributi * 0.40, 2)
+    versati_c = contributi + 2 * rata_c
+    imponibile2 = lordo - versati_c
+    attesi = {f"€{_it(contributi)}", f"€{_it(versati_c)}", f"2 × €{_it(rata_c)}", f"€{_it(imponibile2)}"}
+    totali = {}
+    for aliquota in (0.05, 0.15):
+        imposta1 = round(lordo * aliquota, 2)
+        giugno = contributi + rata_c + imposta1 * 1.5
+        novembre = rata_c + imposta1 * 0.5
+        totali[aliquota] = round(giugno + novembre, 2)
+        regime = contributi + round((lordo - contributi) * aliquota, 2)
+        if aliquota == 0.05:
+            imposta2 = round(imponibile2 * aliquota, 2)
+            attesi |= {f"€{_it(giugno)}", f"€{_it(novembre)}", f"€{_it(imposta2)}", f"€{_it(imposta1 - imposta2)}",
+                       f"€{_it(round((lordo - contributi) * aliquota, 2))}", f"**€{_it(totali[aliquota])}**",
+                       f"circa {_it(totali[aliquota] / regime, 1)} volte", f"il {round(totali[aliquota] / 40_000 * 100)}% dei compensi"}
+        else:
+            attesi |= {f"€{_it(totali[aliquota])}", f"il {round(totali[aliquota] / 40_000 * 100)}% dei compensi"}
+    for atteso in sorted(attesi):
+        assert atteso in sezione, f"previdenza-gestione-separata.md, Flussi di cassa: manca «{atteso}»"
+    for atteso in ("art. 1 c. 212 L. 662/1996", "due rate del 40%", "due rate del 50%", "Ris. AdE 93/E/2019",
+                   "dal 2027 art. 235 c. 1 D.Lgs. 117/2026", "dal 2027 art. 72 c. 4 D.Lgs. 33/2025", "100%",
+                   "Circ. INPS 8/2026", "abrogato dalla L. 113/2026", "parte integrante dei compensi",
+                   "integrativo delle casse", "metodo previsionale", "Verificato: 2026-10"):
+        assert atteso in sezione, f"previdenza-gestione-separata.md, Flussi di cassa: manca «{atteso}»"
+    assert "prorogate al 20 luglio con D.L. 89/2026" not in gs, "il rinvio del 2026 presentato come regola"
+    # nel testo, non solo nel marcatore delle fonti: il rinvio del 2026 è datato e il decreto abrogato
+    corpo = sezione.split("\n*Rivalsa del 4%")[0]
+    assert "abrogato dalla L. 113/2026 che ne ha fatto salvi gli effetti" in corpo and "non la regola" in corpo, corpo[-600:]
+    ff = open(os.path.join(A, "references", "fiscalita-forfettario.md"), encoding="utf-8").read()
+    for atteso in ("rivalsa INPS del 4%", "è un compenso, non un contributo", "integrativo", "**versati**",
+                   "rigo LM49", "rigo RP21", "art. 1 c. 64 L. 190/2014, dal 2027 art. 235 c. 1 D.Lgs. 117/2026",
+                   "per il forfettario puro quell'eccedenza va persa"):
+        assert atteso in ff, f"fiscalita-forfettario.md: manca «{atteso}»"
+    # la skill riporta gli stessi numeri della reference
+    skill = open(os.path.join(A, "SKILL.md"), encoding="utf-8").read()
+    a6 = skill.split("**Pattern A6")[1].split("\n")[0]
+    for atteso in (f"€{_it(totali[0.05])}", f"€{_it(totali[0.15])}", "1,9 volte", "44%", "rivalsa del 4%"):
+        assert atteso in a6, f"Pattern A6: manca «{atteso}»"
+    assert "pattern A1-A6" in skill and "rigo LM49" in skill and "Trattare la rivalsa INPS del 4% come un contributo" in skill
+    # revisione T13: i contributi si versano nella sezione INPS dell'F24 con le causali PXX o P10, non con il 1299
+    for testo, nome in ((skill, "SKILL.md"), (gs, "previdenza-gestione-separata.md")):
+        assert "PXX" in testo and "P10" in testo and "1299" not in testo, f"{nome}: causali F24 della Gestione Separata"
+
 # ══════════════════════ T11: testi unici dal 2027 ══════════════════════
 
 # Norme abrogate o rinumerate dal 1/1/2027 (mappa in it-tax-optimization/references/mappa-nuovo-tuir.md).
@@ -3899,7 +4153,8 @@ _NORME_2027 = re.compile(
     r"|L\.\s?232/2016,?\s?c\.\s?(?:153 e )?158\b|\bc\.\s?158\b[^;\n]{0,10}L\.\s?232/2016"
     r"|L\.\s?190/2014|L\.\s?383/2001|L\.\s?207/2024[^.;\n]{0,10}c\.\s?24\b|1 c\.\s?(?:24|6) L\.\s?207/2024"
     r"|" + _ART + r"\s?11 c\.\s?3 D\.\s?Lgs\.\s?47/2000|D\.\s?Lgs\.\s?47/2000,? art\.\s?11 c\.\s?3\b"
-    r"|lett(?:era|\.)\s?c-(?:bis|ter|quater|quinquies|sexies)")
+    r"|lett(?:era|\.)\s?c-(?:bis|ter|quater|quinquies|sexies)"
+    r"|c\.\s?5-bis,?(?: ultimo periodo,?)? D\.\s?Lgs\.\s?184/1997")
 # il riferimento dal 2027: «dal 2027», una freccia o il numero di uno dei testi unici (non l'anno nudo,
 # che è anche una data)
 _SUCCESSORE_2027 = re.compile(r"(?i:dal (?:1/1/|1° gennaio )?2027)|→|TU 2027|117/2026|141/2026|173/2024|174/2024"
@@ -4387,6 +4642,1969 @@ def t_autonomi_perimetro():
         assert superato not in gs, f"previdenza-gestione-separata.md: «{superato}»"
 
 
+# ═══════════════════════════ T15: capitale umano ═══════════════════════════
+
+CU = ("it-pianificazione-obiettivi", "capitale-umano.py")
+
+
+@test("T15 capitale umano: valori chiusi della valutazione")
+def t_cu_valutazione():
+    m = carica_modulo(asset(*CU))
+    # rendita: g = 0, frazione 1, ν = 0 → formula chiusa
+    assert abs(m.valore_capitale_umano(32000, 0, 32, 0.01, 0, 1) - 32000 * (1 - 1.01 ** -32) / 0.01) < 0.01
+    assert m.valore_capitale_umano(32000, 0.01, 0, 0.01, 0.03, 1) == 0
+    assert abs(m.frazione_lavorata(0.08, 0.5, 0.6) - 0.984) < 1e-12
+    assert abs(m.valore_pensione(18000, 32, 55, 0.01, 0.0075) - 194248.56) < 0.01
+    assert m.quota_azionaria_effettiva(0.3, 1) == 1 and abs(m.quota_azionaria_effettiva(0.3, 0.5) - 0.65) < 1e-12
+    # invarianti: il capitale umano decresce con ν e con p_u, cresce con g
+    base = m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.03, 0.984)
+    assert abs(base - 705036.01) < 0.01, base
+    assert m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.04, 0.984) < base
+    assert m.valore_capitale_umano(35000, 0.01, 32, 0.01, 0.03, m.frazione_lavorata(0.16, 0.5, 0.6)) < base
+    assert m.valore_capitale_umano(35000, 0.02, 32, 0.01, 0.03, 0.984) > base
+
+
+@test("T15 capitale umano: profili con fonte, natura e valori plausibili")
+def t_cu_profili():
+    m = carica_modulo(asset(*CU))
+    p = m.carica_profili()
+    assert p == m.carica_profili(asset("it-pianificazione-obiettivi", "profili-capitale-umano.csv"))
+    assert set(p) == {"pubblico", "privato_stabile", "privato_ciclico", "finanza", "autonomo", "imprenditore"}, set(p)
+    assert p["privato_ciclico"]["quota_azionaria_hc"] == 0.30 and p["privato_ciclico"]["nu"] == 0.03
+    assert p["finanza"]["settore_default"] == "Financials"
+    for nome, r in p.items():
+        assert r["fonte"].strip() and r["natura"].strip(), nome
+        assert 0 <= r["quota_azionaria_hc"] <= 1 and 0 <= r["nu"] <= 0.10 and -1 <= r["rho"] <= 1, nome
+        assert 0 <= r["sigma_h"] <= 0.5 and 0 <= r["p_u"] <= 0.5 and 0 <= r["sostituzione_naspi"] <= 1, nome
+        assert r["settore_default"] in (None, *m.SETTORI_GICS), nome
+    e = m.profilo_effettivo({"profilo": "privato_ciclico", "override": {"p_u": 0.08}}, p)
+    assert e["p_u"] == 0.08 and p["privato_ciclico"]["p_u"] == 0.05   # l'override non tocca la tabella
+
+
+def _cu(*args, cwd=None):
+    return run_script_split(asset(*CU), *args, cwd=cwd)
+
+
+def _cu_esempio():
+    return json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+
+
+def _scrivi_json(path, dati):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dati, f)
+    return path
+
+
+@test("T15 capitale umano: bilancio, esposizione ed equivalenza sull'esempio")
+def t_cu_bilancio():
+    tmp = tempfile.mkdtemp()
+    try:
+        out_json = os.path.join(tmp, "cu.json")
+        rc, so, se = _cu("--json", out_json, cwd=tmp)
+        assert rc == 0 and "dati d'esempio" in so, se[-300:]
+        j = json.load(open(out_json, encoding="utf-8"))
+        b = j["bilancio"]
+        assert abs(b["HC"] - 705036.01) < 0.01 and abs(b["PP"] - 194248.56) < 0.01 and b["F"] == 113000, b
+        assert abs(j["esposizione_finanziaria"] - 0.610619) < 1e-5 and abs(j["esposizione_totale"] - 0.277107) < 1e-5
+        assert j["equivalenza"] is None
+        m = carica_modulo(asset(*CU))
+        assert m.equivalenza(0.5, b)["limite"] == "max" and m.equivalenza(0.5, b)["x"] == 1
+        assert m.equivalenza(0.1, b)["limite"] == "min" and m.equivalenza(0.1, b)["x"] == 0
+        assert abs(m.equivalenza(0.25, b)["x"] - 0.361781) < 1e-5
+        assert "calcolo, non target" in m.equivalenza(0.25, b)["messaggio"]
+        # s = 0 con un portafoglio azionario: esposizione totale < finanziaria
+        dati = _cu_esempio()
+        dati["persona"]["override"]["quota_azionaria_hc"] = 0
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "s0.json"), dati), "--json", out_json, cwd=tmp)
+        j = json.load(open(out_json, encoding="utf-8"))
+        assert rc == 0 and j["esposizione_totale"] < j["esposizione_finanziaria"], se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: dati incoerenti respinti con rc 1, casi limite gestiti")
+def t_cu_errori():
+    tmp = tempfile.mkdtemp()
+    def con(modifica):
+        d = _cu_esempio()
+        modifica(d)
+        return _scrivi_json(os.path.join(tmp, "d.json"), d)
+    try:
+        for modifica, atteso in [
+            (lambda d: d["persona"].update(profilo="astronauta"), "profilo"),
+            (lambda d: d["persona"].update(eta=95), "eta_fine"),
+            (lambda d: d["persona"].update(eta_pensione=30), "eta_pensione"),
+            (lambda d: d["fondo_pensione"].update(quota_azionaria=60), "quota"),
+            (lambda d: d.update(liquidita=-1), "negativ"),
+            (lambda d: d.update(persone=[d.pop("persona")]), "persona"),
+            (lambda d: d["persona"].update(tfr_nel_fondo="sì"), "tfr_nel_fondo"),
+        ]:
+            rc, so, se = _cu("--dati", con(modifica), cwd=tmp)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and atteso in se, (atteso, rc, se[-200:])
+        # portafoglio vuoto con l'equivalenza richiesta: niente divisione per zero
+        def vuoto(d):
+            d.update(posizioni=[], liquidita=0, esposizione_totale_desiderata=0.3)
+        rc, so, se = _cu("--dati", con(vuoto), "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        j = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))
+        assert j["equivalenza"]["x"] is None and "nessun portafoglio" in j["equivalenza"]["messaggio"]
+        # asset_class sconosciuta: non azionaria, con un avviso che la nomina
+        rc, so, se = _cu("--dati", con(lambda d: d["posizioni"].append({"asset_class": "oro", "valore": 5000})), cwd=tmp)
+        assert rc == 0 and "oro" in so and "non azionari" in so, so[-400:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: proiezione, fascia Monte Carlo e caso di Ibbotson")
+def t_cu_proiezione():
+    m = carica_modulo(asset(*CU))
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    p = m.proiezione(dati, prof, c, None, 500, 7)
+    righe = {r["eta"]: r for r in p["anni"]}
+    assert min(righe) == 35 and max(righe) == 72, sorted(righe)[:3]
+    hc = [righe[e]["HC"] for e in range(35, 68)]
+    assert all(a > b for a, b in zip(hc, hc[1:])) and righe[67]["HC"] == 0 and righe[70]["HC"] == 0
+    assert righe[66]["PP"] > righe[35]["PP"] and righe[72]["PP"] < righe[67]["PP"]
+    assert all(r["p10"] <= r["p50"] <= r["p90"] for r in p["anni"])
+    assert p == m.proiezione(dati, prof, c, None, 500, 7)                      # riproducibile col seme
+    # ρ = σ_h = 0 e σ_S = 0: nessuna dispersione, fascia sul deterministico
+    m.SIGMA_AZ = 0.0
+    piatto = dict(prof, rho=0.0, sigma_h=0.0)
+    for r in m.proiezione(dati, piatto, c, None, 200, 7)["anni"]:
+        assert abs(r["p10"] - r["p90"]) < 1e-9 and abs(r["p50"] - r["esposizione"]) < 1e-9, r
+    m.SIGMA_AZ = 0.18
+    # glide path più corto della proiezione: si tiene l'ultima quota, dicendolo
+    g = m.proiezione(dati, prof, c, [0.6, 0.5, 0.4], 200, 7)
+    assert any("più corto" in a for a in g["avvisi"])
+    # già in pensione
+    pens = _cu_esempio()
+    pens["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+    r = m.proiezione(pens, prof, dict(c), None, 200, 7)
+    assert r["eta_sorpasso"] is None and all(x["HC"] == 0 for x in r["anni"])
+    # Ibbotson et al. 2007, fig. 2.3: (HC + PP)/W ≈ 94% a 25 anni (tolleranza larga: letto da un grafico)
+    ib = {"persona": {"profilo": "pubblico", "eta": 25, "eta_pensione": 65, "netto_annuo": 50000, "crescita_reale": 0,
+                      "tfr_annuo": 0, "contributo_datore_fp": 0, "quota_reddito_azioni_datore": 0,
+                      "override": {"p_u": 0, "nu": 0.04}},
+          "pensione": {"netta_annua": 10000, "eta_fine": 85}, "posizioni": [], "liquidita": 50000,
+          "fondo_pensione": {"valore": 0, "quota_azionaria": 0}, "tfr_maturato_azienda": 0, "risparmio_annuo": 5000}
+    pi = m.profilo_effettivo(ib["persona"], m.carica_profili())
+    b = m.bilancio(ib, pi, {"R_F": 0.02, "NU_PENSIONE": 0.04, "ETA_FINE": 85, "ETA_PENSIONE": 65, "PENSIONE_NETTA": 10000})
+    assert 0.92 <= (b["HC"] + b["PP"]) / b["W"] <= 0.96, (b["HC"], b["PP"], b["W"])
+
+
+@test("T15 capitale umano: sovrapposizione settoriale e CSV da Excel italiano")
+def t_cu_settore():
+    m = carica_modulo(asset(*CU))
+    assert set(m.PESI_MONDO) == set(m.SETTORI_GICS) and 0.99 <= sum(m.PESI_MONDO.values()) <= 1.01
+    tmp = tempfile.mkdtemp()
+    try:
+        p = os.path.join(tmp, "comp.csv")
+        with open(p, "w", encoding="utf-8-sig") as f:              # BOM, «;» e percento con la virgola
+            f.write("strumento;settore;peso\nA;Information Technology;50,0\nA;Financials;50,0\n"
+                    "B;Health Care;1,0\n")
+        comp = m.leggi_composizione(p)
+        assert comp == {"A": {"Information Technology": 0.5, "Financials": 0.5}, "B": {"Health Care": 1.0}}, comp
+        pos = [{"asset_class": "azionario", "valore": 30000, "strumento": "A"},
+               {"asset_class": "azionario", "valore": 10000, "strumento": "B"},
+               {"asset_class": "azionario", "valore": 10000, "strumento": "C"}]
+        s = m.sovrapposizione(pos, comp, "Information Technology", 40000, 60000,
+                              {**m.PESI_MONDO, "Information Technology": 0.25})
+        assert abs(s["quota_settore_fin"] - 15000 / 40000) < 1e-12 and s["mancanti"] == ["C"], s
+        assert abs(s["esposizione_combinata"] - (40000 * 0.375 + 60000) / 100000) < 1e-12
+        assert abs(s["rapporto"] - 1.5) < 1e-12 and s["sovrappeso"] is False
+        # l'esempio del plugin passa da riga di comando
+        rc, so, se = run_script_split(asset(*CU), "--composizione",
+                                      asset("it-pianificazione-obiettivi", "esempio-composizione.csv"), cwd=tmp)
+        assert rc == 0 and "4. SOVRAPPOSIZIONE" in so, se[-300:]
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Tecnologia;100\n")
+        rc, so, se = run_script_split(asset(*CU), "--composizione", p, cwd=tmp)
+        assert rc == 1 and "Information Technology" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: sensibilità ordinata e catena --from dagli script previdenziali")
+def t_cu_sensibilita_catena():
+    m = carica_modulo(asset(*CU))
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    righe = m.sensibilita(dati, prof, c)
+    assert {r["parametro"] for r in righe} == {"s", "nu", "g", "p_u", "r_f"} and len(righe) == 9, righe
+    ampiezze = []
+    for r in righe:
+        if not ampiezze or ampiezze[-1][0] != r["parametro"]:
+            ampiezze.append([r["parametro"], 0])
+        ampiezze[-1][1] = max(ampiezze[-1][1], abs(r["delta"]))
+    assert [a[1] for a in ampiezze] == sorted((a[1] for a in ampiezze), reverse=True), ampiezze
+    assert len(ampiezze) == 5, "le varianti dello stesso parametro devono essere adiacenti"
+    assert next(r for r in righe if r["parametro"] == "nu" and r["variante"] == "+1,5 punti")["HC"] < m.bilancio(dati, prof, c)["HC"]
+    tmp = tempfile.mkdtemp()
+    try:
+        A = "it-pianificazione"
+        assert run_script(asset(A, "proiezione-inps.py"), "--json", os.path.join(tmp, "inps.json"), cwd=tmp)[0] == 0
+        assert run_script(asset(A, "netto-pensione.py"), "--json", os.path.join(tmp, "netto.json"), cwd=tmp)[0] == 0
+        senza = _cu_esempio()
+        senza["persona"].pop("eta_pensione")
+        senza.pop("pensione")
+        p = _scrivi_json(os.path.join(tmp, "d.json"), senza)
+        rc, so, se = run_script_split(asset(*CU), "--dati", p, "--from", os.path.join(tmp, "inps.json"),
+                                      "--from", os.path.join(tmp, "netto.json"), "--json", os.path.join(tmp, "cu.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        j = json.load(open(os.path.join(tmp, "cu.json"), encoding="utf-8"))
+        inps = json.load(open(os.path.join(tmp, "inps.json"), encoding="utf-8"))
+        netto = json.load(open(os.path.join(tmp, "netto.json"), encoding="utf-8"))
+        assert j["profilo_usato"]["eta_pensione"] == int(inps["eta_pensionamento"]), j["profilo_usato"]
+        assert j["profilo_usato"]["pensione_netta"] == netto["netto_pensione_inps"]
+        assert j["sensibilita"] and len(j["sensibilita"]) == 9
+        # --set prevale su --dati
+        rc, so, se = run_script_split(asset(*CU), "--set", "ETA_PENSIONE=70", "--json", os.path.join(tmp, "cu.json"), cwd=tmp)
+        assert rc == 0 and json.load(open(os.path.join(tmp, "cu.json"), encoding="utf-8"))["profilo_usato"]["eta_pensione"] == 70
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: input realistici dalla revisione finale (età frazionarie, CSV da Excel, --from scartato)")
+def t_cu_revisione_finale():
+    m = carica_modulo(asset(*CU))
+    tmp = tempfile.mkdtemp()
+    def con(modifica, nome="d.json"):
+        d = _cu_esempio()
+        modifica(d)
+        return _scrivi_json(os.path.join(tmp, nome), d)
+    try:
+        # età frazionarie (proiezione-inps.py le accetta): arrotondate per difetto, senza traceback
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"].update(eta=35.5, eta_pensione=67.5)), cwd=tmp)
+        assert rc == 0 and "Traceback" not in se and "per difetto" in so, (rc, se[-300:])
+        # la frase della diagnosi 2 nomina il blocco più grande: per un pensionato è la pensione
+        def pensionato(d):
+            d["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+        rc, so, se = _cu("--dati", con(pensionato), cwd=tmp)
+        assert rc == 0 and "gli somiglia" not in so and "capitale pensionistico" in so.split("2. ESPOSIZIONE")[1].split("3. ")[0], so[-900:]
+        # CSV da Excel italiano: righe «;;», «;» finale, cp1252 con accenti, celle in percento
+        comp = os.path.join(tmp, "comp.csv")
+        with open(comp, "w", encoding="cp1252") as f:
+            f.write("strumento;settore;peso;\nETF Società;Information Technology;60,0%;\n"
+                    "ETF Società;Financials;40,0%;\n;;;\n")
+        assert m.leggi_composizione(comp) == {"ETF Società": {"Information Technology": 0.6, "Financials": 0.4}}
+        # --dati che scavalca un valore letto con --from: lo dice
+        A = "it-pianificazione"
+        assert run_script(asset(A, "netto-pensione.py"), "--json", os.path.join(tmp, "netto.json"), cwd=tmp)[0] == 0
+        rc, so, se = _cu("--from", os.path.join(tmp, "netto.json"), cwd=tmp)
+        assert rc == 0 and "togli la chiave" in so, so[:900]
+        # nessuna composizione che combaci: niente esposizione combinata fittizia; nomi confrontati senza spazi
+        pos = [{"asset_class": "azionario", "valore": 1000, "strumento": " A "}]
+        z = m.sovrapposizione(pos, {"B": {"Financials": 1.0}}, "Financials", 0, 500, m.PESI_MONDO)
+        assert z["quota_settore_fin"] is None and z["esposizione_combinata"] is None, z
+        z = m.sovrapposizione(pos, {"A": {"Financials": 1.0}}, "Financials", 1000, 500, m.PESI_MONDO)
+        assert z["quota_settore_fin"] == 1.0, z
+        # override fuori dominio: ERRORE pulito, e nessun pezzo di report prima dell'errore
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"]["override"].update(rho=1.5)), cwd=tmp)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "rho" in se and "1. BILANCIO" not in so, (rc, so[-200:], se[-200:])
+        rc, so, se = _cu("--dati", con(lambda d: d["persona"].update(crescita_reale="1%")), cwd=tmp)
+        assert rc == 1 and "crescita_reale" in se and "Traceback" not in se, se[-300:]
+        with open(comp, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Tecnologia;100\n")
+        rc, so, se = _cu("--composizione", comp, cwd=tmp)
+        assert rc == 1 and "1. BILANCIO" not in so, so[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T15 capitale umano: proiezione a tre contenitori, TFR e contributi trasferiti, orizzonte dei pensionati")
+def t_cu_contenitori():
+    m = carica_modulo(asset(*CU))
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    b = m.bilancio(dati, prof, c)
+    # l'anno 0 è la fotografia di oggi, anche con un glide path: coincide con la diagnosi 2
+    for glide in (None, [0.9, 0.9, 0.5]):
+        r0 = m.proiezione(dati, prof, c, glide, 50, 1)["anni"][0]
+        assert abs(r0["esposizione"] - b["esposizione_totale"]) < 1e-12, (glide, r0["esposizione"], b["esposizione_totale"])
+    # il glide path agisce solo sul portafoglio, dall'anno 1: fondo pensione e TFR tengono la loro quota
+    g1 = m.proiezione(dati, prof, c, [0.0, 0.0], 50, 1)["anni"][1]
+    assert g1["az_fondo"] > 0 and g1["az_portafoglio"] == 0, g1
+    # con rendimenti, crescita e risparmio a zero il TFR fa crescere il patrimonio di tfr_annuo l'anno
+    m.REND_AZ_REALE, m.REND_OBB_REALE, m.SIGMA_AZ = 0.0, 0.0, 0.0
+    try:
+        d = _cu_esempio()
+        d["persona"].update(crescita_reale=0, tfr_annuo=3000, contributo_datore_fp=1000)
+        d["risparmio_annuo"] = 0
+        righe = m.proiezione(d, prof, c, None, 20, 1)["anni"]
+        assert abs((righe[1]["F"] - righe[0]["F"]) - 4000) < 1e-6, righe[1]["F"] - righe[0]["F"]
+        assert abs((righe[1]["tfr"] - righe[0]["tfr"]) - 3000) < 1e-6 and abs((righe[1]["fondo"] - righe[0]["fondo"]) - 1000) < 1e-6
+        d["persona"]["tfr_nel_fondo"] = True
+        righe = m.proiezione(d, prof, c, None, 20, 1)["anni"]
+        assert righe[1]["tfr"] == righe[0]["tfr"] and abs((righe[1]["fondo"] - righe[0]["fondo"]) - 4000) < 1e-6
+        # dopo la pensione non entra più niente
+        ultimi = [r for r in righe if r["eta"] >= 67]
+        assert all(abs(x["F"] - ultimi[0]["F"]) < 1e-6 for x in ultimi)
+    finally:
+        m.REND_AZ_REALE, m.REND_OBB_REALE, m.SIGMA_AZ = 0.03, 0.005, 0.18
+    # un pensionato di 80 anni: cinque anni di proiezione, senza superare l'età finale
+    pens = _cu_esempio()
+    pens["persona"].update(eta=80, netto_annuo=0, tfr_annuo=0)
+    eta = [r["eta"] for r in m.proiezione(pens, prof, c, None, 20, 1)["anni"]]
+    assert eta == list(range(80, 86)), eta
+    pens["persona"]["eta"] = 87
+    eta = [r["eta"] for r in m.proiezione(pens, prof, c, None, 20, 1)["anni"]]
+    assert eta[0] == 87 and eta[-1] <= 89 and len(eta) > 1, eta
+
+
+@test("T15 capitale umano: report leggibile (sensibilità in punti, P50, stato del sorpasso, chiavi sconosciute)")
+def t_cu_report():
+    m = carica_modulo(asset(*CU))
+    c = {"R_F": 0.01, "NU_PENSIONE": 0.0075, "ETA_FINE": 90, "ETA_PENSIONE": 67, "PENSIONE_NETTA": 18000}
+    dati = _cu_esempio()
+    prof = m.profilo_effettivo(dati["persona"], m.carica_profili())
+    varianti = {(r["parametro"], r["variante"]) for r in m.sensibilita(dati, prof, c)}
+    assert varianti == {("s", "+10 punti"), ("s", "-10 punti"), ("nu", "+1,5 punti"), ("nu", "-1,5 punti"),
+                        ("g", "0%"), ("g", "2%"), ("p_u", "× 2"), ("r_f", "+1 punto"), ("r_f", "-1 punto")}, varianti
+    assert m.punti(-0.0002) == "0,0 punti" and m.punti(0.0123) == "+1,2 punti" and m.punti(-0.07) == "-7,0 punti"
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "cu.json")
+        rc, so, se = _cu("--json", out, cwd=tmp)
+        assert rc == 0 and "P10 · P50 · P90" in so and "-0,0 punti" not in so, so[-1500:]
+        j = json.load(open(out, encoding="utf-8"))
+        assert j["stato_sorpasso"] == "entro_la_proiezione" and j["eta_sorpasso"] is not None
+        pens = _cu_esempio()
+        pens["persona"].update(eta=68, netto_annuo=0, tfr_annuo=0)
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "p.json"), pens), "--json", out, cwd=tmp)
+        assert rc == 0 and json.load(open(out, encoding="utf-8"))["stato_sorpasso"] == "gia_superato"
+        povero = _cu_esempio()
+        povero.update(posizioni=[], liquidita=0, risparmio_annuo=0, tfr_maturato_azienda=0)
+        povero["fondo_pensione"]["valore"] = 0
+        povero["persona"].update(tfr_annuo=0, contributo_datore_fp=0)
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "n.json"), povero), "--json", out, cwd=tmp)
+        j = json.load(open(out, encoding="utf-8"))
+        assert rc == 0 and j["stato_sorpasso"] == "non_prima_della_fine" and j["eta_sorpasso"] is None, j["stato_sorpasso"]
+        # chiavi sconosciute: avviso che le nomina; «_nota» e i campi extra delle posizioni sono ammessi
+        refuso = _cu_esempio()
+        refuso["liquidta"] = 5000
+        refuso["persona"]["netto_anuo"] = 1
+        refuso["posizioni"][0]["broker"] = "Fineco"
+        rc, so, se = _cu("--dati", _scrivi_json(os.path.join(tmp, "r.json"), refuso), cwd=tmp)
+        assert rc == 0 and "liquidta" in so and "persona.netto_anuo" in so, so[:1200]
+        assert "_nota" not in so and "broker" not in so
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ═══════════════════════════ T16: composizione degli ETF ═══════════════════════════
+
+CE = ("it-pianificazione-obiettivi", "importa-composizione-etf.py")
+
+
+@test("T16 composizione ETF: lettura della tabella (intestazione, preambolo, fine, numeri, formati di file)")
+def t_ce_lettura():
+    m = carica_modulo(asset(*CE))
+    for nome, sep in (("composizione-ishares-en.csv", ","), ("composizione-ishares-it.csv", ";")):
+        righe, foglio = m.leggi_righe(os.path.join(FIXTURES, nome))
+        i, col, testi = m.trova_intestazione(righe)
+        assert i == 5 and foglio is None, (nome, i)
+        assert set(col) == {"peso", "settore", "paese", "asset_class", "nome"}, col
+        dati = m.righe_dati(righe, i, col["peso"])
+        assert len(dati) == 8, (nome, len(dati))                 # il disclaimer in fondo non entra
+        v = m.virgola_decimale([r[col["peso"]] for r in dati])
+        assert v is (sep == ";")
+        assert [m.peso_numerico(r[col["peso"]], v) for r in dati] == [30, 20, 15, 15, 10, 9, 0.8, 0.2]
+    assert testi["peso"] == "Ponderazione (%)" and testi["paese"] == "Area geografica"
+    assert m.peso_numerico("1.234,5", True) == 1234.5 and m.peso_numerico("1,234.5", False) == 1234.5
+    assert m.peso_numerico("4,46%", True) == 4.46 and m.peso_numerico("N/A", False) is None
+    assert m.peso_numerico(0.0565, False) == 0.0565
+    # precedenza tra due candidate: «Sector Classification» batte «Industry Classification»
+    _, col, testi = m.trova_intestazione([["ISIN", "Percent of Fund", "Trade Country Name",
+                                           "Industry Classification", "Sector Classification"]])
+    assert testi["settore"] == "Sector Classification" and col["settore"] == 4
+    tmp = tempfile.mkdtemp()
+    try:
+        # CSV risalvato da Excel italiano: cp1252, «;», righe di soli «;»
+        p = os.path.join(tmp, "excel.csv")
+        with open(p, "w", encoding="cp1252") as f:
+            f.write("Fondo;;;\nPosizioni al;30/09/2026;;\n;;;\nNome;Settore;Area geografica;Ponderazione (%)\n"
+                    "ALPHA;Informatica;Stati Uniti;60,0\nBETA;Sanità;Giappone;40,0\n;;;\n")
+        righe, _ = m.leggi_righe(p)
+        i, col, _ = m.trova_intestazione(righe)
+        assert i == 3 and len(m.righe_dati(righe, i, col["peso"])) == 2
+        assert righe[5][1] == "Sanità"
+        # XLSX con l'intestazione alla riga 4 e il titolo del foglio
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "2026-10-25"
+        ws.append([None])
+        ws.append(["Although information in this document…"])
+        ws.append([None])
+        ws.append([None, "Name", "ISIN", "Country", "Type of Security", "Industry Classification", "Weighting"])
+        ws.append([1, "ALPHA", "US0000000001", "United States", "Equities", "Information Technology", 0.6])
+        px = os.path.join(tmp, "x.xlsx")
+        wb.save(px)
+        righe, foglio = m.leggi_righe(px)
+        i, col, _ = m.trova_intestazione(righe)
+        assert foglio == "2026-10-25" and i == 3 and col["peso"] == 6
+        # errori: pagina HTML, file mancante, scheda prodotto, estensione
+        ph = os.path.join(tmp, "pagina.csv")
+        with open(ph, "w", encoding="utf-8") as f:
+            f.write("  <!DOCTYPE html><html><head><title>iShares</title></head></html>")
+        for percorso, atteso in ((ph, "pagina HTML"), ("/non/esiste.csv", "non trovato")):
+            rc, so, se = run_script_split(asset(*CE), "--file", percorso, "--strumento", "X", cwd=tmp)
+            assert rc == 1 and se.startswith("ERRORE:") and atteso in se and "Traceback" not in se, se[-300:]
+        ps = os.path.join(tmp, "scheda.csv")
+        with open(ps, "w", encoding="utf-8") as f:
+            f.write("Caratteristiche principali\nTER,0.20%\nValuta,USD\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", ps, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "file delle posizioni" in se and "TER" in se, se[-300:]
+        pp = os.path.join(tmp, "f.pdf")
+        with open(pp, "w", encoding="ascii") as f:    # non «wb»: t_cli_utf8 vuole encoding= o «rb» in ogni open()
+            f.write("%PDF-1.4")
+        rc, so, se = run_script_split(asset(*CE), "--file", pp, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "XLSX o CSV" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _xlsx_emittente(tipo, cartella):
+    """File delle posizioni sintetico con il layout reale dell'emittente (preambolo, riga d'intestazione,
+    disclaimer, pesi in frazione o percento, righe non classificate): i file veri non si ridistribuiscono.
+    Il nome del file non contiene l'emittente, così il riconoscimento passa dal preambolo."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    if tipo == "xtrackers":
+        ws.title = "2026-10-25"
+        ws.append([None])
+        ws.append(["Although information in this document has been obtained from sources believed to be reliable, "
+                   "DWS does not guarantee its accuracy, completeness or fairness."])
+        ws.append([None])
+        ws.append([None, "Name", "ISIN", "Country", "Currency", "Type of Security", "Industry Classification", "Weighting"])
+        for n, (nome, settore, paese, tipo_titolo, peso) in enumerate((
+                ("A", "Information Technology", "United States", "Equities", 0.40),
+                ("B", "Financials", "Japan", "Equities", 0.25),
+                ("C", "Health Care", "Germany", "Equities", 0.20),
+                ("D", "Materials", "Switzerland", "Equities", 0.12),
+                ("E", "unknown", "Germany", "Equities", 0.02),
+                ("F", "Health Care", "United Arab Emirates", "Equities", "N/A"),
+                ("G", "unknown", "Germany", "Future", 0.01)), 1):
+            ws.append([n, nome, f"XX000000000{n}", paese, "USD", tipo_titolo, settore, peso])
+    elif tipo == "spdr":
+        ws.title = "holdings"
+        for riga in (("Fund Name:", "State Street SPDR MSCI ACWI IMI UCITS ETF"), ("ISIN:", "IE00B3YLTY66"),
+                     ("Ticker Symbol:", "SPYI GY"), ("Holdings As Of:", "22-Oct-2026"), (None,)):
+            ws.append(list(riga))
+        ws.append(["ISIN", "Security Name", "Percent of Fund", "Trade Country Name", "Sector Classification",
+                   "Industry Classification"])
+        for riga in (("US0000000001", "A", 50.0, "United States", "Information Technology", "Semiconductors"),
+                     ("TW0000000002", "B", 30.0, "Taiwan", "Consumer Discretionary", "Broadline Retail"),
+                     ("HK0000000003", "C", 15.0, "Hong Kong", "Communication Services", "Interactive Media"),
+                     ("Unassigned", "D", 5.04, "Unassigned", "Unassigned", "Unassigned"),
+                     ("Unassigned", "CNY:HKD 20250930", -0.04, "Unassigned", "Unassigned", "Unassigned")):
+            ws.append(list(riga))
+        ws.append([None])
+        ws.append(["Marketing communication. The performance data quoted represents past performance."])
+    elif tipo == "vanguard":
+        ws.append(["Vanguard FTSE All-World UCITS ETF"])
+        ws.append(["As at 30 Sep 2026"])
+        ws.append([None])
+        ws.append(["Holding name", "Sector", "Country", "% of net assets"])
+        for riga in (("A", "Technology", "United States", 40), ("B", "Financials", "Japan", 30),
+                     ("C", "Telecommunications", "France", 10), ("D", "Basic Materials", "Australia", 20)):
+            ws.append(list(riga))
+    elif tipo == "amundi":
+        ws.append(["Amundi MSCI Europe UCITS ETF"])
+        ws.append(["Dati al", "30/09/2026"])
+        ws.append([None])
+        ws.append(["Nome", "Settore", "Paese", "Peso (%)"])
+        for riga in (("A", "Beni di prima necessità", "Francia", 50), ("B", "Servizi di pubblica utilità", "Italia", 30),
+                     ("C", "Immobiliare", "Paesi Bassi", 20)):
+            ws.append(list(riga))
+    else:
+        raise ValueError(tipo)
+    path = os.path.join(cartella, f"posizioni-{('xtrackers', 'spdr', 'vanguard', 'amundi').index(tipo)}.xlsx")
+    wb.save(path)
+    return path
+
+
+@test("T16 composizione ETF: valori chiusi per emittente, riconoscimento ed esclusioni")
+def t_ce_composizione():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    en = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "ETF MSCI World")
+    it = m.componi(os.path.join(FIXTURES, "composizione-ishares-it.csv"), "ETF MSCI World")
+    for c in (en, it):
+        assert c["emittente"] == "ishares" and c["riconosciuto_da"] == "preambolo" and c["classificazione"] == "GICS", c
+        assert c["data_posizioni"] == "2026-09-30" and c["titoli"] == 6, c
+        assert r2(c["settori"]) == {"Information Technology": 40.40, "Financials": 20.20, "Health Care": 15.15,
+                                    "Industrials": 15.15, "Energy": 9.09}, c["settori"]
+        assert r2(c["paesi"]) == {"US": 50.51, "JP": 15.15, "GB": 15.15, "KR": 10.10, "CA": 9.09}, c["paesi"]
+        assert abs(c["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and c["avvisi"] == [], c
+    assert list(en["settori"]) == list(it["settori"]) and en["settori"] == it["settori"]   # stesso ordine e valori
+    assert list(en["settori"])[0] == "Information Technology"                             # peso decrescente
+    tmp = tempfile.mkdtemp()
+    try:
+        x = m.componi(_xlsx_emittente("xtrackers", tmp), "X")
+        assert x["emittente"] == "xtrackers" and x["data_posizioni"] == "2026-10-25" and x["titoli"] == 5, x
+        assert r2(x["settori"]) == {"Information Technology": 41.24, "Financials": 25.77, "Health Care": 20.62,
+                                    "Materials": 12.37}, x["settori"]
+        assert r2(x["paesi"]) == {"US": 40.40, "JP": 25.25, "DE": 22.22, "CH": 12.12}, x["paesi"]
+        assert abs(x["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9
+        assert abs(x["esclusi"]["settore_non_classificato"] - 0.02) < 1e-9 and x["esclusi"]["paese_non_classificato"] == 0
+        s = m.componi(_xlsx_emittente("spdr", tmp), "S")
+        assert s["emittente"] == "spdr" and s["data_posizioni"] == "2026-10-22", s
+        assert s["colonne"]["settore"] == "Sector Classification" and s["colonne"]["paese"] == "Trade Country Name"
+        assert r2(s["settori"]) == {"Information Technology": 52.63, "Consumer Discretionary": 31.58,
+                                    "Communication Services": 15.79}, s["settori"]
+        assert r2(s["paesi"]) == {"US": 52.63, "TW": 31.58, "HK": 15.79}, s["paesi"]
+        assert abs(s["esclusi"]["liquidita_derivati"] - 0.0004) < 1e-9, s["esclusi"]
+        assert any("non classificat" in a and "5%" in a for a in s["avvisi"]), s["avvisi"]   # 5,04% > 5%
+        v = m.componi(_xlsx_emittente("vanguard", tmp), "V")
+        assert v["emittente"] == "vanguard" and v["classificazione"] == "ICB" and v["settori"] == {}, v
+        assert r2(v["paesi"]) == {"US": 40.0, "JP": 30.0, "AU": 20.0, "FR": 10.0} and v["data_posizioni"] == "2026-09-30", v
+        assert any("ICB" in a for a in v["avvisi"]), v["avvisi"]
+        a = m.componi(_xlsx_emittente("amundi", tmp), "A")
+        assert a["emittente"] == "amundi" and a["data_posizioni"] == "2026-09-30", a
+        assert r2(a["settori"]) == {"Consumer Staples": 50.0, "Utilities": 30.0, "Real Estate": 20.0}, a["settori"]
+        assert r2(a["paesi"]) == {"FR": 50.0, "IT": 30.0, "NL": 20.0}, a["paesi"]
+        # riconoscimento: --emittente vince sul preambolo; dal nome del file; nessuno con colonne note → avviso
+        f = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "Z", "spdr")
+        assert f["riconosciuto_da"] == "--emittente" and f["emittente"] == "spdr"
+        g = os.path.join(tmp, "posizioni.csv")
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Country,Weight\nA,Energy,Italy,100\n")
+        c = m.componi(g, "G")
+        assert c["emittente"] is None and c["riconosciuto_da"] == "nessuno", c
+        assert any("regole generiche" in w for w in c["avvisi"]), c["avvisi"]
+        os.rename(g, os.path.join(tmp, "SWDA_holdings_ishares.csv"))
+        c = m.componi(os.path.join(tmp, "SWDA_holdings_ishares.csv"), "G")
+        assert c["riconosciuto_da"] == "nome del file" and c["emittente"] == "ishares", c
+        # ETF obbligazionario, settore vuoto ovunque → solo paesi, con l'avviso
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Asset Class,Location,Weight (%)\nBTP 2030,-,Fixed Income,Italy,60\n"
+                     "OAT 2031,-,Fixed Income,France,40\n")
+        c = m.componi(g, "B")
+        assert c["settori"] == {} and r2(c["paesi"]) == {"IT": 60.0, "FR": 40.0}, c
+        assert any("settore" in w for w in c["avvisi"]), c["avvisi"]
+        # liquidità sopra il 5% → avviso; Telecommunication Services → Communication Services con avviso
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Asset Class,Location,Weight (%)\nA,Telecommunication Services,Equity,Italy,94\n"
+                     "CASH,Cash and/or Derivatives,Cash,Italy,6\n")
+        c = m.componi(g, "C")
+        assert c["settori"] == {"Communication Services": 1.0}, c["settori"]
+        assert any("liquidit" in w for w in c["avvisi"]) and any("Telecommunication" in w for w in c["avvisi"]), c["avvisi"]
+        # dai file reali: paesi minori (Zambia in un MSCI World), «European Union» e «NA» come non classificati,
+        # quote escluse minime scritte «< 0,01%» e non «0,00%»
+        with open(g, "w", encoding="utf-8") as fh:
+            fh.write("Name,Sector,Location,Weight (%)\nA,Materials,Zambia,0.02\nB,Financials,European Union,0.003\n"
+                     "C,Energy,NA,0.001\nD,Energy,Italy,99.976\n")
+        c = m.componi(g, "R")
+        assert set(c["paesi"]) == {"ZM", "IT"}, c["paesi"]
+        assert abs(c["esclusi"]["paese_non_classificato"] - 0.00004) < 1e-12, c["esclusi"]
+        assert all(len(m.PAESI[k]) == 2 for k in m.PAESI) and len(m.PAESI) == 249     # ISO 3166-1 completo
+        assert "paese non classificato < 0,01%" in m.righe_strumento(c, "25/10/2026")[0], m.righe_strumento(c, "x")[0]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    assert m.SETTORI_GICS == carica_modulo(asset(*CU)).SETTORI_GICS
+
+
+@test("T16 composizione ETF: nomi sconosciuti, somme incoerenti e classificazione mista respinti")
+def t_ce_errori():
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Energy;100\n")
+        prima = (open(out, encoding="utf-8").read(), os.path.getmtime(out))
+        casi = (
+            ("Name,Sector,Location,Weight (%)\nA,Spazio,Atlantide,30\nB,Energy,Lemuria,20\nC,Energy,Italy,50\n",
+             ("Atlantide", "Lemuria", "Spazio", "segnala")),
+            ("Name,Sector,Location,Weight (%)\nA,Energy,Italy,40\nB,Energy,France,20\n", ("sommano a 60",)),
+            ("Name,Sector,Location,Weight (%)\nA,Energy,Italy,abc\nB,Energy,France,100\n", ("abc", "riga")),
+            ("Name,Sector,Location,Weight (%)\nA,Technology,Italy,50\nB,Information Technology,France,50\n", ("mista",)),
+            ("Name,Sector,Asset Class,Location,Weight (%)\nCASH,Cash and/or Derivatives,Cash,Italy,100\n", ("nessuna riga",)),
+        )
+        for n, (testo, attesi) in enumerate(casi):
+            p = os.path.join(tmp, f"caso{n}.csv")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(testo)
+            rc, so, se = run_script_split(asset(*CE), "--file", p, "--strumento", "X", "--out", out, cwd=tmp)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and "Traceback" not in se, (n, rc, se[-400:])
+            assert "ERRORE:" not in so, (n, so[-200:])
+            for parola in attesi:
+                assert parola in se, (n, parola, se[-400:])
+            assert (open(out, encoding="utf-8").read(), os.path.getmtime(out)) == prima, n
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: CSV fuso con l'esistente, formato, --json e report")
+def t_ce_uscita():
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:     # vecchio formato, scritto a mano, con un commento libero
+            f.write("# compilato a mano\nstrumento;settore;peso\nETF Europa;Financials;0,6\nETF Europa;Industrials;0,4\n"
+                    "ETF MSCI World;Energy;100\n")
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        uscite = []
+        for _ in range(2):                             # reimportare due volte non duplica
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "ETF MSCI World",
+                                          "--out", out, "--json", os.path.join(tmp, "c.json"), cwd=tmp)
+            assert rc == 0, se[-400:]
+            uscite.append(so)
+        assert "convertito" in uscite[0] and "convertito" not in uscite[1], uscite   # solo il primo trova il vecchio formato
+        testo = open(out, encoding="utf-8-sig").read()
+        with open(out, "rb") as f:
+            assert f.read().startswith(b"\xef\xbb\xbf")
+        righe = testo.splitlines()
+        assert righe[0] == "# compilato a mano" and righe[1] == "strumento;dimensione;voce;peso", righe[:3]
+        assert righe[2:4] == ["ETF Europa;settore;Financials;60,00", "ETF Europa;settore;Industrials;40,00"], righe[2:4]
+        assert sum(1 for r in righe if r.startswith("# ETF MSCI World:")) == 1, righe
+        commento = next(r for r in righe if r.startswith("# ETF MSCI World:"))
+        assert re.fullmatch(r"# ETF MSCI World: iShares, composizione-ishares-en\.csv, posizioni al 30/09/2026, "
+                            r"importato il \d\d/\d\d/\d{4}; esclusi liquidità e derivati 1,00%", commento), commento
+        mw = [r for r in righe if r.startswith("ETF MSCI World;")]
+        assert mw[0] == "ETF MSCI World;settore;Information Technology;40,40" and "ETF MSCI World;paese;KR;10,10" in mw, mw
+        assert len(mw) == 16 and not any(";Energy;100" in r for r in righe), mw   # 5 settori, 5 paesi, 6 titoli (look-through)
+        for dim in ("settore", "paese"):
+            tot = sum(float(r.split(";")[3].replace(",", ".")) for r in mw if r.split(";")[1] == dim)
+            assert abs(tot - 100) <= 0.05, (dim, tot)
+        so = uscite[1]
+        assert "ETF Europa" in so, so                                        # il report dice cosa ha conservato
+        assert "Tecnologia dell'informazione" in so and "Corea del Sud" in so and "Weight (%)" in so, so
+        d = json.load(open(os.path.join(tmp, "c.json"), encoding="utf-8"))
+        assert d["out"] == out and [s["strumento"] for s in d["strumenti"]] == ["ETF MSCI World"], d
+        s = d["strumenti"][0]
+        assert {"strumento", "emittente", "riconosciuto_da", "file", "data_posizioni", "classificazione", "colonne",
+                "titoli", "esclusi", "settori", "paesi", "primi_titoli", "replica_sintetica", "avvisi"} == set(s), set(s)
+        assert abs(sum(s["settori"].values()) - 1) < 1e-9 and abs(sum(s["paesi"].values()) - 1) < 1e-9
+        # --json - : solo JSON su stdout, --out scritto lo stesso
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "Y", "--out", out, "--json", "-", cwd=tmp)
+        assert rc == 0 and json.loads(so)["strumenti"][0]["strumento"] == "Y", (so[:300], se[-300:])
+        assert "Y;paese;US;50,51" in open(out, encoding="utf-8-sig").read()
+        # due file in una chiamata; riga di comando spaiata o ripetuta → rc 2
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--file",
+                                      os.path.join(FIXTURES, "composizione-ishares-it.csv"), "--strumento", "B",
+                                      "--out", out, cwd=tmp)
+        assert rc == 0 and "A;settore;Energy;9,09" in open(out, encoding="utf-8-sig").read(), se[-300:]
+        assert "B;paese;KR;10,10" in open(out, encoding="utf-8-sig").read()
+        for args in (("--file", en, "--file", en, "--strumento", "A"),
+                     ("--file", en, "--strumento", "A", "--file", en, "--strumento", "A")):
+            rc, so, se = run_script_split(asset(*CE), *args, "--out", out, cwd=tmp)
+            assert rc == 2 and "usage:" in se, (args, rc, se[-300:])
+        # un --out con colonne sconosciute non si sovrascrive
+        strano = os.path.join(tmp, "strano.csv")
+        with open(strano, "w", encoding="utf-8") as f:
+            f.write("isin;quota\nIE00;1\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--out", strano, cwd=tmp)
+        assert rc == 1 and open(strano, encoding="utf-8").read() == "isin;quota\nIE00;1\n", se[-300:]
+        # il CSV scritto si rilegge con csv senza perdite: quattro campi per riga dati
+        dati = [r for r in csv.reader(io.StringIO(open(out, encoding="utf-8-sig").read()), delimiter=";")
+                if r and not r[0].startswith("#")]
+        assert all(len(r) == 4 for r in dati), dati
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: capitale-umano legge i due formati, catena dall'importatore")
+def t_ce_capitale_umano():
+    cu = carica_modulo(asset(*CU))
+    vecchio = cu.leggi_composizione(asset("it-pianificazione-obiettivi", "esempio-composizione.csv"))
+    assert abs(vecchio["ETF MSCI World"]["Information Technology"] - 0.27) < 1e-12, vecchio   # invariato
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--strumento", "ETF MSCI World", "--file", _xlsx_emittente("vanguard", tmp),
+                                      "--strumento", "ETF FTSE", "--out", out, cwd=tmp)
+        assert rc == 0, se[-300:]
+        comp = cu.leggi_composizione(out)
+        assert set(comp) == {"ETF MSCI World"}, comp                             # il Vanguard in ICB non ha settori
+        assert abs(comp["ETF MSCI World"]["Information Technology"] - 0.4040) < 1e-9, comp
+        dati = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+        dati["persona"]["settore"] = "Information Technology"
+        dati["posizioni"] = [{"asset_class": "azionario", "valore": 60000, "strumento": "ETF MSCI World"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "ETF FTSE"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "etf msci world"}]
+        pd_ = os.path.join(tmp, "cu.json")
+        with open(pd_, "w", encoding="utf-8") as f:
+            json.dump(dati, f)
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out,
+                                      "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        z = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))["settore"]
+        assert abs(z["quota_settore_fin"] - 0.4040) < 1e-4, z                   # solo la posizione con la composizione
+        assert z["mancanti"] == ["ETF FTSE", "etf msci world"], z["mancanti"]  # il refuso di maiuscole è visibile
+        assert "etf msci world" in so
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("ETF MSCI World;valuta;USD;100\n")
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out, cwd=tmp)
+        assert rc == 1 and "valuta" in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: skill, reference, comando e revisione allineati")
+def t_ce_documentazione():
+    ob = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    skill = open(os.path.join(ob, "SKILL.md"), encoding="utf-8").read()
+    step8 = skill.split("Step 8")[1]
+    assert "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" in step8 and "--strumento" in step8
+    assert step8.index("importa-composizione-etf.py") < step8.index("capitale-umano.py\" --dati"), step8[:600]
+    assert "references/composizione-etf.md" in skill and 'version: "0.24"' in skill
+    ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
+    for parola in ("iShares", "Xtrackers", "Vanguard", "Amundi", "SPDR", "ICB", "da confermare", "non si ridistribuisc",
+                   "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py"):
+        assert parola in ref, parola
+    assert "importa-composizione-etf.py" in open(os.path.join(ob, "references", "capitale-umano.md"), encoding="utf-8").read()
+    # il comando è un alias e non nomina script (t_dove_lavorare): rimanda all'importatore della skill
+    assert "importatore della composizione" in open(os.path.join(ROOT, "commands", "capitale-umano.md"), encoding="utf-8").read()
+    rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    assert "importa-composizione-etf.py" in rev.split("### Contratto di input")[1].split("\n## ")[0]
+    t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
+    assert "composizione-etf" in t16 and "Look-through" in t16 and "tedesc" in t16, t16[:400]
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "Tutti i 18 script" in readme and "importa-composizione-etf.py" in readme
+    assert "importatore della composizione" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().lower()
+
+
+@test("T16 composizione ETF: revisione finale (CSV italiano lungo, --strumento con spazi, poche righe classificate, commenti liberi)")
+def t_ce_revisione():
+    m = carica_modulo(asset(*CE))
+    tmp = tempfile.mkdtemp()
+    try:
+        # 1. CSV italiano di lunghezza reale: con molte righe la virgola decimale sembra un separatore coerente
+        righe = open(os.path.join(FIXTURES, "composizione-ishares-it.csv"), encoding="utf-8").read().splitlines()
+        testa, dati = righe[:6], righe[6:14]
+        lungo = os.path.join(tmp, "lungo.csv")
+        with open(lungo, "w", encoding="utf-8") as f:
+            f.write("\n".join(testa) + "\n")
+            for _ in range(5):
+                for r in dati:
+                    c = r.split(";")
+                    c[5] = m.numero(float(c[5].replace(",", ".")) / 5, 2)
+                    f.write(";".join(c) + "\n")
+            f.write("\nIl contenuto è di proprietà di BlackRock e dei suoi fornitori di informazioni\n")
+        c = m.componi(lungo, "L")
+        assert round(c["settori"]["Information Technology"] * 100, 2) == 40.40 and c["titoli"] == 30, c
+        # lo stesso risalvato da Excel italiano: cp1252, ogni riga riempita di «;», disclaimer senza virgolette
+        excel = os.path.join(tmp, "excel-lungo.csv")
+        testo = open(lungo, encoding="utf-8").read().splitlines()
+        with open(excel, "w", encoding="cp1252") as f:
+            for r in testo:
+                f.write(r + ";" * max(0, 9 - r.count(";")) + "\n")      # dieci colonne su ogni riga
+        c = m.componi(excel, "E")
+        assert round(c["paesi"]["US"] * 100, 2) == 50.51, c["paesi"]
+        # 2. --strumento con uno spazio in più: stesso strumento, nessun blocco doppio; vuoto o ripetuto → rc 2
+        out = os.path.join(tmp, "composizione.csv")
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        for nome in ("ETF World", "ETF World "):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", nome, "--out", out, cwd=tmp)
+            assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert sum(r.startswith("# ETF World") for r in testo.splitlines()) == 1, testo
+        assert sum(r.startswith("ETF World") and ";settore;Energy;" in r for r in testo.splitlines()) == 1, testo
+        for args in (("--strumento", "A", "--file", en, "--strumento", "A "), ("--strumento", "  ")):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, *args, "--out", out, cwd=tmp)
+            assert rc == 2 and "usage:" in se, (args, rc, se[-300:])
+        # 3. poche righe classificate: il 3% del fondo non diventa il 100% dei settori
+        g = os.path.join(tmp, "pochi.csv")
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nA,-,Equity,United States,97\nB,Financials,Equity,Italy,3\n")
+        c = m.componi(g, "P")
+        assert c["settori"] == {} and set(c["paesi"]) == {"US", "IT"}, c
+        assert any("settori non scritti" in a for a in c["avvisi"]), c["avvisi"]
+        # 4. un commento libero resta anche dopo due reimport
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("# nota finale dell'utente\n")
+        for _ in range(2):
+            rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "ETF World", "--out", out, cwd=tmp)
+            assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert testo.count("# nota finale dell'utente") == 1 and testo.count("# ETF World:") == 1, testo
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: il report dice «1 strumento importato» e nomina le colonne senza chiavi tecniche")
+def t_ce_report():
+    tmp = tempfile.mkdtemp()
+    try:
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", cwd=tmp)
+        assert rc == 0, se[-300:]
+        assert "1 strumento importato" in so and "1 strumenti" not in so, so[-400:]
+        assert "asset class «Asset Class»" in so and "asset_class «" not in so, so
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--file", en, "--strumento", "B",
+                                      cwd=tmp)
+        assert rc == 0 and "2 strumenti importati" in so, (so[-400:], se[-300:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: --out e --json verificati prima di scrivere, nessuno dei due a metà")
+def t_ce_destinazioni():
+    tmp = tempfile.mkdtemp()
+    try:
+        en = os.path.join(FIXTURES, "composizione-ishares-en.csv")
+        out = os.path.join(tmp, "composizione.csv")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nA;Energy;100\n")
+        prima = open(out, encoding="utf-8").read()
+        # --json in una cartella che non esiste: composizione.csv resta com'era
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B", "--out", out,
+                                      "--json", os.path.join(tmp, "non-esiste", "c.json"), cwd=tmp)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, se[-300:]
+        assert "Traceback" not in se and open(out, encoding="utf-8").read() == prima
+        # --out in una cartella che non esiste: il JSON non nasce
+        pj = os.path.join(tmp, "c.json")
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B",
+                                      "--out", os.path.join(tmp, "non-esiste", "c.csv"), "--json", pj, cwd=tmp)
+        assert rc == 1 and "impossibile scrivere" in se and not os.path.exists(pj), se[-300:]
+        # --out che è una cartella: errore chiaro, niente traceback
+        rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "B", "--out", tmp, cwd=tmp)
+        assert rc == 1 and "cartella" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: data delle posizioni giorno/mese o mese/giorno, l'ambigua non si scrive")
+def t_ce_date():
+    m = carica_modulo(asset(*CE))
+    tmp = tempfile.mkdtemp()
+    try:
+        g = os.path.join(tmp, "posizioni.csv")
+        casi = (("Fund Holdings as of,10/24/2026", ",", "2026-10-24", False),   # mese/giorno, file statunitense
+                ("Fund Holdings as of,24/10/2026", ",", "2026-10-24", False),   # giorno/mese, file britannico
+                ("Fund Holdings as of,03/04/2026", ",", None, True),            # inglese e ambigua: non si indovina
+                ("Posizioni al;03/04/2026", ";", "2026-04-03", False))          # etichetta italiana: giorno/mese
+        for preambolo, sep, attesa, ambigua in casi:
+            with open(g, "w", encoding="utf-8") as f:
+                f.write(f"{preambolo}\n\n{sep.join(['Name', 'Sector', 'Location', 'Weight (%)'])}\n"
+                        f"{sep.join(['A', 'Energy', 'Italy', '100'])}\n")
+            c = m.componi(g, "D")
+            assert c["data_posizioni"] == attesa, (preambolo, c["data_posizioni"])
+            assert any("ambigua" in a for a in c["avvisi"]) is ambigua, (preambolo, c["avvisi"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: ETF obbligazionari con settori propri, solo paesi e la parte azionaria dei misti")
+def t_ce_obbligazioni():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    tmp = tempfile.mkdtemp()
+    try:
+        g = os.path.join(tmp, "posizioni.csv")
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nBTP 2030,Treasuries,Fixed Income,Italy,50\n"
+                    "OAT 2031,Government,Fixed Income,France,30\nBANCA 2029,Banking,Fixed Income,Germany,20\n")
+        c = m.componi(g, "O")
+        assert c["settori"] == {} and r2(c["paesi"]) == {"IT": 50.0, "FR": 30.0, "DE": 20.0}, c
+        assert abs(c["esclusi"]["settore_obbligazionario"] - 1.0) < 1e-9, c["esclusi"]
+        assert c["esclusi"]["settore_non_classificato"] == 0, c["esclusi"]
+        assert any("obbligazionar" in a and "settore" in a for a in c["avvisi"]), c["avvisi"]
+        assert not any("sopra la soglia" in a for a in c["avvisi"]), c["avvisi"]
+        # misto 60/40 dal sito italiano: i settori sono quelli della parte azionaria
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Nome;Settore;Asset class;Area geografica;Ponderazione (%)\n"
+                    "ALPHA;Informatica;Azionario;Stati Uniti;60,0\nBTP;Titoli di Stato;Reddito fisso;Italia;40,0\n")
+        c = m.componi(g, "M")
+        assert c["settori"] == {"Information Technology": 1.0} and r2(c["paesi"]) == {"US": 60.0, "IT": 40.0}, c
+        assert abs(c["esclusi"]["settore_obbligazionario"] - 0.4) < 1e-9, c["esclusi"]
+        assert "obbligazioni" in m.righe_strumento(c, "29/10/2026")[0], m.righe_strumento(c, "29/10/2026")[0]
+        # un settore sconosciuto su un titolo azionario resta un errore
+        with open(g, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,Weight (%)\nA,Treasuries,Equity,Italy,100\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", g, "--strumento", "X", cwd=tmp)
+        assert rc == 1 and "Treasuries" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: --set sulle tabelle ha effetto, una tupla senza virgola è respinta, --json - resta JSON")
+def t_ce_set():
+    tmp = tempfile.mkdtemp()
+    try:
+        v = os.path.join(tmp, "v.csv")
+        with open(v, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Location,Weight (%)\nA,Telecommunications,Italy,60\nB,Financials,France,40\n")
+        # una tupla (anche con le maiuscole) al posto dell'insieme di default: niente traceback, stessa classificazione
+        rc, so, se = run_script_split(asset(*CE), "--file", v, "--strumento", "V", "--json", "-",
+                                      "--set", "NOMI_ICB_ESCLUSIVI=('Telecommunications',)", cwd=tmp)
+        assert rc == 0 and "Traceback" not in se, se[-400:]
+        d = json.loads(so)                                   # stdout è solo JSON: l'override va su stderr
+        assert d["strumenti"][0]["classificazione"] == "ICB" and "[override]" in se, (d, se)
+        # la stringa al posto della tupla (manca la virgola finale) è il refuso più comune
+        rc, so, se = run_script_split(asset(*CE), "--file", v, "--strumento", "V",
+                                      "--set", "NOMI_ICB_ESCLUSIVI=('telecommunications')", cwd=tmp)
+        assert rc == 1 and "tupla" in se and "Traceback" not in se, se[-300:]
+        # ETICHETTE_DATA vale anche per un emittente riconosciuto
+        p = os.path.join(tmp, "i.csv")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("iShares Core MSCI World UCITS ETF\nValido al;30/09/2026\n\n"
+                    "Nome;Settore;Area geografica;Ponderazione (%)\nA;Energia;Italia;100,0\n")
+        rc, so, se = run_script_split(asset(*CE), "--file", p, "--strumento", "I", "--json", "-",
+                                      "--set", "ETICHETTE_DATA=('valido al',)", cwd=tmp)
+        assert rc == 0, se[-300:]
+        s = json.loads(so)["strumenti"][0]
+        assert s["emittente"] == "ishares" and s["data_posizioni"] == "2026-09-30", s
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 composizione ETF: lingue tedesca e francese (intestazioni, settori, paesi, esclusioni, data)")
+def t_ce_lingue():
+    m = carica_modulo(asset(*CE))
+    en = m.componi(os.path.join(FIXTURES, "composizione-ishares-en.csv"), "EN")
+    de = m.componi(os.path.join(FIXTURES, "composizione-xtrackers-de.csv"), "DE")
+    fr = m.componi(os.path.join(FIXTURES, "composizione-amundi-fr.csv"), "FR")
+    assert de["emittente"] == "xtrackers" and fr["emittente"] == "amundi", (de["emittente"], fr["emittente"])
+    for c in (de, fr):
+        # stessi titoli e pesi del file inglese: stessi settori e paesi al bit, stessa data, stesse esclusioni
+        assert c["data_posizioni"] == "2026-09-30" and c["titoli"] == 6 and c["classificazione"] == "GICS", c
+        assert c["settori"] == en["settori"] and c["paesi"] == en["paesi"], (c["settori"], c["paesi"])
+        assert abs(c["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and c["avvisi"] == [], c
+    assert de["colonne"]["settore"] == "Branche" and de["colonne"]["paese"] == "Land" and de["colonne"]["peso"] == "Gewichtung (%)"
+    assert fr["colonne"]["settore"] == "Secteur" and fr["colonne"]["asset_class"] == "Classe d'actifs"
+    assert [t["isin"] for t in fr["primi_titoli"]][:2] == ["US0000000001", "US0000000002"]   # «Code ISIN»
+    tmp = tempfile.mkdtemp()
+    try:
+        def file(nome, testo):
+            path = os.path.join(tmp, nome)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(testo)
+            return path
+        # ICB in tedesco e in francese: solo i paesi, con l'avviso; il vecchio GICS tedesco e francese con il suo avviso
+        icb = m.componi(file("icb.csv", "Name;Sektor;Land;Gewichtung\nA;Technologie;Deutschland;60\nB;Grundstoffe;Frankreich;40\n"), "I")
+        assert icb["classificazione"] == "ICB" and icb["settori"] == {} and {k: round(v, 2) for k, v in icb["paesi"].items()} == {"DE": 0.6, "FR": 0.4}, icb
+        icb_fr = m.componi(file("icb-fr.csv", "Nom;Secteur;Pays;Poids\nA;Technologie;Allemagne;60\nB;Matériaux de base;Suisse;40\n"), "I")
+        assert icb_fr["classificazione"] == "ICB" and {k: round(v, 2) for k, v in icb_fr["paesi"].items()} == {"DE": 0.6, "CH": 0.4}, icb_fr
+        vecchio = m.componi(file("v.csv", "Name;Sektor;Land;Gewichtung\nA;Telekommunikationsdienste;Österreich;100\n"), "V")
+        assert list(vecchio["settori"]) == ["Communication Services"] and any("2018" in a for a in vecchio["avvisi"]), vecchio
+        # settori e paesi in tedesco e francese con le varianti più comuni dei file reali
+        misto = m.componi(file("m.csv", "Nom;Secteur;Pays;Poids (%)\nA;Consommation discrétionnaire;Pays-Bas;20\n"
+                                        "B;Biens de consommation de base;Suède;20\nC;Services aux collectivités;Espagne;20\n"
+                                        "D;Matériaux;Hong Kong;20\nE;Immobilier;Taïwan;20\n"), "M")
+        assert set(misto["settori"]) == {"Consumer Discretionary", "Consumer Staples", "Utilities", "Materials", "Real Estate"}, misto
+        assert set(misto["paesi"]) == {"NL", "SE", "ES", "HK", "TW"}, misto["paesi"]
+        misto_de = m.componi(file("md.csv", "Name;Branche;Land;Gewichtung (%)\nA;Nicht-Basiskonsumgüter;Niederlande;25\n"
+                                            "B;Basiskonsumgüter;Schweden;25\nC;Versorger;Spanien;25\nD;Roh-, Hilfs- & Betriebsstoffe;Hongkong;25\n"), "M")
+        assert set(misto_de["settori"]) == {"Consumer Discretionary", "Consumer Staples", "Utilities", "Materials"}, misto_de
+        assert set(misto_de["paesi"]) == {"NL", "SE", "ES", "HK"}, misto_de["paesi"]
+        # la data tedesca con il mese abbreviato e l'etichetta «Stichtag»; obbligazioni e righe non classificate in tedesco
+        d = m.componi(file("d.csv", "Stichtag;30. Okt. 2026\n\nName;Branche;Land;Wertpapierart;Gewichtung (%)\n"
+                                    "A;Finanzen;Deutschland;Aktien;50\nB;Staatsanleihen;Italien;Anleihen;40\nC;Unbekannt;Nicht zugeordnet;Aktien;10\n"), "D")
+        assert d["data_posizioni"] == "2026-10-30" and list(d["settori"]) == ["Financials"], d
+        assert {k: round(v, 3) for k, v in d["paesi"].items()} == {"DE": 0.556, "IT": 0.444}, d["paesi"]
+        assert abs(d["esclusi"]["settore_obbligazionario"] - 0.4) < 1e-9 and abs(d["esclusi"]["settore_non_classificato"] - 0.1) < 1e-9, d["esclusi"]
+        # revisione finale M1: «Secteur» vince su «Industrie» (il livello sotto), come «Sector» su «Industry Classification»
+        f2 = m.componi(file("f2.csv", "Nom;Secteur;Industrie;Pays;Poids (%)\nA;Finance;Banques;France;60\nB;Santé;Pharmacie;Suisse;40\n"), "F")
+        assert f2["colonne"]["settore"] == "Secteur" and set(f2["settori"]) == {"Financials", "Health Care"}, f2
+        # M2: mesi con accento o dieresi
+        assert m._data("31 déc. 2026") == "2026-12-31" and m._data("1. März 2026") == "2026-03-01" and m._data("15 août 2026") == "2026-08-15"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _xlsx_reale(tipo, cartella):
+    """File sintetici con il layout dei file reali di novembre 2026 (i file veri non si ridistribuiscono):
+    Vanguard dal sito italiano (posizioni con «% del valore di mercato», «Regione» in codici ISO, settori ICB) e
+    Amundi «Composizione dell'indice» (ripartizione per settore e paese su fogli separati, stili Excel non validi)."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    if tipo == "vanguard-it":
+        ws = wb.active
+        ws.title = "Dati delle partecipazioni"
+        for riga in (["Questo file è stato scaricato il 07 nov 2026"], [None], ["Dati delle partecipazioni"],
+                     ["Vanguard FTSE All-World UCITS ETF (USD) Accumulating"], ["Al 30 set 2026"], [None],
+                     ["Ticker", "Nome delle partecipazioni", "% del valore di mercato", "Settore", "Regione", "Valore di mercato", "Azioni"],
+                     ["NVDA", "NVIDIA Corp", "50,0000%", "Technology", "US", "4.382.237.428,42\xa0USD", "19.188.359"],
+                     ["JPM", "JPMorgan Chase & Co", "30,0000%", "Financials", "JP", "1.000,00\xa0USD", "1"],
+                     ["2330", "Taiwan Semiconductor Manufacturing Co Ltd", "10,0000%", "Telecommunications", "TW", "1,00\xa0USD", "1"],
+                     ["RIO", "Rio Tinto PLC", "10,0000%", "Basic Materials", "GB", "1,00\xa0USD", "1"],
+                     ["ORA", "Orora Ltd", "0,00%", "Industrials", "AU", "0,00\xa0USD", "0"],
+                     [None],
+                     ["Le percentuali di allocazione totali mostrate nei dettagli delle partecipazioni potrebbero non essere pari al 100%."]):
+            ws.append(riga)
+        path = os.path.join(cartella, "Dati_delle_partecipazioni_-_Vanguard_FTSE_All-World.xlsx")
+        wb.save(path)
+        return path
+    if tipo == "xtrackers-de":
+        # intestazioni in inglese, valori in tedesco, foglio con la data, pesi in frazione (anche in notazione
+        # scientifica) e «N/A», disclaimer alla riga 1 con «DWS»
+        ws = wb.active
+        ws.title = "2026-11-07"
+        ws.append(["Obwohl die Informationen in diesem Dokument aus Quellen stammen, die als zuverlässig gelten, garantiert DWS "
+                   "ihre Richtigkeit, Vollständigkeit oder Fairness nicht."])
+        ws.append([None, "Name", "ISIN", "Country", "Currency", "Exchange", "Type of Security", "Rating", "Primary Listing",
+                   "Industry Classification", "Weighting"])
+        for n, riga in enumerate((("APPLE", "US0378331005", "Vereinigte Staaten von Amerika", "USD", "NASDAQ", "Aktien", "Aa1", "NASDAQ", "Informationstechnologie", 0.40),
+                                  ("SIEMENS", "DE0007236101", "Deutschland", "EUR", "Xetra", "Aktien", "A1", "DAX", "Industrieunternehmen", 0.25),
+                                  ("RIO TINTO", "GB0007188757", "Großbritannien (UK)", "GBP", "LSE", "Aktien", "A2", "FTSE 100", "Material", 0.20),
+                                  ("SAMSUNG ELECTRONICS", "KR7005930003", "Süd Korea", "KRW", "KRX", "Aktien", "-", "KOSPI", "Informationstechnologie", 0.10),
+                                  ("ZCCM", "ZM0000000037", "Sambia", "ZMW", "-", "Aktien", "-", "-", "Material", 2e-2),
+                                  ("EUR CASH", "-", "Deutschland", "EUR", "-", "Cash", "-", "-", "unbekannt", 0.02),
+                                  ("MSCI WORLD INDEX  DEC26", "___ADI2VD0J5", "Deutschland", "USD", "-", "Future", "-", "-", "unbekannt", "N/A"),
+                                  ("KAIMAN HOLDING", "KYG000000001", "Kaiman Inseln", "USD", "-", "Aktien", "-", "-", "Finanzen", 9.98013e-03)), 1):
+            ws.append([n, *riga])
+        path = os.path.join(cartella, "Constituent_IE00BJ0KDQ92.xlsx")
+        wb.save(path)
+        return path
+    if tipo == "amundi-holdings-swap":
+        ws = wb.active
+        ws.title = "Fund Holdings"
+        for _ in range(5):
+            ws.append([None, None])
+        for riga in (["Amundi ETF"], ["FUND HOLDINGS"], ["Name of the fund", "Amundi Core S&P 500 Swap UCITS ETF USD Dist"],
+                     ["ISIN code", "LU0496786657"], ["Replication method", "Synthetic"], ["", ""],
+                     ["Fund Assets Under Management as at 04/11/2026", "32,749.14 M USD"], ["Reference currency", "USD"], ["", ""],
+                     ["Name of the swap counterparty(ies)", "Société Générale,Morgan Stanley"],
+                     ["Please note that holdings data can change daily. Data correct as at 04/11/2026. Please refer to the website for the latest information."]):
+            ws.append([None, *riga])
+        ws.append(["", "ISIN code", "Name", "Asset class", "Currency", "Weight", "Sector", "Country"])
+        for riga in (("US0231351067", "AMAZON.COM INC", "EQUITY", "USD", 0.50, "Consumer Discretionary", "United States"),
+                     ("DE0007164600", "SAP SE", "EQUITY", "EUR", 0.30, "Information Technology", "Germany"),
+                     ("CH0038863350", "NESTLE SA", "EQUITY", "CHF", 0.19, "Consumer Staples", "Switzerland"),
+                     (None, None, "CASH", "EUR", 0.01, " ", " ")):
+            ws.append(["", *riga])
+        ws.append([None, None])
+        ws.append([None, "Source: Amundi Asset Management"])
+        ws.append([None, "Synthetic/Indirect replication :\nThe Fund is managed, using a synthetic replication method."])
+        path = os.path.join(cartella, "Fund_Holdings_Amundi_Core_SP_500_Swap_LU0496786657.xlsx")
+        wb.save(path)
+        _rompi_stili(path)
+        return path
+    if tipo == "amundi-ripartizione":
+        wb.remove(wb.active)
+        for titolo, etichetta, righe in (
+                ("Ripartizione Settoriale", "Settore", [("Information Technology", 0.48971750662827), ("Finanziari", 0.17002944241627),
+                                                      ("Beni voluttuari", 0.08050483511033), ("Industrali", 0.06763303947281),
+                                                      ("Servizi di comunicazione", 0.0618903032786), ("Sanità", 0.03688094764619),
+                                                      ("Materiali", 0.0268479389615), ("Altro", 0.02553059144587),
+                                                      ("Beni di prima necessità", 0.02494362061412), ("Energia", 0.01602177442605)]),
+                ("Ripartizione per Valuta", "Valuta", [("TWD", 0.33), ("KRW", 0.24), ("Altro", 0.43)]),
+                ("Ripartizione Geografica", "Paesi", [("Taiwan", 0.32962512667995), ("Cina", 0.25442263869334), ("Sud Corea", 0.23675290731958),
+                                                     ("India", 0.1494387344214), ("Malesia", 0.01131901430715), ("Tailandia", 0.01090781570556),
+                                                     ("Indonesia", 0.00431833948604), ("Filippine", 0.00321542338698)])):
+            ws = wb.create_sheet(titolo)
+            for _ in range(5):
+                ws.append([None, None, None])
+            ws.append([None, "Amundi ETF"])
+            ws.append([None, titolo.upper(), None])
+            ws.append([None, "Indice", "MSCI EM Asia ESG Broad CTB Select Net USD Index"])
+            ws.append([None, "Ticker Bloomberg dell'Indice", "MXEFAECT"])
+            ws.append([None, "Valuta dell'Indice", "USD"])
+            ws.append([None, "Dati ritenuti esatti al 04/11/2026. Si prega di fare riferimento al sito per le ultime informazioni diponibili."])
+            for _ in range(5):
+                ws.append([None, None, None])
+            ws.append(["", etichetta, "Peso"])
+            for nome, peso in righe:
+                ws.append(["", nome, peso])
+            ws.append([None, None, None])
+            ws.append([None, "Fonte : Amundi Asset Management"])
+            ws.append([None, "Informazioni promozionali e non contrattuali, che non devono essere considerate come un consiglio."])
+        path = os.path.join(cartella, "Composizione_dellindice_Amundi_MSCI_EM_Asia_LU1781541849.xlsx")
+        wb.save(path)
+        _rompi_stili(path)
+        return path
+    raise ValueError(tipo)
+
+
+def _rompi_stili(path):
+    """Lo stile non valido dei file reali di Amundi («Colors must be aRGB hex values»): un colore rgb non esadecimale."""
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        membri = {n: z.read(n) for n in z.namelist()}
+    stili = membri["xl/styles.xml"].decode("utf-8")
+    assert 'theme="1"' in stili, stili[:300]
+    membri["xl/styles.xml"] = stili.replace('<color theme="1"/>', '<color rgb="0xffffff"/>', 1).encode("utf-8")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for n, b in membri.items():
+            z.writestr(n, b)
+
+
+@test("T16 composizione ETF: file reali di novembre 2026 (iShares e Vanguard dai siti italiani, ripartizione dell'indice Amundi)")
+def t_ce_file_reali():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    tmp = tempfile.mkdtemp()
+    try:
+        # iShares dal sito italiano: etichetta «Al», una riga di solo NBSP, settori abbreviati, campi tra virgolette
+        it = m.componi(os.path.join(FIXTURES, "composizione-ishares-it-2026-11.csv"), "I")
+        assert it["emittente"] == "ishares" and it["riconosciuto_da"] == "nome del file" and it["data_posizioni"] == "2026-11-05", it
+        assert r2(it["settori"]) == {"Information Technology": 30.30, "Communication Services": 20.20, "Consumer Staples": 15.15,
+                                     "Utilities": 15.15, "Financials": 10.10, "Health Care": 9.09}, it["settori"]
+        assert r2(it["paesi"]) == {"US": 50.51, "GB": 15.15, "JP": 15.15, "HK": 10.10, "CA": 9.09}, it["paesi"]
+        assert it["titoli"] == 6 and abs(it["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and it["avvisi"] == [], it
+        # il nome con cui il sito lo scarica non contiene «ishares» intero; il preambolo non ha il marchio
+        copia = os.path.join(tmp, "iShare_SWDA_holdings.csv")
+        shutil.copy(os.path.join(FIXTURES, "composizione-ishares-it-2026-11.csv"), copia)
+        assert m.componi(copia, "I")["riconosciuto_da"] == "nome del file"
+        # Vanguard dal sito italiano: «% del valore di mercato» in stringhe con «%», «Regione» in codici ISO, ICB → solo paesi
+        v = m.componi(_xlsx_reale("vanguard-it", tmp), "V")
+        assert v["emittente"] == "vanguard" and v["data_posizioni"] == "2026-09-30" and v["classificazione"] == "ICB", v
+        assert v["colonne"] == {"peso": "% del valore di mercato", "settore": "Settore", "paese": "Regione"}, v["colonne"]
+        assert v["settori"] == {} and r2(v["paesi"]) == {"US": 50.0, "JP": 30.0, "TW": 10.0, "GB": 10.0}, v["paesi"]
+        assert v["titoli"] == 5 and v["primi_titoli"][0]["nome"] == "NVIDIA Corp" and any("ICB" in a for a in v["avvisi"]), v
+        # Amundi «Composizione dell'indice»: ripartizione su fogli separati, stili non validi che openpyxl rifiuta
+        path = _xlsx_reale("amundi-ripartizione", tmp)
+        import openpyxl
+        try:
+            openpyxl.load_workbook(path, read_only=True)
+            raise AssertionError("la fixture deve avere lo stile rotto del file reale")
+        except ValueError:
+            pass
+        a = m.componi(path, "A")
+        assert a["emittente"] == "amundi" and a["data_posizioni"] == "2026-11-04" and a["classificazione"] == "GICS", a
+        assert a["titoli"] == 0 and a["primi_titoli"] == [], a
+        altro = 0.02553059144587
+        tot = 0.48971750662827 + 0.17002944241627 + 0.08050483511033 + 0.06763303947281 + 0.0618903032786 + 0.03688094764619 + \
+            0.0268479389615 + altro + 0.02494362061412 + 0.01602177442605
+        assert abs(a["settori"]["Information Technology"] - 0.48971750662827 / (tot - altro)) < 1e-9, a["settori"]
+        assert set(a["settori"]) == {"Information Technology", "Financials", "Consumer Discretionary", "Industrials",
+                                     "Communication Services", "Health Care", "Materials", "Consumer Staples", "Energy"}, a["settori"]
+        assert abs(a["esclusi"]["settore_non_classificato"] - altro) < 1e-9 and abs(sum(a["settori"].values()) - 1) < 1e-9
+        assert set(a["paesi"]) == {"TW", "CN", "KR", "IN", "MY", "TH", "ID", "PH"} and abs(sum(a["paesi"].values()) - 1) < 1e-9, a["paesi"]
+        assert abs(a["paesi"]["KR"] - 0.23675290731958 / (0.32962512667995 + 0.25442263869334 + 0.23675290731958 + 0.1494387344214 +
+                                                          0.01131901430715 + 0.01090781570556 + 0.00431833948604 + 0.00321542338698)) < 1e-9
+        assert a["colonne"] == {"peso": "Peso", "settore": "Settore", "paese": "Paesi"}, a["colonne"]
+        assert any("ripartizione" in x and "titoli" in x for x in a["avvisi"]) and any("stili" in x for x in a["avvisi"]), a["avvisi"]
+        # la ripartizione scritta nel CSV e letta dal look-through come ogni altra
+        out = os.path.join(tmp, "composizione.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", path, "--isin", "LU1781541849", "--out", out, cwd=tmp)
+        assert rc == 0 and "ripartizione" in so and "LU1781541849;paese;TW;" in open(out, encoding="utf-8-sig").read(), (so[-400:], se[-300:])
+        assert ";titolo;" not in open(out, encoding="utf-8-sig").read()
+        # Xtrackers dal sito tedesco: intestazioni inglesi, valori tedeschi («Industrieunternehmen», «Material»,
+        # «Großbritannien (UK)», «Süd Korea», «Sambia», «Kaiman Inseln»), foglio con la data, pesi in frazione
+        x = m.componi(_xlsx_reale("xtrackers-de", tmp), "X")
+        assert x["emittente"] == "xtrackers" and x["riconosciuto_da"] == "preambolo" and x["data_posizioni"] == "2026-11-07", x
+        assert r2(x["settori"]) == {"Information Technology": 51.02, "Industrials": 25.51, "Materials": 22.45, "Financials": 1.02}, x["settori"]
+        assert r2(x["paesi"]) == {"US": 40.82, "DE": 25.51, "GB": 20.41, "KR": 10.20, "ZM": 2.04, "KY": 1.02}, x["paesi"]
+        assert x["titoli"] == 6 and abs(x["esclusi"]["liquidita_derivati"] - 0.02) < 1e-9 and x["colonne"]["settore"] == "Industry Classification", x
+        # Amundi «Fund Holdings» di un ETF a swap: stili rotti, intestazioni inglesi, replica sintetica dichiarata nel
+        # preambolo (le posizioni sono il collaterale), data dd/mm sotto un'etichetta inglese perché Amundi scrive così
+        sw = m.componi(_xlsx_reale("amundi-holdings-swap", tmp), "S")
+        assert sw["emittente"] == "amundi" and sw["data_posizioni"] == "2026-11-04" and sw["replica_sintetica"] is True, sw
+        assert r2(sw["settori"]) == {"Consumer Discretionary": 50.51, "Information Technology": 30.30, "Consumer Staples": 19.19}, sw["settori"]
+        assert r2(sw["paesi"]) == {"US": 50.51, "DE": 30.30, "CH": 19.19} and abs(sw["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9, sw
+        assert sw["primi_titoli"][0] == {"nome": "AMAZON.COM INC", "isin": "US0231351067", "peso": 0.5}, sw["primi_titoli"]
+        assert any("sintetica" in a and "collaterale" in a for a in sw["avvisi"]), sw["avvisi"]
+        assert sum(1 for a in sw["avvisi"] if "stili" in a) == 1, sw["avvisi"]     # il file si apre una volta sola
+        assert a["replica_sintetica"] is False and it["replica_sintetica"] is False
+        rc, so, se = run_script_split(asset(*CE), "--file", _xlsx_reale("amundi-holdings-swap", tmp), "--isin", "LU0496786657",
+                                      "--out", os.path.join(tmp, "sw.csv"), cwd=tmp)
+        commento = next(r for r in open(os.path.join(tmp, "sw.csv"), encoding="utf-8-sig").read().splitlines() if r.startswith("# LU0496786657"))
+        assert rc == 0 and "replica sintetica" in commento, (rc, commento, se[-300:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ═══════════════════════════ T16: look-through del portafoglio ═══════════════════════════
+
+LT = ("it-pianificazione-obiettivi", "look-through-portafoglio.py")
+
+
+@test("T16 look-through: l'importatore scrive i primi titoli, --isin è --strumento, il JSON porta l'ISIN dei titoli")
+def t_lt_importatore_titoli():
+    tmp = tempfile.mkdtemp()
+    try:
+        out, js = os.path.join(tmp, "composizione.csv"), os.path.join(tmp, "c.json")
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--isin", "IE00B4L5Y983", "--out", out, "--json", js, cwd=tmp)
+        assert rc == 0, se[-300:]
+        righe = [r for r in open(out, encoding="utf-8-sig").read().splitlines() if ";titolo;" in r]
+        # pesi nel fondo, non rinormalizzati; liquidità e future fuori; ordine per peso
+        assert righe == ["IE00B4L5Y983;titolo;ALPHA CORP;30,00", "IE00B4L5Y983;titolo;BETA BANK;20,00",
+                         "IE00B4L5Y983;titolo;GAMMA PHARMA;15,00", "IE00B4L5Y983;titolo;DELTA INDUSTRIES;15,00",
+                         "IE00B4L5Y983;titolo;EPSILON SOFT;10,00", "IE00B4L5Y983;titolo;ZETA ENERGY;9,00"], righe
+        s = json.load(open(js, encoding="utf-8"))["strumenti"][0]
+        assert s["strumento"] == "IE00B4L5Y983" and s["primi_titoli"][0] == {"nome": "ALPHA CORP", "isin": None, "peso": 0.30}, s["primi_titoli"][:1]
+        assert "Primi titoli: ALPHA CORP 30,00%" in so, so[-600:]
+        # --set N_TITOLI=2 e un XLSX con la colonna ISIN (Xtrackers): isin nel JSON, titoli di prima conservati
+        rc, so, se = run_script_split(asset(*CE), "--file", _xlsx_emittente("xtrackers", tmp), "--strumento", "XD",
+                                      "--out", out, "--json", js, "--set", "N_TITOLI=2", cwd=tmp)
+        assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert testo.count("XD;titolo;") == 2 and testo.count("IE00B4L5Y983;titolo;") == 6, testo
+        t = json.load(open(js, encoding="utf-8"))["strumenti"][0]["primi_titoli"]
+        assert [x["isin"] for x in t] == ["XX0000000001", "XX0000000002"] and t[0]["peso"] == 0.40, t
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--strumento", "A", "--out", out, "--set", "N_TITOLI=0", cwd=tmp)
+        assert rc == 1 and "N_TITOLI" in se and "Traceback" not in se, se[-300:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 look-through: capitale-umano ignora le righe titolo e confronta le posizioni per ISIN")
+def t_lt_capitale_umano_isin():
+    cu = carica_modulo(asset(*CU))
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"),
+                                      "--isin", "IE00B4L5Y983", "--out", out, cwd=tmp)
+        assert rc == 0, se[-300:]
+        comp = cu.leggi_composizione(out)
+        assert set(comp) == {"IE00B4L5Y983"} and abs(comp["IE00B4L5Y983"]["Information Technology"] - 0.4040) < 1e-9, comp
+        assert cu.chiave_composizione({"isin": "IE00B4L5Y983", "strumento": "ETF World"}, comp) == "IE00B4L5Y983"
+        assert cu.chiave_composizione({"strumento": "IE00B4L5Y983"}, comp) == "IE00B4L5Y983"
+        assert cu.chiave_composizione({"isin": "IE00B4L5Y984", "strumento": "ETF World"}, comp) is None
+        dati = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+        dati["persona"]["settore"] = "Information Technology"
+        dati["posizioni"] = [{"asset_class": "azionario", "valore": 60000, "isin": "IE00B4L5Y983"},
+                             {"asset_class": "azionario", "valore": 20000, "isin": "IE00B4L5Y984"},
+                             {"asset_class": "azionario", "valore": 20000, "strumento": "ETF FTSE", "isin": "IE00B3RBWM25"}]
+        pd_ = os.path.join(tmp, "cu.json")
+        with open(pd_, "w", encoding="utf-8") as f:
+            json.dump(dati, f)
+        rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out, "--json", os.path.join(tmp, "o.json"), cwd=tmp)
+        assert rc == 0, se[-300:]
+        z = json.load(open(os.path.join(tmp, "o.json"), encoding="utf-8"))["settore"]
+        assert abs(z["quota_settore_fin"] - 0.4040) < 1e-4 and z["mancanti"] == ["IE00B4L5Y984", "ETF FTSE"], z
+        # l'esempio del plugin ha gli ISIN e gira ancora sull'esempio-composizione.csv (vecchio formato, per nome)
+        rc, out_es = run_script(asset(*CU), "--composizione", asset("it-pianificazione-obiettivi", "esempio-composizione.csv"))
+        assert rc == 0, out_es[-300:]
+        sezione = out_es.split("SOVRAPPOSIZIONE")[1].split("SENSIBILIT")[0]
+        assert "27,0%" in sezione and "Senza composizione" not in sezione, sezione   # trovato per nome, nessun mancante
+        es = json.load(open(asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json"), encoding="utf-8"))
+        assert all(re.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}\d", p["isin"]) for p in es["posizioni"]), es["posizioni"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _broker_look_through(tmp, estratto="estratto-look-through.csv"):
+    """Il JSON dell'importatore dei broker sulla fixture del look-through (due ETF, uno su due broker, un BTP, un'azione)."""
+    rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"), os.path.join(FIXTURES, estratto),
+                         "--anno", "2026", "--json", "broker.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    return os.path.join(tmp, "broker.json")
+
+
+@test("T16 look-through: chiave dei titoli (suffissi, classi, accenti) e nomi che restano vuoti")
+def t_lt_chiave_titolo():
+    m = carica_modulo(asset(*LT))
+    for a, b in (("Apple Inc.", "APPLE INC"), ("ALPHABET INC CLASS A", "Alphabet Inc Class C"),
+                 ("Microsoft Corp", "MICROSOFT CORPORATION"), ("Nestlé SA", "NESTLE S.A."),
+                 ("Taiwan Semiconductor Manufacturing", "TAIWAN SEMICONDUCTOR MANUFACTURING CO LTD"),
+                 ("Samsung Electronics Co Ltd", "SAMSUNG ELECTRONICS"), ("Eni SpA", "ENI S.P.A."),
+                 ("Prologis REIT Inc", "PROLOGIS")):
+        assert m.chiave_titolo(a) == m.chiave_titolo(b) != "", (a, b, m.chiave_titolo(a), m.chiave_titolo(b))
+    for a, b in (("Bank of America", "Bank of Montreal"), ("Nvidia", "Novartis"), ("Shell", "Shell Midstream")):
+        assert m.chiave_titolo(a) != m.chiave_titolo(b), (a, b)
+    # Review Focus 4: un nome che dopo la pulizia non ha più niente non diventa una chiave vuota
+    assert m.chiave_titolo("S.A.") == "" and m.chiave_titolo("-") == "" and m.chiave_titolo("Co") == ""
+
+
+@test("T16 look-through: valori chiusi sulle fixture, due broker sommati, BTP solo nei paesi, senza composizione")
+def t_lt_valori_chiusi():
+    tmp = tempfile.mkdtemp()
+    try:
+        comp = os.path.join(FIXTURES, "composizione-look-through.csv")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", comp, "--posizioni", _broker_look_through(tmp),
+                                      "--json", "lt.json", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.load(open(os.path.join(tmp, "lt.json"), encoding="utf-8"))
+        tot = 9200 + 19500 + 3800 + 2850 + 1500                                   # 36.850
+        assert r["controvalore_totale"] == tot
+        pos = {p["chiave"]: p for p in r["posizioni"]}
+        assert pos["IE00B4L5Y983"]["valore"] == 13000 and pos["IE00B4L5Y983"]["nome"] == "iShares Core MSCI World"   # Review Focus 1: due broker
+        assert pos["IT0005454241"] == {"chiave": "IT0005454241", "nome": "BTP Futura 2037", "valore": 2850,
+                                       "quota": 2850 / tot, "settori": False, "paesi": True, "titoli": False}
+        assert r["senza_composizione"] == [{"chiave": "DE0007164600", "nome": "SAP SE", "valore": 1500, "quota": 1500 / tot}]
+        V_s = 13000 + 19500                                                         # settori e titoli: i due ETF
+        assert abs(r["copertura"]["settori"] - V_s / tot) < 1e-12 and abs(r["copertura"]["titoli"] - V_s / tot) < 1e-12
+        assert abs(r["copertura"]["paesi"] - (V_s + 2850) / tot) < 1e-12
+        settori = {s["voce"]: s["peso"] for s in r["settori"]}
+        assert abs(settori["Information Technology"] - (13000 * .30 + 19500 * .40) / V_s) < 1e-12
+        assert abs(settori["Financials"] - (13000 * .20 + 19500 * .60) / V_s) < 1e-12
+        assert abs(settori["Health Care"] - 13000 * .50 / V_s) < 1e-12 and abs(sum(settori.values()) - 1) < 1e-12
+        assert r["settori"][0]["voce"] == "Financials" and r["settori"][0]["nome"] == "Finanza"   # ordinati per peso
+        paesi = {p["voce"]: p["peso"] for p in r["paesi"]}
+        V_p = V_s + 2850
+        assert abs(paesi["US"] - (13000 * .60 + 19500) / V_p) < 1e-12 and abs(paesi["IT"] - 2850 / V_p) < 1e-12
+        assert r["paesi"][0]["nome"] == "Stati Uniti"
+        titoli = {t["nome"]: t for t in r["titoli"]}
+        assert abs(titoli["Apple Inc."]["peso"] - (13000 * .05 + 19500 * .07) / V_s) < 1e-12      # sommati, nome dal maggiore
+        assert titoli["Apple Inc."]["da"] == ["IE00B5BMR087", "IE00B4L5Y983"]
+        assert abs(titoli["MICROSOFT CORP"]["peso"] - 19500 * .06 / V_s) < 1e-12 and titoli["NESTLE SA"]["da"] == ["IE00B4L5Y983"]
+        assert r["n_titoli_aggregati"] == 3 and abs(r["quota_primi_titoli"] - sum(t["peso"] for t in r["titoli"])) < 1e-12
+        assert "SAP SE (DE0007164600)" in so and "minimo della concentrazione" in so and "€36.850" in so, so
+        assert "Finanza" in so and "Stati Uniti" in so and "Apple Inc." in so, so
+        # Review Focus 2: una posizione che ha solo l'ISIN mentre il CSV ha il nome
+        with open(os.path.join(tmp, "nome.csv"), "w", encoding="utf-8") as f:
+            f.write("strumento;settore;peso\nETF MSCI World;Information Technology;100\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(tmp, "nome.csv"),
+                                      "--posizioni", os.path.join(tmp, "broker.json"), cwd=tmp)
+        assert rc == 1 and "nessuna posizione ha una composizione" in se and "ISIN" in se, se[-300:]
+        # Review Focus 3: uno strumento con sole righe titolo conta solo nei titoli
+        with open(os.path.join(tmp, "solo-titoli.csv"), "w", encoding="utf-8") as f:
+            f.write("strumento;dimensione;voce;peso\nDE0007164600;titolo;SAP SE;100\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(tmp, "solo-titoli.csv"),
+                                      "--posizioni", os.path.join(tmp, "broker.json"), "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.loads(so)
+        assert r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 1500 / tot} and r["settori"] == [] and r["titoli"][0]["peso"] == 1.0
+        # il --dati del capitale umano come sorgente, con --posizioni ripetuto che somma
+        dati = {"persona": {"profilo": "privato_stabile", "eta": 35},
+                "posizioni": [{"asset_class": "azionario", "valore": 1000, "isin": "IE00B5BMR087"},
+                              {"asset_class": "obbligazionario", "valore": 500, "strumento": "IT0005454241"}]}
+        with open(os.path.join(tmp, "cu.json"), "w", encoding="utf-8") as f:
+            json.dump(dati, f)
+        rc, so, se = run_script_split(asset(*LT), "--composizione", comp, "--posizioni", os.path.join(tmp, "cu.json"),
+                                      "--posizioni", os.path.join(tmp, "cu.json"), "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.loads(so)
+        assert r["controvalore_totale"] == 3000 and {p["chiave"]: p["valore"] for p in r["posizioni"]} == {"IE00B5BMR087": 2000, "IT0005454241": 1000}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 look-through: errori con rc 1 (CSV, posizioni, valori), avvisi sul valore zero")
+def t_lt_errori():
+    tmp = tempfile.mkdtemp()
+    try:
+        comp = os.path.join(FIXTURES, "composizione-look-through.csv")
+        broker = _broker_look_through(tmp)
+        def caso(*args):
+            rc, so, se = run_script_split(asset(*LT), *args, cwd=tmp)
+            assert rc == 1 and se.startswith("ERRORE:") and "ERRORE" not in so and "Traceback" not in se, (rc, se[-300:])
+            return se
+        def scrivi(nome, testo):
+            with open(os.path.join(tmp, nome), "w", encoding="utf-8") as f:
+                f.write(testo)
+            return os.path.join(tmp, nome)
+        assert "non trovato" in caso("--composizione", os.path.join(tmp, "no.csv"), "--posizioni", broker)
+        assert "colonne" in caso("--composizione", scrivi("colonne.csv", "isin;settore;peso\nX;Energy;100\n"), "--posizioni", broker)
+        assert "valuta" in caso("--composizione", scrivi("dim.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;valuta;USD;100\n"),
+                                "--posizioni", broker)
+        assert "manca la lista posizioni" in caso("--composizione", comp, "--posizioni", scrivi("senza.json", '{"persona": {}}'))
+        assert "posizioni[0]" in caso("--composizione", comp, "--posizioni",
+                                      scrivi("neg.json", '{"posizioni": [{"isin": "IE00B4L5Y983", "valore": -1}]}'))
+        assert "controvalore totale" in caso("--composizione", comp, "--posizioni",
+                                             scrivi("zero.json", '{"posizioni": [{"isin": "IE00B4L5Y983", "valore": 0}]}'))
+        unozero = scrivi("unozero.json", '{"posizioni": [{"isin": "IE00B4L5Y983", "valore": 0}, {"isin": "IE00B5BMR087", "valore": 100}]}')
+        rc, so, se = run_script_split(asset(*LT), "--composizione", comp, "--posizioni", unozero, cwd=tmp)
+        assert rc == 0 and "valore zero" in so and "IE00B4L5Y983" in so, (so[-400:], se[-300:])
+        # revisione finale I3: titoli scritti a mano in frazione accanto a settori in percento, e sole righe titolo sotto 1
+        fraz = scrivi("fraz.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;settore;Financials;100,00\n"
+                                  "IE00B4L5Y983;titolo;APPLE INC;0,05\nIE00B5BMR087;titolo;MICROSOFT CORP;0,8\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", fraz, "--posizioni", broker, "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.loads(so)
+        assert sum(1 for a in r["avvisi"] if "IE00B4L5Y983" in a and "percento" in a) == 1, r["avvisi"]
+        assert sum(1 for a in r["avvisi"] if "IE00B5BMR087" in a and "frazione" in a) == 1, r["avvisi"]
+        # M5: un titolo il cui nome resta vuoto non diventa una chiave vuota; M7: chiavi del CSV senza posizione nel report
+        vuoto = scrivi("vuoto.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;titolo;S.A.;5\nIE00B4L5Y983;titolo;APPLE INC;5\n"
+                                    "LU0000000001;settore;Energy;100\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", vuoto, "--posizioni", broker, cwd=tmp)
+        assert rc == 0 and "«S.A.»" in so and "senza posizione: LU0000000001" in so, (so[-500:], se[-300:])
+        rc, so, se = run_script_split(asset(*LT), "--composizione", vuoto, "--posizioni", broker, "--json", "-", cwd=tmp)
+        assert [t["nome"] for t in json.loads(so)["titoli"]] == ["APPLE INC"] and json.loads(so)["composizioni_senza_posizione"] == ["LU0000000001"]
+        assert "tupla" in caso("--composizione", comp, "--posizioni", broker, "--set", "SUFFISSI_SOCIETARI=('spa')")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ═══════════════════════════ T17: cruscotto grafico ═══════════════════════════
+
+def _righe_csv_ordini(cartella):
+    """(broker, operazione, classe, importo) di ogni riga dei CSV degli ordini, senza la riga NOTA finale."""
+    import csv
+    righe = []
+    for nome in sorted(os.listdir(cartella)):
+        with open(os.path.join(cartella, nome), encoding="utf-8-sig", newline="") as f:
+            r = list(csv.reader(f, delimiter=";"))
+        for riga in r[1:]:
+            if riga and riga[1] != "NOTA":
+                righe.append((riga[0], riga[1], riga[2], float(riga[5].replace(".", "").replace(",", "."))))
+    return righe
+
+
+@test("T17 ribilanciamento --json: chiavi del piano, ordini uguali ai CSV, stdout invariato")
+def t_t17_ribilancia_json():
+    script = asset("it-rebalance", "ribilanciamento-multibroker.py")
+    a, b = tempfile.mkdtemp(), tempfile.mkdtemp()
+    try:
+        rc, out = run_script(script, "--out", "ordini", cwd=a)
+        rc_json, out_json = run_script(script, "--out", "ordini", "--json", "piano.json", cwd=b)
+        assert rc == 0 and rc_json == 0, (rc, rc_json, out_json[-400:])
+        riga_json = "JSON del piano: piano.json\n"
+        assert out_json.count(riga_json) == 1 and out == out_json.replace(riga_json, ""), out_json[-600:]
+        d = json.load(open(os.path.join(b, "piano.json"), encoding="utf-8"))
+        chiavi = {"totale", "totale_post", "imposta", "prelievo", "entrate", "liquidato", "drift", "risultante",
+                  "zainetto", "ordini"}
+        assert chiavi <= set(d), set(d)
+        assert d["totale"] == 100000 and d["imposta"] == 0, (d["totale"], d["imposta"])
+        az = d["drift"]["azionario"]
+        assert az["fuori_banda"] is True and abs(az["peso"] - 0.68) < 1e-9, az
+        assert {"peso", "target", "drift", "tight", "wide", "fuori_banda", "esito", "motivo"} <= set(az), set(az)
+        assert abs(d["risultante"]["azionario"] - 0.60) < 1e-6, d["risultante"]
+        assert round(d["zainetto"]["Fineco"]) == 1800, d["zainetto"]
+        dal_json = sorted((o["broker"], o["operazione"], o["classe"], round(o["importo_eur"], 2)) for o in d["ordini"])
+        assert dal_json and dal_json == sorted(_righe_csv_ordini(os.path.join(b, "ordini"))), dal_json
+        # file di output non scrivibile → ERRORE e rc 1
+        rc, so, se = run_script_split(script, "--out", "ordini", "--json", "/non/esiste/x.json", cwd=b)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, (rc, se[-300:])
+        assert "ERRORE:" not in so and "Traceback" not in se, so[-300:]
+    finally:
+        shutil.rmtree(a, ignore_errors=True)
+        shutil.rmtree(b, ignore_errors=True)
+    # Review Focus 4: zainetto Fineco a zero → nessun ordine, il drift resta fuori banda, JSON serializzabile
+    m, p = _ribilancia(ZAINETTO={"Fineco": 0, "Directa": 0})
+    d = m.piano_json(p, m.genera_ordini(p))
+    assert d["ordini"] == [] and d["drift"]["azionario"]["fuori_banda"] is True, d["ordini"]
+    json.dumps(d)
+
+
+_JSON_ESEMPIO = {}
+NOME_PERICOLOSO = "</script><img src=x onerror=alert(1)> & l'«anticipo»"
+
+
+def _json_esempio():
+    """I JSON degli script del piano sugli esempi del plugin, generati una volta per esecuzione della suite:
+    {nome del file: percorso}. Sono gli input reali del cruscotto."""
+    if not _JSON_ESEMPIO:
+        tmp = tempfile.mkdtemp(prefix="cruscotto-")
+        pian = asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx")
+        OB, PE = (lambda n: asset("it-pianificazione-obiettivi", n)), (lambda n: asset("it-pianificazione", n))
+        lanci = [
+            ("alloc.json", OB("allocatore-capitale.py"), [pian]),
+            ("glide.json", OB("glidepath-obiettivi.py"), [pian]),
+            ("mco.json", OB("montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
+            ("cu.json", OB("capitale-umano.py"), ["--composizione", OB("esempio-composizione.csv")]),
+            ("dati.json", PE("importa-previdenza.py"), [os.path.join(FIXTURES, "estratto-inps-test.xml"),
+                                                       os.path.join(FIXTURES, "storico-fondo-test.csv"), "--anonimo"]),
+            ("inps.json", PE("proiezione-inps.py"), ["--from", "dati.json"]),
+            ("mc.json", PE("montecarlo-pensione.py"), ["--from", "dati.json", "--from", "inps.json", "--set", "N_SIM=500"]),
+            ("netto.json", PE("netto-pensione.py"), ["--from", "mc.json"]),
+            ("broker.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
+             [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
+            ("piano.json", asset("it-rebalance", "ribilanciamento-multibroker.py"), ["--out", "ordini"]),
+            # il look-through gira sulla sua fixture (due ETF con composizione): broker-lt.json è il suo input e NON entra
+            # in _tutti_i_json(), perché sarebbe un secondo JSON di tipo «broker»
+            # ponte e riscatto (T17, sviluppo successivo): mc-uscita.json è un secondo mc_pensione e NON entra in _tutti_i_json()
+            ("ris.json", PE("riscatto-laurea.py"), ["--from", "dati.json", "--from", "inps.json"]),
+            ("mc-uscita.json", PE("montecarlo-pensione.py"), ["--from", "dati.json", "--from", "inps.json", "--set", "ANNI=25", "--set", "N_SIM=500"]),
+            ("ponte.json", PE("ponte-pensione.py"), ["--from", "inps.json", "--from", "mc-uscita.json", "--set", "ETA_USCITA=62"]),
+            ("broker-lt.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
+             [os.path.join(FIXTURES, "estratto-look-through.csv"), "--anno", "2026"]),
+            ("lt.json", OB("look-through-portafoglio.py"),
+             ["--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"), "--posizioni", "broker-lt.json"]),
+        ]
+        for nome, script, args in lanci:
+            rc, out = run_script(script, *args, "--json", nome, cwd=tmp)
+            assert rc == 0, f"{os.path.basename(script)}: rc {rc}, {out[-300:]}"
+            _JSON_ESEMPIO[nome] = os.path.join(tmp, nome)
+    return _JSON_ESEMPIO
+
+
+def _cruscotto(*sorgenti, cartella=None, extra=()):
+    """Lancia genera-cruscotto.py sui file dati; ritorna (rc, stdout, stderr, bundle o None, html o None)."""
+    cartella = cartella or tempfile.mkdtemp(prefix="cruscotto-out-")
+    args = [a for f in sorgenti for a in ("--from", f)]
+    html, bundle = os.path.join(cartella, "c.html"), os.path.join(cartella, "b.json")
+    rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), *args, "-o", html, "--json", bundle,
+                                  "--data", "2026-10-25", *extra, cwd=cartella)
+    b = json.load(open(bundle, encoding="utf-8")) if rc == 0 else None
+    h = open(html, encoding="utf-8").read() if rc == 0 else None
+    return rc, so, se, b, h
+
+
+def _json_variante(nome, modifica):
+    """Copia di un JSON d'esempio con `modifica(dati)` applicata, nella stessa cartella con un prefisso."""
+    d = json.load(open(_json_esempio()[nome], encoding="utf-8"))
+    modifica(d)
+    path = os.path.join(os.path.dirname(_json_esempio()[nome]), "variante-" + nome)
+    json.dump(d, open(path, "w", encoding="utf-8"), ensure_ascii=False)
+    return path
+
+
+@test("T17 cruscotto: ogni output reale riconosciuto con il suo tipo, nessuno con due firme")
+def t_t17_riconosci():
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    js = _json_esempio()
+    attesi = {"alloc.json": "allocatore", "glide.json": "glide_path", "mco.json": "mc_obiettivi", "inps.json": "inps",
+              "mc.json": "mc_pensione", "netto.json": "netto_pensione", "cu.json": "capitale_umano",
+              "broker.json": "broker", "piano.json": "ribilanciamento", "dati.json": "ignorato:importa-previdenza",
+              "lt.json": "look_through", "broker-lt.json": "broker", "ris.json": "riscatto", "ponte.json": "ponte",
+              "mc-uscita.json": "mc_pensione"}
+    for nome, tipo in attesi.items():
+        d = json.load(open(js[nome], encoding="utf-8"))
+        assert mod.riconosci(d) == tipo, (nome, mod.riconosci(d))
+        assert sum(1 for _, firma in mod.FIRME if firma(d)) <= 1, nome
+    assert {t for t, _ in mod.FIRME} == {t for t in attesi.values() if not t.startswith("ignorato")}
+    assert mod.riconosci({"a": 1}) is None
+    # l'importatore della previdenza resta l'unico ignorato: la catena previdenziale si passa intera
+    assert [n for n, _ in mod.IGNORATI] == ["importa-previdenza"]
+
+
+@test("T17 cruscotto: il bundle porta i valori dei JSON di origine e nessuna posizione dell'estratto")
+def t_t17_bundle():
+    js = _json_esempio()
+    L = lambda n: json.load(open(js[n], encoding="utf-8"))
+    tutti = [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
+                             "broker.json", "piano.json", "lt.json", "ponte.json", "ris.json")]
+    rc, so, se, b, html = _cruscotto(*tutti)
+    assert rc == 0, (so[-300:], se[-300:])
+    mco, mc, netto, cu, broker, piano = (L(n) for n in ("mco.json", "mc.json", "netto.json", "cu.json", "broker.json", "piano.json"))
+    assert b["generato_il"] == "2026-10-25" and b["versione"] == 1
+    assert b["plugin"] == json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
+    assert [f["tipo"] for f in b["fonti"]] == ["allocatore", "look_through", "glide_path", "mc_obiettivi", "inps", "mc_pensione",
+                                              "netto_pensione", "ponte", "riscatto", "capitale_umano", "broker", "ribilanciamento"], b["fonti"]
+    assert b["obiettivi"]["obiettivi"][0]["probabilita_successo"] == mco["obiettivi"][0]["probabilita_successo"]
+    assert b["obiettivi"]["obiettivi"][1]["capitale_finale"] == mco["obiettivi"][1]["capitale_finale"]
+    assert b["pensione"]["tasso_lordo"]["mediana"] == mc["tasso_sostituzione_lordo"]["mediana"]
+    assert b["pensione"]["target"] == mc["target"]
+    assert b["glide_path"]["portafoglio"] == L("glide.json")["portafoglio"]
+    assert b["allocazione"]["target_aggregato"] == L("alloc.json")["aggregato"]
+    ind = {i["id"]: i for i in b["indicatori"]}
+    assert list(ind) == ["capitale_allocato", "valore_portafoglio", "probabilita_essenziali", "sostituzione_netta",
+                         "zainetto_in_scadenza"], list(ind)
+    assert ind["capitale_allocato"]["valore"] == L("alloc.json")["capitale"]
+    assert ind["sostituzione_netta"]["valore"] == next(s for s in netto["scenari"] if s["nome"] == "mediana")["tasso_sostituzione_netto"]
+    assert ind["probabilita_essenziali"]["nota"] == "Fondo di emergenza"
+    assert ind["probabilita_essenziali"]["valore"] == mco["obiettivi"][0]["probabilita_successo"]
+    assert b["capitale_umano"]["eta_sorpasso"] == cu["eta_sorpasso"] and b["capitale_umano"]["stato_sorpasso"] == cu["stato_sorpasso"]
+    assert ind["zainetto_in_scadenza"]["valore"] == broker["analisi"]["zainetto_in_scadenza"]
+    assert ind["valore_portafoglio"]["valore"] == broker["analisi"]["totale_valore"]
+    assert b["ribilanciamento"]["drift"]["azionario"]["drift"] == piano["drift"]["azionario"]["drift"]
+    assert len(b["ribilanciamento"]["ordini"]) == len(piano["ordini"]) > 0
+    # anche le posizioni dell'estratto da cui viene il look-through (T16): nel bundle passano solo gli aggregati
+    for p in broker["posizioni"] + L("broker-lt.json")["posizioni"]:
+        assert p["isin"] not in html and p["descrizione"] not in html and p["isin"] not in json.dumps(b), p["isin"]
+    # stdout: percorso, tipi riconosciuti, sezioni e indicatori in formato italiano
+    assert "Cruscotto:" in so and "mc.json → mc_pensione" in so and "Sezioni:" in so and "€130.000" in so, so[-800:]
+
+
+@test("T17 cruscotto: sezioni assenti, indicatori senza fonte, errori con rc 1 e rc 2")
+def t_t17_errori():
+    js = _json_esempio()
+    rc, so, se, b, _ = _cruscotto(js["alloc.json"])
+    assert rc == 0, se[-300:]
+    assert b["allocazione"] and all(b[k] is None for k in ("obiettivi", "glide_path", "pensione", "capitale_umano",
+                                                            "fiscalita", "ribilanciamento")), b
+    assert [i["id"] for i in b["indicatori"]] == ["capitale_allocato"], b["indicatori"]
+    # Review Focus 3: nessun obiettivo essenziale → niente indicatore della probabilità minima
+    def senza_essenziali(d):
+        for o in d["obiettivi"]:
+            o["priorita"] = "importante"
+    rc, so, se, b, _ = _cruscotto(_json_variante("mco.json", senza_essenziali))
+    assert rc == 0 and [i["id"] for i in b["indicatori"]] == [] and b["obiettivi"], (se[-300:], b and b["indicatori"])
+    # dati.json di importa-previdenza: riconosciuto e ignorato, con un avviso
+    rc, so, se, b, _ = _cruscotto(js["alloc.json"], js["dati.json"])
+    assert rc == 0 and "ℹ" in so and "ignorato" in so and "dati.json" in so, so[-400:]
+
+    def errore(*args, atteso, extra=()):
+        rc, so, se, _, _ = _cruscotto(*args, extra=extra)
+        assert rc == 1, (args, rc, so[-200:], se[-300:])
+        assert se.lstrip().startswith("ERRORE:") and "ERRORE:" not in so and "Traceback" not in se, (so[-200:], se[-300:])
+        for a in (atteso if isinstance(atteso, tuple) else (atteso,)):
+            assert a in se, (a, se[-300:])
+    tmp = tempfile.mkdtemp()
+    try:
+        non_json = os.path.join(tmp, "rotto.json")
+        open(non_json, "w", encoding="utf-8").write("{non è json")
+        lista = os.path.join(tmp, "lista.json")
+        open(lista, "w", encoding="utf-8").write("[1, 2]")
+        ignoto = os.path.join(tmp, "ignoto.json")
+        open(ignoto, "w", encoding="utf-8").write('{"a": 1}')
+        copia = os.path.join(tmp, "mc-uscita.json")
+        shutil.copy(js["mc.json"], copia)
+        errore("/non/esiste.json", atteso="non trovato")
+        errore(non_json, atteso=("rotto.json", "JSON"))
+        errore(lista, atteso="lista.json")
+        errore(ignoto, atteso=("ignoto.json", "non è un output riconosciuto", "mc_pensione"))
+        errore(js["mc.json"], copia, atteso=("mc.json", "mc-uscita.json", "stesso tipo"))
+        # Review Focus 1: un JSON di una versione precedente senza un campo usato
+        errore(_json_variante("mc.json", lambda d: d["tasso_sostituzione_lordo"].pop("p90")),
+               atteso=("variante-mc.json", "tasso_sostituzione_lordo.p90"))
+        errore(js["alloc.json"], extra=("--data", "2026-13-01"), atteso="data")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), "--from", js["alloc.json"],
+                                  "-o", "/non/esiste/c.html")
+    assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, (rc, se[-300:])
+    rc, out = run_script(asset("it-revisione", "genera-cruscotto.py"))
+    assert rc == 2 and "usage:" in out, (rc, out[-300:])
+    rc, out = run_script(asset("it-revisione", "genera-cruscotto.py"), "--from")
+    assert rc == 2 and "usage:" in out, (rc, out[-300:])
+
+
+@test("T17 cruscotto: HTML autosufficiente, segnaposto unico, nomi pericolosi innocui")
+def t_t17_html():
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    js = _json_esempio()
+    tpl = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    assert tpl.count("__DATI_CRUSCOTTO__") == 1
+    def pericoloso(d):
+        d["obiettivi"][0]["nome"] = NOME_PERICOLOSO
+    rc, so, se, b, html = _cruscotto(js["alloc.json"], _json_variante("mco.json", pericoloso))
+    assert rc == 0, se[-300:]
+    for testo in (tpl, html):
+        assert not re.search(r"https?://|(src|href)\s*=\s*[\"']//|@import|fetch\(", testo)
+    assert "__DATI_CRUSCOTTO__" not in html
+    # Review Focus 5: il nome non chiude il tag e il JSON incorporato si rilegge identico
+    assert "</script><img" not in html and html.count("</script>") == tpl.count("</script>")
+    dati = json.loads(re.search(r'<script id="dati" type="application/json">(.*?)</script>', html, re.S).group(1))
+    assert dati["obiettivi"]["obiettivi"][0]["nome"] == NOME_PERICOLOSO
+    assert dati == b
+    for tpl_rotto in ("<p>senza</p>", "__DATI_CRUSCOTTO__ __DATI_CRUSCOTTO__"):
+        try:
+            mod.incorpora(tpl_rotto, {})
+            raise AssertionError("incorpora deve respingere il template")
+        except mod.ErroreDati:
+            pass
+
+
+# Il rendering si verifica in Chromium con Playwright per Python. Senza Playwright i test sono saltati,
+# salvo RICHIEDI_BROWSER=1 (la CI). PLAYWRIGHT_CHROMIUM_EXECUTABLE indica un Chromium già installato
+# fuori dalla cache di Playwright.
+
+def browser():
+    """Il modulo sync di Playwright e una funzione che lancia Chromium; Salta se Playwright manca."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        if os.environ.get("RICHIEDI_BROWSER"):
+            raise AssertionError("RICHIEDI_BROWSER è impostato ma Playwright non è installato")
+        raise Salta("Playwright non installato")
+    def lancia(p):
+        eseguibile = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE")
+        return p.chromium.launch(executable_path=eseguibile) if eseguibile else p.chromium.launch()
+    return sync_playwright, lancia
+
+
+def formato_it_percento(x):
+    """Una frazione come la mostra il cruscotto: un decimale, virgola, «%» attaccato (0,4901 → «49,0%»)."""
+    return f"{x * 100:.1f}".replace(".", ",") + "%"
+
+
+def _apri_cruscotto(pagina, html, schema="light", larghezza=1200):
+    """Scrive l'HTML in un file e lo apre in una pagina nuova; ritorna (page, errori, eccezioni, richieste)."""
+    cartella = tempfile.mkdtemp(prefix="cruscotto-browser-")
+    path = os.path.join(cartella, "c.html")
+    open(path, "w", encoding="utf-8").write(html)
+    contesto = pagina.new_context(color_scheme=schema, viewport={"width": larghezza, "height": 900})
+    page = contesto.new_page()
+    page.set_default_timeout(5000)
+    errori, eccezioni, richieste = [], [], []
+    page.on("console", lambda m: errori.append(m.text) if m.type == "error" else None)
+    page.on("pageerror", lambda e: eccezioni.append(str(e)))
+    page.on("request", lambda r: richieste.append(r.url))
+    page.goto("file://" + path)
+    page.wait_for_load_state("load")
+    return page, errori, eccezioni, richieste
+
+
+SEZIONI_CRUSCOTTO = ("allocazione", "look_through", "obiettivi", "glide_path", "pensione", "capitale_umano", "fiscalita",
+                     "ribilanciamento")
+
+
+def _tutti_i_json():
+    js = _json_esempio()
+    return [js[n] for n in ("alloc.json", "glide.json", "mco.json", "inps.json", "mc.json", "netto.json", "cu.json",
+                            "broker.json", "piano.json", "lt.json", "ponte.json", "ris.json")]
+
+
+@test("T17 cruscotto nel browser: si apre senza errori, ogni sezione col suo SVG, nessuna richiesta di rete")
+def t_t17_browser_rendering():
+    sync_playwright, lancia = browser()
+    rc, so, se, b, html = _cruscotto(*_tutti_i_json())
+    assert rc == 0, se[-300:]
+    rc, _, se, _, solo_alloc = _cruscotto(_json_esempio()["alloc.json"])
+    assert rc == 0, se[-300:]
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, richieste = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert all(r.startswith(("file://", "data:")) for r in richieste), richieste
+            for k in SEZIONI_CRUSCOTTO:
+                assert page.locator(f"#sez-{k} svg").count() >= 1, k
+            assert page.locator("#sez-indicatori").count() == 1
+            page, errori, eccezioni, _ = _apri_cruscotto(br, solo_alloc)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert page.locator("section[id^=sez-]").count() == 2, page.locator("section[id^=sez-]").count()
+        finally:
+            br.close()
+
+
+@test("T17 cruscotto nel browser: numeri in italiano, nomi intatti, null senza NaN, tema scuro, 375px")
+def t_t17_browser_contenuti():
+    sync_playwright, lancia = browser()
+    def pericoloso(d):
+        d["obiettivi"][0]["nome"] = NOME_PERICOLOSO
+    def senza_sorpasso(d):
+        d["eta_sorpasso"], d["stato_sorpasso"] = None, "non_prima_della_fine"
+    def senza_ordini(d):
+        d["ordini"] = []
+    sorgenti = [f for f in _tutti_i_json() if not f.endswith(("mco.json", "cu.json", "piano.json"))]
+    sorgenti += [_json_variante("mco.json", pericoloso), _json_variante("cu.json", senza_sorpasso),
+                 _json_variante("piano.json", senza_ordini)]
+    rc, so, se, b, html = _cruscotto(*sorgenti)
+    assert rc == 0, se[-300:]
+    rc, _, se, b_tutti, html_tutti = _cruscotto(*_tutti_i_json())
+    assert rc == 0, se[-300:]
+    ind = {i["id"]: i for i in b_tutti["indicatori"]}
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti)
+            assert page.inner_text('[data-valore="prob-0"]') == formato_it_percento(b_tutti["obiettivi"]["obiettivi"][0]["probabilita_successo"])
+            assert page.inner_text('[data-valore="sostituzione_netta"]') == formato_it_percento(ind["sostituzione_netta"]["valore"])
+            assert page.inner_text('[data-valore="capitale_allocato"]') == "€130.000", page.inner_text('[data-valore="capitale_allocato"]')
+            assert page.inner_text('[data-valore="valore_portafoglio"]') == "€8.900"
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            corpo = page.inner_text("body")
+            for brutto in ("NaN", "undefined", "null", "Infinity"):
+                assert brutto not in corpo, brutto
+            # Review Focus 5: il nome pericoloso si legge identico, nessun markup interpretato
+            assert NOME_PERICOLOSO in corpo and page.locator("img").count() == 0
+            # Review Focus 2 e 4: nessun sorpasso, nessun ordine, detti a parole
+            assert "nessun sorpasso" in page.inner_text("#sez-capitale_umano").lower()
+            assert "nessun ordine" in page.inner_text("#sez-ribilanciamento").lower()
+            sfondo = lambda pg: pg.evaluate("getComputedStyle(document.body).backgroundColor")
+            chiaro = sfondo(page)
+            scura, errori, eccezioni, _ = _apri_cruscotto(br, html, schema="dark")
+            assert sfondo(scura) != chiaro and errori == [] and eccezioni == [], (chiaro, sfondo(scura))
+            stretta, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti, larghezza=375)
+            larghezza = stretta.evaluate("document.documentElement.scrollWidth")
+            assert larghezza <= 375 and errori == [] and eccezioni == [], larghezza
+        finally:
+            br.close()
+    src = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    for vietato in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"):
+        assert vietato not in src, vietato
+
+
+@test("T17 cruscotto: la skill chiede conferma prima di pubblicare, comando e README allineati")
+def t_t17_skill():
+    skill_md = lambda s: os.path.join(SKILLS, s, "SKILL.md")
+    skill = open(skill_md("it-revisione"), encoding="utf-8").read()
+    assert "### 6. Cruscotto grafico" in skill, "it-revisione: manca il passo 6 «Cruscotto grafico»"
+    passo = skill.split("### 6. Cruscotto grafico")[1].split("\n## ")[0]
+    assert "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" in passo, passo[:300]
+    assert "chiedi" in passo.lower() and "sì esplicito" in passo and "claude.ai" in passo and "Artifact" in passo, passo[:600]
+    anti = skill.split("## Anti-pattern")[1].split("\n## ")[0]
+    assert "senza conferma" in anti and "a mano" in anti, anti[-600:]
+    assert os.path.isfile(os.path.join(ROOT, "commands", "cruscotto.md"))
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "/cruscotto" in readme and "genera-cruscotto.py" in readme
+    dati = readme.split("### Dove vanno i tuoi dati")[1].split("\n### ")[0]
+    assert "Artifact" in dati and "conferma" in dati, dati[-600:]
+    for s in ("it-pianificazione-obiettivi", "it-pianificazione", "it-rebalance"):
+        assert "/cruscotto" in open(skill_md(s), encoding="utf-8").read(), s
+    # revisione finale T17: i file di input degli script stanno nella stessa cartella e non si passano;
+    # due file dello stesso tipo sono una scelta dell'utente, non un file da rigenerare
+    for nome in ("piano.json", "capitale-umano.json", "ips.json"):
+        assert nome in passo, f"il passo 6 deve nominare l'input {nome} da non passare"
+    assert "stesso tipo" in passo and "chiedi all'utente" in passo.lower(), passo[:1500]
+    comando = open(os.path.join(ROOT, "commands", "cruscotto.md"), encoding="utf-8").read()
+    assert "--json" in comando and "input" in comando, comando
+
+
+@test("T16 look-through: il cruscotto riconosce il JSON, il bundle non porta posizioni né ISIN, la sezione in pagina")
+def t_lt_cruscotto():
+    js = _json_esempio()
+    rc, so, se, b, html = _cruscotto(js["alloc.json"], js["lt.json"])
+    assert rc == 0, se[-300:]
+    lt, r = b["look_through"], json.load(open(js["lt.json"], encoding="utf-8"))
+    assert set(lt) == {"copertura", "settori", "paesi", "titoli", "quota_primi_titoli", "n_posizioni", "n_senza_composizione",
+                       "quota_senza_composizione", "n_titoli_diretti"}, set(lt)
+    assert lt["settori"][0] == {"nome": "Finanza", "peso": r["settori"][0]["peso"]} and lt["n_senza_composizione"] == 1
+    assert lt["paesi"][0]["nome"] == "Stati Uniti" and lt["titoli"][0]["nome"] == "Apple Inc." and lt["n_posizioni"] == 4
+    for vietato in ("IE00B4L5Y983", "DE0007164600", "SAP SE", "iShares Core MSCI World", "BTP Futura"):
+        assert vietato not in html, vietato
+    assert "lt.json → look_through" in so and "look_through" in so.split("Sezioni:")[1], so
+    # revisione finale I1: una posizione diretta descritta a mano con una riga «titolo» è una posizione dell'utente e non
+    # entra nella pagina; M3: N_TITOLI_REPORT taglia la lista e la quota insieme
+    tmp = os.path.dirname(js["lt.json"])
+    with open(os.path.join(FIXTURES, "composizione-look-through.csv"), encoding="utf-8") as f, \
+         open(os.path.join(tmp, "comp-dirette.csv"), "w", encoding="utf-8") as g:
+        g.write(f.read() + "IT0005454241;titolo;BTP Futura 2037;100\nDE0007164600;paese;DE;100\nDE0007164600;titolo;SAP SE;100\n")
+    rc, out = run_script(asset(*LT), "--composizione", "comp-dirette.csv", "--posizioni", "broker-lt.json", "--json", "lt-dirette.json",
+                         "--set", "N_TITOLI_REPORT=2", cwd=tmp)
+    assert rc == 0 and "BTP Futura 2037" in out, out[-400:]                       # nel report a terminale sì
+    r = json.load(open(os.path.join(tmp, "lt-dirette.json"), encoding="utf-8"))
+    diretti = {t["nome"]: t["diretto"] for t in r["titoli"]}
+    assert diretti == {"Apple Inc.": False, "MICROSOFT CORP": False, "NESTLE SA": False, "BTP Futura 2037": True, "SAP SE": True}, diretti
+    assert r["n_titoli_report"] == 2 and abs(r["quota_primi_titoli"] - sum(t["peso"] for t in r["titoli"][:2])) < 1e-12
+    rc, _, se, b_d, html_dirette = _cruscotto(os.path.join(tmp, "lt-dirette.json"))   # html resta la pagina di lt.json
+    assert rc == 0, se[-300:]
+    assert [t["nome"] for t in b_d["look_through"]["titoli"]] == [t["nome"] for t in r["titoli"] if not t["diretto"]][:2]
+    assert b_d["look_through"]["n_titoli_diretti"] == 2 and abs(b_d["look_through"]["quota_primi_titoli"] - r["quota_primi_titoli"]) < 1e-12
+    for vietato in ("BTP Futura", "SAP SE", "IT0005454241", "DE0007164600"):
+        assert vietato not in html_dirette, vietato
+    def peso_testo(d):
+        d["titoli"][0]["peso"] = "5"
+    rc, _, se, _, _ = _cruscotto(_json_variante("lt.json", peso_testo))
+    assert rc == 1 and "non è un numero" in se, se[-300:]
+    # Review Focus 5: un JSON di prima di una modifica delle chiavi si rifiuta con «manca …», senza traceback
+    def senza(d):
+        del d["quota_primi_titoli"]
+    rc, so, se, _, _ = _cruscotto(_json_variante("lt.json", senza))
+    assert rc == 1 and "manca quota_primi_titoli" in se and "variante-lt.json" in se and "Traceback" not in se, se[-300:]
+    sync_playwright, lancia = browser()
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            assert page.locator("#sez-look_through svg").count() >= 2
+            testo = page.inner_text("#sez-look_through")
+            assert "1 posizione senza composizione" in testo and "minimo della concentrazione" in testo, testo[:800]
+            assert formato_it_percento(lt["copertura"]["settori"]) in testo, testo[:800]
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_dirette)
+            testo = page.inner_text("#sez-look_through")
+            assert errori == [] and "2 titoli di posizioni dirette non mostrati" in testo and "BTP" not in testo, testo[-600:]
+        finally:
+            br.close()
+
+
+@test("T16 look-through: skill, reference, revisione, README, CHANGELOG e ROADMAP allineati")
+def t_lt_documentazione():
+    ob = os.path.join(SKILLS, "it-pianificazione-obiettivi")
+    skill = open(os.path.join(ob, "SKILL.md"), encoding="utf-8").read()
+    step8 = skill.split("Step 8")[1]
+    assert "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" in step8 and "--posizioni" in step8 and "--isin" in step8
+    assert 'version: "0.24"' in skill and "look-through-portafoglio.py" in skill.split("## Riferimenti")[1]
+    ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
+    for parola in ("look-through", "titolo", "ISIN", "a mano", "copertura", "minimo"):
+        assert parola in ref, parola
+    assert "isin" in open(os.path.join(ob, "references", "capitale-umano.md"), encoding="utf-8").read()
+    rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
+    assert 'version: "0.9"' in rev
+    contratto = rev.split("### Contratto di input")[1].split("\n## ")[0]
+    assert "look-through-portafoglio.py" in contratto and "senza_composizione" in contratto
+    assert "look-through" in rev.split("### 3. Avanzamento")[1].split("### 4.")[0].lower()
+    assert "look-through" in rev.split("### 6. Cruscotto grafico")[1].split("\n## ")[0].lower()
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    assert "Tutti i 18 script" in readme and "look-through-portafoglio.py" in readme
+    assert "look-through" in readme.split("### Dove vanno i tuoi dati")[1].split("\n### ")[0].lower()
+    assert "look-through" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.11.0")[0].lower()
+    t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
+    assert "[x] **Look-through del portafoglio**" in t16 and "2026-11-01-look-through" in t16, t16[:1200]
+
+
+@test("T17 cruscotto: ponte pensione e riscatto della laurea nella sezione Pensione")
+def t_t17_ponte_riscatto():
+    js = _json_esempio()
+    L = lambda n: json.load(open(js[n], encoding="utf-8"))
+    ponte, ris = L("ponte.json"), L("ris.json")
+    # da soli bastano a far nascere la sezione Pensione
+    rc, so, se, b, html = _cruscotto(js["ponte.json"], js["ris.json"])
+    assert rc == 0, se[-300:]
+    p, r = b["pensione"]["ponte"], b["pensione"]["riscatto"]
+    assert b["pensione"]["inps"] is None and "pensione" in so.split("Sezioni:")[1]
+    assert p["eta_uscita"] == ponte["eta_uscita"] and p["anni_ponte"] == ponte["anni_ponte"] == 7
+    assert p["capitale_ponte"] == ponte["capitale_ponte"] and p["probabilita_successo"] == ponte["probabilita_successo"]
+    assert p["capitale_necessario"] == {"85%": ponte["capitale_necessario"]["85%"], "95%": ponte["capitale_necessario"]["95%"]}
+    assert p["rita"] == {k: ponte["rita"][k] for k in ("attiva", "eta_inizio", "rata_netta")}
+    assert p["costo_permanente_lordo_annuo"] == ponte["costo_permanente_lordo_annuo"]
+    assert r["onere_agevolato"] == ris["onere_agevolato"] and r["onere_ordinario"] == ris["onere_ordinario"]
+    assert r["costo_netto"] == ris["costo_netto"] and r["anni_per_rientrare"] == ris["anni_per_rientrare"]
+    assert r["eta_anticipata_con_riscatto"] == ris["eta_anticipata_con_riscatto"] and r["modalita"] == "agevolato"
+    assert r["rate_mensili"] == ris["rate_mensili"] == 120                      # revisione finale I2: le rate dal JSON
+    tmp = os.path.dirname(js["ris.json"])
+    rc, out = run_script(asset("it-pianificazione", "riscatto-laurea.py"), "--from", "dati.json", "--from", "inps.json",
+                         "--set", "RATE_MENSILI=1", "--json", "ris-unica.json", cwd=tmp)
+    assert rc == 0, out[-300:]
+    rc, _, se, b1, html_unica = _cruscotto(os.path.join(tmp, "ris-unica.json"))
+    assert rc == 0 and b1["pensione"]["riscatto"]["rate_mensili"] == 1, se[-300:]
+    # un JSON di prima di una modifica delle chiavi si rifiuta con «manca …»
+    def senza(d):
+        del d["capitale_necessario"]
+    rc, _, se, _, _ = _cruscotto(_json_variante("ponte.json", senza))
+    assert rc == 1 and "manca capitale_necessario" in se and "Traceback" not in se, se[-300:]
+    sync_playwright, lancia = browser()
+    with sync_playwright() as pw:
+        br = lancia(pw)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            testo = page.inner_text("#sez-pensione")
+            assert page.locator("#sez-pensione svg").count() >= 2, page.locator("#sez-pensione svg").count()
+            assert "Ponte pensionistico" in testo and "uscita a 62" in testo and "69" in testo, testo[:600]
+            assert formato_it_percento(ponte["probabilita_successo"]) in testo and "€120.704" in testo, testo[:900]
+            assert "RITA" in testo and "Riscatto della laurea" in testo and "€31.033" in testo and "19,1 anni" in testo, testo[-900:]
+            assert "73,3" in testo and "78,3" in testo and "in 120 rate" in testo, testo[-600:]
+            for brutto in ("NaN", "undefined", "null"):
+                assert brutto not in testo, brutto
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_unica)
+            testo = page.inner_text("#sez-pensione")
+            assert errori == [] and "Unica soluzione" in testo and "120" not in testo, testo[-600:]
+        finally:
+            br.close()
+
+
+@test("T17 cruscotto: gli avvisi dell'importatore che nominano le posizioni non entrano nella pagina")
+def t_t17_avvisi_posizioni():
+    # revisione finale T17: gli avvisi dell'importatore nominano la posizione (descrizione o ISIN), e il
+    # testo del consenso dice che le posizioni non ci sono. Restano solo gli avvisi di zainetto e broker.
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, out = run_script(asset("it-tax-optimization", "importa-estratto-broker.py"),
+                             os.path.join(FIXTURES, "estratto-pubblici-etc.csv"), "--broker", "Fineco",
+                             "--anno", "2026", "--json", "b.json", cwd=tmp)
+        assert rc == 0, out[-300:]
+        broker = json.load(open(os.path.join(tmp, "b.json"), encoding="utf-8"))
+        nomi = [p[k] for p in broker["posizioni"] for k in ("isin", "descrizione") if p.get(k)]
+        assert any(n in a for a in broker["avvisi"] for n in nomi), "la fixture deve produrre avvisi sulle posizioni"
+        rc, so, se, b, html = _cruscotto(os.path.join(tmp, "b.json"))
+        assert rc == 0, se[-300:]
+        for n in nomi:
+            assert n not in html and n not in json.dumps(b, ensure_ascii=False), n
+        assert b["fiscalita"]["avvisi_omessi"] >= 1, b["fiscalita"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T17 cruscotto: il ribilanciamento sui dati d'esempio lo dice nel JSON e nella pagina")
+def t_t17_dati_esempio():
+    js = _json_esempio()
+    assert json.load(open(js["piano.json"], encoding="utf-8"))["dati_esempio"] is True
+    rc, so, se, b, html = _cruscotto(js["piano.json"])
+    assert rc == 0 and b["ribilanciamento"]["dati_esempio"] is True, se[-300:]
+    # un piano da --dati non è d'esempio
+    m, piano = _ribilancia(DATI_ESEMPIO=False)
+    assert m.piano_json(piano, m.genera_ordini(piano))["dati_esempio"] is False
+    sync_playwright, lancia = browser()
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
+            for sez in ("#sez-ribilanciamento", "#sez-allocazione"):
+                assert "dati di esempio" in page.inner_text(sez).lower(), sez
+        finally:
+            br.close()
+
+
+@test("T17 cruscotto nel browser: il template aperto senza dati spiega come generarlo, senza errori")
+def t_t17_template_vuoto():
+    # Segnalato dal proprietario: aperto così com'è, il template andava in SyntaxError sul segnaposto e la
+    # pagina restava vuota. Ora dice cosa fare; lo stesso vale per un blocco dati non leggibile.
+    sync_playwright, lancia = browser()
+    tpl = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
+    rotto = tpl.replace("__DATI_CRUSCOTTO__", '{"versione": 1, "probabilita": NaN}')
+    with sync_playwright() as p:
+        br = lancia(p)
+        try:
+            for html in (tpl, rotto):
+                page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+                assert errori == [] and eccezioni == [], (errori, eccezioni)
+                testo = page.inner_text("#cruscotto")
+                assert "genera-cruscotto.py" in testo and "/cruscotto" in testo, testo
+                assert page.locator("section[id^=sez-]").count() == 0
+        finally:
+            br.close()
+
+
 # ══════════════════════ freshness · json · guardia ══════════════════════
 
 # File con dati normativi che DEVONO portare almeno un marcatore «Verificato: AAAA-MM»:
@@ -4410,10 +6628,12 @@ OBBLIGATI_FRESHNESS = (
     "it-pianificazione/assets/proiezione-inps.py",
     "it-pianificazione/assets/ponte-pensione.py",
     "it-pianificazione/assets/importa-previdenza.py",
+    "it-pianificazione/assets/riscatto-laurea.py",
     "it-pianificazione-autonomi/references/casse-professionali.md",
     "it-pianificazione-autonomi/references/previdenza-gestione-separata.md",
     "it-pianificazione-autonomi/references/fiscalita-forfettario.md",
     "it-pianificazione-obiettivi/references/asset-location.md",
+    "it-pianificazione-obiettivi/references/capitale-umano.md",
     "it-rebalance/SKILL.md",
     "it-revisione/assets/genera-ips.py",
 )
@@ -4570,8 +6790,13 @@ def t_contratto_revisione():
         "mco.json": (asset("it-pianificazione-obiettivi", "montecarlo-obiettivi.py"), [pian, "--set", "N_SIM=500"]),
         "alloc.json": (asset("it-pianificazione-obiettivi", "allocatore-capitale.py"), [pian]),
         "glide.json": (asset("it-pianificazione-obiettivi", "glidepath-obiettivi.py"), [pian]),
+        "cu.json": (asset("it-pianificazione-obiettivi", "capitale-umano.py"),
+                    ["--composizione", asset("it-pianificazione-obiettivi", "esempio-composizione.csv")]),
         "imp.json": (asset("it-tax-optimization", "importa-estratto-broker.py"),
                      [os.path.join(FIXTURES, "estratto-multibroker.csv"), os.path.join(FIXTURES, "zainetto-multibroker.csv"), "--anno", "2026"]),
+        "lt.json": (asset("it-pianificazione-obiettivi", "look-through-portafoglio.py"),
+                    ["--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"),
+                     "--posizioni", asset("it-pianificazione-obiettivi", "esempio-capitale-umano.json")]),
     }
     try:
         js = {}
@@ -4605,7 +6830,11 @@ def t_contratto_revisione():
                   ("mco.json", "obiettivi[].target_oggi"), ("mco.json", "obiettivi[].priorita"),
                   ("alloc.json", "aggregato.azioni"), ("alloc.json", "aggregato.totale"), ("glide.json", "portafoglio"),
                   ("imp.json", "posizioni[].valore"), ("imp.json", "analisi.per_broker[].zainetto_in_scadenza"),
-                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"))
+                  ("imp.json", "analisi.per_broker[].plus_realizzabili_a_costo_zero"),
+                  ("cu.json", "esposizione_finanziaria"), ("cu.json", "esposizione_totale"),
+                  ("cu.json", "settore.quota_settore_fin"), ("cu.json", "settore.sovrappeso"), ("cu.json", "eta_sorpasso"),
+                  ("cu.json", "stato_sorpasso"), ("lt.json", "settori[].peso"), ("lt.json", "paesi[].nome"), ("lt.json", "titoli[].peso"),
+                  ("lt.json", "copertura.settori"), ("lt.json", "quota_primi_titoli"), ("lt.json", "senza_composizione[].nome"))
         for nome, percorso in attese:
             assert percorso.replace("[]", "[") .split("[")[0].split(".")[-1] in tabella or percorso in tabella, \
                 f"la tabella del contratto non nomina «{percorso}»"
@@ -5147,11 +7376,13 @@ def t_frontmatter_skill():
             for f in sorted(os.listdir(cartella_assets)):
                 if f.endswith((".py", ".xlsx")) and f != "motore_bootstrap.py":
                     assert f"assets/{f}" in riferimenti, f"{skill}: assets/{f} non è nei Riferimenti"
-    # riscatto, ricongiunzione e totalizzazione non sono gestiti: fuori dai trigger, dichiarati esclusi
+    # ricongiunzione e totalizzazione non sono gestite: fuori dai trigger, dichiarate escluse; il riscatto della
+    # laurea dalla T13 sì (riscatto-laurea.py), quindi è un trigger e non più un'esclusione
     d = _yaml_stretto(_frontmatter(os.path.join(SKILLS, "it-pianificazione", "SKILL.md"))[0], "it-pianificazione")
     trigger, esclusioni = d["description"].split("NON copre")
-    assert not re.search(r"riscatto|ricongiunzione|totalizzazione", trigger), "it-pianificazione: trigger non gestiti"
-    assert all(x in esclusioni for x in ("riscatto", "ricongiunzione", "totalizzazione")), esclusioni
+    assert not re.search(r"ricongiunzione|totalizzazione", trigger), "it-pianificazione: trigger non gestiti"
+    assert all(x in esclusioni for x in ("ricongiunzione", "totalizzazione")), esclusioni
+    assert "riscatto della laurea" in trigger and "riscatto" not in esclusioni, (trigger[-300:], esclusioni)
 
 
 @test("T14 comandi: alias sottili delle skill, uno per skill e come nel README")

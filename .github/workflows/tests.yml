@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  suite:
     runs-on: ubuntu-latest
     # Il minimo dichiarato nel README e la versione più recente: t_compila compila
     # tutti gli script con l'interprete del job, quindi una sintassi solo-3.12 emerge qui.
@@ -36,6 +36,12 @@ jobs:
           cache: pip
           cache-dependency-path: tests/requirements.txt
       - run: pip install -r tests/requirements.txt
+      # Playwright e Chromium per i test che aprono il cruscotto grafico (it-revisione) nel browser.
+      # Solo qui e non in tests/requirements.txt: il job Windows e chi lancia la suite in locale non ne
+      # hanno bisogno (senza Playwright quei test risultano saltati). Versione fissata: aggiornarla a mano.
+      - name: Installa Playwright e Chromium
+        timeout-minutes: 10
+        run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
       # LibreOffice per i test che ricalcolano gli Excel (scripts/ricalcola-excel.py).
       # I .deb restano in cache tra un run e l'altro: su alcuni runner il mirror li
       # serve a ~70 KB/s (perché e come, in scripts/installa-libreoffice.sh). Oltre
@@ -60,6 +66,7 @@ jobs:
       - run: python tests/run_tests.py --skip freshness
         env:
           RICHIEDI_LIBREOFFICE: "1"   # in CI i test degli Excel non si saltano
+          RICHIEDI_BROWSER: "1"       # né quelli del cruscotto nel browser
 
   # Windows: script e suite devono girare anche con una console cp1252 e i percorsi con
   # la barra rovesciata. Una sola versione di Python (il minimo dichiarato) e niente
@@ -79,10 +86,23 @@ jobs:
       - run: pip install -r tests/requirements.txt
       - run: python tests/run_tests.py --skip freshness
 
+  # Il ruleset di main e develop chiede un check che si chiama «test»: i job della matrice si
+  # chiamano «suite (3.11)» e «suite (3.14)», quindi questo job li riassume. È verde solo se lo
+  # sono tutti, Windows compreso: con !cancelled() un job a monte fallito lo fa fallire invece di
+  # saltarlo (un check saltato varrebbe come superato), e un run annullato non dà un falso rosso.
+  test:
+    if: ${{ !cancelled() }}
+    needs: [suite, test-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "suite: ${{ needs.suite.result }} · test-windows: ${{ needs.test-windows.result }}"
+          [ "${{ needs.suite.result }}" = success ] && [ "${{ needs.test-windows.result }}" = success ]
+
   # Il manifest del plugin passa `claude plugin validate --strict`: anche i warning
   # (campi sconosciuti, nomi non kebab-case) bloccano. Evita di scoprire un plugin.json
   # rotto solo all'installazione. Il solo avviso ammesso è ICON_MISSING del controllo
-  # per il plugin directory, che non cambia l'esito (l'icona la decide il proprietario).
+  # per il plugin directory, che non cambia l'esito (l'icona non si aggiunge, per decisione del proprietario).
   validate:
     runs-on: ubuntu-latest
     steps:

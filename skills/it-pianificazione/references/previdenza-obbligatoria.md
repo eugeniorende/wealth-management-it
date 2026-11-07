@@ -7,6 +7,7 @@
 - Aliquote contributive lavoro dipendente privato 2026
 - Coefficienti di trasformazione 2025-2026 — Tabella ufficiale DM 20/11/2024
 - Requisiti di accesso pensione 2026
+- Riscatto della laurea
 - Tassazione assegno pensionistico
 - Tasso di sostituzione tipico (sistema contributivo puro)
 - Heuristic per la skill
@@ -176,6 +177,29 @@ Stato nel 2026:
 
 Tutti questi richiedono ricostruzione della posizione contributiva con patronato/INPS.
 
+## Riscatto della laurea
+
+Il riscatto (art. 2 D.Lgs. 184/1997) trasforma in contribuzione gli anni del **corso legale** di studi universitari concluso con il titolo (diploma universitario, laurea, laurea magistrale, specializzazione, dottorato di ricerca), se non sono già coperti da contributi in nessuna gestione. Serve almeno un contributo obbligatorio nella gestione in cui si fa la domanda, salvo per chi non ha mai lavorato. Gli anni riscattati contano per il diritto alla pensione (c. 5-ter) e, poiché l'onere entra nel montante e si rivaluta dalla data della domanda, anche per la sua misura (c. 5).
+
+Per gli anni che cadono nel sistema contributivo l'onere si calcola in due modi:
+
+| Modalità | Onere per ogni anno riscattato | Domanda nel 2026 |
+|---|---|---|
+| Agevolata (c. 5-quater, aggiunto dall'art. 20 c. 6 DL 4/2019) | minimale di reddito di artigiani e commercianti × aliquota di computo del Fondo lavoratori dipendenti (33%), vigenti alla data della domanda | €18.808 × 33% = **€6.206,64** |
+| Ordinaria (c. 5) | aliquota contributiva della gestione (33% per i dipendenti privati) × retribuzione dei dodici mesi prima della domanda | con una retribuzione di €36.000: €11.880 |
+
+Per gli anni che cadono nel retributivo (prima del 1996) l'ordinario segue la riserva matematica (art. 13 L. 1338/1962): dipende da età, sesso e retribuzioni, e lo calcola solo INPS. L'agevolato vale anche per quegli anni solo se la pensione si calcola tutta con il contributivo, per esempio con l'opzione dell'art. 1 c. 23 L. 335/1995 (Circ. INPS 6/2020 e 54/2021): l'opzione diventa irrevocabile con il pagamento della prima rata e va valutata con INPS o un patronato. Lo stesso vale per chi ha contributi solo dal 1996 ma anni di corso precedenti: riscattarli tocca il sistema di calcolo e quindi i canali di uscita (per esempio l'anticipata contributiva, riservata a chi è nel contributivo puro), e la scelta va fatta con INPS o un patronato; `riscatto-laurea.py` con `ANNI_PRIMA_DEL_1996` ne stima solo l'anzianità.
+
+**Come si paga.** In un'unica soluzione entro 60 giorni dal provvedimento, oppure fino a **120 rate mensili senza interessi** (c. 4-bis). Chi è già pensionato non può rateizzare, e con la domanda di pensione le rate residue si pagano in un'unica soluzione. I pagamenti parziali accreditano il periodo che corrisponde a quanto versato; una volta accreditato, il riscatto non si revoca.
+
+**Fisco.** L'onere si deduce dal reddito complessivo senza tetto, tra i contributi versati facoltativamente alla propria gestione obbligatoria (art. 10 c. 1 lett. e TUIR; dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026). Chi non ha mai lavorato può riscattare con lo stesso onere dell'agevolato (c. 5-bis): lo deduce lui stesso, oppure il familiare di cui è fiscalmente a carico lo detrae al 19% (c. 5-bis, ultimo periodo; dal 2027 art. 10 c. 1 lett. u e art. 14 c. 1 lett. i D.Lgs. 117/2026, che abroga quel periodo).
+
+**Cosa compra.** L'onere entra nel montante e si rivaluta dalla data della domanda (c. 5), quindi la pensione in più è proporzionale a quanto si paga: per ogni euro versato agevolato e ordinario rendono allo stesso modo. L'agevolato compra gli **stessi anni di anzianità** al prezzo minimo, l'ordinario più pensione a un prezzo più alto. Sui default di `assets/riscatto-laurea.py` (5 anni, retribuzione di €36.000, uscita a 69 anni, PIL reale 0,5%) l'agevolato costa €31.033 lordi e €20.792 netti con la deduzione al 33% (120 rate da €258,61), e aggiunge circa €1.751 lordi l'anno di pensione: con l'aliquota del 38% sulla pensione in più (la marginale che `netto-pensione.py` dà sulla pensione dei default, €29.800 circa) servono circa 19 anni di pensione netta per rientrare del costo netto. Gli anni contano soprattutto per l'**anticipata ordinaria**, che chiede solo anni di contributi: con 12 anni di contributi a 37 anni e il requisito degli uomini di 43 anni e 1 mese dal 2028 (per le donne 42 anni e 1 mese, un anno prima: `--set SESSO='F'`), l'anticipata passa da circa 68 anni e 4 mesi a circa 63 anni e 4 mesi. Uscire prima abbassa però la pensione, quindi la proiezione va rifatta a quell'età. Per chi arriverebbe alla vecchiaia sotto i 20 anni di contributi, il riscatto può completarli.
+
+Lo script legge con `--from` il JSON di `importa-previdenza.py` (montante, retribuzione, età, anzianità) e quello di `proiezione-inps.py` (coefficiente, età e anni all'uscita); senza quest'ultimo calcola il coefficiente come `proiezione-inps.py`. Con `--json` scrive il montante con il riscatto e l'età di uscita, che `proiezione-inps.py --from` rilegge per la proiezione completa; gli altri `--set` di scenario (PIL reale, crescita della retribuzione) vanno ripetuti. Il dato esatto lo dà la simulazione del riscatto sul portale INPS.
+
+*Riscatto della laurea: art. 2 D.Lgs. 184/1997 (cc. 2, 3, 4, 4-bis, 5, 5-bis, 5-ter e 5-quater), art. 20 c. 6 DL 4/2019, art. 10 c. 1 lett. e TUIR (dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026); per chi non ha mai lavorato art. 2 c. 5-bis, ultimo periodo, D.Lgs. 184/1997 (dal 2027 art. 10 c. 1 lett. u e art. 14 c. 1 lett. i D.Lgs. 117/2026); minimale 2026 di €18.808 (Circ. INPS 14/2026), scheda INPS «Riscatto della laurea ai fini pensionistici» (aggiornata al 12/11/2025) — Verificato: 2026-10.*
+
 ## Tassazione assegno pensionistico
 
 L'assegno è soggetto a:
@@ -245,7 +269,7 @@ Per questa ragione la **complementare diventa strutturalmente necessaria**, non 
 
 5. **Disclaimer obbligatori**: orizzonte temporale lungo + variabilità normativa + variabilità macroeconomica = range, non puntuale. Non promettere mai.
 
-6. **Riferimento patronato**: per dati esatti su anzianità contributiva, riscatto, totalizzazione, ricongiunzione, sempre rinviare a patronato (CGIL/CISL/UIL/INAS/etc.) o INPS. Sono servizi gratuiti.
+6. **Riferimento patronato**: per dati esatti su anzianità contributiva, onere del riscatto (anche la simulazione sul portale INPS), totalizzazione, ricongiunzione, sempre rinviare a patronato (CGIL/CISL/UIL/INAS/etc.) o INPS. Sono servizi gratuiti.
 
 ---
 *Massimale e prima fascia 2026 (Circ. INPS 6/2026), requisiti di vecchiaia, anticipata e precoci 2026-2028 (Circ. INPS 19/2026 e 28/2026, All. 2), detrazione pensionati (art. 13 c. 3 e 3-bis TUIR; dal 2027 art. 13 c. 3 e 4 D.Lgs. 117/2026) — Verificato: 2026-10.*

@@ -1,8 +1,8 @@
 ---
 name: it-pianificazione-obiettivi
-description: "Pianificazione finanziaria per obiettivi (goals-based) per investitori privati italiani: più obiettivi (fondo di emergenza, casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte, importo e priorità, con il profilo di allocazione adatto all'orizzonte e il piano di accumulo per raggiungerlo. Usa questa skill quando l'utente parla di pianificare gli investimenti, da dove iniziare, quanto mettere da parte al mese, fondo di emergenza, risparmiare per la casa o per i figli, asset allocation per obiettivo, orizzonte e rischio, «ho X € e non so come allocarli», PAC, bucket strategy, probabilità di raggiungere un obiettivo, Monte Carlo del piano, glide path. È il passo a monte di `it-rebalance`: definisce l'allocazione target che quella mantiene. Postura educativa e metodologica: mostra allocazioni-tipo come esempi, NON raccomanda titoli specifici, NON sceglie l'allocazione al posto dell'utente e NON è consulenza di investimento."
+description: "Pianificazione finanziaria per obiettivi (goals-based) per investitori privati italiani: più obiettivi (fondo di emergenza, casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte, importo e priorità, profilo di allocazione e piano di accumulo. Usa questa skill quando l'utente parla di pianificare gli investimenti, da dove iniziare, quanto mettere da parte al mese, fondo di emergenza, risparmiare per la casa o per i figli, asset allocation per obiettivo, orizzonte e rischio, «ho X € e non so come allocarli», PAC, bucket strategy, probabilità di raggiungere un obiettivo, Monte Carlo del piano, glide path, capitale umano (reddito da lavoro nella ricchezza totale, «sono un'azione o un'obbligazione?»). È il passo a monte di `it-rebalance`: definisce l'allocazione target che quella mantiene. Postura educativa e metodologica: mostra allocazioni-tipo come esempi, NON raccomanda titoli specifici, NON sceglie l'allocazione al posto dell'utente e NON è consulenza di investimento."
 metadata:
-  version: "0.20"
+  version: "0.24"
 ---
 
 # it-pianificazione-obiettivi
@@ -93,6 +93,7 @@ I dati personali e i file compilati vivono nella **cartella di lavoro** dell'ute
 - i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/pianificatore-obiettivi.xlsx`;
 - gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/montecarlo-obiettivi.py" pianificatore-obiettivi.xlsx --json montecarlo.json`, `python "${CLAUDE_SKILL_DIR}/assets/glidepath-obiettivi.py" pianificatore-obiettivi.xlsx --json glide.json`, `python "${CLAUDE_SKILL_DIR}/assets/allocatore-capitale.py" pianificatore-obiettivi.xlsx 50000 --json allocazione.json`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
+- i JSON scritti con `--json` si vedono in grafico con `/cruscotto` (it-revisione, passo «Cruscotto grafico»), che chiede prima di pubblicare la pagina come Artifact.
 
 `${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze degli script: Python 3.11 o successivo con numpy e openpyxl (`pip install numpy openpyxl`).
 
@@ -214,6 +215,36 @@ Il framework, per obiettivo:
 - **Finalità successoria** → polizza vita / BTP / PIR (esenti da imposta di successione), solo se la successione è prioritaria e i costi accettabili. Per azioni e obbligazioni dirette il costo degli eredi riparte dal valore di successione; per fondi ed ETF non è garantito: vedi `it-tax-optimization/references/successione-donazione.md`.
 
 Principio: il **dossier amministrato è il default**; si devia verso un contenitore vincolato solo quando il suo vincolo coincide con la natura dell'obiettivo e il vantaggio fiscale supera costi e perdita di flessibilità/diversificazione. Tensioni da comunicare sempre: il fondo pensione è dominante ma vincolato; il PIR azzera le tasse ma costa concentrazione italiana (≈2% del mondo) e commissioni che possono annullare il beneficio; le polizze hanno vantaggio successorio ma costi spesso elevati. Per i **numeri** del beneficio netto c'è lo script `assets/asset-location-optimizer.py` (vedi sotto). Vedi `references/asset-location.md`.
+
+### Step 8 (facoltativo): la lente del capitale umano
+
+Il portafoglio non è tutta la ricchezza di chi lavora: il bene più grande è spesso il **capitale umano**, il valore attuale dei redditi da lavoro futuri, più la pensione INPS che verrà. Questo step li mette nel conto, per capire se il portafoglio **compensa** il capitale umano o lo **duplica** (un dipendente pubblico ha già una grossa «obbligazione»; chi lavora in finanza o nella tecnologia ha già molta «azione», spesso dello stesso settore).
+
+```
+python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv --strumento "ETF MSCI World" [--file … --strumento …]
+python "${CLAUDE_SKILL_DIR}/assets/capitale-umano.py" --dati capitale-umano.json --composizione composizione.csv --json capitale-umano-out.json
+```
+
+La composizione per la diagnosi 4 si importa dal **file delle posizioni** di ogni ETF, scaricato dalla pagina del fondo sul sito dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, in italiano, inglese, tedesco o francese): l'importatore scrive `composizione.csv` per settore GICS, paese e primi titoli, con le esclusioni dichiarate. `--strumento` (o `--isin`) va scritto come l'`isin` o il campo `strumento` delle posizioni, altrimenti lo strumento finisce tra quelli senza composizione. Formati, esclusioni e limiti in `references/composizione-etf.md`; la compilazione a mano di `composizione.csv` resta possibile.
+
+Il JSON ha la forma di `assets/esempio-capitale-umano.json` (persona, pensione, posizioni con lo schema di `it-rebalance`); età di pensione e pensione netta possono arrivare con `--from` dai JSON di `proiezione-inps.py` e `netto-pensione.py`. Le cinque diagnosi:
+
+1. **bilancio patrimoniale totale**: finanziario, capitale umano (parte azionaria e obbligazionaria, dal profilo di lavoro) e capitale pensionistico;
+2. **esposizione azionaria** del patrimonio finanziario contro quella della ricchezza totale, con la riga di equivalenza facoltativa (`esposizione_totale_desiderata`);
+3. **proiezione** fino alla pensione con i percentili del Monte Carlo, con portafoglio, fondo pensione e TFR separati e i trasferimenti di ogni anno: a parità di allocazione l'esposizione totale sale con l'età;
+4. **sovrapposizione settoriale** tra il settore del proprio lavoro e il portafoglio, contro il peso del settore nel mercato mondiale;
+5. **sensibilità** ai parametri del profilo.
+
+È una **lente, non un target**: non modifica l'allocazione degli obiettivi né quella che `it-rebalance` mantiene, e la riga di equivalenza è un calcolo, non una raccomandazione. Profili, metodo, esempio svolto e limiti in `references/capitale-umano.md`.
+
+**Look-through del portafoglio.** Con lo stesso `composizione.csv` si risponde a «cosa possiedo davvero, sommando gli ETF?»: settori, paesi e primi titoli aggregati su tutte le posizioni, pesati per controvalore.
+
+```
+python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv --isin IE00B4L5Y983 [--file … --isin …]
+python "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" --composizione composizione.csv --posizioni broker.json [--posizioni …] --json look-through.json
+```
+
+Le posizioni sono il `--json` di `importa-estratto-broker.py` (it-tax-optimization; un file per broker, la stessa posizione su due broker si somma) oppure il `--dati` del capitale umano; il confronto con il CSV avviene per **ISIN** e poi per nome, quindi con l'estratto del broker si importa ogni ETF con `--isin` (alias di `--strumento`). Si riportano i pesi **con la copertura accanto** (la quota del controvalore che ha quella dimensione), i titoli come **minimo** della concentrazione (sono i primi di ogni ETF) e le posizioni senza composizione per nome: per quelle si importa il file dell'emittente, o si compilano a mano le righe (una singola azione o un BTP: il paese, il titolo). Il look-through legge e riporta, non cambia i target; `it-revisione` lo riprende nel passo 3 e il cruscotto lo disegna. Dettagli in `references/composizione-etf.md`, «Il look-through del portafoglio».
 
 ## Strumento operativo: il pianificatore Excel
 
@@ -354,4 +385,12 @@ Workflow tipico end-to-end: l'utente parte da qui per definire obiettivi e alloc
 - `assets/asset-location-optimizer.py` — in quale contenitore conviene tenere un obiettivo, al netto di tasse e costi: fondo pensione contro dossier (deduzione, tassa finale, vincolo fino alla pensione) e PIR contro dossier per gli obiettivi lunghi con capitale già accantonato; parametri con `--set`, vedi `references/asset-location.md`
 - `assets/decumulo-obiettivi.py` — simulazione del decumulo: probabilità di successo, sensibilità sul tasso di prelievo, dimostrazione del rischio di sequenza, confronto con/senza buffer, lente USA vs scenario globale (de-rating) (richiede numpy; usa rendimenti-storici.csv)
 - `references/mercati-e-correlazione.md` — le due correzioni di onestà al Monte Carlo: la **non-USA-centricità** (l'azionario mondiale rende ~5,2% reale vs gli USA eccezionali, fonte DMS; de-rating e calibrazione globale) e la **correlazione sistemica** tra obiettivi (un crollo li colpisce insieme; l'indipendenza sottostima il rischio che saltino tutti nello stesso scenario)
+- `references/capitale-umano.md` — il capitale umano nella ricchezza totale: modello (Ibbotson, Milevsky, Chen e Zhu 2007), quota azionaria per profilo di lavoro, NASpI, le cinque diagnosi, esempio svolto, limiti e bibliografia verificata
+- `references/composizione-etf.md` — l'importatore della composizione degli ETF: dove si scarica il file delle posizioni per emittente, colonne riconosciute, esclusioni (liquidità, derivati, righe non classificate), stato dei layout verificati, limiti e licenza
+- `assets/capitale-umano.py` — la lente del capitale umano: bilancio patrimoniale totale, esposizione azionaria del portafoglio contro quella della ricchezza totale (con la riga di equivalenza), proiezione con fascia Monte Carlo, sovrapposizione settoriale, sensibilità; non modifica i target (richiede numpy)
+- `assets/profili-capitale-umano.csv` — i sei profili di lavoro (quota azionaria del capitale umano, premio ν, correlazione e volatilità del reddito, probabilità di perdere il lavoro, NASpI), con la fonte e la natura di ogni valore
+- `assets/esempio-capitale-umano.json` — dati d'esempio di `capitale-umano.py` (sviluppatore di 35 anni nel privato), da copiare nella cartella di lavoro e compilare
+- `assets/esempio-composizione.csv` — composizione settoriale d'esempio (pesi illustrativi) per `capitale-umano.py --composizione`
+- `assets/importa-composizione-etf.py` — importatore della composizione degli ETF: dal file delle posizioni dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, in italiano, inglese, tedesco o francese) a `composizione.csv` per settore GICS, paese e primi titoli, con l'ISIN come chiave (`--isin`); richiede openpyxl per gli XLSX
+- `assets/look-through-portafoglio.py` — il look-through del portafoglio: settori, paesi e primi titoli aggregati su tutte le posizioni (dal `--json` dell'importatore dei broker o dal `--dati` del capitale umano), pesati per controvalore, con la copertura e le posizioni senza composizione; `--json` per `it-revisione` e per il cruscotto
 - **Vedi anche** `it-rebalance/SKILL.md` (mantenimento delle allocazioni), `it-tax-optimization/SKILL.md` (fiscalità degli strumenti), `it-pianificazione/SKILL.md` (obiettivo pensione)

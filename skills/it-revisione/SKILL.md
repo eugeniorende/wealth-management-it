@@ -1,8 +1,8 @@
 ---
 name: it-revisione
-description: "Revisione periodica personale della situazione finanziaria complessiva: il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole «fare il punto», chiede una revisione annuale o di fine anno, dice «come sta andando il mio piano», «rivediamo il portafoglio», «check-up finanziario», «tiriamo le somme», o a novembre-dicembre vuole una verifica complessiva prima del 31/12; anche per l'Investment Policy Statement (IPS) e il cruscotto patrimoniale. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento), `it-tax-optimization` (minusvalenze di fine anno) e `it-rebalance` (deriva dell'allocazione). NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato."
+description: "Revisione periodica personale della situazione finanziaria complessiva: il livello di sintesi che tiene insieme pensione, obiettivi, fiscalità e allocazione. Usa questa skill quando l'utente vuole «fare il punto», chiede una revisione annuale o di fine anno, dice «come sta andando il mio piano», «rivediamo il portafoglio», «check-up finanziario», «tiriamo le somme», o a novembre-dicembre vuole una verifica complessiva prima del 31/12; anche per l'Investment Policy Statement (IPS), il cruscotto patrimoniale e quello grafico del piano. È la skill di orchestrazione: non ricalcola le proiezioni delle altre, le richiama e le sintetizza in un quadro unico con azioni prioritizzate e un report. Si appoggia a `it-pianificazione` e `it-pianificazione-autonomi` (gap previdenziale), `it-pianificazione-obiettivi` (avanzamento), `it-tax-optimization` (minusvalenze di fine anno) e `it-rebalance` (deriva dell'allocazione). NON è consulenza finanziaria, fiscale o previdenziale: rinvia a un professionista abilitato."
 metadata:
-  version: "0.7"
+  version: "0.9"
 ---
 
 # Revisione periodica personale
@@ -26,14 +26,14 @@ NON è il posto per una singola analisi verticale: se l'utente chiede solo "quan
 I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
 
 - i modelli Excel si **copiano** nella cartella di lavoro e si compilano lì, mai in `assets/`: `${CLAUDE_SKILL_DIR}/assets/cruscotto-patrimoniale.xlsx`, `${CLAUDE_SKILL_DIR}/assets/tracker-secchielli.xlsx`, `${CLAUDE_SKILL_DIR}/assets/investment-policy-statement.xlsx`;
-- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`;
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/genera-ips.py" ips.docx --dati ips.json`, `python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from mc.json -o cruscotto.html`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
 
-`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze dello script: Python 3.11 o successivo con python-docx (`pip install python-docx`).
+`${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze degli script: Python 3.11 o successivo; `genera-ips.py` vuole python-docx (`pip install python-docx`), `genera-cruscotto.py` solo la libreria standard.
 
 ## Il workflow della revisione
 
-La revisione segue un'agenda in cinque passi. Ai passi 1-2 fotografa; al passo 3 **richiama le altre skill** (non ne duplica la logica); ai passi 4-5 sintetizza e produce il report. Lo strumento `assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa.
+La revisione segue un'agenda in cinque passi più uno facoltativo. Ai passi 1-2 fotografa; al passo 3 **richiama le altre skill** (non ne duplica la logica); ai passi 4-5 sintetizza e produce il report; al passo 6, se l'utente lo vuole, disegna il piano in un cruscotto grafico. Lo strumento `assets/cruscotto-patrimoniale.xlsx` raccoglie la parte quantitativa.
 
 ### 1. Fotografia (dove sono)
 Patrimonio netto (attività per contenitore fiscale − passività), composizione, e allocazione complessiva per classe. Il cruscotto (fogli **Patrimonio** e **Allocazione**) la raccoglie. I contenitori fiscali richiamano `it-pianificazione-obiettivi/references/asset-location.md`.
@@ -45,7 +45,7 @@ Versamenti effettuati vs pianificati; andamento del periodo **separando il rendi
 - **Pensione** → `it-pianificazione` (dipendenti) o `it-pianificazione-autonomi` (P.IVA): il tasso di sostituzione proiettato è ancora in linea con l'obiettivo? C'è un **gap previdenziale**? Va aumentato il versamento al fondo pensione (verificando la deducibilità nel proprio regime)? Per il dipendente, qual è lo **spazio deducibile residuo** dell'anno: max(0, €5.300 − datore − dovuto − volontari già versati nell'anno), con il contributo del datore e quello minimo del lavoratore (il TFR non conta)? È il tetto fiscale dei volontari da versare ancora entro il 31/12, non un importo consigliato (foglio Complementare dell'Excel di `it-pianificazione`); per il forfettario la deduzione arriva solo fino agli altri redditi IRPEF (`it-pianificazione-autonomi`). Ciò che supera il plafond, o che il forfettario non deduce, va comunicato al fondo come non dedotto entro il 31/12 dell'anno dopo: senza comunicazione in uscita è tassato di nuovo, con una perdita del 9-15% su quella parte (23% se la posizione esce con un'anticipazione non sanitaria o un riscatto per altre cause).
 - **Obiettivi** → `it-pianificazione-obiettivi`: ogni obiettivo è **on track**? La **probabilità di successo** (Monte Carlo) è ancora adeguata? Il **glide path** richiede de-risking quest'anno? Va aggiustato il versamento mensile? La deriva per obiettivo si legge nel `tracker-secchielli.xlsx`, se l'utente lo tiene.
 - **Fiscalità** → `it-tax-optimization`: ci sono **minusvalenze in scadenza** (finestra 4 anni) da usare entro il 31/12? Plusvalenze da compensare? Opportunità di **harvesting**? (A fine anno questo passo ha priorità per via delle scadenze.)
-- **Allocazione** → `it-rebalance`: quanto è il **drift** rispetto al target? Va ribilanciato? Si può ribilanciare sfruttando le **minus in scadenza** per compensare le plus da vendita (coordinamento fiscale)?
+- **Allocazione** → `it-rebalance`: quanto è il **drift** rispetto al target? Va ribilanciato? Si può ribilanciare sfruttando le **minus in scadenza** per compensare le plus da vendita (coordinamento fiscale)? Con `composizione.csv` e il JSON dell'estratto, il **look-through** (`look-through-portafoglio.py --json`, it-pianificazione-obiettivi) dice cosa contengono gli ETF messi insieme: nel report i primi tre settori e paesi con la copertura, la quota dei primi dieci titoli (un minimo) e le posizioni senza composizione, da importare o compilare.
 
 ### 4. Azioni prioritizzate
 Si raccolgono le azioni emerse e si **ordinano**, secondo la logica di `references/metodo-revisione.md`:
@@ -57,6 +57,28 @@ Il valore della sintesi sono le **azioni cross-dominio** che risolvono più cose
 
 ### 5. Report
 Si produce il **report della revisione** come deliverable (vedi Formato output). È il pezzo che nessuna singola skill produce: la fotografia, i progressi e le azioni in un documento unico.
+
+### 6. Cruscotto grafico
+Una pagina HTML con i grafici del piano: allocazione attuale contro target con le bande, probabilità e capitale finale degli obiettivi, glide path, pensione lorda e netta, capitale umano, zainetto per scadenza, drift e ordini del ribilanciamento. I numeri vengono **solo** dai JSON che gli script scrivono con `--json` (quelli del «Contratto di input» più `ribilanciamento-multibroker.py --json`): la pagina li disegna, non li ricalcola, e tu non li riscrivi.
+
+1. Dalla cartella di lavoro, lancia il generatore sui JSON **scritti dagli script con `--json`** (`--from` ripetibile, l'ordine non conta; quello di `importa-previdenza.py` si riconosce e si salta; `ponte-pensione.py` e `riscatto-laurea.py` entrano nella sezione Pensione; del look-through passano solo gli aggregati, mai le posizioni). Non passare i file di **input** che stanno nella stessa cartella: `piano.json` (il `--dati` del ribilanciamento), `capitale-umano.json` (il `--dati` del capitale umano), `ips.json` (il `--dati` dell'IPS):
+   ```bash
+   python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from glide.json --from mco.json \
+       --from inps.json --from mc.json --from netto.json --from capitale-umano-out.json \
+       --from broker.json --from ribilancia.json --from look-through.json [--from ponte.json --from riscatto.json] -o cruscotto.html
+   ```
+   Se un JSON manca, dillo e genera il cruscotto con quelli che ci sono: le sezioni senza dati non compaiono. Gli errori fermano lo script con `ERRORE:`; secondo il messaggio:
+   - «non è un output riconosciuto»: è un file di input o di un altro programma, toglilo dai `--from`;
+   - «sono dello stesso tipo»: due file dello stesso script (per esempio `mc.json` al pensionamento e `mc-uscita.json` all'uscita anticipata): chiedi all'utente quale usare, non scegliere tu;
+   - «manca …»: il JSON viene da una versione precedente dello script; rigeneralo con lo script, non correggerlo a mano.
+2. Comunica il percorso del file e le sezioni incluse (le stampa lo script). Il file resta nella cartella di lavoro e si apre nel browser con un doppio clic, anche offline.
+3. **Chiedi sempre** se pubblicarlo come Artifact, con questa informazione: la pagina va su claude.ai e contiene importi, età e proiezioni del piano; resta privata finché l'utente non la condivide; si può cancellare. Le singole posizioni dell'estratto (ISIN, descrizioni) non ci sono. **Senza un sì esplicito non pubblicare.**
+4. Se l'utente dice sì:
+   - in **Claude Code**, pubblica con lo strumento Artifact il file `cruscotto.html` così com'è, senza riscriverlo;
+   - in **claude.ai** e in **Cowork**, crea un artifact HTML con il contenuto del file, copiato senza modifiche;
+   - se l'ambiente non ha un modo di creare artifact, dillo e lascia il file locale.
+   Per aggiornare il cruscotto dopo una nuova revisione si rilanciano gli script e il generatore, e si ripubblica sullo stesso Artifact.
+5. Se l'utente dice no, basta il file locale.
 
 ## Formato output
 
@@ -117,6 +139,8 @@ Ogni cella di input del cruscotto ha una fonte precisa. Dove la fonte è uno scr
 | Pensione, dipendenti | `proiezione-inps.py --json` → `montecarlo-pensione.py --from --json` → `netto-pensione.py --from --json` (it-pianificazione) | `tasso_sostituzione_lordo.mediana` del Monte Carlo: INPS più fondo, lordo sulla RAL finale. L'obiettivo è il `target` dello stesso JSON, sulla stessa base lorda (per un obiettivo diverso si rilancia con `--set TASSO_SOSTITUZIONE_TARGET=…`). Il netto (`scenari[nome="mediana"].tasso_sostituzione_netto`, e `P10` per la lettura prudente) va nel report come misura del tenore di vita, mai in B12 contro un obiettivo lordo; `tasso_sostituzione_lordo_vs_ral_finale` della proiezione è la sola quota pubblica e non va in B12 | `Sintesi!B12`; `B13` |
 | Pensione, autonomi | `proiezione-pensione-autonomi.xlsx`, foglio Riepilogo (nessuno script) | `Riepilogo!B13`, «Tasso di sostituzione — totale» (non la B12, che è la sola obbligatoria), lordo; l'obiettivo sulla stessa base | `Sintesi!B12`; `B13` |
 | Fiscalità | `importa-estratto-broker.py --json` | `analisi.per_broker[broker].zainetto_in_scadenza` e `.plus_realizzabili_a_costo_zero` | foglio `Azioni`, righe di scadenza al 31/12 (nessuna cella numerica) |
+| Capitale umano | `capitale-umano.py --json` (it-pianificazione-obiettivi), con `--composizione` da `importa-composizione-etf.py` per il settore | `esposizione_finanziaria` contro `esposizione_totale`; `settore.quota_settore_fin` e `settore.sovrappeso` se c'è la composizione; `eta_sorpasso` con `stato_sorpasso` (`gia_superato`, `entro_la_proiezione`, `non_prima_della_fine`) | report, nessuna cella: è una lente, non un target |
+| Look-through | `look-through-portafoglio.py --json` (it-pianificazione-obiettivi), con `--composizione` e `--posizioni` dal `--json` di `importa-estratto-broker.py` | `settori[]`, `paesi[]` e `titoli[]` (`nome`, `peso` sulla parte coperta) con `copertura` accanto; `quota_primi_titoli` (un minimo); `senza_composizione[]` per nome | report, nessuna cella: fotografia delle composizioni alla data dei file |
 
 Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione; `--help` di ogni script elenca anche le chiavi che legge con `--from`.
 
@@ -128,6 +152,8 @@ Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione
 - ❌ **Trattare i quattro domini come liste separate**: il valore è nelle azioni cross-dominio (ribilanciare usando le minus, versare dove rende di più). Cercarle sempre.
 - ❌ **Ignorare le scadenze di fine anno**: a novembre-dicembre le minus in scadenza, il versamento al fondo pensione e la comunicazione dei contributi non dedotti hanno priorità operativa, vanno prima dell'impatto strutturale.
 - ❌ **Promettere risultati o dare raccomandazioni di investimento personalizzate**: la revisione mette ordine e propone, ma rinvia al professionista per le decisioni.
+- ❌ **Pubblicare il cruscotto senza conferma**: un Artifact porta i dati del piano su claude.ai; si pubblica solo dopo un sì esplicito, ogni volta.
+- ❌ **Scrivere a mano numeri nel cruscotto o modificare il template nel plugin**: i numeri vengono dai JSON degli script; se uno è sbagliato si rilancia lo script, e `cruscotto.html` si rigenera, non si edita.
 
 ## Riferimenti
 
@@ -137,6 +163,8 @@ Le chiavi dei JSON sono quelle scritte dagli script alla data di questa versione
 - `assets/cruscotto-patrimoniale.xlsx` — il cruscotto quantitativo (Patrimonio, Allocazione, Andamento, Sintesi, Azioni, Rendimento TWR)
 - `assets/tracker-secchielli.xlsx` — il monitoraggio goals-based: secchielli e anno del piano (Impostazioni), calendario del glide path incollato da `glidepath-obiettivi.py` (Glide), posizioni assegnate a secchiello e classe con tendine (Posizioni), effettivo contro target per secchiello e aggregato con semaforo sulle bande 5/25 (Controllo), registro dei versamenti; si compila nella cartella di lavoro e si rilegge al passo 3
 - `assets/genera-ips.py` — l'IPS in Word: copertina, 12 sezioni, appendici con la checklist e il broker; la nota di rischio viene dalla quota azionaria; i dati del caso arrivano da `--dati ips.json` (vedi «I dati dell'IPS»), senza il documento è l'esempio e lo dice in copertina
+- `assets/genera-cruscotto.py` — il **cruscotto grafico**: legge i `--json` degli script del piano (`--from`, ripetibile), ne riconosce il tipo dalle chiavi e scrive una pagina HTML autosufficiente con i grafici; `--json` scrive anche i dati che finiscono nella pagina (vedi «Cruscotto grafico»)
+- `assets/cruscotto.html` — il template della pagina, fisso: HTML, CSS e JavaScript senza risorse esterne; non si modifica, lo usa `genera-cruscotto.py`
 - `assets/template-revisione.md` — il **template del report** di revisione, scheletro markdown precompilato da riempire (le cinque sezioni + disclaimer)
 - **Orchestra** (non duplica) le altre skill del plugin:
   - `it-pianificazione` / `it-pianificazione-autonomi` — il gap previdenziale e il fondo pensione

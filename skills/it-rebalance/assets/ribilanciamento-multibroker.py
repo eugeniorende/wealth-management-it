@@ -59,6 +59,7 @@ scegliere lo strumento specifico (quale ETF/fondo) da movimentare.
 
 import argparse
 import csv
+import json
 import os
 import sys
 
@@ -937,6 +938,9 @@ def main(argv=None):
                     help="JSON di importa-estratto-broker.py --json: lo zainetto per broker in euro 26%%-equivalenti "
                          "(analisi.per_broker), al posto di quello del JSON di --dati o dello script")
     ap.add_argument("--out", metavar="DIR", help="cartella dei CSV degli ordini (default: ./ordini nella cartella corrente)")
+    ap.add_argument("--json", metavar="FILE",
+                    help="scrive il piano in JSON (drift, allocazione risultante, imposta, zainetto, ordini), "
+                         "letto da genera-cruscotto.py di it-revisione")
     args = ap.parse_args(argv)
     try:
         if args.dati:
@@ -953,16 +957,41 @@ def main(argv=None):
         print(f"ERRORE: parametri: {e}", file=sys.stderr)
         raise SystemExit(1)
     stampa(plan)
+    ordini = genera_ordini(plan)
     if GENERA_CSV:
-        esporta_ordini(plan)
+        esporta_ordini(plan, ordini)
+    if args.json:
+        try:
+            with open(args.json, "w", encoding="utf-8") as f:
+                json.dump(piano_json(plan, ordini), f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            print(f"ERRORE: impossibile scrivere {args.json}: {e}", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"JSON del piano: {args.json}")
     print("   Questo strumento è educativo e non costituisce consulenza di investimento o fiscale:")
     print("   l'allocazione target è tua; saldi, prezzo medio di carico e zainetto vanno verificati")
     print("   sul portale del broker.")
     print()
 
 
-def esporta_ordini(plan):
-    ordini = genera_ordini(plan)
+def piano_json(plan, ordini):
+    """Il piano per --json (lo legge genera-cruscotto.py di it-revisione): gli stessi numeri dello stdout e
+    gli ordini dei CSV, nessun calcolo nuovo. Le chiavi sono quelle interne del piano (SKILL.md, «Formato output»)."""
+    campi_drift = ("peso", "target", "drift", "tight", "wide", "fuori_banda", "esito", "motivo")
+    return {
+        "totale": plan["totale"], "totale_post": plan["totale_post"], "imposta": plan["imposta"],
+        "prelievo": plan["prelievo"], "entrate": plan["entrate"], "liquidato": plan["liquidato"],
+        "drift": {cl: {k: d.get(k) for k in campi_drift} for cl, d in plan["drift"].items()},
+        "risultante": plan["risultante"],
+        "zainetto": plan["zainetto"],
+        "ordini": ordini,
+        "dati_esempio": DATI_ESEMPIO,   # come la riga NOTA del CSV: il JSON può circolare da solo
+    }
+
+
+def esporta_ordini(plan, ordini=None):
+    if ordini is None:
+        ordini = genera_ordini(plan)
     if not ordini:
         print("5) NESSUN ORDINE DA ESPORTARE — le correzioni sono rinviate (vedi la sezione 2) o non "
               "necessarie; nessun CSV generato")

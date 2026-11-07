@@ -23,6 +23,7 @@ Dal **1° gennaio 2027** si applicano i testi unici della riforma fiscale, che a
 |---|---|
 | art. 10 c. 1 lett. e TUIR (contributi previdenziali obbligatori) | art. 10 c. 1 lett. f |
 | art. 10 c. 1 lett. e-bis TUIR (previdenza complementare) | art. 10 c. 1 lett. h |
+| art. 2 c. 5-bis D.Lgs. 184/1997, ultimo periodo (riscatto della laurea di chi non ha mai lavorato: deduzione dell'interessato, 19% al familiare) | art. 10 c. 1 lett. u e art. 14 c. 1 lett. i (il periodo è abrogato) |
 | art. 9 c. 2 TUIR (cambio del giorno per corrispettivi e costi in valuta) | art. 9 c. 2 |
 | art. 11 TUIR (scaglioni) | art. 11 |
 | art. 13 c. 1 e c. 3 TUIR (detrazioni lavoro dipendente e pensione) | art. 13 c. 1 e c. 3 |

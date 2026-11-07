@@ -26,6 +26,8 @@ Step 3: imposta sostitutiva
 
 L'imposta sostitutiva **sostituisce**: IRPEF, addizionali regionali e comunali, IRAP. Il reddito forfettario **NON concorre** al reddito complessivo IRPEF.
 
+**Cosa entra nei compensi.** La rivalsa INPS del 4% addebitata ai clienti dal professionista in Gestione Separata (art. 1 c. 212 L. 662/1996) è un compenso, non un contributo: conta per il limite di €85.000 e si moltiplica per il coefficiente come il resto della fattura. Il contributo integrativo di una cassa professionale, posto dalla legge a carico del cliente, resta invece fuori dai compensi. Dettagli ed esempio in `previdenza-gestione-separata.md`, «Flussi di cassa».
+
 ### Coefficienti di redditività per codice ATECO
 
 | Attività | Coefficiente |
@@ -67,6 +69,8 @@ Esempio: consulente IT, ricavi €40.000, coefficiente 78%
 ```
 
 ⚠️ Dimenticare di dedurre i contributi obbligatori costa il 15% (o 5%) del loro ammontare in imposta non risparmiata. È un errore da non fare mai.
+
+**Si deducono per cassa, e l'eccedenza va sugli altri redditi.** Contano i contributi **versati** nell'anno, non quelli di competenza: nel secondo anno di attività, quando si pagano insieme il saldo del primo e gli acconti del secondo, la deduzione vale quasi due annualità e l'imponibile quasi si dimezza (esempio in `previdenza-gestione-separata.md`). Se i contributi versati superano il reddito lordo forfettario (rigo LM34), la parte che non trova capienza va nel rigo LM49 e si deduce dal reddito complessivo IRPEF nel rigo RP21 (art. 1 c. 64 L. 190/2014, dal 2027 art. 235 c. 1 D.Lgs. 117/2026; deduzione dell'art. 10 c. 1 lett. e TUIR, dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026). Serve quindi avere altri redditi IRPEF: per il forfettario puro quell'eccedenza va persa. *(Istruzioni Redditi PF 2026, Fascicolo 3, righi LM35 e LM49 — Verificato: 2026-10.)*
 
 ### Contributo VOLONTARIO al fondo pensione → NON DEDUCIBILE (per il forfettario puro)
 
@@ -172,4 +176,5 @@ Per chi ha **costi reali elevati** o vuole **dedurre il fondo pensione**, l'ordi
 4. **Ricordare la deducibilità dei contributi obbligatori**: quelli SÌ si deducono dal forfettario (unica deduzione). Non dedurli è un errore costoso.
 5. **Presentare il confronto fondo vs ETF onestamente**: per il forfettario puro non c'è una risposta univoca; dipende da liquidità, costi, orizzonte.
 6. **Coefficiente 78% per IT/professioni**: usarlo come default per developer/consulenti, ma confermare il codice ATECO.
-7. **Rinviare al commercialista** per la scelta del regime: è una valutazione complessa, non un calcolo meccanico.
+7. **Rivalsa ed eccedenza**: la rivalsa INPS del 4% è un compenso (limite di €85.000 e reddito); i contributi si deducono nell'anno in cui si versano, e quelli oltre il reddito forfettario solo dagli altri redditi IRPEF (LM49 → RP21).
+8. **Rinviare al commercialista** per la scelta del regime: è una valutazione complessa, non un calcolo meccanico.

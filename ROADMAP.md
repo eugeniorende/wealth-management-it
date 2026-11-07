@@ -1,13 +1,13 @@
 # Roadmap
 
-Stato al 24/10/2026: 0.11.0 rilasciata il 24/10/2026 (T9, T12, T14 e le voci di pre-pubblicazione non riservate al proprietario), dopo la 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11 e parte di T13). Restano T13 (da decidere) e le voci del proprietario: visibilità, branch protection, icona, prove di installazione da un account esterno e in Cowork. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 7/11/2026: 0.12.0 in rilascio (`release/0.12.0` da `develop`, dopo la PR #59), con T13 (PR #54), T15 capitale umano (PR #55 e #56), T17 cruscotto grafico (PR #57), T16 importatore della composizione degli ETF (PR #58) e il ciclo deciso l'1/11/2026 (PR #59: look-through del portafoglio, ponte e riscatto nel cruscotto, lingue tedesca e francese, file reali degli emittenti). Prima: 0.11.0 del 24/10/2026 (T9, T12, T14 e pre-pubblicazione) e 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11). Il repository è pubblico dal 24/10/2026, con un ruleset su `main` e `develop`; l'icona del plugin non si aggiunge. Restano al proprietario le prove di installazione da un account senza accesso e in Cowork, e la prova della pubblicazione del cruscotto come Artifact. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
 Prese il 20/10/2026.
 
 1. **0.10.0 correttiva entro il 31/12/2026**, con il fix della CI, i quick win, tutti i temi P0 (T1–T8) e T11.
-2. **Repository privato ora, pubblico più avanti.** Licenza, privacy, Windows e packaging si chiudono nella milestone «Pre-pubblicazione», prima di cambiare la visibilità.
+2. **Repository privato ora, pubblico più avanti.** Licenza, privacy, Windows e packaging si chiudono nella milestone «Pre-pubblicazione», prima di cambiare la visibilità. Il proprietario l'ha reso pubblico il 24/10/2026, dopo la 0.11.0.
 3. **Regime dichiarativo: solo principi.** Il motore resta sull'amministrato e la reference del dichiarativo diventa corretta e completa (T3). Non si costruisce un importatore per IBKR o Degiro.
 4. **Uscite operative con gate stretti e disclaimer.** La OPZIONE sulla leva di rischio, il «versa fino a €5.300» e il CSV degli ordini restano, ma solo quando le condizioni sono rispettate. Il disclaimer va anche nei commands e nel CSV.
 5. **Proposte dell'audit adottate:**
@@ -156,7 +156,8 @@ Prese il 20/10/2026.
 - Criteri: T9 e T12 chiusi, le voci di «Pre-pubblicazione» spuntate o motivate come riservate al proprietario (visibilità, branch protection, icona, prove di installazione da account esterno e in Cowork).
 - `release/0.11.0` parte da `develop` → PR su `main` con merge commit → tag `v0.11.0` → `release.yml` (suite completa con freshness, zip con LICENSE e NOTICE) → merge back di `main` su `develop`.
 - Finestra: i marcatori più vecchi sono del 2026-06 e scadono a giugno 2027; `release.yml` esegue anche la freshness, quindi il tag va dato prima, oppure dopo una riverifica alle fonti.
-- [x] Rilasciata il 24/10/2026: T9 (PR #43-#46), T12 (#47), T14 (#48), pre-pubblicazione (#49).
+- [x] Su `main` il 24/10/2026 (PR #50, merge back con la #51): T9 (PR #43-#46), T12 (#47), T14 (#48), pre-pubblicazione (#49). `release.yml` collaudato su `main` con l'avvio manuale (suite completa con freshness verde, zip come artifact).
+- [x] Tag `v0.11.0` su `main` dato dal proprietario (dalla sessione cloud il push dei tag è respinto con un 403); `release.yml` (run 40123407611) ha pubblicato la GitHub Release con lo zip.
 
 ## Pre-pubblicazione — prima di rendere pubblico il repository
 
@@ -176,22 +177,60 @@ Prese il 20/10/2026.
   - [x] description entro i 1.024 caratteri, quotate per un parser YAML stretto, con `metadata.version` per skill e i trigger non gestiti di it-pianificazione (riscatto, ricongiunzione, totalizzazione) dichiarati fuori perimetro;
   - [x] CHANGELOG.md, con la storia delle skill tolta dai SKILL.md;
   - [x] commands come alias delle skill (`disable-model-invocation`, `argument-hint`, `$ARGUMENTS`);
-  - [x] plugin.json senza warning: `upstream` in `metadata`, `claude plugin validate --strict` nella CI (resta solo ICON_MISSING del controllo per il plugin directory, che non cambia l'esito: l'icona la decide il proprietario);
+  - [x] plugin.json senza warning: `upstream` in `metadata`, `claude plugin validate --strict` nella CI (resta solo ICON_MISSING del controllo per il plugin directory, che non cambia l'esito: il proprietario ha deciso il 24/10/2026 di non aggiungere l'icona);
   - [x] indici nelle reference da 100 righe in su, istruzioni di aggiornamento nel README (`claude plugin update`, auto-update, `--scope`), titolo e lingua italiana nell'IPS in Word.
-- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatte il 21 e il 24/10/2026 le prove in profili Claude Code vuoti: marketplace locale, marketplace da GitHub (con le credenziali della sessione), `--config` e `/plugin configure` della cartella di lavoro, script lanciati dalla copia in cache, zip estratto e validato con `--strict` (verbale in `docs/sviluppo/verbale-installazione-2026-10-24.md`). **Restano al proprietario**: GitHub da un account senza accesso, possibile solo dopo la pubblicazione (decisione 2), e l'upload in Cowork, che richiede la sua interfaccia; i passi sono nel verbale.
+- [ ] Prova di installazione da zero, da un account senza accesso al repository, e in Cowork con lo zip della release. Fatte il 21 e il 24/10/2026 le prove in profili Claude Code vuoti: marketplace locale, marketplace da GitHub (con le credenziali della sessione), `--config` e `/plugin configure` della cartella di lavoro, script lanciati dalla copia in cache, zip estratto e validato con `--strict` (verbale in `docs/sviluppo/verbale-installazione-2026-10-24.md`). **Restano al proprietario**: GitHub da un account senza accesso, possibile dal 24/10/2026 con il repository pubblico, e l'upload in Cowork, che richiede la sua interfaccia; i passi sono nel verbale.
 - [x] Supply chain della CI: action fissate per SHA con test di igiene, claude-code a versione fissa (PR #15). Dependabot su pip non serve: le dipendenze hanno solo versioni minime.
 - [x] Rilettura degli output operativi rispetto alla postura «educativa» (decisione 4): OPZIONE e tetto dei €5.300 con il loro gate, CSV degli ordini con la categoria del vocabolario e i dati d'esempio dichiarati, IPS d'esempio dichiarato in copertina, leve previdenziali come scenari nelle skill (verbale in `docs/sviluppo/verbale-rilettura-output-2026-10-24.md`).
 - [x] README coerente con un repository pubblico: marketplace e Releases, aggiornamenti (`claude plugin update`, auto-update, `--scope`), opzione della cartella di lavoro, CHANGELOG.md.
 
 ## Dopo — da decidere
 
-- [ ] **T13 Estensioni** (P1, L): F021, F054, F055, F063.
+- [x] **T13 Estensioni** (P1, L): F021, F054, F055, F063 (PR #32 e #54).
   - [x] Reference sui dividendi esteri e su successione e donazione (F021, F054), anticipate nella 0.10.0 con l'indice, i rimandi da it-rebalance e it-pianificazione-obiettivi e i test sui numeri (PR #32).
-  - [ ] Sezione sul riscatto della laurea (F055); la correzione della description di it-pianificazione si può anticipare con T14.
-  - [ ] Casi frequenti del freelance (F063).
+  - [x] Riscatto della laurea (F055, PR #54): sezione in `previdenza-obbligatoria.md` e, oltre la proposta dell'audit («solo sezione e `--set`»), lo script `riscatto-laurea.py` nella catena `--json` → `--from`, deciso dal proprietario il 24/10/2026 («implementare le ultime funzioni rimaste»).
+  - [x] Casi frequenti del freelance (F063, PR #54): rivalsa del 4%, saldo e acconti con l'esempio primo anno contro secondo, eccedenza LM49 → RP21, Pattern A6.
 
-  Per le due voci aperte la proposta dell'audit, non ancora decisa, è: riscatto solo come sezione e con `--set`. Il confronto TFR contro fondo (F037) e il prelievo in decumulo (F046) sono già in T4 e T7.
+  Il confronto TFR contro fondo (F037) e il prelievo in decumulo (F046) sono già in T4 e T7.
+
+- [x] **T15 Capitale umano, lente diagnostica** (P2, L): spec `docs/sviluppo/specs/2026-10-25-capitale-umano-design.md`, piano `docs/sviluppo/piani/2026-10-25-capitale-umano.md`.
+  - [x] `capitale-umano.py`, profili, esempi, reference, comando `/capitale-umano` e Step 8 di it-pianificazione-obiettivi.
+  - [x] Diagnosi 1-5 con la riga di equivalenza.
+  - [x] Integrazione in `it-revisione` (contratto di input e template).
+  - [x] Test con valori chiusi, invarianti e il caso di Ibbotson et al. 2007.
+  - [x] Gli otto minori della revisione finale: proiezione a tre contenitori con TFR e contributi trasferiti, orizzonte dei pensionati, P50, sensibilità in punti, `stato_sorpasso`, chiavi non riconosciute, mediana del Monte Carlo spiegata.
+  - Sviluppi successivi, da decidere: secondo reddito del nucleo; volatilità personale del reddito dall'estratto INPS (`importa-previdenza.py`); aggiustamento dei target (il capitale umano che modifica l'allocazione); polizza vita (Ibbotson et al. cap. 3; Chen et al. 2006).
+- [x] **T17 Cruscotto grafico e Artifact** (P2, M): spec `docs/sviluppo/specs/2026-10-25-cruscotto-grafico-design.md`, piano `docs/sviluppo/piani/2026-10-25-cruscotto-grafico.md`.
+  - [x] `ribilanciamento-multibroker.py --json`.
+  - [x] `genera-cruscotto.py`: firme dei JSON, bundle minimo, errori espliciti.
+  - [x] `cruscotto.html`: nove sezioni in SVG, tema chiaro e scuro, larghezza da telefono, nessuna risorsa esterna.
+  - [x] Test in Chromium con Playwright, obbligatori in CI.
+  - [x] Passo 6 di it-revisione e comando `/cruscotto`, con la conferma prima di pubblicare l'Artifact.
+  - [ ] Prova manuale della pubblicazione in claude.ai e in Cowork alla prossima release.
+  - [x] Ponte pensione e riscatto della laurea nella sezione Pensione del cruscotto (1/11/2026): i due JSON, prima riconosciuti e saltati, disegnano probabilità e capitale del ponte, RITA e costo permanente, oneri e rientro del riscatto.
+  - Sviluppi successivi, da decidere: confronto tra due revisioni; versione anonimizzata per la condivisione.
+- [ ] **T16 Fonti dati esterne e connettori** (P2). Principio: gli script di calcolo restano offline; il dato si procura a parte (importatore su file, o Claude che lo scarica nella cartella di lavoro) e lo script legge un file locale. Per ogni fonte si annotano licenza (quelle a pagamento non si ridistribuiscono nel repository) e mese di verifica.
+
+  - [x] **Composizione degli ETF** (alta priorità): spec `docs/sviluppo/specs/2026-10-25-composizione-etf-design.md`, piano `docs/sviluppo/piani/2026-10-25-composizione-etf.md`. `importa-composizione-etf.py` legge i file delle posizioni di iShares, Xtrackers, Vanguard, Amundi e SPDR (CSV o XLSX, italiano o inglese) e scrive `composizione.csv` per settore GICS e paese ISO; `capitale-umano.py` lo legge per la diagnosi 4, accanto al vecchio formato compilato a mano. Layout di Xtrackers e SPDR verificati su file reali il 25/10/2026; iShares (sito italiano, CSV), Vanguard (sito italiano, XLSX in ICB) e Amundi (sito italiano, «Composizione dell'indice» letta come file di ripartizione) su file reali forniti dal proprietario il 7/11/2026. Nello stesso giorno anche il «Fund Holdings» di Amundi (ETF a swap, replica sintetica segnalata) e il «Constituent» di Xtrackers dal sito tedesco. Restano da confermare: iShares dal sito britannico, Amundi dai siti tedesco e francese.
+  - [x] **Look-through del portafoglio** (evolutiva C, decisa l'1/11/2026): spec `docs/sviluppo/specs/2026-11-01-look-through-design.md`, piano `docs/sviluppo/piani/2026-11-01-look-through.md`. `look-through-portafoglio.py` aggrega settori, paesi e primi titoli su tutte le posizioni, pesati per controvalore, con la copertura per dimensione; le posizioni arrivano dall'estratto del broker (`importa-estratto-broker.py --json`) o dal `--dati` del capitale umano, con l'ISIN come chiave (`--isin` dell'importatore); `capitale-umano.py` legge il campo `isin`; l'importatore scrive le righe `titolo` (primi dieci, peso nel fondo); `--json` per `it-revisione` e sezione «Look-through» del cruscotto. Sviluppi successivi, da decidere: regioni come dimensione; ISIN dei titoli nel CSV per sommare senza la chiave del nome; valuta di denominazione.
+  - [x] **Lingue tedesca e francese** (1/11/2026): sinonimi delle intestazioni, dei settori GICS (con i nomi ICB esclusivi), dei paesi dei file reali, delle esclusioni e delle etichette della data per gli export di Xtrackers e Amundi dai siti tedesco e francese; solo dati nelle tabelle, nessun cambio al motore; verificato su file sintetici (`composizione-xtrackers-de.csv`, `composizione-amundi-fr.csv`), da confermare su un file reale come iShares, Vanguard e Amundi.
+
+  | Priorità | Dato | Serve per | Fonte | Forma |
+  |---|---|---|---|---|
+  | Alta, fatta | Composizione degli ETF per settore e paese | Diagnosi 4 del capitale umano; look-through del portafoglio | File delle posizioni di iShares, Xtrackers, Vanguard, Amundi, SPDR | `importa-composizione-etf.py` → `composizione.csv` |
+  | Media | Tasso reale privo di rischio dell'area euro | `R_F` del capitale umano | BCE Data Portal (curva dei tassi; aspettative d'inflazione SPF); BTP€i/OAT€i | Fetch di Claude o `--set R_F` |
+  | Media | Perdita del lavoro e durata della disoccupazione per settore e contratto | `p_u`, `durata_anni` dei profili | ISTAT (flussi delle forze di lavoro); Osservatorio INPS su precariato e NASpI | Calibrazione annuale con `Verificato:` |
+  | Media | Parametri NASpI | `sostituzione_naspi` | Circolare INPS annuale sui massimali | Manuale, nella freshness |
+  | Bassa | Volatilità delle retribuzioni per settore | `sigma_h` dei profili | ISTAT (retribuzioni contrattuali); Eurostat SES; Banca d'Italia SHIW | Calibrazione una tantum, citata nel CSV |
+  | Bassa | Rendimenti azionari europei e mondiali | Correlazioni e bootstrap non solo USA | Kenneth French Data Library (gratuita); MSCI, DMS (a pagamento) | CSV sostitutivo di `rendimenti-storici.csv` |
+  | Bassa | Pesi settoriali dell'indice mondiale | `PESI_MONDO` di `capitale-umano.py` | Scheda MSCI ACWI | Manuale a ogni release |
+
+### Linea di taglio e rilascio della 0.12.0
+
+- Dentro: T13, T15, T16 (importatore, look-through, lingue, file reali), T17 (cruscotto, ponte e riscatto). Skill: it-pianificazione-obiettivi 0.24, it-revisione 0.9, it-rebalance 0.8, it-pianificazione 0.13, it-pianificazione-autonomi 0.5, it-tax-optimization 0.11.
+- `release/0.12.0` parte da `develop` il 7/11/2026 (versione nei manifest, sezione v0.12.0 del changelog, README e ROADMAP) → PR su `main` con merge commit → tag `v0.12.0` dato dal proprietario → `release.yml` → merge back di `main` su `develop`.
+- Freshness: nessun marcatore scade prima del 2027-06, quindi `release.yml` passa senza riverifiche.
 
 ## Fuori dal codice
 
-- [ ] Branch protection su `main` e `develop` con i check `test` e `validate`, da impostare su GitHub **dopo la pubblicazione**: su un repository privato senza GitHub Pro non è attivabile (l'API risponde 403, verificato il 23/10/2026). Decisione del proprietario.
+- [x] Branch protection su `main` e `develop`: dal 24/10/2026, con il repository pubblico, il proprietario ha attivato un ruleset su entrambi i branch (niente cancellazione né force push, check obbligatori `test` e `validate`).

@@ -2,7 +2,7 @@
 name: it-rebalance
 description: "Ribilanciamento di portafoglio tax-aware sotto la fiscalità italiana (regime amministrato). Usa questa skill quando l'utente parla di ribilanciamento, rebalancing, riequilibrio del portafoglio, allocazione target vs effettiva, drift dell'asset allocation, portafoglio sbilanciato («le azioni sono cresciute troppo»), riportare i pesi all'allocazione obiettivo con o senza vendere, ribilanciare con i nuovi versamenti o i dividendi, prelievo in decumulo, ribilanciamento di fine anno coordinato con le minusvalenze. Misura il drift con le bande 5/25 e applica la gerarchia delle leve (versamenti, flussi, vendite in minus, vendite tassate con gate), con il CSV degli ordini per broker. Coordina con `it-tax-optimization`: in Italia ogni vendita è un evento fiscale (plus/minus sul costo medio ponderato, zainetto). NON è consulenza di investimento: non raccomanda quale asset allocation scegliere, che è input dell'utente. NON copre i fondi pensione (vincolati)."
 metadata:
-  version: "0.7"
+  version: "0.8"
 ---
 
 # it-rebalance
@@ -89,7 +89,7 @@ Per un portafoglio tipico in ETF UCITS, il costo di transazione del ribilanciame
 
 I dati personali e i file compilati vivono nella **cartella di lavoro** dell'utente (per esempio `~/piano-finanziario/`; se il plugin è stato installato con Claude Code, è quella scelta all'installazione: `${user_config.cartella_lavoro}`; se il segnaposto qui sopra non è stato sostituito, chiedila all'utente), mai dentro il plugin: la copia installata si sovrascrive a ogni aggiornamento. Regole:
 
-- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/ribilanciamento-multibroker.py" --dati piano.json --zainetto importatore.json --out ordini`;
+- gli script si lanciano dalla cartella di lavoro con il loro percorso nel plugin, e il file da leggere si passa sempre come argomento (`--help` elenca argomenti e opzioni): `python "${CLAUDE_SKILL_DIR}/assets/ribilanciamento-multibroker.py" --dati piano.json --zainetto importatore.json --out ordini --json ribilancia.json`;
 - gli output (JSON, CSV degli ordini, documenti) finiscono nella cartella di lavoro, mai nel plugin.
 
 `${CLAUDE_SKILL_DIR}` è la cartella di questa skill: Claude Code lo sostituisce con il percorso reale quando carica la skill (anche quando la skill la carica un comando: i comandi sono alias e non lanciano script). Dipendenze dello script: Python 3.11 o successivo, solo libreria standard.
@@ -244,6 +244,8 @@ Per ogni mossa proposta, calcolare:
 
 Mostrare il **costo fiscale totale** del piano e l'allocazione finale rispetto al target.
 
+Con `--json FILE` lo script scrive anche il piano in JSON (vedi «Formato output»): servono al cruscotto grafico di `it-revisione`.
+
 ## Formato output
 
 Report markdown in sezioni:
@@ -278,6 +280,18 @@ Tabella allocazione post-ribilanciamento vs target, per verificare che il piano 
 - Se serve vendere → indicare la sequenza fiscalmente ottimale
 - Se la correzione paga imposta → regola di rientro: fino a metà banda, non a target, e solo con il drift oltre la banda larga; altrimenti si rinvia, dicendo quanto resta da correggere e quanto costerebbe
 - Coordinamento di fine anno: se ci sono minus in scadenza (31/12 del 4° anno), il ribilanciamento può essere il momento per realizzare plus compensabili
+
+### Il piano in JSON (`--json FILE`)
+
+Gli stessi numeri dello stdout e gli ordini dei CSV, nessun calcolo nuovo; le chiavi sono quelle interne del piano:
+
+- `totale` e `totale_post` (il patrimonio prima e dopo versamenti, flussi e prelievo), `imposta`, `prelievo`, `entrate`, `liquidato`;
+- `drift`: per classe `peso`, `target`, `drift`, `tight` (banda stretta), `wide` (banda larga), `fuori_banda`, `esito`, `motivo`, con i pesi come frazioni (0,68 = 68%);
+- `risultante`: il peso per classe dopo il piano;
+- `zainetto`: lo zainetto residuo per broker dopo il piano, in euro 26%-equivalenti;
+- `ordini`: gli ordini eseguibili, con le colonne dei CSV (`broker`, `operazione`, `classe`, `categoria_fiscale`, `importo_eur`, `plus_minus_eur`, `imposta_eur`, `compensazione_zainetto_eur`, `nota`).
+
+Per vederlo in grafico insieme agli altri JSON del piano: `/cruscotto` (it-revisione), che chiede prima di pubblicare.
 
 ### Disclaimer (obbligatorio in fondo)
 
