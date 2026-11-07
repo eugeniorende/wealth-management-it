@@ -1,0 +1,13 @@
+﻿Al,"05/11/2026"
+ 
+Ticker dell'emittente,Nome,Settore,Asset Class,Valore di mercato,Ponderazione (%),Valore nozionale,Nominale,Prezzo,Area Geografica,Cambio,Valuta di mercato
+"AAA","ALPHA","IT","Azionario","3.000,00","30,00","3.000,00","10,00","300,00","Stati Uniti","NASDAQ","USD"
+"BBB","BETA CLASS A","Comunicazione","Azionario","2.000,00","20,00","2.000,00","10,00","200,00","Stati Uniti","NASDAQ","USD"
+"CCC","GAMMA","Generi di largo consumo","Azionario","1.500,00","15,00","1.500,00","10,00","150,00","Regno unito","London Stock Exchange","GBP"
+"DDD","DELTA","Imprese di servizi di pubblica utilità","Azionario","1.500,00","15,00","1.500,00","10,00","150,00","Giappone","Tokyo Stock Exchange","JPY"
+"EEE","EPSILON","Finanziari","Azionario","1.000,00","10,00","1.000,00","10,00","100,00","Hong Kong","Hong Kong Exchanges And Clearing Ltd","HKD"
+"FFF","ZETA","Salute","Azionario","900,00","9,00","900,00","10,00","90,00","Canada","Toronto Stock Exchange","CAD"
+"EUR","EUR CASH","Liquidità e/o derivati","Contanti","80,00","0,80","80,00","80,00","1,00","Unione Europea","-","EUR"
+"VGZ6","EURO STOXX 50 DEC 26","Liquidità e/o derivati","Futures","0,00","0,00","5.000,00","1,00","5.000,00","Unione Europea","Eurex Deutschland","EUR"
+"AUD","AUD/USD","Liquidità e/o derivati","FX","-9,00","0,00","-9,00","1,00","1,00","Stati Uniti","-","USD"
+"XXX","MONEY MARKET","Liquidità e/o derivati","Money Market","20,00","0,20","20,00","20,00","1,00","-","-","USD"

@@ -5610,6 +5610,129 @@ def t_ce_lingue():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _xlsx_reale(tipo, cartella):
+    """File sintetici con il layout dei file reali di novembre 2026 (i file veri non si ridistribuiscono):
+    Vanguard dal sito italiano (posizioni con «% del valore di mercato», «Regione» in codici ISO, settori ICB) e
+    Amundi «Composizione dell'indice» (ripartizione per settore e paese su fogli separati, stili Excel non validi)."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    if tipo == "vanguard-it":
+        ws = wb.active
+        ws.title = "Dati delle partecipazioni"
+        for riga in (["Questo file è stato scaricato il 07 nov 2026"], [None], ["Dati delle partecipazioni"],
+                     ["Vanguard FTSE All-World UCITS ETF (USD) Accumulating"], ["Al 30 set 2026"], [None],
+                     ["Ticker", "Nome delle partecipazioni", "% del valore di mercato", "Settore", "Regione", "Valore di mercato", "Azioni"],
+                     ["NVDA", "NVIDIA Corp", "50,0000%", "Technology", "US", "4.382.237.428,42\xa0USD", "19.188.359"],
+                     ["JPM", "JPMorgan Chase & Co", "30,0000%", "Financials", "JP", "1.000,00\xa0USD", "1"],
+                     ["2330", "Taiwan Semiconductor Manufacturing Co Ltd", "10,0000%", "Telecommunications", "TW", "1,00\xa0USD", "1"],
+                     ["RIO", "Rio Tinto PLC", "10,0000%", "Basic Materials", "GB", "1,00\xa0USD", "1"],
+                     ["ORA", "Orora Ltd", "0,00%", "Industrials", "AU", "0,00\xa0USD", "0"],
+                     [None],
+                     ["Le percentuali di allocazione totali mostrate nei dettagli delle partecipazioni potrebbero non essere pari al 100%."]):
+            ws.append(riga)
+        path = os.path.join(cartella, "Dati_delle_partecipazioni_-_Vanguard_FTSE_All-World.xlsx")
+        wb.save(path)
+        return path
+    if tipo == "amundi-ripartizione":
+        wb.remove(wb.active)
+        for titolo, etichetta, righe in (
+                ("Ripartizione Settoriale", "Settore", [("Information Technology", 0.48971750662827), ("Finanziari", 0.17002944241627),
+                                                      ("Beni voluttuari", 0.08050483511033), ("Industrali", 0.06763303947281),
+                                                      ("Servizi di comunicazione", 0.0618903032786), ("Sanità", 0.03688094764619),
+                                                      ("Materiali", 0.0268479389615), ("Altro", 0.02553059144587),
+                                                      ("Beni di prima necessità", 0.02494362061412), ("Energia", 0.01602177442605)]),
+                ("Ripartizione per Valuta", "Valuta", [("TWD", 0.33), ("KRW", 0.24), ("Altro", 0.43)]),
+                ("Ripartizione Geografica", "Paesi", [("Taiwan", 0.32962512667995), ("Cina", 0.25442263869334), ("Sud Corea", 0.23675290731958),
+                                                     ("India", 0.1494387344214), ("Malesia", 0.01131901430715), ("Tailandia", 0.01090781570556),
+                                                     ("Indonesia", 0.00431833948604), ("Filippine", 0.00321542338698)])):
+            ws = wb.create_sheet(titolo)
+            for _ in range(5):
+                ws.append([None, None, None])
+            ws.append([None, "Amundi ETF"])
+            ws.append([None, titolo.upper(), None])
+            ws.append([None, "Indice", "MSCI EM Asia ESG Broad CTB Select Net USD Index"])
+            ws.append([None, "Ticker Bloomberg dell'Indice", "MXEFAECT"])
+            ws.append([None, "Valuta dell'Indice", "USD"])
+            ws.append([None, "Dati ritenuti esatti al 04/11/2026. Si prega di fare riferimento al sito per le ultime informazioni diponibili."])
+            for _ in range(5):
+                ws.append([None, None, None])
+            ws.append(["", etichetta, "Peso"])
+            for nome, peso in righe:
+                ws.append(["", nome, peso])
+            ws.append([None, None, None])
+            ws.append([None, "Fonte : Amundi Asset Management"])
+            ws.append([None, "Informazioni promozionali e non contrattuali, che non devono essere considerate come un consiglio."])
+        path = os.path.join(cartella, "Composizione_dellindice_Amundi_MSCI_EM_Asia_LU1781541849.xlsx")
+        wb.save(path)
+        # lo stile non valido del file reale («Colors must be aRGB hex values»): un colore rgb che non è esadecimale
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            membri = {n: z.read(n) for n in z.namelist()}
+        stili = membri["xl/styles.xml"].decode("utf-8")
+        assert 'theme="1"' in stili, stili[:300]
+        membri["xl/styles.xml"] = stili.replace('<color theme="1"/>', '<color rgb="0xffffff"/>', 1).encode("utf-8")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+            for n, b in membri.items():
+                z.writestr(n, b)
+        return path
+    raise ValueError(tipo)
+
+
+@test("T16 composizione ETF: file reali di novembre 2026 (iShares e Vanguard dai siti italiani, ripartizione dell'indice Amundi)")
+def t_ce_file_reali():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    tmp = tempfile.mkdtemp()
+    try:
+        # iShares dal sito italiano: etichetta «Al», una riga di solo NBSP, settori abbreviati, campi tra virgolette
+        it = m.componi(os.path.join(FIXTURES, "composizione-ishares-it-2026-11.csv"), "I")
+        assert it["emittente"] == "ishares" and it["riconosciuto_da"] == "nome del file" and it["data_posizioni"] == "2026-11-05", it
+        assert r2(it["settori"]) == {"Information Technology": 30.30, "Communication Services": 20.20, "Consumer Staples": 15.15,
+                                     "Utilities": 15.15, "Financials": 10.10, "Health Care": 9.09}, it["settori"]
+        assert r2(it["paesi"]) == {"US": 50.51, "GB": 15.15, "JP": 15.15, "HK": 10.10, "CA": 9.09}, it["paesi"]
+        assert it["titoli"] == 6 and abs(it["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and it["avvisi"] == [], it
+        # il nome con cui il sito lo scarica non contiene «ishares» intero; il preambolo non ha il marchio
+        copia = os.path.join(tmp, "iShare_SWDA_holdings.csv")
+        shutil.copy(os.path.join(FIXTURES, "composizione-ishares-it-2026-11.csv"), copia)
+        assert m.componi(copia, "I")["riconosciuto_da"] == "nome del file"
+        # Vanguard dal sito italiano: «% del valore di mercato» in stringhe con «%», «Regione» in codici ISO, ICB → solo paesi
+        v = m.componi(_xlsx_reale("vanguard-it", tmp), "V")
+        assert v["emittente"] == "vanguard" and v["data_posizioni"] == "2026-09-30" and v["classificazione"] == "ICB", v
+        assert v["colonne"] == {"peso": "% del valore di mercato", "settore": "Settore", "paese": "Regione"}, v["colonne"]
+        assert v["settori"] == {} and r2(v["paesi"]) == {"US": 50.0, "JP": 30.0, "TW": 10.0, "GB": 10.0}, v["paesi"]
+        assert v["titoli"] == 5 and v["primi_titoli"][0]["nome"] == "NVIDIA Corp" and any("ICB" in a for a in v["avvisi"]), v
+        # Amundi «Composizione dell'indice»: ripartizione su fogli separati, stili non validi che openpyxl rifiuta
+        path = _xlsx_reale("amundi-ripartizione", tmp)
+        import openpyxl
+        try:
+            openpyxl.load_workbook(path, read_only=True)
+            raise AssertionError("la fixture deve avere lo stile rotto del file reale")
+        except ValueError:
+            pass
+        a = m.componi(path, "A")
+        assert a["emittente"] == "amundi" and a["data_posizioni"] == "2026-11-04" and a["classificazione"] == "GICS", a
+        assert a["titoli"] == 0 and a["primi_titoli"] == [], a
+        altro = 0.02553059144587
+        tot = 0.48971750662827 + 0.17002944241627 + 0.08050483511033 + 0.06763303947281 + 0.0618903032786 + 0.03688094764619 + \
+            0.0268479389615 + altro + 0.02494362061412 + 0.01602177442605
+        assert abs(a["settori"]["Information Technology"] - 0.48971750662827 / (tot - altro)) < 1e-9, a["settori"]
+        assert set(a["settori"]) == {"Information Technology", "Financials", "Consumer Discretionary", "Industrials",
+                                     "Communication Services", "Health Care", "Materials", "Consumer Staples", "Energy"}, a["settori"]
+        assert abs(a["esclusi"]["settore_non_classificato"] - altro) < 1e-9 and abs(sum(a["settori"].values()) - 1) < 1e-9
+        assert set(a["paesi"]) == {"TW", "CN", "KR", "IN", "MY", "TH", "ID", "PH"} and abs(sum(a["paesi"].values()) - 1) < 1e-9, a["paesi"]
+        assert abs(a["paesi"]["KR"] - 0.23675290731958 / (0.32962512667995 + 0.25442263869334 + 0.23675290731958 + 0.1494387344214 +
+                                                          0.01131901430715 + 0.01090781570556 + 0.00431833948604 + 0.00321542338698)) < 1e-9
+        assert a["colonne"] == {"peso": "Peso", "settore": "Settore", "paese": "Paesi"}, a["colonne"]
+        assert any("ripartizione" in x and "titoli" in x for x in a["avvisi"]) and any("stili" in x for x in a["avvisi"]), a["avvisi"]
+        # la ripartizione scritta nel CSV e letta dal look-through come ogni altra
+        out = os.path.join(tmp, "composizione.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", path, "--isin", "LU1781541849", "--out", out, cwd=tmp)
+        assert rc == 0 and "ripartizione" in so and "LU1781541849;paese;TW;" in open(out, encoding="utf-8-sig").read(), (so[-400:], se[-300:])
+        assert ";titolo;" not in open(out, encoding="utf-8-sig").read()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ═══════════════════════════ T16: look-through del portafoglio ═══════════════════════════
 
 LT = ("it-pianificazione-obiettivi", "look-through-portafoglio.py")

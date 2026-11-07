@@ -56,6 +56,7 @@ from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 SINONIMI_COLONNE = {
     "peso": ("weight (%)", "weight", "weighting", "percent of fund", "% of net assets", "% of fund",
              "market value weight", "ponderazione (%)", "ponderazione", "peso (%)", "peso", "% del patrimonio",
+             "% del valore di mercato",
              # tedesco e francese (siti di Xtrackers e Amundi)
              "gewichtung (%)", "gewichtung", "gewicht (%)", "gewicht", "anteil (%)", "anteil", "% des nettovermögens",
              "% des fondsvermögens", "pondération (%)", "pondération", "poids (%)", "poids", "% de l'actif net",
@@ -64,12 +65,12 @@ SINONIMI_COLONNE = {
     "settore": ("sector", "gics sector", "sector classification", "industry classification", "settore",
                 "settore gics", "secteur", "secteur gics", "classification sectorielle", "branche", "sektor", "industrie"),
     "paese": ("location", "country", "trade country name", "country of risk", "domicile", "area geografica",
-              "paese", "nazione", "land", "standort", "sitzland", "pays", "localisation", "pays de risque"),
+              "paese", "nazione", "regione", "land", "standort", "sitzland", "pays", "localisation", "pays de risque"),
     "asset_class": ("asset class", "type of security", "security type", "asset type", "classe di attivo",
                     "tipo di strumento", "anlageklasse", "wertpapierart", "wertpapiertyp", "classe d'actifs",
                     "type de titre", "type d'actif"),
-    "nome": ("name", "security name", "holding name", "nome", "titolo", "emittente", "bezeichnung", "wertpapier",
-             "nom", "libellé", "titre"),
+    "nome": ("name", "security name", "holding name", "nome", "nome delle partecipazioni", "titolo", "emittente",
+             "bezeichnung", "wertpapier", "nom", "libellé", "titre"),
     "isin": ("isin", "codice isin", "isin code", "code isin"),
 }
 RIGHE_INTESTAZIONE = 40   # la riga d'intestazione si cerca nelle prime N righe
@@ -109,20 +110,23 @@ _VARIANTI_SETTORI = {
                                "zyklische konsumgüter", "konsumgüter (zyklisch)", "zyklischer konsum",
                                "consommation discrétionnaire", "biens de consommation cycliques",
                                "biens de consommation discrétionnaire"),
-    "Communication Services": ("servizi di comunicazione", "comunicazioni", "servizi per le comunicazioni",
+    "Communication Services": ("servizi di comunicazione", "comunicazioni", "comunicazione", "servizi per le comunicazioni",
                                "communication", "kommunikationsdienste", "kommunikationsdienstleistungen",
                                "services de communication"),
     "Industrials": ("industriali", "industria", "industriale", "beni industriali", "industrie", "industriewerte",
-                    "industriels", "industriegüter"),
+                    "industriels", "industriegüter",
+                    "industrali"),   # refuso nel file «Composizione dell'indice» di Amundi (sito italiano, 11/2026)
     "Consumer Staples": ("beni di prima necessità", "beni di consumo di base", "consumi di base",
-                         "beni di consumo primari", "beni di consumo non ciclici", "basiskonsumgüter",
+                         "beni di consumo primari", "beni di consumo non ciclici", "generi di largo consumo",
+                         "basiskonsumgüter",
                          "nichtzyklische konsumgüter", "nicht-zyklische konsumgüter", "konsumgüter (nicht-zyklisch)",
                          "nichtzyklischer konsum", "biens de consommation de base", "consommation de base",
                          "biens de consommation non cycliques", "consommation courante"),
     "Energy": ("energia", "energetico", "energie", "énergie"),
     "Materials": ("materiali", "materie prime", "roh-, hilfs- & betriebsstoffe", "roh-, hilfs- und betriebsstoffe",
                   "rohstoffe", "materialien", "matériaux"),
-    "Utilities": ("servizi di pubblica utilità", "pubblica utilità", "utility", "servizi pubblici", "versorger",
+    "Utilities": ("servizi di pubblica utilità", "pubblica utilità", "utility", "servizi pubblici",
+                  "imprese di servizi di pubblica utilità", "versorger",
                   "versorgungsbetriebe", "versorgungsunternehmen", "services aux collectivités", "services publics",
                   "services collectifs"),
     "Real Estate": ("immobiliare", "immobili", "settore immobiliare", "immobilien", "immobilier"),
@@ -269,7 +273,7 @@ KI;Kiribati;Kiribati
 KM;Comore;Comoros
 KN;Saint Kitts e Nevis;Saint Kitts and Nevis
 KP;Corea del Nord;North Korea|Korea (North)|Korea, Democratic People's Republic of
-KR;Corea del Sud;Korea (South)|Korea, Republic of|South Korea|Republic of Korea|Korea|Corea|Repubblica di Corea
+KR;Corea del Sud;Korea (South)|Korea, Republic of|South Korea|Republic of Korea|Korea|Corea|Repubblica di Corea|Sud Corea
 KW;Kuwait;Kuwait
 KY;Isole Cayman;Cayman Islands
 KZ;Kazakistan;Kazakhstan
@@ -365,7 +369,7 @@ TC;Isole Turks e Caicos;Turks and Caicos Islands
 TD;Ciad;Chad
 TF;Terre australi e antartiche francesi;French Southern Territories
 TG;Togo;Togo
-TH;Thailandia;Thailand
+TH;Thailandia;Thailand|Tailandia
 TJ;Tagikistan;Tajikistan
 TK;Tokelau;Tokelau
 TL;Timor Est;Timor-Leste|East Timor
@@ -484,26 +488,37 @@ VALORI_NON_CLASSIFICATI = ("unknown", "unassigned", "other", "-", "n/a", "na", "
 
 # ── Schede degli emittenti ──────────────────────────────────────────────────
 # Solo quello che il motore non deduce. «verificato»: mese e fonte della verifica del layout su un file reale.
-ETICHETTE_DATA = ("fund holdings as of", "holdings as of", "as of", "posizioni al", "dati al",
+ETICHETTE_DATA = ("fund holdings as of", "holdings as of", "as of", "posizioni al", "dati al", "al",
                   "stand", "stand per", "stichtag", "positionen per", "bestände per", "daten per",
                   "positions au", "données au", "composition au", "portefeuille au", "date au")
 SCHEDE = {
-    "ishares": {"nome": "iShares", "riconosci": ("ishares", "blackrock"), "classificazione": "GICS",
+    # «ishare»: il sito italiano scarica «iShare_<ticker>_holdings.csv», e il CSV italiano non ha il marchio nel preambolo
+    "ishares": {"nome": "iShares", "riconosci": ("ishares", "ishare", "blackrock"), "classificazione": "GICS",
                 "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
-                "verificato": "da confermare"},
+                "verificato": "2026-11, file reale (sito italiano, CSV)"},
     "xtrackers": {"nome": "Xtrackers", "riconosci": ("xtrackers", "dws"), "classificazione": "GICS",
                   "etichette_extra": (), "data_nel_foglio": True, "liquidita": ("warrants",),
                   "verificato": "2026-10, file reale (sito britannico, XLSX)"},
     # Vanguard: GICS o ICB secondo l'indice (FTSE usa ICB); finché un file reale non lo conferma, dai nomi
     "vanguard": {"nome": "Vanguard", "riconosci": ("vanguard",), "classificazione": None,
                  "etichette_extra": ("as at",), "data_nel_foglio": False, "liquidita": (),
-                 "verificato": "da confermare"},
+                 "verificato": "2026-11, file reale (sito italiano, XLSX): FTSE All-World in ICB, solo paesi"},
     "amundi": {"nome": "Amundi", "riconosci": ("amundi", "lyxor"), "classificazione": "GICS",
-               "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
-               "verificato": "da confermare"},
+               "etichette_extra": ("dati ritenuti esatti al",), "data_nel_foglio": False, "liquidita": (),
+               "verificato": "2026-11, file reale (sito italiano, «Composizione dell'indice»: ripartizione per settore e paese)"},
     "spdr": {"nome": "SPDR", "riconosci": ("spdr", "state street", "ssga"), "classificazione": "GICS",
              "etichette_extra": (), "data_nel_foglio": False, "liquidita": (),
              "verificato": "2026-10, file reale (sito EMEA, XLSX)"},
+}
+
+
+# File di RIPARTIZIONE (Amundi, «Composizione dell'indice»): niente elenco dei titoli, ma un foglio con i pesi per
+# settore e uno con i pesi per paese. Si riconoscono dal nome del foglio; la tabella è «nome;peso».
+FOGLI_RIPARTIZIONE = {
+    "settore": ("ripartizione settoriale", "ripartizione per settore", "sector breakdown", "sector allocation",
+                "répartition sectorielle", "sektoraufteilung", "branchenaufteilung"),
+    "paese": ("ripartizione geografica", "ripartizione per paese", "geographic breakdown", "country breakdown",
+              "geographical breakdown", "répartition géographique", "länderaufteilung", "geografische aufteilung"),
 }
 
 
@@ -527,7 +542,7 @@ def _vuota(cella):
 
 # ── Lettura del file ────────────────────────────────────────────────────────
 
-def leggi_righe(path):
+def leggi_righe(path, avvisi=None):
     """Tutte le righe del file come liste di celle, e il titolo del foglio (XLSX) o None.
     XLSX con openpyxl (i numeri arrivano già come numeri); CSV in UTF-8 con BOM o cp1252 (il «CSV» di Excel
     italiano), separatore riconosciuto tra «,», «;» e tab."""
@@ -541,26 +556,110 @@ def leggi_righe(path):
                "sul sito dell'emittente usa il pulsante di download delle posizioni (XLSX o CSV)")
     estensione = os.path.splitext(path)[1].lower()
     if estensione == ".xlsx":
-        return _righe_xlsx(path, grezzo)
+        return _righe_xlsx(path, grezzo, avvisi)
     if estensione in (".csv", ".txt"):
         return _righe_csv(grezzo), None
     errore(f"{os.path.basename(path)}: formato non supportato ({estensione or 'senza estensione'}): "
            "esporta le posizioni in XLSX o CSV")
 
 
-def _righe_xlsx(path, grezzo):
+def _stili_minimi():
+    """Il foglio di stile di un workbook vuoto di openpyxl: valido per costruzione, con il minimo che il lettore esige."""
     import openpyxl
-    try:
-        with warnings.catch_warnings():   # «Workbook contains no default style»: innocuo, negli export degli emittenti
-            warnings.simplefilter("ignore")
-            wb = openpyxl.load_workbook(io.BytesIO(grezzo), read_only=True, data_only=True)
-    except Exception as e:  # noqa: BLE001 — zip rotto, xls rinominato: qualunque errore di openpyxl è un file illeggibile
-        errore(f"{os.path.basename(path)}: XLSX illeggibile ({type(e).__name__}): riscaricalo o esportalo in CSV")
+    import zipfile
+    vuoto = io.BytesIO()
+    openpyxl.Workbook().save(vuoto)
+    with zipfile.ZipFile(io.BytesIO(vuoto.getvalue())) as z:
+        return z.read("xl/styles.xml")
+
+
+def _senza_stili(grezzo):
+    """Lo stesso XLSX con un foglio di stile minimo al posto di xl/styles.xml: il file «Composizione dell'indice»
+    di Amundi ha colori non esadecimali che openpyxl rifiuta, e gli stili non servono per leggere i valori."""
+    import zipfile
+    stili = _stili_minimi()
+    uscita = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(grezzo)) as z, zipfile.ZipFile(uscita, "w", zipfile.ZIP_DEFLATED) as w:
+        for nome in z.namelist():
+            w.writestr(nome, stili if nome == "xl/styles.xml" else z.read(nome))
+    return uscita.getvalue()
+
+
+def _apri_xlsx(path, grezzo, avvisi):
+    import openpyxl
+    for tentativo, dati in enumerate((grezzo, None)):
+        try:
+            with warnings.catch_warnings():   # «Workbook contains no default style»: innocuo, negli export degli emittenti
+                warnings.simplefilter("ignore")
+                return openpyxl.load_workbook(io.BytesIO(dati if tentativo == 0 else _senza_stili(grezzo)),
+                                              read_only=True, data_only=True)
+        except ValueError as e:
+            # stile non valido («Colors must be aRGB hex values», stylesheet illeggibile): si rilegge senza stili
+            if tentativo == 0 and ("style" in str(e).lower() or "color" in str(e).lower()):
+                avvisi.append("file letto senza gli stili Excel (il foglio di stile non è valido): una data in formato "
+                              "numerico di Excel potrebbe non essere riconosciuta")
+                continue
+            errore(f"{os.path.basename(path)}: XLSX illeggibile ({type(e).__name__}): riscaricalo o esportalo in CSV")
+        except Exception as e:  # noqa: BLE001 — zip rotto, xls rinominato: qualunque errore di openpyxl è un file illeggibile
+            errore(f"{os.path.basename(path)}: XLSX illeggibile ({type(e).__name__}): riscaricalo o esportalo in CSV")
+
+
+def _righe_xlsx(path, grezzo, avvisi=None):
+    wb = _apri_xlsx(path, grezzo, [] if avvisi is None else avvisi)
     for ws in wb.worksheets:
         righe = [list(r) for r in ws.iter_rows(values_only=True)]
         if any(not _vuota(c) for r in righe for c in r):
             return righe, ws.title
     errore(f"{os.path.basename(path)}: nessun foglio con dati")
+
+
+def leggi_ripartizione(wb):
+    """Le tabelle di un file di ripartizione: {"settore": [(nome, peso)], "paese": [...], "preambolo": righe sopra la
+    tabella del primo foglio} o None se nessun foglio ha un nome di FOGLI_RIPARTIZIONE. In ogni foglio la tabella
+    inizia alla riga che ha una cella di peso (sinonimi di «peso») e una cella di nome prima; finisce alla prima riga
+    senza un peso numerico."""
+    tabelle, preambolo = {}, None
+    for ws in wb.worksheets:
+        titolo = normalizza(ws.title)
+        dim = next((d for d, nomi in FOGLI_RIPARTIZIONE.items() if any(titolo == normalizza(n) for n in nomi)), None)
+        if dim is None:
+            continue
+        righe = [list(r) for r in ws.iter_rows(values_only=True)]
+        for i, r in enumerate(righe):
+            piene = [(j, c) for j, c in enumerate(r) if not _vuota(c)]
+            j_peso = next((j for j, c in piene if isinstance(c, str) and normalizza(c) in _SINONIMI_NORM["peso"]), None)
+            if j_peso is None or not any(j < j_peso for j, _ in piene):
+                continue
+            j_nome = max(j for j, _ in piene if j < j_peso)
+            voci = []
+            for r2 in righe[i + 1:]:
+                peso = r2[j_peso] if j_peso < len(r2) else None
+                if not _sembra_numero(peso):
+                    break
+                voci.append((str(r2[j_nome] if j_nome < len(r2) else "").strip(), peso))
+            tabelle[dim] = {"voci": voci, "testo": str(r[j_nome]).strip(), "peso": str(r[j_peso]).strip()}
+            if preambolo is None:
+                preambolo = righe[:i]
+            break
+    return {**tabelle, "preambolo": preambolo or []} if tabelle else None
+
+
+def leggi_file(path, avvisi):
+    """(righe, titolo del foglio, ripartizione): come leggi_righe, ma un XLSX di ripartizione (Amundi) torna come
+    tabelle per settore e paese al posto delle righe."""
+    if not os.path.isfile(path):
+        errore(f"--file: file non trovato: {path}")
+    with open(path, "rb") as f:
+        grezzo = f.read()
+    if os.path.splitext(path)[1].lower() == ".xlsx":
+        inizio = grezzo[:512].lstrip().lower()
+        if not inizio.startswith((b"<!doctype", b"<html", b"\xef\xbb\xbf<!doctype", b"\xef\xbb\xbf<html")):
+            wb = _apri_xlsx(path, grezzo, avvisi)
+            ripartizione = leggi_ripartizione(wb)
+            if ripartizione:
+                return None, None, ripartizione
+    righe, foglio = leggi_righe(path, avvisi)
+    return righe, foglio, None
 
 
 def _righe_csv(grezzo):
@@ -772,12 +871,14 @@ def componi(path, strumento, forzato=None):
     """La composizione di un file delle posizioni: la voce di «strumenti» del JSON (spec §3.4), pesi in frazione
     rinormalizzati a 1 per dimensione e ordinati per peso decrescente. Un errore nei dati ferma lo script."""
     file = os.path.basename(path)
-    righe, foglio = leggi_righe(path)
+    avvisi = []
+    righe, foglio, ripartizione = leggi_file(path, avvisi)
+    if ripartizione is not None:
+        return _componi_ripartizione(file, strumento, forzato, ripartizione, avvisi)
     i, col, testi = trova_intestazione(righe)
     dati = righe_dati(righe, i, col["peso"])
     chiave, riconosciuto_da = riconosci_emittente(righe[:i], file, forzato)
     scheda = SCHEDE.get(chiave)
-    avvisi = []
     if scheda is None:
         avvisi.append("emittente non riconosciuto: regole generiche, controlla le esclusioni")
     cella = lambda r, ruolo: r[col[ruolo]] if ruolo in col and col[ruolo] < len(r) else None  # noqa: E731
@@ -840,6 +941,59 @@ def componi(path, strumento, forzato=None):
             else:
                 grezzi[dim].append((normalizza(valore), str(valore).strip(), peso))
 
+    return _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, n_titoli,
+                      candidati, n_primi, avvisi, righe[:i], foglio)
+
+
+def _componi_ripartizione(file, strumento, forzato, rip, avvisi):
+    """La composizione da un file di ripartizione: i pesi per settore e per paese sono già aggregati; nessun titolo."""
+    chiave, riconosciuto_da = riconosci_emittente(rip["preambolo"], file, forzato)
+    scheda = SCHEDE.get(chiave)
+    if scheda is None:
+        avvisi.append("emittente non riconosciuto: regole generiche, controlla le esclusioni")
+    non_classificati = _tabella("VALORI_NON_CLASSIFICATI")
+    esclusi = {"liquidita_derivati": 0.0, "settore_obbligazionario": 0.0, "settore_non_classificato": 0.0,
+               "paese_non_classificato": 0.0}
+    grezzi, col, testi = {"settore": [], "paese": []}, {}, {}
+    for dim in ("settore", "paese"):
+        if dim not in rip:
+            continue
+        col[dim], testi[dim] = 1, rip[dim]["testo"]
+        col["peso"], testi["peso"] = 2, rip[dim]["peso"]
+        voci = rip[dim]["voci"]
+        if not voci:
+            errore(f"{file}: il foglio della ripartizione per {dim} non ha righe con un peso numerico")
+        virgola = virgola_decimale([p for _, p in voci])
+        pesi = []
+        for nome, peso in voci:
+            try:
+                pesi.append((nome, peso_numerico(peso, virgola)))
+            except ValueError:
+                errore(f"{file}: peso {peso!r} non numerico nella ripartizione per {dim} ({nome})")
+        totale = sum(p for _, p in pesi if p is not None)
+        if 0.9 <= totale <= 1.1:
+            scala = 1.0
+        elif 90 <= totale <= 110:
+            scala = 100.0
+        else:
+            errore(f"{file}: i pesi della ripartizione per {dim} sommano a {numero(totale, 2)}, né circa 1 né circa 100")
+        for nome, peso in pesi:
+            if peso is None:
+                continue
+            peso /= scala
+            if normalizza(nome) in non_classificati:
+                esclusi[f"{dim}_non_classificato"] += peso
+            else:
+                grezzi[dim].append((normalizza(nome), nome, peso))
+    avvisi.append("file di ripartizione dell'indice per settore e paese, non elenco dei titoli: nessun titolo scritto "
+                  "(per i primi titoli serve il file delle posizioni) e pesi dell'indice, non del fondo")
+    return _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, 0, [],
+                      globals()["N_TITOLI"], avvisi, rip["preambolo"], None, ripartizione=True)
+
+
+def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, n_titoli, candidati,
+               n_primi, avvisi, preambolo, foglio, ripartizione=False):
+    """La coda comune: classificazione, sinonimi, rinormalizzazione, avvisi, primi titoli e data."""
     # classificazione: dalla scheda, o dai nomi esclusivi dei due sistemi
     nomi_settori = {n for n, _, _ in grezzi["settore"]}
     classificazione = scheda["classificazione"] if scheda and scheda["classificazione"] else None
@@ -881,7 +1035,8 @@ def componi(path, strumento, forzato=None):
         if totale_dim > 0 and totale_dim / con_dim < SOGLIA_CLASSIFICATI:
             scartate[dim] = totale_dim / con_dim
             totale_dim = 0
-        risultato[plurale] = {k: v / totale_dim for k, v in sorted(pesi[dim].items(), key=lambda kv: -kv[1])} \
+        # una voce a peso zero (posizioni allo 0,00% nei file di Vanguard) non si scrive
+        risultato[plurale] = {k: v / totale_dim for k, v in sorted(pesi[dim].items(), key=lambda kv: -kv[1]) if v > 0} \
             if totale_dim > 0 else {}
     if not risultato["settori"] and not risultato["paesi"]:
         errore(f"{file}: nessuna riga di titoli con settore o paese dopo le esclusioni (liquidità, derivati, "
@@ -913,12 +1068,12 @@ def componi(path, strumento, forzato=None):
                       "sintetico il file può contenere il paniere di collaterale, non l'esposizione")
 
     # i primi titoli per peso, con il peso nel fondo (non rinormalizzato): un minimo della concentrazione
-    if "nome" not in col:
+    if "nome" not in col and not ripartizione:
         avvisi.append("il file non ha la colonna del nome: titoli non scritti")
     primi = [{"nome": n, "isin": isin_t, "peso": p}
              for n, isin_t, p in sorted(candidati, key=lambda t: -t[2])[:n_primi]]
 
-    data, avviso_data = data_posizioni(righe[:i], foglio, scheda)
+    data, avviso_data = data_posizioni(preambolo, foglio, scheda)
     if avviso_data:
         avvisi.append(avviso_data)
     return {"strumento": strumento, "emittente": chiave, "riconosciuto_da": riconosciuto_da, "file": file,

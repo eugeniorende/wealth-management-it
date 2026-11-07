@@ -42,13 +42,15 @@ Sempre dalla pagina del singolo ETF sul sito dell'emittente, nella sezione delle
 
 | Emittente | Formato tipico | Note |
 |---|---|---|
-| iShares (BlackRock) | CSV | Preambolo di qualche riga con nome del fondo e data («Fund Holdings as of», «Posizioni al»); dal sito italiano intestazioni e settori in italiano, con la virgola decimale |
+| iShares (BlackRock) | CSV | Preambolo di qualche riga con nome del fondo e data («Fund Holdings as of», «Posizioni al»); dal sito italiano (file `iShare_<ticker>_holdings.csv`) solo «Al» e la data, una riga vuota, intestazioni e settori in italiano abbreviati («IT», «Comunicazione», «Generi di largo consumo»), campi tra virgolette con la virgola decimale |
 | Xtrackers (DWS) | XLSX | Disclaimer in testa, intestazione alla riga 4, peso in frazione, data nel nome del foglio; dal sito tedesco intestazioni (`Branche`, `Land`, `Gewichtung`) e settori in tedesco |
-| Vanguard | XLSX o CSV | Per gli ETF su indici FTSE la classificazione dei settori può essere ICB: vedi sotto |
-| Amundi | XLSX | Intestazioni nella lingua del sito: italiano, inglese, tedesco o francese (`Secteur`, `Pays`, `Poids (%)`) |
+| Vanguard | XLSX o CSV | Dal sito italiano («Dati delle partecipazioni»): «Al 30 set 2026» nel preambolo, pesi come testo con «%», colonna «Regione» con i codici ISO; per gli ETF su indici FTSE la classificazione dei settori è ICB: vedi sotto |
+| Amundi | XLSX | Il sito italiano scarica la **«Composizione dell'indice»**: non l'elenco dei titoli ma la ripartizione per settore e per paese su fogli separati («Ripartizione Settoriale», «Ripartizione Geografica»), con uno stile Excel non valido. L'importatore la legge come **file di ripartizione** (vedi sotto). Intestazioni nella lingua del sito (`Secteur`, `Pays`, `Poids (%)`) |
 | SPDR (State Street) | XLSX | Preambolo con «Holdings As Of», paese di negoziazione («Trade Country Name»), righe «Unassigned» per i contratti di cambio |
 
 Se il sito apre la pagina invece di scaricare il file (capita quando si copia il link del pulsante), l'importatore riconosce l'HTML e chiede di usare il pulsante di download.
+
+**File di ripartizione.** Un XLSX con fogli chiamati «Ripartizione Settoriale» e «Ripartizione Geografica» (o «Sector breakdown», «Répartition sectorielle», «Sektoraufteilung»…) non elenca i titoli: ogni foglio ha una tabella «nome;peso» già aggregata. L'importatore la legge così com'è, con le stesse esclusioni delle righe non classificate («Altro»), e scrive settori e paesi ma nessuna riga `titolo`; lo dice con un avviso, perché i pesi sono quelli dell'**indice** (non del fondo) e per i primi titoli serve il file delle posizioni. Se il foglio di stile dell'XLSX non è valido (il file di Amundi del novembre 2026), lo rilegge senza stili e lo dice.
 
 ## Cosa legge e cosa esclude
 
@@ -83,11 +85,14 @@ UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decima
 |---|---|---|
 | Xtrackers | XLSX dal sito britannico in inglese | file reale, 25/10/2026 |
 | SPDR | XLSX dal sito EMEA in inglese | file reale, 25/10/2026 |
-| iShares | CSV, siti italiano e britannico | da confermare su un file reale |
-| Vanguard | — | da confermare su un file reale (GICS o ICB) |
-| Amundi | — | da confermare su un file reale |
+| iShares | CSV dal sito italiano (`iShare_SWDA_holdings.csv`, MSCI World) | file reale, 7/11/2026 |
+| iShares | CSV dal sito britannico | da confermare su un file reale |
+| Vanguard | XLSX dal sito italiano («Dati delle partecipazioni», FTSE All-World, ICB: solo paesi) | file reale, 7/11/2026 |
+| Amundi | XLSX dal sito italiano («Composizione dell'indice»: file di ripartizione, senza titoli) | file reale, 7/11/2026 |
+| Amundi | file delle posizioni (elenco dei titoli), se il sito lo offre | da confermare su un file reale |
+| Xtrackers e Amundi | siti tedesco e francese | da confermare su un file reale (fixture sintetiche) |
 
-«Da confermare» vuol dire che i sinonimi coprono i formati documentati ma nessun file reale è ancora passato dall'importatore: se qualcosa non torna, lo script si ferma e dice cosa ha visto.
+«Da confermare» vuol dire che i sinonimi coprono i formati documentati ma nessun file reale è ancora passato dall'importatore: se qualcosa non torna, lo script si ferma e dice cosa ha visto. I file reali non entrano nel repository: le fixture dei test ne riproducono il layout.
 
 ## Il look-through del portafoglio
 
@@ -109,7 +114,7 @@ python "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" --composizione c
 
 ## Limiti
 
-- **Posizioni del fondo, non dell'indice**: un ETF a replica campionaria espone posizioni diverse dall'indice; un ETF sintetico (swap) può pubblicare il paniere di collaterale.
+- **Posizioni del fondo, non dell'indice**: un ETF a replica campionaria espone posizioni diverse dall'indice; un ETF sintetico (swap) può pubblicare il paniere di collaterale. Un file di ripartizione dice invece la composizione dell'**indice**: utile per settori e paesi, muto sui titoli.
 - **Fotografia a una data**: la composizione cambia; la data delle posizioni è nel commento del CSV e va riguardata a ogni revisione annuale. Una data numerica sotto un'etichetta inglese con giorno e mese entrambi fino a 12 («Holdings as of 03/04/2026») è ambigua tra il formato britannico e quello statunitense: non si scrive, con un avviso. Con un numero oltre il 12 («10/24/2026») o un'etichetta italiana («Posizioni al») la data si legge senza dubbi.
 - **Solo GICS** per i settori; nessuna conversione da ICB.
 - **Paese secondo l'emittente**: domicilio, paese di rischio o di negoziazione, a seconda del file; il report dice quale colonna ha letto.
