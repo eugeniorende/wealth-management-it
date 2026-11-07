@@ -1,6 +1,6 @@
 # Roadmap
 
-Stato al 7/11/2026: 0.12.0 in rilascio (`release/0.12.0` da `develop`, dopo la PR #59), con T13 (PR #54), T15 capitale umano (PR #55 e #56), T17 cruscotto grafico (PR #57), T16 importatore della composizione degli ETF (PR #58) e il ciclo deciso l'1/11/2026 (PR #59: look-through del portafoglio, ponte e riscatto nel cruscotto, lingue tedesca e francese, file reali degli emittenti). Prima: 0.11.0 del 24/10/2026 (T9, T12, T14 e pre-pubblicazione) e 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11). Il repository è pubblico dal 24/10/2026, con un ruleset su `main` e `develop`; l'icona del plugin non si aggiunge. Restano al proprietario le prove di installazione da un account senza accesso e in Cowork, e la prova della pubblicazione del cruscotto come Artifact. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 7/11/2026: 0.12.0 rilasciata il 7/11/2026 (PR #60 su `main`, tag `v0.12.0`, GitHub Release con lo zip, merge back PR #61), con T13 (PR #54), T15 capitale umano (PR #55 e #56), T17 cruscotto grafico (PR #57), T16 importatore della composizione degli ETF (PR #58) e il ciclo deciso l'1/11/2026 (PR #59: look-through del portafoglio, ponte e riscatto nel cruscotto, lingue tedesca e francese, file reali degli emittenti). Prima: 0.11.0 del 24/10/2026 (T9, T12, T14 e pre-pubblicazione) e 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11). Il repository è pubblico dal 24/10/2026, con un ruleset su `main` e `develop`; l'icona del plugin non si aggiunge. Restano al proprietario le prove di installazione da un account senza accesso e in Cowork, e la prova della pubblicazione del cruscotto come Artifact. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
@@ -228,8 +228,8 @@ Prese il 20/10/2026.
 ### Linea di taglio e rilascio della 0.12.0
 
 - Dentro: T13, T15, T16 (importatore, look-through, lingue, file reali), T17 (cruscotto, ponte e riscatto). Skill: it-pianificazione-obiettivi 0.24, it-revisione 0.9, it-rebalance 0.8, it-pianificazione 0.13, it-pianificazione-autonomi 0.5, it-tax-optimization 0.11.
-- `release/0.12.0` parte da `develop` il 7/11/2026 (versione nei manifest, sezione v0.12.0 del changelog, README e ROADMAP) → PR su `main` con merge commit → tag `v0.12.0` dato dal proprietario → `release.yml` → merge back di `main` su `develop`.
-- Freshness: nessun marcatore scade prima del 2027-06, quindi `release.yml` passa senza riverifiche.
+- [x] `release/0.12.0` da `develop` il 7/11/2026 (versione nei manifest, sezione v0.12.0 del changelog, README e ROADMAP) → PR #60 su `main` con merge commit (`9119a7a`) → tag `v0.12.0` dato dal proprietario → `release.yml` (run 42378501167) verde, GitHub Release con lo zip di 92 file → merge back di `main` su `develop` con la PR #61.
+- Freshness: nessun marcatore scade prima del 2027-06, quindi `release.yml` è passato senza riverifiche.
 
 ## Fuori dal codice
 
