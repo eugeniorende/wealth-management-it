@@ -448,7 +448,8 @@ def stampa_proiezione(p):
 def leggi_composizione(path):
     """Composizione settoriale degli strumenti, da un CSV in uno dei due formati (righe «#» saltate, BOM ammesso):
     strumento;dimensione;voce;peso scritto da importa-composizione-etf.py, di cui contano le righe «settore»
-    (le righe «paese» servono ad altro), oppure strumento;settore;peso compilato a mano.
+    (le righe «paese» e «titolo» servono al look-through), oppure strumento;settore;peso compilato a mano.
+    La chiave è il campo «strumento» del CSV: un ISIN o un nome (vedi chiave_composizione).
     Pesi in frazione o in percento (se quelli di uno strumento sommano più di 1,5), virgola o punto."""
     if not os.path.exists(path):
         errore(f"--composizione: file non trovato: {path}")
@@ -471,9 +472,9 @@ def leggi_composizione(path):
         if not any(r.values()):
             continue
         if importato:
-            if r["dimensione"] not in ("settore", "paese"):
+            if r["dimensione"] not in ("settore", "paese", "titolo"):
                 errore(f"--composizione: dimensione {r['dimensione']!r} sconosciuta ({r['strumento']}): "
-                       "attese «settore» o «paese»")
+                       "attese «settore», «paese» o «titolo»")
             if r["dimensione"] != "settore":
                 continue
             r["settore"] = r["voce"]
@@ -498,6 +499,21 @@ def leggi_composizione(path):
     return comp
 
 
+def chiave_composizione(pos, composizione):
+    """La chiave con cui una posizione trova la sua composizione: prima l'ISIN, poi il nome dello strumento
+    (spazi ai bordi tolti, maiuscole rispettate: un refuso deve restare visibile tra i mancanti). None se nessuna."""
+    for campo in ("isin", "strumento"):
+        chiave = (pos.get(campo) or "").strip()
+        if chiave and chiave in composizione:
+            return chiave
+    return None
+
+
+def nome_posizione(pos):
+    """Come l'utente vede la posizione nel report: lo strumento, o l'ISIN se manca."""
+    return (pos.get("strumento") or pos.get("isin") or "(senza strumento)").strip()
+
+
 def sovrapposizione(posizioni, composizione, settore, F_az, HC_az, pesi_mondo):
     """Diagnosi 4: quanto della parte azionaria del portafoglio sta nel settore del proprio lavoro, contro il
     mercato mondiale, e l'esposizione combinata se la parte azionaria del capitale umano sta tutta lì.
@@ -506,12 +522,12 @@ def sovrapposizione(posizioni, composizione, settore, F_az, HC_az, pesi_mondo):
     for p in posizioni:
         if p["asset_class"] != "azionario":
             continue
-        nome = (p.get("strumento") or "(senza strumento)").strip()
-        if nome not in composizione:
-            mancanti.append(nome)
+        chiave = chiave_composizione(p, composizione)
+        if chiave is None:
+            mancanti.append(nome_posizione(p))
             continue
         con += p["valore"]
-        num += p["valore"] * composizione[nome].get(settore, 0)
+        num += p["valore"] * composizione[chiave].get(settore, 0)
     quota = num / con if con else None
     peso_mondo = pesi_mondo[settore]
     rapporto = quota / peso_mondo if quota is not None else None
@@ -712,7 +728,7 @@ def main():
     if comp is not None:
         posizioni = dati.get("posizioni") or []
         F_az_comp = sum(q["valore"] for q in posizioni
-                        if q["asset_class"] == "azionario" and (q.get("strumento") or "").strip() in comp)
+                        if q["asset_class"] == "azionario" and chiave_composizione(q, comp) is not None)
         z = sovrapposizione(posizioni, comp, settore, F_az_comp, b["HC_az"], PESI_MONDO)
     sens = sensibilita(dati, profilo, c)
 

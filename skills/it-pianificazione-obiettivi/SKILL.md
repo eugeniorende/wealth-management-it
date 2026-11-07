@@ -2,7 +2,7 @@
 name: it-pianificazione-obiettivi
 description: "Pianificazione finanziaria per obiettivi (goals-based) per investitori privati italiani: più obiettivi (fondo di emergenza, casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte, importo e priorità, profilo di allocazione e piano di accumulo. Usa questa skill quando l'utente parla di pianificare gli investimenti, da dove iniziare, quanto mettere da parte al mese, fondo di emergenza, risparmiare per la casa o per i figli, asset allocation per obiettivo, orizzonte e rischio, «ho X € e non so come allocarli», PAC, bucket strategy, probabilità di raggiungere un obiettivo, Monte Carlo del piano, glide path, capitale umano (reddito da lavoro nella ricchezza totale, «sono un'azione o un'obbligazione?»). È il passo a monte di `it-rebalance`: definisce l'allocazione target che quella mantiene. Postura educativa e metodologica: mostra allocazioni-tipo come esempi, NON raccomanda titoli specifici, NON sceglie l'allocazione al posto dell'utente e NON è consulenza di investimento."
 metadata:
-  version: "0.23"
+  version: "0.24"
 ---
 
 # it-pianificazione-obiettivi
@@ -225,7 +225,7 @@ python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv 
 python "${CLAUDE_SKILL_DIR}/assets/capitale-umano.py" --dati capitale-umano.json --composizione composizione.csv --json capitale-umano-out.json
 ```
 
-La composizione per la diagnosi 4 si importa dal **file delle posizioni** di ogni ETF, scaricato dalla pagina del fondo sul sito dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, italiano o inglese): l'importatore scrive `composizione.csv` per settore GICS e paese, con le esclusioni dichiarate. `--strumento` va scritto come il campo `strumento` delle posizioni, altrimenti lo strumento finisce tra quelli senza composizione. Formati, esclusioni e limiti in `references/composizione-etf.md`; la compilazione a mano di `composizione.csv` resta possibile.
+La composizione per la diagnosi 4 si importa dal **file delle posizioni** di ogni ETF, scaricato dalla pagina del fondo sul sito dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, in italiano, inglese, tedesco o francese): l'importatore scrive `composizione.csv` per settore GICS, paese e primi titoli, con le esclusioni dichiarate. `--strumento` (o `--isin`) va scritto come l'`isin` o il campo `strumento` delle posizioni, altrimenti lo strumento finisce tra quelli senza composizione. Formati, esclusioni e limiti in `references/composizione-etf.md`; la compilazione a mano di `composizione.csv` resta possibile.
 
 Il JSON ha la forma di `assets/esempio-capitale-umano.json` (persona, pensione, posizioni con lo schema di `it-rebalance`); età di pensione e pensione netta possono arrivare con `--from` dai JSON di `proiezione-inps.py` e `netto-pensione.py`. Le cinque diagnosi:
 
@@ -236,6 +236,15 @@ Il JSON ha la forma di `assets/esempio-capitale-umano.json` (persona, pensione, 
 5. **sensibilità** ai parametri del profilo.
 
 È una **lente, non un target**: non modifica l'allocazione degli obiettivi né quella che `it-rebalance` mantiene, e la riga di equivalenza è un calcolo, non una raccomandazione. Profili, metodo, esempio svolto e limiti in `references/capitale-umano.md`.
+
+**Look-through del portafoglio.** Con lo stesso `composizione.csv` si risponde a «cosa possiedo davvero, sommando gli ETF?»: settori, paesi e primi titoli aggregati su tutte le posizioni, pesati per controvalore.
+
+```
+python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv --isin IE00B4L5Y983 [--file … --isin …]
+python "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" --composizione composizione.csv --posizioni broker.json [--posizioni …] --json look-through.json
+```
+
+Le posizioni sono il `--json` di `importa-estratto-broker.py` (it-tax-optimization; un file per broker, la stessa posizione su due broker si somma) oppure il `--dati` del capitale umano; il confronto con il CSV avviene per **ISIN** e poi per nome, quindi con l'estratto del broker si importa ogni ETF con `--isin` (alias di `--strumento`). Si riportano i pesi **con la copertura accanto** (la quota del controvalore che ha quella dimensione), i titoli come **minimo** della concentrazione (sono i primi di ogni ETF) e le posizioni senza composizione per nome: per quelle si importa il file dell'emittente, o si compilano a mano le righe (una singola azione o un BTP: il paese, il titolo). Il look-through legge e riporta, non cambia i target; `it-revisione` lo riprende nel passo 3 e il cruscotto lo disegna. Dettagli in `references/composizione-etf.md`, «Il look-through del portafoglio».
 
 ## Strumento operativo: il pianificatore Excel
 
@@ -382,5 +391,6 @@ Workflow tipico end-to-end: l'utente parte da qui per definire obiettivi e alloc
 - `assets/profili-capitale-umano.csv` — i sei profili di lavoro (quota azionaria del capitale umano, premio ν, correlazione e volatilità del reddito, probabilità di perdere il lavoro, NASpI), con la fonte e la natura di ogni valore
 - `assets/esempio-capitale-umano.json` — dati d'esempio di `capitale-umano.py` (sviluppatore di 35 anni nel privato), da copiare nella cartella di lavoro e compilare
 - `assets/esempio-composizione.csv` — composizione settoriale d'esempio (pesi illustrativi) per `capitale-umano.py --composizione`
-- `assets/importa-composizione-etf.py` — importatore della composizione degli ETF: dal file delle posizioni dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, italiano o inglese) a `composizione.csv` per settore GICS e paese (richiede openpyxl per gli XLSX)
+- `assets/importa-composizione-etf.py` — importatore della composizione degli ETF: dal file delle posizioni dell'emittente (iShares, Xtrackers, Vanguard, Amundi, SPDR; CSV o XLSX, in italiano, inglese, tedesco o francese) a `composizione.csv` per settore GICS, paese e primi titoli, con l'ISIN come chiave (`--isin`); richiede openpyxl per gli XLSX
+- `assets/look-through-portafoglio.py` — il look-through del portafoglio: settori, paesi e primi titoli aggregati su tutte le posizioni (dal `--json` dell'importatore dei broker o dal `--dati` del capitale umano), pesati per controvalore, con la copertura e le posizioni senza composizione; `--json` per `it-revisione` e per il cruscotto
 - **Vedi anche** `it-rebalance/SKILL.md` (mantenimento delle allocazioni), `it-tax-optimization/SKILL.md` (fiscalità degli strumenti), `it-pianificazione/SKILL.md` (obiettivo pensione)

@@ -1,0 +1,16 @@
+# Fixture sintetica per il look-through: pesi illustrativi, non di un ETF reale. Chiave: l'ISIN della posizione.
+strumento;dimensione;voce;peso
+IE00B4L5Y983;settore;Information Technology;30,00
+IE00B4L5Y983;settore;Financials;20,00
+IE00B4L5Y983;settore;Health Care;50,00
+IE00B4L5Y983;paese;US;60,00
+IE00B4L5Y983;paese;JP;25,00
+IE00B4L5Y983;paese;GB;15,00
+IE00B4L5Y983;titolo;APPLE INC;5,00
+IE00B4L5Y983;titolo;NESTLE SA;3,00
+IE00B5BMR087;settore;Information Technology;40,00
+IE00B5BMR087;settore;Financials;60,00
+IE00B5BMR087;paese;US;100,00
+IE00B5BMR087;titolo;Apple Inc.;7,00
+IE00B5BMR087;titolo;MICROSOFT CORP;6,00
+IT0005454241;paese;IT;100,00
