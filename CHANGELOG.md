@@ -4,9 +4,9 @@ Le versioni del plugin `wealth-management-it`, dalla più recente. Le modifiche 
 
 Ogni skill ha anche una versione propria (`metadata.version` nel frontmatter di `SKILL.md`): la sua storia è in fondo, in «Storia delle skill».
 
-## Non rilasciato
+## v0.12.0 (07/11/2026)
 
-Su `develop` dopo il tag `v0.11.0`.
+Le estensioni decise dopo la 0.11.0 (T13), il capitale umano come lente dell'allocazione (T15), l'importatore della composizione degli ETF con il look-through del portafoglio e le lingue tedesca e francese (T16), il cruscotto grafico pubblicabile come Artifact con ponte e riscatto (T17). Le voci sono in ordine inverso di merge.
 
 - **File reali di iShares, Vanguard e Amundi** (T16): i tre layout «da confermare» provati sui file scaricati dai siti italiani il 7/11/2026. iShares: etichetta della data «Al», riga di solo spazio, settori abbreviati («IT», «Comunicazione», «Generi di largo consumo», «Imprese di servizi di pubblica utilità»), nome del file `iShare_…` riconosciuto. Vanguard: «% del valore di mercato», «Nome delle partecipazioni», «Regione» con i codici ISO, «Al 30 set 2026»; settori ICB, quindi solo i paesi; le posizioni allo 0,00% non si scrivono. Amundi: il sito italiano scarica la «Composizione dell'indice», un **file di ripartizione** (fogli «Ripartizione Settoriale» e «Ripartizione Geografica», tabelle nome;peso già aggregate) che l'importatore ora legge come tale, senza titoli e con l'avviso che i pesi sono dell'indice; il suo foglio di stile non valido, che openpyxl rifiuta, si aggira rileggendo il file senza stili. Sinonimi nuovi per «Sud Corea», «Tailandia» e il refuso «Industrali». Nello stesso giorno anche il «Fund Holdings» di Amundi (elenco dei titoli con intestazioni inglesi, data dd/mm anche sotto «as at», stile non valido) e il «Constituent» di Xtrackers dal sito tedesco (intestazioni inglesi e valori tedeschi: «Industrieunternehmen», «Material», «Großbritannien (UK)», «Süd Korea», «Sambia», «Kaiman Inseln»; una cinquantina di nomi tedeschi e francesi di paesi in più). Una **replica sintetica** dichiarata nel preambolo («Replication method: Synthetic») finisce nel report, nel JSON (`replica_sintetica`) e nel commento del CSV: le posizioni sono il collaterale dello swap, non l'esposizione all'indice. Fixture sintetiche con i cinque layout.
 - **Lingue tedesca e francese dell'importatore della composizione** (T16): i file delle posizioni scaricati dai siti tedesco e francese di Xtrackers e Amundi si leggono come quelli italiani e inglesi: sinonimi delle intestazioni (`Branche`, `Land`, `Gewichtung (%)`, `Secteur`, `Pays`, `Poids (%)`, `Code ISIN`…), dei settori GICS (`Informationstechnologie`, `Nicht-Basiskonsumgüter`, `Technologies de l'information`, `Services aux collectivités`…) con i nomi ICB esclusivi (`Technologie`, `Grundstoffe`, `Matériaux de base`) e il vecchio `Telekommunikationsdienste`, dei paesi dei file reali (`Vereinigte Staaten`, `Südkorea`, `États-Unis`, `Royaume-Uni`…), delle esclusioni (`Barmittel`, `Derivate`, `Anleihen`, `Liquidités`, `Obligations`, `Non classé`…), delle etichette della data (`Stand`, `Stichtag`, `Données au`) e dei mesi abbreviati (`Okt`, `Dez`, `avr`). Solo tabelle, nessun cambio al motore; verificato su file sintetici con il layout dei due siti.
@@ -386,16 +386,16 @@ Le note di ogni iterazione, fino alla 0.10.0 tenute in fondo a ciascun `SKILL.md
 
 ### it-pianificazione-obiettivi
 
-#### v0.24 (non rilasciato)
+#### v0.24 (plugin 0.12.0)
 - Look-through del portafoglio (`look-through-portafoglio.py`) nello Step 8; l'importatore scrive i primi titoli, accetta l'ISIN come chiave (`--isin`) e legge i file in tedesco e in francese; `capitale-umano.py` confronta le posizioni per ISIN.
 
-#### v0.23 (non rilasciato)
+#### v0.23 (plugin 0.12.0)
 - Importatore della composizione degli ETF (`importa-composizione-etf.py`, reference `composizione-etf.md`) nello Step 8; `capitale-umano.py` legge la composizione importata.
 
-#### v0.22 (non rilasciato)
+#### v0.22 (plugin 0.12.0)
 - Capitale umano: proiezione a tre contenitori con i trasferimenti di TFR e contributi, percentili P10 · P50 · P90, sensibilità in punti, `stato_sorpasso`, avviso sulle chiavi non riconosciute.
 
-#### v0.21 (non rilasciato)
+#### v0.21 (plugin 0.12.0)
 - Step 8, la lente del capitale umano: `capitale-umano.py` con bilancio patrimoniale totale, esposizione azionaria della ricchezza totale e riga di equivalenza, proiezione con fascia Monte Carlo, sovrapposizione settoriale e sensibilità; profili di lavoro in CSV, reference `capitale-umano.md`, comando `/capitale-umano`.
 
 #### v0.20 (plugin 0.11.0)
@@ -575,7 +575,7 @@ Roadmap:
 
 ### it-rebalance
 
-#### v0.8 (non rilasciato)
+#### v0.8 (plugin 0.12.0)
 - `--json FILE`: il piano in JSON (drift per classe con le due bande, allocazione risultante, imposta, zainetto residuo, ordini dei CSV), letto dal cruscotto grafico di `it-revisione`. Lo stdout e i CSV non cambiano.
 
 #### v0.7 (plugin 0.11.0)
@@ -609,10 +609,10 @@ Roadmap:
 
 ### it-revisione
 
-#### v0.9 (non rilasciato)
+#### v0.9 (plugin 0.12.0)
 - Look-through del portafoglio nel passo 3 e nel contratto di input; sezione «Look-through» nel cruscotto grafico; ponte pensione e riscatto della laurea nella sezione Pensione del cruscotto.
 
-#### v0.8 (non rilasciato)
+#### v0.8 (plugin 0.12.0)
 - Passo 6 «Cruscotto grafico»: `genera-cruscotto.py` e il template `cruscotto.html`, comando `/cruscotto`; conferma esplicita prima di pubblicare l'Artifact, due anti-pattern nuovi.
 
 #### v0.7 (plugin 0.11.0)
