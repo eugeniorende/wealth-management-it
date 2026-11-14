@@ -236,7 +236,9 @@ Expected: FAIL sulla tabella di `proiezione-pensione.xlsx`.
 
 ```python
 import re, shutil, sys, zipfile
-NUOVI = {57: (24.080, 0.04153), …}                       # i quindici valori di DECRETO_COEFF_2027
+NUOVI = {57: (24.080, 0.04153), 58: (23.507, 0.04254), 59: (22.929, 0.04361), 60: (22.345, 0.04475), 61: (21.756, 0.04596),
+         62: (21.163, 0.04725), 63: (20.565, 0.04863), 64: (19.963, 0.05009), 65: (19.357, 0.05166), 66: (18.747, 0.05334),
+         67: (18.136, 0.05514), 68: (17.523, 0.05707), 69: (16.908, 0.05914), 70: (16.290, 0.06139), 71: (15.669, 0.06382)}
 TESTI = [("biennio 2025-2026", "biennio 2027-2028"),
          ("Decreto direttoriale del 20 novembre 2024 (Min. Lavoro / MEF) — GU n. 35 del 12/02/2025",
           "Decreto direttoriale del 16 ottobre 2026 (Min. Lavoro / MEF), decorrenza 1° gennaio 2027"),
