@@ -6866,6 +6866,23 @@ def t_t17_anonimo():
         assert ris["onere_agevolato"] is None and ris["costo_netto"] is None and ris["rata_mensile"] is None and ris["delta_pensione_lorda_annua"] is None
         assert ris["anni_riscatto"] == pieno["pensione"]["riscatto"]["anni_riscatto"] and ris["modalita"] == pieno["pensione"]["riscatto"]["modalita"]
         assert "pensione_inps_lorda" not in {v["id"] for v in anon["confronto"]["voci"]} and "pensione_inps_lorda" in {v["id"] for v in pieno["confronto"]["voci"]}
+        # fallisce chiuso: un campo che lo script non conosce non arriva nella pagina anonima
+        x = copy.deepcopy(pieno)
+        x["pensione"]["ponte"]["nuovo_importo"] = 98765.0
+        x["obiettivi"]["obiettivi"][0]["descrizione"] = "Casa al mare di Mario"
+        x["indicatori"].append({"id": "nuovo", "etichetta": "Nuovo", "valore": 54321.0, "fonte": "prova", "nota": ""})   # senza «formato»
+        copia_x = copy.deepcopy(x)
+        r = mod.anonimizza(x)
+        assert x == copia_x, "anonimizza() ha modificato il suo argomento"
+        testo_r = json.dumps(r, ensure_ascii=False)
+        assert "98765" not in testo_r and "Casa al mare" not in testo_r and "54321" not in testo_r, "un campo ignoto è arrivato nella pagina"
+        assert r["pensione"]["ponte"]["nuovo_importo"] is None and r["obiettivi"]["obiettivi"][0]["descrizione"] is None
+        assert abs(r["indicatori"][-1]["valore"] - 100 * 54321.0 / cap) < 1e-9      # senza formato vale importo: indice
+        # la guardia dei testi: ogni stringa del bundle completo resta, è un nome o è un testo libero dichiarato tolto
+        non_classificati = sorted({p for p, v in mod.foglie_testo(pieno) if v != "" and mod.classifica_testo(p) is None})
+        assert not non_classificati, f"campi di testo non classificati: {non_classificati}"
+        assert mod.classifica_testo("fiscalita.avvisi[]") == "tolto" and mod.classifica_testo("obiettivi.obiettivi[].nome") == "nome"
+        assert mod.classifica_testo("obiettivi.obiettivi[].priorita") == "resta" and not (mod.CAMPI_TESTO & mod.CAMPI_TESTO_TOLTI)
         # Review Focus 4: una base a zero si salta; senza importi non c'è indice
         b0 = copy.deepcopy(pieno)
         b0["allocazione"]["capitale"] = 0

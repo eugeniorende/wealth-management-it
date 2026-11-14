@@ -678,20 +678,22 @@ BASI_INDICE = (
 BASE_MASSIMO = "importo più grande della pagina"
 
 
-def _percorre(nodo, percorso=""):
-    """Ogni numero del bundle come (percorso generalizzato, valore, contenitore, chiave): i booleani non sono numeri."""
+def _percorre(nodo, percorso="", testi=False):
+    """Ogni numero del bundle (ogni stringa, con testi=True) come (percorso generalizzato, valore, contenitore,
+    chiave): i booleani non sono numeri."""
+    foglia = (lambda v: isinstance(v, str)) if testi else _e_numero
     if isinstance(nodo, dict):
         for chiave, valore in nodo.items():
             figlio = f"{percorso}.{{}}" if percorso in CHIAVI_LIBERE else (f"{percorso}.{chiave}" if percorso else str(chiave))
             if isinstance(valore, (dict, list)):
-                yield from _percorre(valore, figlio)
-            elif _e_numero(valore):
+                yield from _percorre(valore, figlio, testi)
+            elif foglia(valore):
                 yield figlio, valore, nodo, chiave
     elif isinstance(nodo, list):
         for i, valore in enumerate(nodo):
             if isinstance(valore, (dict, list)):
-                yield from _percorre(valore, f"{percorso}[]")
-            elif _e_numero(valore):
+                yield from _percorre(valore, f"{percorso}[]", testi)
+            elif foglia(valore):
                 yield f"{percorso}[]", valore, nodo, i
 
 
@@ -713,8 +715,55 @@ def classifica(percorso):
 
 
 def _e_importo(percorso, contenitore):
+    """Un importo è un campo di CAMPI_EURO o uno di CAMPI_EURO_SE_FORMATO il cui «formato» non è «percento»: un formato
+    mancante o sconosciuto vale importo (si sbaglia verso l'indice, mai verso l'euro)."""
     tipo = classifica(percorso)
-    return tipo == "euro" or (tipo == "dipende" and isinstance(contenitore, dict) and contenitore.get("formato") == "euro")
+    return tipo == "euro" or (tipo == "dipende" and not (isinstance(contenitore, dict) and contenitore.get("formato") == "percento"))
+
+
+# Le stringhe del bundle. CAMPI_TESTO: categorie, etichette fisse scritte dagli script, date, versione del plugin, settore
+# del lavoro, nomi del look-through (aggregati dei fondi, non posizioni dell'utente): restano. CAMPI_NOME: nomi di
+# obiettivi e di broker, sostituiti con «Obiettivo N» e «Broker X» (anche le chiavi dei dizionari, fiscalita.per_broker e
+# ribilanciamento.zainetto). CAMPI_TESTO_TOLTI: testi liberi che possono portare importi o nomi, tolti. Ogni altra
+# stringa è ignota e nella pagina anonima diventa None (le stringhe vuote non portano nulla e restano).
+CAMPI_TESTO = frozenset({
+    "generato_il", "plugin", "fonti[].tipo", "anonimo.base",
+    "allocazione.classi[].classe", "allocazione.obiettivi[].profilo", "allocazione.obiettivi[].tipo",
+    "look_through.settori[].nome", "look_through.regioni[].nome", "look_through.paesi[].nome",
+    "look_through.valute[].nome", "look_through.titoli[].nome",
+    "obiettivi.modello", "obiettivi.obiettivi[].profilo", "obiettivi.obiettivi[].priorita",
+    "pensione.netto.scenari[].nome", "pensione.riscatto.modalita",
+    "capitale_umano.voci[].nome", "capitale_umano.stato_sorpasso", "capitale_umano.settore.settore",
+    "fiscalita.zainetto[].scade_il", "fiscalita.zainetto[].stato",
+    "ribilanciamento.drift.{}.esito", "ribilanciamento.ordini[].operazione", "ribilanciamento.ordini[].classe",
+    "ribilanciamento.ordini[].categoria_fiscale",
+    "indicatori[].id", "indicatori[].etichetta", "indicatori[].formato", "indicatori[].fonte",
+    "confronto.data_precedente", "confronto.plugin_precedente", "confronto.obiettivi[].stato",
+    "confronto.voci[].sezione", "confronto.voci[].id", "confronto.voci[].etichetta", "confronto.voci[].formato",
+})
+CAMPI_NOME = frozenset({
+    "allocazione.obiettivi[].nome", "obiettivi.obiettivi[].nome", "glide_path.obiettivi[].nome",
+    "confronto.obiettivi[].nome", "indicatori[].nota",
+    "fiscalita.zainetto[].broker", "ribilanciamento.ordini[].broker",
+})
+CAMPI_TESTO_TOLTI = frozenset({"fonti[].file", "fiscalita.avvisi[]", "ribilanciamento.ordini[].nota",
+                               "ribilanciamento.drift.{}.motivo"})
+
+
+def foglie_testo(bundle):
+    """[(percorso generalizzato, valore)] di ogni stringa del bundle (stessa sintassi di foglie_numeriche)."""
+    return [(p, v) for p, v, _, _ in _percorre(bundle, testi=True)]
+
+
+def classifica_testo(percorso):
+    """«resta», «nome», «tolto» o None se la stringa non è dichiarata."""
+    if percorso in CAMPI_TESTO:
+        return "resta"
+    if percorso in CAMPI_NOME:
+        return "nome"
+    if percorso in CAMPI_TESTO_TOLTI:
+        return "tolto"
+    return None
 
 
 def base_indice(bundle):
@@ -752,9 +801,15 @@ def anonimizza(bundle):
     - Nomi: «Obiettivo 1…n» e «Broker A, B…» per ordine di prima comparsa, gli stessi in ogni sezione (anche chiavi di
       dizionario, nota dell'indicatore, confronto). Dalle fonti restano solo i tipi.
     - Testi liberi tolti: gli avvisi della fiscalità (contati in avvisi_omessi), la nota degli ordini, il motivo del drift.
+    - Fallisce chiuso: un numero non dichiarato (classifica() None) e una stringa non dichiarata (classifica_testo() None)
+      diventano None; un formato mancante o sconosciuto in CAMPI_EURO_SE_FORMATO vale importo.
     Il resto (percentuali, probabilità, anni, età, date, conteggi, classi, profili, esiti, aggregati del look-through)
     resta com'è. anonimo = {base, obiettivi, broker}: l'etichetta della base e quanti nomi sono stati sostituiti."""
     b = copy.deepcopy(bundle)
+    # 0. fallisce chiuso: un numero che non è dichiarato non entra nella pagina
+    for percorso, _, contenitore, chiave in list(_percorre(b)):
+        if classifica(percorso) is None:
+            contenitore[chiave] = None
     # 1. i lordi e gli importi di legge escono prima di scegliere la base: l'indice non li vede
     for percorso, _, contenitore, chiave in list(_percorre(b)):
         if percorso in CAMPI_LORDI or (percorso.startswith("pensione.riscatto.") and classifica(percorso) == "euro"):
@@ -802,6 +857,10 @@ def anonimizza(bundle):
             if isinstance(d, dict):
                 d["motivo"] = None
     b["fonti"] = [{"tipo": f.get("tipo")} for f in b.get("fonti") or [] if isinstance(f, dict)]
+    # 2b. fallisce chiuso: una stringa che non resta e non è un nome già sostituito diventa None (le vuote restano)
+    for percorso, valore, contenitore, chiave in list(_percorre(b, testi=True)):
+        if valore != "" and classifica_testo(percorso) not in ("resta", "nome"):
+            contenitore[chiave] = None
     # 3. l'indice: un solo fattore per tutti gli importi (con la base a None gli importi sono tutti zero e restano zero)
     base = base_indice(b)
     if base:
