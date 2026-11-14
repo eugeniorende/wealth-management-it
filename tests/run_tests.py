@@ -6984,6 +6984,41 @@ FUORI_DAL_GRAFICO = """() => {
   return fuori;
 }"""
 
+# Pezzi comuni ai test del cruscotto nel browser: il blocco dati della pagina, le parole che non devono mai comparire,
+# il testo completo (compreso quello dei <details> chiusi, che inner_text non vede, e dei <title> dei grafici).
+BLOCCO_DATI = re.compile(r'(<script id="dati" type="application/json">)(.*?)(</script>)', re.S)
+BRUTTI = ("NaN", "undefined", "null", "Infinity")
+TESTO_COMPLETO = """() => { const c = document.body.cloneNode(true);
+    c.querySelectorAll("script, style").forEach(e => e.remove()); return c.textContent; }"""
+ID_SEZIONI = "Array.from(document.querySelectorAll('section[id^=sez-]')).map(s => s.id)"
+# Tabelle senza righe nel corpo e grafici senza alcun segno (barra, linea, cerchio, tracciato) dentro il confronto.
+VUOTI_NEL_CONFRONTO = """() => ({
+    tabelle: Array.from(document.querySelectorAll("#sez-confronto table")).filter(t => !t.querySelector("tbody tr")).length,
+    grafici: Array.from(document.querySelectorAll("#sez-confronto svg")).filter(s => !s.querySelector("rect, line, circle, path, polygon")).length })"""
+
+
+def _con_dati(pagina_html, modifica):
+    """La stessa pagina con il bundle del blocco dati modificato da `modifica(bundle)`."""
+    bundle = json.loads(BLOCCO_DATI.search(pagina_html).group(2))
+    modifica(bundle)
+    dati = json.dumps(bundle, ensure_ascii=False).replace("<", "\\u003c")
+    return BLOCCO_DATI.sub(lambda m: m.group(1) + dati + m.group(3), pagina_html, count=1)
+
+
+def _nullo(percorso):
+    """La modifica del bundle che porta a null il campo lungo il percorso (chiavi e indici)."""
+    def modifica(bundle):
+        nodo = bundle
+        for chiave in percorso[:-1]:
+            nodo = nodo[chiave]
+        nodo[percorso[-1]] = None
+    return modifica
+
+
+def _senza_brutti(testo, dove):
+    for brutto in BRUTTI:
+        assert brutto not in testo, (dove, brutto, testo[max(0, testo.index(brutto) - 60):testo.index(brutto) + 40])
+
 
 @test("T17 cruscotto nel browser: numeri in italiano, nomi intatti, null senza NaN, tema scuro, 375px")
 def t_t17_browser_contenuti():
@@ -7048,6 +7083,8 @@ def t_t17_browser_confronto():
         rc, so, se, b, html = _cruscotto(*ora, extra=("--precedente", prima))
         assert rc == 0, se[-300:]
         rc, _, se, _, html_senza = _cruscotto(*ora)
+        rc, _, se, _, html_anonima = _cruscotto(*ora, extra=("--precedente", prima, "--anonimo"))
+        assert rc == 0, se[-300:]
         with sync_playwright() as p:
             br = lancia(p)
             try:
@@ -7078,6 +7115,80 @@ def t_t17_browser_confronto():
                     assert atteso in visibile, atteso
                 page, errori, eccezioni, _ = _apri_cruscotto(br, html_senza)
                 assert page.locator("#sez-confronto").count() == 0 and errori == [] and eccezioni == []
+                # valori nulli del confronto, uno alla volta, sulla pagina normale e su quella anonima: nessun errore, nessuna
+                # parola da programmatore, nessuna tabella senza righe né grafico senza segni; una grandezza che manca si
+                # legge «n/d», come ogni numero che manca nella pagina
+                RIGHE = "() => Array.from(document.querySelectorAll('#sez-confronto tbody tr')).map(r => Array.from(r.children).map(c => c.textContent))"
+                TITOLI = "() => Array.from(document.querySelectorAll('#sez-confronto svg title')).map(t => t.textContent)"
+                TESTO_CONFRONTO = "() => document.getElementById('sez-confronto').textContent"
+                ND = ["n/d", "n/d", "n/d"]
+                def presenti(bundle):
+                    return [o for o in bundle["confronto"]["obiettivi"] if o["stato"] == "presente"]
+                def senza_probabilita(bundle):
+                    o = presenti(bundle)[0]
+                    assert o["probabilita"] and o["gia"] and o["versamento"], o
+                    o["probabilita"] = None
+                def senza_gia_e_versamento(bundle):
+                    o = presenti(bundle)[0]
+                    assert o["probabilita"] and o["gia"] and o["versamento"], o
+                    o["gia"] = o["versamento"] = None
+                def prima_a_zero(bundle):
+                    v = next(v for v in bundle["confronto"]["voci"] if v["id"] == "capitale_allocato")
+                    assert v["formato"] == "euro" and v["prima"] > 0 and v["delta_rel"] is not None, v
+                    v.update(prima=0, delta=v["ora"], delta_rel=None)
+                def senza_voci(bundle):
+                    bundle["confronto"]["voci"] = []
+                def senza_obiettivi(bundle):
+                    bundle["confronto"]["obiettivi"] = []
+                def senza_niente(bundle):
+                    senza_voci(bundle)
+                    senza_obiettivi(bundle)
+                def tutto_nullo(bundle):
+                    for o in presenti(bundle):
+                        o["probabilita"] = o["gia"] = o["versamento"] = None
+                for pagina, sorgente in (("normale", html), ("anonima", html_anonima)):
+                    base = json.loads(BLOCCO_DATI.search(sorgente).group(2))
+                    nome = presenti(base)[0]["nome"]
+                    altri = [o["nome"] for o in presenti(base)[1:]]
+                    assert altri, "serve un secondo obiettivo presente, con le barre al loro posto"
+                    # la pagina di partenza non ha «n/d» e ha le barre del primo obiettivo: senza questo le prove sotto sarebbero vuote
+                    pg, errori, eccezioni, _ = _apri_cruscotto(br, sorgente)
+                    assert "n/d" not in pg.evaluate(TESTO_CONFRONTO) and any(t.startswith(nome + " · ") for t in pg.evaluate(TITOLI))
+                    for etichetta, modifica in (("senza probabilità", senza_probabilita), ("senza già e versamento", senza_gia_e_versamento),
+                                                ("prima a zero", prima_a_zero), ("senza voci", senza_voci),
+                                                ("senza obiettivi", senza_obiettivi), ("senza voci né obiettivi", senza_niente),
+                                                ("tutto nullo", tutto_nullo)):
+                        dove = (pagina, etichetta)
+                        pg, errori, eccezioni, _ = _apri_cruscotto(br, _con_dati(sorgente, modifica))
+                        assert errori == [] and eccezioni == [], (dove, errori, eccezioni)
+                        assert pg.locator("#sez-confronto").count() == 1, dove
+                        testo = pg.evaluate(TESTO_CONFRONTO)
+                        _senza_brutti(testo, dove)
+                        assert pg.evaluate(VUOTI_NEL_CONFRONTO) == {"tabelle": 0, "grafici": 0}, (dove, pg.evaluate(VUOTI_NEL_CONFRONTO))
+                        righe, titoli = pg.evaluate(RIGHE), pg.evaluate(TITOLI)
+                        propri = [r for r in righe if r[0] == nome]
+                        if etichetta == "senza probabilità":
+                            assert [nome, "Probabilità", *ND] in righe, (dove, propri)
+                            assert [r[1] for r in propri if "n/d" not in r] == ["Già accumulato", "Versamento mensile"], (dove, propri)
+                            assert not [t for t in titoli if t.startswith(nome + " · ")], (dove, titoli)     # nessuna barra senza probabilità
+                            assert any(t.startswith(altri[0] + " · ") for t in titoli), (dove, titoli)
+                        elif etichetta == "senza già e versamento":
+                            assert [nome, "Già accumulato", *ND] in righe and [nome, "Versamento mensile", *ND] in righe, (dove, propri)
+                            assert [r[1] for r in propri if "n/d" not in r] == ["Probabilità"], (dove, propri)
+                            assert any(t.startswith(nome + " · prima") for t in titoli), (dove, titoli)
+                        elif etichetta == "prima a zero":
+                            cella = next(r for r in pg.evaluate(RIGHE) if r[0] == "Capitale allocato")
+                            assert cella[1] in ("€0", "0,00") and cella[3].startswith("+") and "(" not in cella[3] and "n/d" not in cella, (dove, cella)
+                        elif etichetta == "senza voci":
+                            assert pg.locator("#sez-confronto table").count() == 1 and pg.locator("#sez-confronto h3").all_inner_texts() == ["Obiettivi"], dove
+                        elif etichetta == "senza obiettivi":
+                            assert "Obiettivi" not in pg.locator("#sez-confronto h3").all_inner_texts() and pg.locator("#sez-confronto table").count() >= 1, dove
+                            assert pg.locator("#sez-confronto svg").count() == 0, dove
+                        elif etichetta == "senza voci né obiettivi":
+                            assert pg.locator("#sez-confronto table, #sez-confronto svg, #sez-confronto h3").count() == 0, dove
+                        elif etichetta == "tutto nullo":
+                            assert len([r for r in righe if r[2:] == ND]) == 3 * len(presenti(base)), (dove, righe)
+                            assert not [t for t in titoli if " · prima" in t], (dove, titoli)
             finally:
                 br.close()
     finally:

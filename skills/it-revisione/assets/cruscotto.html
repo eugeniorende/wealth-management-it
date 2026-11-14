@@ -586,7 +586,7 @@ footer .fonti { color: var(--muto); }
       presenti.forEach(function (o) {
         [["probabilita", "Probabilità", "percento"], ["gia", "Già accumulato", "euro"], ["versamento", "Versamento mensile", "euro"]].forEach(function (q) {
           var x = o[q[0]];
-          if (!x) return;
+          if (!x) { righe.push([o.nome, q[1], "n/d", "n/d", "n/d"]); return; }       // una grandezza non confrontabile si dice, non sparisce
           righe.push([o.nome, q[1], valoreVoce(q[2], x.prima), valoreVoce(q[2], x.ora), variazione({ formato: q[2], delta: x.delta })]);
         });
       });
