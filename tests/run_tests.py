@@ -6791,6 +6791,30 @@ def t_t17_confronto():
         assert sum(1 for x in c["voci"] if x["id"].startswith("settore_")) == 3
         # Review Focus 1: la revisione precedente non aveva il capitale umano
         assert not [x for x in c["voci"] if x["sezione"] == "capitale_umano"] and b["capitale_umano"] is not None
+        # il capitale umano in tutte e due le revisioni, con valori diversi: le quattro voci con valori chiusi dai due JSON
+        def cu_di_prima(d):
+            d["esposizione_finanziaria"] -= 0.05
+            d["esposizione_totale"] -= 0.02
+            d["proiezione"][0]["F"] -= 20000.0
+            d["proiezione"][0]["HC"] -= 50000.0
+        cu_prima = _json_variante("cu.json", cu_di_prima)
+        vecchio, nuovo = json.load(open(cu_prima, encoding="utf-8")), L("cu.json")
+        foto = _bundle_di(tmp, "prima-cu.json", *[f for f in _tutti_i_json() if not f.endswith("cu.json")], cu_prima, data="2025-11-20")
+        rc_cu, _, se_cu, b_cu, _ = _cruscotto(*_tutti_i_json(), extra=("--precedente", foto))
+        assert rc_cu == 0, se_cu[-300:]
+        def voce_cu(id_, etichetta, formato, p, o):
+            return {"sezione": "capitale_umano", "id": id_, "etichetta": etichetta, "formato": formato, "prima": p, "ora": o,
+                    "delta": o - p, "delta_rel": (o - p) / p if formato == "euro" else None}
+        atteso = [voce_cu("esposizione_finanziaria", "Esposizione azionaria finanziaria", "percento",
+                          vecchio["esposizione_finanziaria"], nuovo["esposizione_finanziaria"]),
+                  voce_cu("esposizione_totale", "Esposizione azionaria totale", "percento",
+                          vecchio["esposizione_totale"], nuovo["esposizione_totale"]),
+                  voce_cu("patrimonio_finanziario", "Patrimonio finanziario di oggi", "euro",
+                          vecchio["proiezione"][0]["F"], nuovo["proiezione"][0]["F"]),
+                  voce_cu("capitale_umano", "Capitale umano di oggi", "euro", vecchio["proiezione"][0]["HC"], nuovo["proiezione"][0]["HC"])]
+        assert all(x["delta"] > 0 for x in atteso), atteso          # i due JSON differiscono davvero: la prova non è vuota
+        assert [x for x in b_cu["confronto"]["voci"] if x["sezione"] == "capitale_umano"] == atteso, \
+            [x for x in b_cu["confronto"]["voci"] if x["sezione"] == "capitale_umano"]
         ob, nomi = {o["nome"]: o for o in c["obiettivi"]}, [o["nome"] for o in L("mco.json")["obiettivi"]]
         assert ob[nomi[0]]["stato"] == "presente" and abs(ob[nomi[0]]["probabilita"]["delta"] + 0.10) < 1e-12 and ob[nomi[0]]["gia"]["delta"] == 0
         assert ob[nomi[1]] == {"nome": nomi[1], "stato": "non_piu_presente", "probabilita": None, "gia": None, "versamento": None}
@@ -6803,15 +6827,64 @@ def t_t17_confronto():
                                       "--precedente", stessa, "--data", "2026-10-25", cwd=tmp)
         assert rc == 0 and mod.estrai_bundle_da_pagina(open(stessa, encoding="utf-8").read())["confronto"]["data_precedente"] == "2025-11-20", se
         # casi di bordo, sulla funzione: importo di partenza a zero, nome ripetuto
-        def minimo(capitale, nomi):
+        def minimo(capitale, nomi, prob=0.5, gia=0):
             return {"versione": 2, "generato_il": "2025-01-01", "plugin": "x", "indicatori": [
                         {"id": "capitale_allocato", "etichetta": "Capitale allocato", "valore": capitale, "formato": "euro", "fonte": "", "nota": ""}],
-                    "obiettivi": {"obiettivi": [{"nome": n, "probabilita_successo": 0.5, "gia": 0, "versamento_confidenza": 100} for n in nomi]}}
+                    "obiettivi": {"obiettivi": [{"nome": n, "probabilita_successo": prob, "gia": gia, "versamento_confidenza": 100} for n in nomi]}}
         k = mod.confronta(minimo(0, ["Casa", "Casa"]), dict(minimo(500, ["Casa"]), generato_il="2026-01-01"))
         assert k["voci"][0]["delta"] == 500 and k["voci"][0]["delta_rel"] is None and k["versioni_diverse"] is False
         assert [o["stato"] for o in k["obiettivi"]] == ["ripetuto"], k["obiettivi"]
+        # A2, casi limite sulla funzione. Il confronto di partenza ha una voce e un obiettivo presente, con tutto confrontato
+        oggi = lambda x: dict(x, generato_il="2026-01-01")                                       # noqa: E731
+        base = mod.confronta(minimo(100, ["Casa"]), oggi(minimo(200, ["Casa"], prob=0.7)))
+        assert [v["id"] for v in base["voci"]] == ["capitale_allocato"] and base["obiettivi"][0]["stato"] == "presente"
+        assert abs(base["obiettivi"][0]["probabilita"]["delta"] - 0.2) < 1e-12 and base["obiettivi"][0]["gia"]["delta"] == 0
+        # un booleano non è un numero: nessuna voce per quell'indicatore, nessuna probabilità per quell'obiettivo, nessun errore
+        for prima_x, ora_x in ((minimo(True, ["Casa"]), oggi(minimo(200, ["Casa"]))), (minimo(100, ["Casa"]), oggi(minimo(True, ["Casa"])))):
+            assert mod.confronta(prima_x, ora_x)["voci"] == [], (prima_x["indicatori"], ora_x["indicatori"])
+        for prima_x, ora_x in ((minimo(100, ["Casa"], prob=True), oggi(minimo(200, ["Casa"], prob=0.7))),
+                               (minimo(100, ["Casa"], prob=0.5), oggi(minimo(200, ["Casa"], prob=True)))):
+            o = mod.confronta(prima_x, ora_x)["obiettivi"]
+            assert o == [{"nome": "Casa", "stato": "presente", "probabilita": None,
+                          "gia": {"prima": 0, "ora": 0, "delta": 0}, "versamento": {"prima": 100, "ora": 100, "delta": 0}}], o
+        # una sezione a None in una sola delle due revisioni, nei due versi: nessuna voce di quella sezione, le altre voci e gli
+        # obiettivi come nel confronto senza la modifica, nessun errore (il bundle di oggi è completo)
+        intero = mod.confronta(b, b)
+        sezioni_con_voci = {v["sezione"] for v in intero["voci"]}
+        assert sezioni_con_voci == set(mod.ORDINE_SEZIONI_CONFRONTO), sorted(sezioni_con_voci)
+        for sezione in (*mod.ORDINE_SEZIONI_CONFRONTO, "obiettivi"):
+            vuoto = dict(b, **{sezione: None})
+            for verso, k in (("prima", mod.confronta(vuoto, b)), ("ora", mod.confronta(b, vuoto))):
+                assert k["voci"] == [v for v in intero["voci"] if v["sezione"] != sezione], (sezione, verso)
+                if sezione == "obiettivi":
+                    assert {o["stato"] for o in k["obiettivi"]} == {"nuovo" if verso == "prima" else "non_piu_presente"}, (verso, k["obiettivi"])
+                else:
+                    assert k["obiettivi"] == intero["obiettivi"], (sezione, verso)
+        # un nome ripetuto solo nella revisione di oggi: una riga, «ripetuto», nessuna grandezza
+        k = mod.confronta(minimo(100, ["Casa"]), oggi(minimo(100, ["Casa", "Casa"])))
+        assert k["obiettivi"] == [{"nome": "Casa", "stato": "ripetuto", "probabilita": None, "gia": None, "versamento": None}], k["obiettivi"]
+        # una grandezza non numerica di un obiettivo presente in entrambe: «presente», quella a None, le altre confrontate
+        for non_numero in ("n/d", None):
+            for prima_x, ora_x in ((minimo(100, ["Casa"], gia=non_numero), oggi(minimo(200, ["Casa"], prob=0.7))),
+                                   (minimo(100, ["Casa"]), oggi(minimo(200, ["Casa"], prob=0.7, gia=non_numero)))):
+                o = mod.confronta(prima_x, ora_x)["obiettivi"][0]
+                assert o["stato"] == "presente" and o["gia"] is None and abs(o["probabilita"]["delta"] - 0.2) < 1e-12, (non_numero, o)
+                assert o["versamento"] == {"prima": 100, "ora": 100, "delta": 0}, o
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# Le foglie numeriche del bundle che non sono importi e possono superare 1.000, per percorso e con il motivo: tutte le altre
+# foglie da 1.000 in su sono importi veri, comunque le classifichi lo script.
+NUMERI_NON_IMPORTI = {
+    "fiscalita.zainetto[].anno": "l'anno di formazione della minusvalenza (2023, 2024): una data, non un importo",
+}
+
+
+def _importi_veri(mod, bundle):
+    """Gli importi del bundle completo, arrotondati all'intero: ogni foglia numerica da 1.000 in su (in valore assoluto) tolte
+    quelle di NUMERI_NON_IMPORTI. Non guarda classifica(): è la prova che non dipende da come lo script classifica i campi."""
+    return {round(abs(v)) for p, v in mod.foglie_numeriche(bundle) if abs(v) >= 1000 and p not in NUMERI_NON_IMPORTI}
 
 
 @test("T17 cruscotto: versione anonimizzata, importi come indice, nomi sostituiti, nessun campo numerico non classificato")
@@ -6856,6 +6929,11 @@ def t_t17_anonimo():
         veri = {round(v) for p, v in mod.foglie_numeriche(pieno) if mod.classifica(p) == "euro" and abs(v) >= 1000}
         rimasti = {round(v) for p, v in mod.foglie_numeriche(anon) if mod.classifica(p) == "euro"}
         assert veri and not (veri & rimasti), sorted(veri & rimasti)
+        # C2: lo stesso controllo senza fidarsi della classificazione: nessuna foglia numerica del bundle anonimo, a qualunque
+        # percorso, arrotondata all'intero è uno degli importi veri (un importo dichiarato per errore «non euro» resterebbe vero)
+        veri_tutti = _importi_veri(mod, pieno)
+        rimasti_tutti = {(p, round(abs(v))) for p, v in mod.foglie_numeriche(anon) if p not in NUMERI_NON_IMPORTI and round(abs(v)) in veri_tutti}
+        assert veri and veri <= veri_tutti and not rimasti_tutti, sorted(rimasti_tutti)
         blocco = re.search(r'<script id="dati" type="application/json">(.*?)</script>', html, re.S).group(1)
         assert "€" not in blocco and json.loads(blocco) == anon
         # mai il lordo e il netto della stessa grandezza; niente importi di legge del riscatto
@@ -6888,6 +6966,36 @@ def t_t17_anonimo():
         b0["allocazione"]["capitale"] = 0
         assert mod.base_indice(b0)[0] == "valore in portafoglio"
         assert mod.base_indice({"versione": 2, "indicatori": [], "obiettivi": None}) is None
+        # C1: i testi liberi tolti, con un caso in cui ci sono davvero. Nell'esempio gli avvisi sono vuoti e il motivo del drift anche:
+        # senza marcatori le asserzioni su di loro passerebbero anche se anonimizza() non li toccasse
+        BANCA, CIFRA = "Banca Fittizia Orsetto", "7.654,32"
+        def avvisi_con_marcatori(d):
+            d["avvisi"] = [f"Directa: saldo parziale presso {BANCA}, € {CIFRA}", f"zainetto 2023: {BANCA}, € {CIFRA} da verificare"]
+        def piano_con_marcatori(d):
+            d["drift"]["azionario"]["motivo"] = f"rinvio chiesto da {BANCA} per € {CIFRA}"
+            d["drift"]["azionario"]["esito"] = "rinviata"
+            d["ordini"][0]["nota"] = f"{BANCA}: € {CIFRA} in attesa"
+        sorgenti_c1 = [f for f in ora if not f.endswith(("broker.json", "piano.json"))] + [
+            _json_variante("broker.json", avvisi_con_marcatori), _json_variante("piano.json", piano_con_marcatori)]
+        rc, so, se, pieno_c1, _ = _cruscotto(*sorgenti_c1)
+        assert rc == 0, se[-300:]
+        rc, so, se, anon_c1, html_c1 = _cruscotto(*sorgenti_c1, extra=("--anonimo",))
+        assert rc == 0, se[-300:]
+        fis_p, fis_a = pieno_c1["fiscalita"], anon_c1["fiscalita"]
+        drift_p, drift_a = pieno_c1["ribilanciamento"]["drift"], anon_c1["ribilanciamento"]["drift"]
+        # prima: i marcatori arrivano nel bundle completo, altrimenti la prova è vuota
+        assert len(fis_p["avvisi"]) == 2 and all(BANCA in a and CIFRA in a for a in fis_p["avvisi"]), fis_p["avvisi"]
+        assert BANCA in drift_p["azionario"]["motivo"] and CIFRA in drift_p["azionario"]["motivo"] and drift_p["azionario"]["esito"] == "rinviata"
+        assert BANCA in pieno_c1["ribilanciamento"]["ordini"][0]["nota"] and CIFRA in pieno_c1["ribilanciamento"]["ordini"][0]["nota"]
+        assert BANCA in json.dumps(pieno_c1, ensure_ascii=False) and CIFRA in json.dumps(pieno_c1, ensure_ascii=False)
+        # poi: non compaiono da nessuna parte, né nel bundle né nel file della pagina
+        for dove, testo_c1 in (("bundle", json.dumps(anon_c1, ensure_ascii=False)), ("pagina", html_c1)):
+            for marcatore in (BANCA, CIFRA):
+                assert marcatore not in testo_c1, (dove, marcatore)
+        assert fis_a["avvisi"] == [] and fis_a["avvisi_omessi"] == fis_p["avvisi_omessi"] + 2, fis_a
+        assert all(o["nota"] is None for o in anon_c1["ribilanciamento"]["ordini"]) and drift_a["azionario"]["motivo"] is None
+        assert all(d["motivo"] is None for d in drift_a.values())
+        assert {c: d["esito"] for c, d in drift_a.items()} == {c: d["esito"] for c, d in drift_p.items()} and drift_a["azionario"]["esito"] == "rinviata"
         # riga di comando: nome di default, niente archivio, stdout senza euro
         rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--anonimo", "--data", "2026-10-25", cwd=tmp)
         assert rc == 0 and os.path.isfile(os.path.join(tmp, "cruscotto-anonimo.html")) and not os.path.exists(os.path.join(tmp, "cruscotto.html")), se
@@ -7041,9 +7149,11 @@ def t_t17_browser_contenuti():
         br = lancia(p)
         try:
             page, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti)
+            assert errori == [] and eccezioni == [], (errori, eccezioni)
             # le etichette lunghe delle barre non escono dal proprio grafico, a scrivania come a 375 px
             for larg in (1200, 375):
-                pg, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti, larghezza=larg)
+                pg, err_larg, ecc_larg, _ = _apri_cruscotto(br, html_tutti, larghezza=larg)
+                assert err_larg == [] and ecc_larg == [], (larg, err_larg, ecc_larg)
                 fuori = pg.evaluate(FUORI_DAL_GRAFICO)
                 assert fuori == [], (larg, fuori)
             assert page.inner_text('[data-valore="prob-0"]') == formato_it_percento(b_tutti["obiettivi"]["obiettivi"][0]["probabilita_successo"])
@@ -7090,6 +7200,7 @@ def t_t17_browser_confronto():
             try:
                 page, errori, eccezioni, _ = _apri_cruscotto(br, html)
                 assert errori == [] and eccezioni == [], (errori, eccezioni)
+                assert page.evaluate(FUORI_DAL_GRAFICO) == [], page.evaluate(FUORI_DAL_GRAFICO)       # a scrivania, come a 375 px
                 assert page.locator("section[id^=sez-]").nth(1).get_attribute("id") == "sez-confronto"
                 testo = page.inner_text("#sez-confronto")
                 assert "Rispetto alla revisione del 20/11/2025" in testo and "+€10.000 (+7,7%)" in testo and "-10,0 punti" in testo, testo[:1500]
@@ -7198,45 +7309,34 @@ def t_t17_browser_confronto():
 @test("T17 cruscotto nel browser: versione anonimizzata senza euro né nomi, con la testata che dice cosa resta")
 def t_t17_browser_anonimo():
     sync_playwright, lancia = browser()
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
     tmp = tempfile.mkdtemp()
     try:
         prima, ora = _revisioni_di_prova(tmp)
         rc, so, se, pieno, html_pieno = _cruscotto(*ora, extra=("--precedente", prima))
         rc, so, se, anon, html = _cruscotto(*ora, extra=("--precedente", prima, "--anonimo"))
         assert rc == 0, se[-300:]
-        blocco_dati = re.compile(r'(<script id="dati" type="application/json">)(.*?)(</script>)', re.S)
-        def con_dati(pagina_html, modifica):
-            """La stessa pagina con il bundle del blocco dati modificato da `modifica(bundle)`."""
-            bundle = json.loads(blocco_dati.search(pagina_html).group(2))
-            modifica(bundle)
-            dati = json.dumps(bundle, ensure_ascii=False).replace("<", "\\u003c")
-            return blocco_dati.sub(lambda m: m.group(1) + dati + m.group(3), pagina_html, count=1)
-        def nullo(percorso):
-            def modifica(bundle):
-                nodo = bundle
-                for chiave in percorso[:-1]:
-                    nodo = nodo[chiave]
-                nodo[percorso[-1]] = None
-            return modifica
-        # il testo della pagina compreso quello dei <details> chiusi (inner_text non lo vede) e dei <title> dei grafici
-        TESTO_COMPLETO = """() => { const c = document.body.cloneNode(true);
-            c.querySelectorAll("script, style").forEach(e => e.remove()); return c.textContent; }"""
-        ID_SEZIONI = "Array.from(document.querySelectorAll('section[id^=sez-]')).map(s => s.id)"
         with sync_playwright() as p:
             br = lancia(p)
             try:
                 page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+                assert errori == [] and eccezioni == [], (errori, eccezioni)
                 corpo = page.inner_text("body")
                 completo = page.evaluate(TESTO_COMPLETO)
                 assert "€" not in completo, completo[completo.index("€") - 60:completo.index("€") + 20]
-                for brutto in ("NaN", "undefined", "null", "Infinity"):
-                    assert brutto not in completo, (brutto, completo[completo.index(brutto) - 60:completo.index(brutto) + 40])
+                _senza_brutti(completo, "pagina anonima")
                 for nome in [o["nome"] for o in pieno["obiettivi"]["obiettivi"]] + list(pieno["fiscalita"]["per_broker"]) + [f["file"] for f in pieno["fonti"]]:
                     assert nome not in completo, nome
-                # nessun importo vero dell'utente (scritto all'italiana) nemmeno nelle tabelle chiuse
-                for vero in (pieno["allocazione"]["capitale"], pieno["pensione"]["montante_fp"]["mediana"],
-                             pieno["pensione"]["inps"]["pensione_inps_lorda_annua"]):
-                    assert f"{round(vero):,}".replace(",", ".") not in completo, vero
+                # nessun importo vero dell'utente (scritto all'italiana) nemmeno nelle tabelle chiuse: ogni importo del bundle
+                # completo da 1.000 in su, senza fidarsi di come lo script classifica i campi
+                veri = _importi_veri(mod, pieno)
+                assert len(veri) > 20, sorted(veri)
+                italiano = lambda v: f"{v:,}".replace(",", ".")                                 # noqa: E731
+                trovati = [v for v in sorted(veri) if italiano(v) in completo]
+                assert not trovati, trovati
+                completo_pieno = _apri_cruscotto(br, html_pieno)[0].evaluate(TESTO_COMPLETO)       # il controllo può fallire: lì ci sono
+                visti = [v for v in sorted(veri) if italiano(v) in completo_pieno]
+                assert len(visti) >= 10, visti
                 # le stesse sezioni, nello stesso ordine, della pagina completa: nessuna sparisce in silenzio
                 pagina_piena = _apri_cruscotto(br, html_pieno)[0]
                 sezioni = page.evaluate(ID_SEZIONI)
@@ -7250,19 +7350,27 @@ def t_t17_browser_anonimo():
                                ("confronto", "plugin_precedente"), ("look_through", "settori", 0, "nome"),
                                ("pensione", "netto", "scenari", 1, "nome"), ("capitale_umano", "voci", 1, "nome")]
                 for percorso in CAMPI_NULLI:
-                    variante, errori, eccezioni, _ = _apri_cruscotto(br, con_dati(html, nullo(percorso)))
+                    variante, err_v, ecc_v, _ = _apri_cruscotto(br, _con_dati(html, _nullo(percorso)))
                     testo = variante.evaluate(TESTO_COMPLETO)
-                    assert errori == [] and eccezioni == [], (percorso, errori, eccezioni)
-                    for brutto in ("NaN", "undefined", "null", "Infinity"):
-                        assert brutto not in testo, (percorso, brutto, testo[testo.index(brutto) - 60:testo.index(brutto) + 40])
+                    assert err_v == [] and ecc_v == [], (percorso, err_v, ecc_v)
+                    _senza_brutti(testo, percorso)
                     assert variante.evaluate(ID_SEZIONI) == sezioni, (percorso, variante.evaluate(ID_SEZIONI))
                     assert variante.locator("section .avviso", has_text="Sezione non disegnata").count() == 0, percorso
+                # la rete di sicurezza scatta davvero: un contenitore a null fa fallire il disegno di una sezione, che resta con
+                # il suo id e una riga che lo dice; le altre sezioni, la console e il testo non ne risentono
+                rotta, err_r, ecc_r, _ = _apri_cruscotto(br, _con_dati(html, _nullo(("capitale_umano", "proiezione"))))
+                avviso = rotta.locator("#sez-capitale_umano .avviso")
+                assert avviso.count() == 1 and avviso.inner_text() == "Sezione non disegnata in questa versione: Capitale umano", avviso.all_inner_texts()
+                assert rotta.locator("section .avviso", has_text="Sezione non disegnata").count() == 1
+                assert rotta.evaluate(ID_SEZIONI) == sezioni, rotta.evaluate(ID_SEZIONI)
+                assert err_r == [] and ecc_r == [], (err_r, ecc_r)
+                _senza_brutti(rotta.evaluate(TESTO_COMPLETO), "sezione non disegnata")
                 # «invariato» si decide sul valore mostrato: 0,4 su un indice è una variazione, non zero
                 def con_variazione(pagina_html, delta):
                     def modifica(bundle):
                         voce = next(v for v in bundle["confronto"]["voci"] if v["formato"] == "euro" and v["id"] == "capitale_allocato")
                         voce.update(prima=2.0, ora=2.0 + delta, delta=delta, delta_rel=delta / 2.0)
-                    return con_dati(pagina_html, modifica)
+                    return _con_dati(pagina_html, modifica)
                 def riga_capitale(pagina):
                     return next(r for r in pagina.evaluate("""() => Array.from(document.querySelectorAll("#sez-confronto tr"))
                         .map(r => r.textContent)""") if r.startswith("Capitale allocato"))
@@ -7284,8 +7392,7 @@ def t_t17_browser_anonimo():
                 pensione = page.inner_text("#sez-pensione")
                 assert "Pensione INPS lorda" not in pensione and "Onere agevolato" not in pensione and "n/d" not in pensione, pensione[-900:]
                 assert "Tasso di sostituzione lordo" in pensione and "Pensione netta" in pensione
-                for brutto in ("NaN", "undefined", "null", "Infinity"):
-                    assert brutto not in corpo, brutto
+                _senza_brutti(corpo, "testo visibile")
                 # nessun «€» nemmeno negli attributi e nei <title> dei grafici, che inner_text non vede
                 nascosti = page.evaluate("""() => Array.from(document.querySelectorAll("*")).filter(e => e.tagName !== "SCRIPT" && e.tagName !== "STYLE" &&
                     (Array.from(e.attributes).some(a => a.value.includes("€")) || (e.tagName.toLowerCase() === "title" && e.textContent.includes("€")))).map(e => e.tagName)""")
