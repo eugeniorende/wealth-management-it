@@ -1,9 +1,11 @@
-# Passaggio della sessione di sviluppo — 07/11/2026
+# Passaggio della sessione di sviluppo — 14/11/2026
 
-Documento per riprendere lo sviluppo in un'altra sessione (Claude Code in cloud o su un'altra macchina). Sostituisce la versione del 24/10/2026, che si fermava a T13; i §§ 2.1-2.8 restano la storia della 0.11.0 e di T13, il § 2.9 copre i temi entrati dopo. Tutto ciò che serve è nel repository: questo file, `ROADMAP.md`, `docs/audit-2026-10.md` e i dati in `docs/sviluppo/`.
+Documento per riprendere lo sviluppo in un'altra sessione (Claude Code in cloud o su un'altra macchina). Sostituisce la versione del 07/11/2026, che si fermava alla 0.12.0, e prima ancora quella del 24/10/2026; i §§ 2.1-2.8 restano la storia della 0.11.0 e di T13, il § 2.9 copre i temi entrati dopo, il § 3 è lo stato di fine ondata 1. Tutto ciò che serve è nel repository: questo file, `ROADMAP.md`, `docs/audit-2026-10.md` e i dati in `docs/sviluppo/`.
 
 ## 1. Dove siamo
 
+- **Stato al 14/11/2026, fine dell'ondata 1.** Il proprietario ha deciso un programma di completamento delle voci rimaste aperte (spec `docs/sviluppo/specs/2026-11-14-completamento-roadmap-design.md`: cinque ondate, tre rilasci). Le ondate 0 e 1 sono fatte sul branch di sessione `claude/amazing-noether-l4w4u2`, con tre piani: `docs/sviluppo/piani/2026-11-14-ondata-0-dati-pubblicati.md` (coefficienti 2027-2028, tasso di capitalizzazione 2026, pesi MSCI ACWI, tabella dei dati normativi vincolata da un test), `docs/sviluppo/piani/2026-11-14-ondata-1-look-through.md` (regioni, ISIN dei titoli, valuta di denominazione) e `docs/sviluppo/piani/2026-11-14-ondata-1-cruscotto.md` (archivio delle revisioni, confronto con la precedente, versione anonimizzata). Nessuna pull request è aperta: la apre il proprietario o la chiede. Skill: it-pianificazione-obiettivi 0.25, it-revisione 0.10, it-rebalance 0.8, it-pianificazione 0.14, it-pianificazione-autonomi 0.6, it-tax-optimization 0.11; i test sono 197 (il numero vincolato è nel README). Il changelog è in «Non rilasciato», destinato alla 0.13.0.
+- **Come è stato eseguito.** L'ondata 0 in linea, con una revisione finale (correzioni nel commit `9941602`). Il look-through e il cruscotto con un esecutore e un revisore per ogni task e una revisione finale dell'intero piano; le correzioni del look-through sono nel commit `d496186`, le correzioni della revisione finale del cruscotto sono nel commit che segue questo aggiornamento.
 - **0.11.0 rilasciata il 24/10/2026**: PR #50 su `main` (merge commit `24e0cf1`), merge back su develop (PR #51), tag `v0.11.0` dato dal proprietario e GitHub Release con lo zip pubblicata da `release.yml` (run 40123407611): zip di 79 file con LICENSE, NOTICE e CHANGELOG.md, versione 0.11.0 nel manifest, estratto e validato con `claude plugin validate --strict`. Dalla sessione cloud il push dei tag è respinto con un 403 dal proxy GitHub, mentre i branch passano: al prossimo rilascio il tag lo dà di nuovo il proprietario, con `git tag -a vX.Y.Z <merge commit su main> -m vX.Y.Z && git push origin vX.Y.Z`, senza creare prima la release dall'interfaccia (il passo `gh release create` del workflow fallirebbe). Prima del tag, `release.yml` si collauda su `main` con l'avvio manuale.
 - Dentro la 0.11.0, dopo la 0.10.0 del 22/10/2026: PR #37-#40 (verifiche alle fonti, LibreOffice in CI, aliquota mista), PR #42 (stato dopo la 0.10.0), T9 in quattro PR (#43-#46: interfaccia comune degli script, lettore unico del pianificatore, catena `--json` → `--from`, input da file, «Dove lavorare», vocabolario), T12 (#47: test che vincolano i numeri), T14 (#48: description, CHANGELOG.md, comandi alias, manifest `--strict`, indici) e la pre-pubblicazione (#49: rilettura degli output, prove di installazione, verifiche alle fonti). Ogni tema ha la sua revisione avversariale, con gli esiti in `docs/sviluppo/revisioni/` (esito-t9a, esito-t9bcd, esito-t12, esito-t14).
 - **0.12.0 rilasciata il 7/11/2026**: PR #60 di `release/0.12.0` su `main` (merge commit `9119a7a`), tag `v0.12.0` dato dal proprietario, `release.yml` (run 42378501167) verde con la GitHub Release e lo zip di 92 file, merge back di `main` su `develop` con la PR #61. Su origin restano solo `main` e `develop`. La prossima versione è la 0.13.0; il changelog riparte da una sezione «Non rilasciato» al primo merge. Contenuto della 0.12.0, in ordine di merge su `develop`:
@@ -93,7 +95,7 @@ Ordine di lavoro deciso dal proprietario l'1/11/2026 per il ciclo 0.12.0, dopo l
 5. **Rilascio 0.12.0: fatto il 7/11/2026** (PR #59 su `develop`, release branch, PR #60 su `main`, tag del proprietario, `release.yml` verde, merge back PR #61). La procedura resta quella del § 1 della versione precedente di questo file: il tag lo dà il proprietario sul merge commit di `main`, senza creare prima la release dall'interfaccia. Le skill sono a it-pianificazione-obiettivi 0.24 e it-revisione 0.9; la suite conta 182 test.
 6. **Prossimo ciclo (0.13.0), da decidere con il proprietario**: le voci rinviate qui sotto, più ciò che porta la legge di bilancio 2027.
 
-Rinviati a dopo la legge di bilancio 2027, quando si riapre comunque la calibrazione: le fonti dati a priorità media e bassa di T16 (R_F dalla BCE, `p_u` e durata da ISTAT e INPS, NASpI nella freshness, `sigma_h`, rendimenti europei, `PESI_MONDO`), i quattro sviluppi del capitale umano (secondo reddito, volatilità personale dall'estratto INPS, aggiustamento dei target, polizza vita) e gli altri due del cruscotto (confronto tra due revisioni, versione anonimizzata).
+Il programma del 14/11/2026 ha preso le voci qui sotto e le ha distribuite in ondate (§ 3.1); restano da decidere con il proprietario, dopo la legge di bilancio 2027, le fonti dati a priorità media e bassa di T16 (R_F dalla BCE, `p_u` e durata da ISTAT e INPS, NASpI nella freshness, `sigma_h`, rendimenti europei) e i quattro sviluppi del capitale umano (secondo reddito, volatilità personale dall'estratto INPS, aggiustamento dei target, polizza vita). Il confronto tra due revisioni e la versione anonimizzata del cruscotto sono fatti (ondata 1).
 
 Restano al proprietario: le due prove di installazione del § 2.6 (account senza accesso e upload dello zip in Cowork), la prova manuale della pubblicazione del cruscotto come Artifact in claude.ai e in Cowork, il tag della 0.12.0. I layout iShares, Vanguard e Amundi sono stati confermati il 7/11/2026 su file reali forniti dal proprietario (siti italiani; Amundi come file di ripartizione dell'indice); poi anche il «Fund Holdings» di Amundi (ETF a swap) e il «Constituent» di Xtrackers dal sito tedesco; restano da confermare iShares dal sito britannico e Amundi dai siti tedesco e francese.
 
@@ -102,6 +104,57 @@ Con il calendario del README («Freshness fiscale»):
 - **Con la legge di bilancio 2027 e i correttivi del D.Lgs. 117/2026**: rivedere i due punti «Da verificare» della mappa dei testi unici (rinvii del DM 21/02/2013, art. 306 c. 6) e le soglie annuali (massimale contributivo, minimale INPS, onere del riscatto agevolato, coefficienti, tassi di rivalutazione).
 - **Dal 1/1/2027** entrano in vigore i testi unici: le doppie citazioni di `mappa-nuovo-tuir.md` restano valide, ma la citazione principale va girata sul testo nuovo quando le prassi dell'AdE lo seguono.
 - **Entro giugno 2027**: riverifica alle fonti dei marcatori del 2026-06, prima che la freshness mensile apra la issue e prima di un nuovo tag (`release.yml` esegue anche la freshness).
+
+### 3.1 Dopo l'ondata 1: la 0.13.0 e le ondate successive
+
+**Cosa resta al proprietario per la 0.13.0**, nell'ordine:
+
+1. pull request del branch di sessione su `develop`;
+2. release branch `release/0.13.0` da `develop` (versione nei manifest, sezione v0.13.0 del changelog al posto di «Non rilasciato», README e ROADMAP), pull request su `main`, tag sul merge commit, merge back su `develop`, cancellazione del branch di sessione; dalla sessione cloud il push dei tag e le cancellazioni dei branch sono respinti;
+3. le prove manuali già elencate: installazione da un account senza accesso, upload dello zip in Cowork, pubblicazione del cruscotto come Artifact in claude.ai e in Cowork, ora anche della versione anonimizzata;
+4. la conferma del coefficiente 2023-2024 a 71 anni: il «-2,18%» della frase sul trend nella reference dei coefficienti non si è potuto riverificare alla fonte (la tabella 2023-2024 non era raggiungibile), quindi la frase usa i soli valori ricalcolabili; a memoria del revisore il passaggio dal 2021-2022 al 2023-2024 fu un aumento, e la frase di contesto («calano strutturalmente») va riletta su Gazzetta Ufficiale o sul sito del Ministero.
+
+**Ondate 2, 3 e 4**, con le date da cui dipendono (dal «Programma di completamento» della ROADMAP; ciascuna avrà la propria spec prima del piano):
+
+- **Ondata 2, capitale umano, il modello** (0.14.0): volatilità personale del reddito dall'estratto INPS; secondo reddito del nucleo. Non dipende da una data.
+- **Ondata 3, calibrazione e parametri 2027** (0.14.0, da febbraio 2027, quando sono uscite le circolari INPS): `R_F`, `p_u` e `durata_anni`, NASpI, `sigma_h`, rendimenti azionari non USA, parametri 2027 del calendario del README.
+- **Ondata 4, postura** (0.15.0, prima di giugno 2027 o dopo la riverifica dei marcatori): polizza vita; aggiustamento dei target, che aspetta dal proprietario la decisione sulla postura.
+- **Igiene della suite, con scadenza**: prima di luglio 2027 il test del filtro `--only`/`--skip` pretende che il test di freshness passi, e dalla scadenza dei marcatori di giugno 2026 fermerebbe la CI delle PR; entro metà settembre 2027 `_json_esempio()` fissa `ANNI=25` e sei test del cruscotto cadono quando la persona della fixture compie 38 anni arrotondati.
+
+**Rilievi minori rimandati dalle revisioni**, in attesa della decisione del proprietario (una riga ciascuno; quelli chiusi da un commit successivo non sono riportati).
+
+Ondata 0:
+- Il test dei pesi MSCI conta, nella tabella di copertura del README, per sei script che non esercita, per via dell'asserzione sui file con il marcatore obbligatorio.
+- Non tutti i numeri ricalcolati della reference dei coefficienti sono fissati da un test (righe del confronto, passaggi dell'esempio fiscale, «+€338», «6,3%»): oggi sono giusti.
+- Il limite alto di `ANNO_CORRENTE` (2100) non ha un test.
+- Testi con i vecchi valori: «(es. 0.048)» nel commento di `COEFF_ESPLICITO`, «51,4%» come esempio di formato nel README; la riga «quando esce» del calendario non elenca tutti i punti in cui il decreto è citato; la skill potrebbe dire come riconoscere una copia vecchia dell'Excel (`Coefficienti!A1` dice «biennio 2025-2026»).
+
+Look-through:
+- `regione_di()` scorre tutte le regioni a ogni chiamata e su un codice ignoto solleva un `KeyError` nudo (non raggiungibile: i paesi sono validati prima).
+- L'espressione dell'ISIN è scritta due volte, nell'importatore e nel look-through, legate solo da un commento: se divergono torna il caso «l'importatore scrive, il lettore rifiuta».
+- Dopo un reimport un file di composizione può avere righe di quattro e di cinque campi insieme (i lettori le accettano).
+- Lo stesso titolo con ISIN diversi nello stesso strumento somma i pesi ma tiene solo l'ultimo ISIN; un titolo con il nome vuoto si scarta anche se ha un ISIN valido.
+- L'avviso sulla classe con copertura del cambio scatta anche su frasi negate («senza copertura del cambio», «nicht abgesichert»).
+- Il comando suggerito dall'avviso (`--copertura NOME=EUR`) non mette le virgolette a un nome con spazi; `--copertura` ripetuto per lo stesso strumento vince l'ultimo in silenzio; un nome con «=» non si può coprire.
+- L'errore sulle valute non riconosciute chiude con «segnalali per aggiungerli ai sinonimi», che per un codice valuta non è la correzione giusta; `CODICI_VALUTA` accetta anche codici ISO che non sono valute (XXX, XTS, metalli).
+- L'avviso «il file non ha la colonna della valuta» esce anche per i file di ripartizione di Amundi, che non hanno colonne di posizioni.
+- Due righe molto lunghe in `look-through-portafoglio.py`; `_genere()` ritorna una tupla di cinque elementi senza nomi; `--help` elenca tra le costanti di `--set` anche `DIMENSIONI` e `ISIN_TITOLO`, che non sono parametri di scenario.
+- Il docstring dice `quota_euro` «assente» quando nessuna posizione ha valute, mentre lo script scrive `null`.
+- «altri 1 paesi» al singolare nel report del look-through e nel cruscotto.
+- Alcuni test scrivono con `open(...).write(...)` senza `with` (stile già presente nel runner).
+
+Cruscotto:
+- `--archivia ""` non archivia nulla in silenzio e `-o ""` diventa il default.
+- La revisione precedente si legge con `utf-8` e non `utf-8-sig`: un bundle o una pagina risalvati con il BOM danno «non è una revisione».
+- `generato_il` si valida con `date.fromisoformat`, che accetta anche forme diverse da AAAA-MM-GG, mentre le date si confrontano come stringhe.
+- Le scritture non passano da un file temporaneo e rinomina: un errore di I/O a metà può lasciare un file parziale.
+- L'aiuto di `-o` dice che il default è `cruscotto.html`, ma con `--anonimo` è `cruscotto-anonimo.html`.
+- Con nomi di classe o di settore duplicati in un bundle il confronto prende il primo in silenzio; con voci e obiettivi del confronto entrambi vuoti la sezione non dice «nessuna grandezza in comune» e può sembrare un guasto.
+- Sotto i 520 px le tabelle del confronto perdono la semantica di tabella per i lettori di schermo; la larghezza delle etichette delle barre è una stima per carattere, provata solo in Chromium; l'ultima etichetta dell'asse dei grafici a linee può avvicinarsi alla precedente.
+- Versione anonimizzata: due broker che differiscono solo per uno spazio ai bordi finiscono nella stessa etichetta; il segnaposto «(da finanziare)» degli ordini riceve un'etichetta «Broker X» ed entra nel conteggio; `base_indice()` chiamata da sola può scegliere una base diversa da quella di `anonimizza()`; il costo permanente lordo del ponte resta come indice (la spec va completata con questa riga).
+- Il formato dell'indice stampa «10,00» per 9,996; in indice una variazione sotto la precisione si legge «100,0 | 100,0 | +0,04 (0,0%)»; la marca «(indice)» non è uniforme e il suffisso è sparso in una quindicina di punti del template.
+- Nella pagina normale un contenitore a `null` fa fallire il disegno con un errore in console e la pagina resta vuota senza un messaggio (voluto: il generatore non lo produce).
+- La revisione finale del cruscotto decide se restano così: `tipo`, `priorita` e `profilo` degli obiettivi sono testo libero delle celle del pianificatore e un nome scritto lì arriva nella pagina anonima (servirebbe un elenco di valori ammessi); la guardia copre i valori e non le chiavi dei dizionari.
 
 ## 4. Regole di lavoro
 
@@ -125,10 +178,19 @@ python tests/run_tests.py --only freshness      # solo freshness
 python tests/run_tests.py --tabella-freshness   # tabella per il README
 ```
 
+In questa sessione cloud Chromium e Playwright sono già installati (non si lancia `playwright install`) e i test del browser e di LibreOffice sono obbligatori:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium RICHIEDI_BROWSER=1 RICHIEDI_LIBREOFFICE=1 python3 -B tests/run_tests.py
+```
+
+`python3 -B` evita i `__pycache__`: serve quando si provano i mutanti, perché il bytecode vecchio di una modifica della stessa lunghezza nello stesso secondo darebbe un esito falso.
+
 In CI: `RICHIEDI_LIBREOFFICE=1` rende obbligatori i test Excel e `RICHIEDI_BROWSER=1` quelli del browser (`PLAYWRIGHT_CHROMIUM_EXECUTABLE` indica un Chromium già installato); matrice Python 3.11 e 3.14; `scripts/installa-libreoffice.sh` installa LibreOffice dai `.deb` in cache (PR #39). Il validatore locale: `claude plugin validate .`.
 
 ## 6. Storico e materiale
 
+- Passaggio del 07/11/2026: stato alla 0.12.0 rilasciata, con il ciclo di T13, T15, T16 e T17; questo aggiornamento lo sostituisce e ne conserva la storia nei §§ 1-2.
 - Passaggio del 21/10/2026: stato prima della 0.10.0, temi su branch separati, note fuori perimetro (§ 4 di allora): tutto chiuso tranne il conteggio dei test del README (§ 2.1).
 - `docs/sviluppo/revisioni/`: `review-<tema>.json` (esiti delle revisioni avversariali: `confermati`, `contesi`, `non_verificati`) ed `esito-<tema>.json` (cosa è stato applicato), uno per tema; esito-t2, esito-t3 ed esito-t13 ricostruiti con la PR #47. Per la 0.11.0: esito-t9a, esito-t9bcd, esito-t12 ed esito-t14 (quest'ultimo copre anche la PR #49). Dopo: esito-t13b e esito-t16a; per T15 e T17 l'esito della revisione finale è nei commit di correzione (`9772053`, `cfac020`, `daa37cc`, `83c51da`), senza file JSON.
 - `docs/sviluppo/t11/`: `mappa-nuovo-tuir.md` e `doppie-citazioni.md` sono bozze storiche, già integrate nella reference; i verbali `verifica-2026-10-22-*.md` sono la fonte delle corrispondenze 2027.

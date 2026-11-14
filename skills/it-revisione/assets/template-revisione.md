@@ -10,6 +10,8 @@
 
 **Patrimonio netto: € [valore]** ([variazione vs anno scorso] rispetto a € [valore precedente])
 
+*La variazione del patrimonio netto è il confronto tra due valori che hai scritto tu (foglio Patrimonio): non viene da uno script.*
+
 *Composizione per contenitore fiscale (dal foglio Patrimonio):*
 
 | Contenitore | Valore | % del netto |
@@ -31,6 +33,7 @@
 
 ## 2. Cosa è cambiato — dall'ultima revisione
 
+- **Rispetto alla revisione del [data]** (dal confronto del cruscotto): [le variazioni principali, con i numeri di `confronto`]
 - **Versamenti**: ho versato € [—] contro i € [—] pianificati. [in linea / sotto / sopra]
 - **Drift dell'allocazione**: [quali classi si sono spostate, di quanto]
 - **Eventi della vita**: [variazioni di reddito, figli, casa, passaggio dipendente↔P.IVA, eredità… o "nessuno"]

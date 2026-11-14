@@ -7440,6 +7440,21 @@ def t_t17_skill():
     assert "stesso tipo" in passo and "chiedi all'utente" in passo.lower(), passo[:1500]
     comando = open(os.path.join(ROOT, "commands", "cruscotto.md"), encoding="utf-8").read()
     assert "--json" in comando and "input" in comando, comando
+    # confronto tra revisioni e versione anonimizzata (spec §7.1, §7.2)
+    passo3 = skill.split("### 3. Avanzamento")[1].split("### 4.")[0]
+    assert "--solo-dati" in passo3 and "--archivia" in passo3 and "--precedente revisioni/" in passo3, passo3[-900:]
+    passo5 = skill.split("### 5. Report")[1].split("### 6.")[0]
+    assert "confronto" in passo5 and "patrimonio netto" in passo5.lower(), passo5
+    assert "--precedente" in passo and "--anonimo" in passo and "anonimizzata" in passo and "facoltativ" in passo.lower()
+    assert "sottrazioni" in anti and "anonimizzata" in anti, anti[-800:]
+    contratto = skill.split("### Contratto di input")[1].split("\n## ")[0]
+    assert "| Confronto |" in contratto and "confronto.voci" in contratto and "confronto.obiettivi" in contratto
+    modello = open(asset("it-revisione", "template-revisione.md"), encoding="utf-8").read()
+    assert "Rispetto alla revisione del" in modello and "due valori che hai scritto tu" in modello
+    assert "revisioni/" in dati and "anonimizzata" in dati and "ordine di grandezza del reddito" in dati, dati[-900:]
+    nr = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.12.0")[0]
+    assert "confronto" in nr.lower() and "anonimizzata" in nr and "--solo-dati" in nr
+    assert "--anonimo" in comando
 
 
 @test("T16 look-through: il cruscotto riconosce il JSON, il bundle non porta posizioni né ISIN, la sezione in pagina")
