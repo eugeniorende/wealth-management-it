@@ -6552,7 +6552,7 @@ def t_t17_bundle():
     rc, so, se, b, html = _cruscotto(*tutti)
     assert rc == 0, (so[-300:], se[-300:])
     mco, mc, netto, cu, broker, piano = (L(n) for n in ("mco.json", "mc.json", "netto.json", "cu.json", "broker.json", "piano.json"))
-    assert b["generato_il"] == "2026-10-25" and b["versione"] == 1
+    assert b["generato_il"] == "2026-10-25" and b["versione"] == 2 and b["confronto"] is None and b["anonimo"] is None
     assert b["plugin"] == json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
     assert [f["tipo"] for f in b["fonti"]] == ["allocatore", "look_through", "glide_path", "mc_obiettivi", "inps", "mc_pensione",
                                               "netto_pensione", "ponte", "riscatto", "capitale_umano", "broker", "ribilanciamento"], b["fonti"]
@@ -6659,6 +6659,93 @@ def t_t17_html():
             raise AssertionError("incorpora deve respingere il template")
         except mod.ErroreDati:
             pass
+
+
+def _bundle_di(cartella, nome, *sorgenti, data, extra=()):
+    """Scrive in cartella/nome il bundle generato dai sorgenti alla data indicata, senza pagina; ritorna il percorso."""
+    os.makedirs(cartella, exist_ok=True)
+    path = os.path.join(cartella, nome)
+    rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), *[a for f in sorgenti for a in ("--from", f)],
+                                  "--solo-dati", "--json", path, "--data", data, *extra, cwd=cartella)
+    assert rc == 0, se[-300:]
+    return path
+
+
+def _come_v1(path, plugin="0.11.0"):
+    """Riscrive un bundle come lo scriveva la 0.12.0 (versione 1, senza confronto e anonimo, look-through senza
+    regioni e valute), con il plugin di una versione precedente."""
+    b = json.load(open(path, encoding="utf-8"))
+    b["versione"], b["plugin"] = 1, plugin
+    for k in ("confronto", "anonimo"):
+        b.pop(k, None)
+    for k in ("regioni", "valute", "quota_euro"):
+        (b.get("look_through") or {}).pop(k, None)
+    json.dump(b, open(path, "w", encoding="utf-8"), ensure_ascii=False)
+    return path
+
+
+@test("T17 cruscotto: archivio della revisione, --solo-dati, revisione precedente da bundle, pagina e cartella")
+def t_t17_archivio():
+    G = asset("it-revisione", "genera-cruscotto.py")
+    mod, js = carica_modulo(G), _json_esempio()
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--solo-dati", "--archivia", "--data", "2025-11-20", cwd=tmp)
+        assert rc == 0 and os.listdir(tmp) == ["revisioni"], (so, se, os.listdir(tmp))       # nessuna pagina
+        foto = json.load(open(os.path.join(tmp, "revisioni", "cruscotto-2025-11-20.json"), encoding="utf-8"))
+        assert foto["versione"] == 2 and foto["generato_il"] == "2025-11-20" and foto["confronto"] is None and foto["anonimo"] is None
+        assert "Archiviato:" in so and "cruscotto-2025-11-20.json" in so and "Cruscotto:" not in so and "sovrascritta" not in so, so
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--solo-dati", "--archivia", "--data", "2025-11-20", cwd=tmp)
+        assert rc == 0 and "sovrascritta la foto dello stesso giorno" in so, so
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--solo-dati", "--archivia", "altrove", "--data", "2026-01-10", cwd=tmp)
+        assert rc == 0 and os.path.isfile(os.path.join(tmp, "altrove", "cruscotto-2026-01-10.json")), se
+        for args in (("--solo-dati",), ("--solo-dati", "--json", "b.json", "-o", "c.html")):
+            rc, so, se = run_script_split(G, "--from", js["alloc.json"], *args, cwd=tmp)
+            assert rc == 2 and "--solo-dati" in se, (args, rc, se[-200:])
+        # Review Focus 5: l'archivio su un percorso che è un file
+        open(os.path.join(tmp, "occupato"), "w", encoding="utf-8").write("x")
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--archivia", "occupato", "-o", "p.html", cwd=tmp)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se and not os.path.exists(os.path.join(tmp, "p.html")), se
+        # la revisione precedente: bundle di versione 2 e 1, pagina, cartella
+        v2 = _bundle_di(tmp, "prima.json", js["alloc.json"], data="2025-11-20")
+        nome, b = mod.leggi_precedente(v2, "2026-10-25")
+        assert nome == "prima.json" and b["generato_il"] == "2025-11-20"
+        v1 = _come_v1(_bundle_di(tmp, "v1.json", js["alloc.json"], data="2025-11-20"))
+        assert mod.leggi_precedente(v1, "2026-10-25")[1]["versione"] == 1
+        rc, _, se, b_pagina, html = _cruscotto(js["alloc.json"], extra=("--data", "2025-11-20"))
+        pagina = os.path.join(tmp, "vecchio.html")
+        open(pagina, "w", encoding="utf-8").write(html)
+        assert mod.leggi_precedente(pagina, "2026-10-25")[1] == b_pagina and mod.estrai_bundle_da_pagina(html) == b_pagina
+        cartella = os.path.join(tmp, "revisioni")                                   # ha già la foto del 20/11/2025
+        _bundle_di(cartella, "cruscotto-2026-10-25.json", js["alloc.json"], data="2026-10-25")   # quella di oggi: si salta
+        _bundle_di(cartella, "cruscotto-vecchia.json", js["alloc.json"], data="2026-03-01")      # vale generato_il, non il nome
+        open(os.path.join(cartella, "appunti.json"), "w", encoding="utf-8").write("{}")          # Review Focus 3: ignorato
+        assert mod.leggi_precedente(cartella, "2026-10-25")[1]["generato_il"] == "2026-03-01"
+
+        def respinto(percorso, data, *attesi):
+            try:
+                mod.leggi_precedente(percorso, data)
+            except mod.ErroreDati as e:
+                assert all(a in str(e) for a in attesi), (attesi, str(e))
+                return
+            raise AssertionError(f"{percorso}: doveva essere respinto")
+        respinto(os.path.join(tmp, "non-esiste.json"), "2026-10-25", "non trovat")
+        respinto(cartella, "2025-01-01", "nessuna revisione precedente")
+        respinto(v2, "2025-11-20", "data", "precedente")                            # stessa data: non è una revisione precedente
+        open(os.path.join(tmp, "altro.json"), "w", encoding="utf-8").write('{"a": 1}')
+        respinto(os.path.join(tmp, "altro.json"), "2026-10-25", "altro.json", "non è una revisione")
+        respinto(asset("it-revisione", "cruscotto.html"), "2026-10-25", "template")
+        tre = json.load(open(v2, encoding="utf-8"))
+        tre["versione"] = 3
+        json.dump(tre, open(os.path.join(tmp, "v3.json"), "w", encoding="utf-8"))
+        respinto(os.path.join(tmp, "v3.json"), "2026-10-25", "versione")
+        tre["versione"], tre["anonimo"] = 2, {"base": "capitale allocato", "obiettivi": 1, "broker": 0}
+        json.dump(tre, open(os.path.join(tmp, "anon.json"), "w", encoding="utf-8"))
+        respinto(os.path.join(tmp, "anon.json"), "2026-10-25", "anonimizzata")
+        open(os.path.join(cartella, "cruscotto-rotta.json"), "w", encoding="utf-8").write("{rotta")
+        respinto(cartella, "2026-10-25", "cruscotto-rotta.json")                    # Review Focus 3: non si salta in silenzio
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 # Il rendering si verifica in Chromium con Playwright per Python. Senza Playwright i test sono saltati,

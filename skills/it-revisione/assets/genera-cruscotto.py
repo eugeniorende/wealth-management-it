@@ -13,7 +13,14 @@ Artifact su claude.ai, ma solo se l'utente lo chiede (vedi SKILL.md, «Cruscotto
 
 Uso (dalla cartella di lavoro):
     python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from mc.json ... \
-        [-o cruscotto.html] [--json bundle.json] [--data AAAA-MM-GG]
+        [-o cruscotto.html] [--json bundle.json] [--data AAAA-MM-GG] \
+        [--archivia [CARTELLA]] [--solo-dati] [--precedente FILE|CARTELLA]
+
+Archivio: --archivia scrive anche il bundle in CARTELLA/cruscotto-AAAA-MM-GG.json (default revisioni/, creata
+se manca; la data è quella di generato_il, e un secondo lancio nello stesso giorno sovrascrive la foto del
+giorno). --solo-dati compone, archivia e legge la revisione precedente senza scrivere la pagina (vuole --json o
+--archivia, non accetta -o). --precedente indica la revisione con cui confrontare: un bundle, una pagina
+generata dal plugin o una cartella di foto (si prende la più recente con data precedente a quella corrente).
 
 ONESTÀ METODOLOGICA
 - Il cruscotto disegna i numeri degli script, non ne calcola di nuovi: ogni valore della pagina
@@ -29,6 +36,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import sys
 
 CARTELLA = os.path.dirname(os.path.abspath(__file__))
@@ -394,10 +402,11 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - ribilanciamento: totale, totale_post, imposta, prelievo, drift {classe: {peso, target, drift, tight, wide,
       fuori_banda, esito, motivo}}, risultante, zainetto, ordini [{broker, operazione, classe,
       categoria_fiscale, importo_eur, imposta_eur, nota}], dati_esempio (il piano gira sull'esempio dello script).
+    - confronto e anonimo: None (li compilano il confronto con la revisione precedente e la versione anonimizzata).
     Una sezione senza fonte è None. ErroreDati per un campo mancante, con il file e la chiave."""
     s = sorgenti.get
     bundle = {
-        "versione": 1,
+        "versione": 2,
         "generato_il": data,
         "plugin": versione_plugin,
         "fonti": [{"file": sorgenti[t][0], "tipo": t} for t in ORDINE if t in sorgenti],
@@ -409,6 +418,8 @@ def componi_bundle(sorgenti, data, versione_plugin):
         "capitale_umano": _capitale_umano(s("capitale_umano")),
         "fiscalita": _fiscalita(s("broker")),
         "ribilanciamento": _ribilanciamento(s("ribilanciamento")),
+        "confronto": None,
+        "anonimo": None,
     }
     bundle["indicatori"] = _indicatori(bundle)
     return bundle
@@ -422,6 +433,115 @@ def incorpora(template, bundle):
                          f"(trovato {template.count(SEGNAPOSTO)} volte): reinstallare il plugin")
     dati = json.dumps(bundle, ensure_ascii=False).replace("<", "\\u003c")
     return template.replace(SEGNAPOSTO, dati)
+
+
+_RE_DATI = re.compile(r'<script id="dati" type="application/json">(.*?)</script>', re.S)
+
+
+def estrai_bundle_da_pagina(html):
+    """Il bundle incorporato in una pagina del plugin (blocco <script id="dati" type="application/json">),
+    o None se il blocco manca, contiene ancora il segnaposto del template o non è un JSON."""
+    m = _RE_DATI.search(html)
+    if not m or SEGNAPOSTO in m.group(1):
+        return None
+    try:
+        return json.loads(m.group(1))
+    except ValueError:
+        return None
+
+
+def _bundle_da_file(percorso):
+    """(nome del file, bundle) letto da un bundle JSON o da una pagina del plugin; ErroreDati se non lo è."""
+    nome = os.path.basename(percorso)
+    try:
+        with open(percorso, encoding="utf-8") as f:
+            testo = f.read()
+    except UnicodeDecodeError:
+        raise ErroreDati(f"«{nome}» non è una revisione del cruscotto: non è un testo")
+    except OSError as e:
+        raise ErroreDati(f"impossibile leggere «{percorso}»: {e}")
+    try:
+        bundle = json.loads(testo)
+    except ValueError:
+        bundle = estrai_bundle_da_pagina(testo)
+        if bundle is None:
+            if SEGNAPOSTO in testo:
+                raise ErroreDati(f"«{nome}» è il template del cruscotto, senza dati: serve una pagina già generata "
+                                 "o un bundle")
+            raise ErroreDati(f"«{nome}» non è una revisione del cruscotto (né un bundle né una pagina del plugin)")
+    if not _ha(bundle, "versione", "generato_il", "fonti"):
+        raise ErroreDati(f"«{nome}» non è una revisione del cruscotto (né un bundle né una pagina del plugin)")
+    if bundle["versione"] not in (1, 2) or isinstance(bundle["versione"], bool):
+        raise ErroreDati(f"«{nome}»: versione {bundle['versione']!r} del bundle sconosciuta "
+                         "(si leggono la 1 e la 2): aggiornare il plugin")
+    if bundle.get("anonimo") is not None:
+        raise ErroreDati(f"«{nome}» è una versione anonimizzata: i suoi numeri sono riscalati, "
+                         "non si confronta con una revisione anonimizzata")
+    try:
+        datetime.date.fromisoformat(str(bundle["generato_il"]))
+    except ValueError:
+        raise ErroreDati(f"«{nome}»: generato_il {bundle['generato_il']!r} non è una data AAAA-MM-GG")
+    return nome, bundle
+
+
+def leggi_precedente(percorso, data_corrente):
+    """(nome del file, bundle) della revisione precedente a data_corrente. `percorso` è un bundle JSON, una
+    pagina del plugin o una cartella: tra i suoi cruscotto-*.json si prende la foto con il generato_il più
+    recente tra quelli precedenti a data_corrente (la data è il generato_il, non il nome del file). Gli altri
+    file della cartella si ignorano; una foto illeggibile ferma la lettura e si nomina, senza saltare a una più
+    vecchia. ErroreDati se manca il percorso o la foto, o se la revisione non è utilizzabile."""
+    if os.path.isdir(percorso):
+        foto = sorted(f for f in os.listdir(percorso)
+                      if f.startswith("cruscotto-") and f.endswith(".json") and os.path.isfile(os.path.join(percorso, f)))
+        precedenti = []
+        for f in foto:
+            nome, bundle = _bundle_da_file(os.path.join(percorso, f))
+            if str(bundle["generato_il"]) < data_corrente:
+                precedenti.append((str(bundle["generato_il"]), nome, bundle))
+        if not precedenti:
+            raise ErroreDati(f"nessuna revisione precedente al {data_corrente} nella cartella «{percorso}» "
+                             "(cercati i cruscotto-*.json)")
+        precedenti.sort(key=lambda t: (t[0], t[1]))
+        _, nome, bundle = precedenti[-1]
+        return nome, bundle
+    if not os.path.exists(percorso):
+        raise ErroreDati(f"--precedente: «{percorso}» non trovato")
+    nome, bundle = _bundle_da_file(percorso)
+    if str(bundle["generato_il"]) >= data_corrente:
+        raise ErroreDati(f"«{nome}» è del {bundle['generato_il']}: la data non è precedente a quella corrente "
+                         f"({data_corrente}), non è una revisione precedente")
+    return nome, bundle
+
+
+def archivia(bundle, cartella):
+    """Scrive il bundle in cartella/cruscotto-<generato_il>.json, creando la cartella. Ritorna (percorso,
+    se ha sovrascritto la foto dello stesso giorno). ErroreDati se non si può scrivere."""
+    percorso = os.path.join(cartella, f"cruscotto-{bundle['generato_il']}.json")
+    sovrascritta = os.path.isfile(percorso)
+    try:
+        os.makedirs(cartella, exist_ok=True)
+        with open(percorso, "w", encoding="utf-8") as f:
+            f.write(json.dumps(bundle, ensure_ascii=False, indent=2))
+    except OSError as e:
+        raise ErroreDati(f"impossibile scrivere {percorso}: {e}")
+    return percorso, sovrascritta
+
+
+def _controlla_scrivibile(percorso):
+    """Prima della prima scrittura: ErroreDati se `percorso` (un file) non si potrà scrivere, perché la sua
+    cartella è un file o un file esiste già al posto di una cartella, o il percorso è una cartella."""
+    p = os.path.abspath(percorso)
+    if os.path.isdir(p):
+        raise ErroreDati(f"impossibile scrivere {percorso}: è una cartella")
+    cartella = os.path.dirname(p)
+    while not os.path.exists(cartella):
+        cartella = os.path.dirname(cartella)
+    if not os.path.isdir(cartella):
+        raise ErroreDati(f"impossibile scrivere {percorso}: «{cartella}» non è una cartella")
+    if not os.access(cartella, os.W_OK | os.X_OK):
+        raise ErroreDati(f"impossibile scrivere {percorso}: «{cartella}» non è scrivibile")
+    if os.path.exists(p) and not os.access(p, os.W_OK):
+        raise ErroreDati(f"impossibile scrivere {percorso}: file non scrivibile")
 
 
 # ═══════════════════════════ RIGA DI COMANDO ═══════════════════════════
@@ -485,13 +605,26 @@ def main(argv=None):
                     "Codici d'uscita: 0 riuscito, 1 errore nei dati o nella scrittura, 2 riga di comando errata.")
     ap.add_argument("--from", dest="sorgenti", metavar="FILE", action="append",
                     help="JSON di uno script del plugin (ripetibile, l'ordine non conta)")
-    ap.add_argument("-o", "--output", default="cruscotto.html", metavar="FILE",
+    ap.add_argument("-o", "--output", metavar="FILE",
                     help="la pagina da scrivere (default: cruscotto.html nella cartella corrente)")
     ap.add_argument("--json", metavar="FILE", help="scrive anche il bundle, cioè i dati che finiscono nella pagina")
     ap.add_argument("--data", metavar="AAAA-MM-GG", help="data in testata (default: oggi)")
+    ap.add_argument("--archivia", nargs="?", const="revisioni", metavar="CARTELLA",
+                    help="scrive anche il bundle in CARTELLA/cruscotto-AAAA-MM-GG.json (default: revisioni/; "
+                         "un secondo lancio nello stesso giorno sovrascrive la foto del giorno)")
+    ap.add_argument("--solo-dati", action="store_true",
+                    help="compone, archivia e confronta senza scrivere la pagina (vuole --json o --archivia, non -o)")
+    ap.add_argument("--precedente", metavar="FILE|CARTELLA",
+                    help="la revisione con cui confrontare: un bundle, una pagina del plugin o una cartella di foto")
     args = ap.parse_args(argv)
     if not args.sorgenti:
         ap.error("serve almeno un --from FILE")
+    if args.solo_dati and args.output:
+        ap.error("--solo-dati non scrive la pagina: non si usa con -o")
+    if args.solo_dati and not (args.json or args.archivia):
+        ap.error("--solo-dati vuole --json o --archivia: altrimenti non scrive nulla")
+    if not args.solo_dati and not args.output:
+        args.output = "cruscotto.html"
     try:
         data = datetime.date.today().isoformat()
         if args.data:
@@ -502,11 +635,22 @@ def main(argv=None):
         sorgenti, ignorati = leggi_sorgenti(args.sorgenti)
         if not sorgenti:
             raise ErroreDati("nessun JSON che il cruscotto sappia disegnare tra quelli passati")
+        if args.precedente:
+            leggi_precedente(args.precedente, data)    # il confronto vero e proprio è un passo successivo
         bundle = componi_bundle(sorgenti, data, versione_plugin())
-        with open(TEMPLATE, encoding="utf-8") as f:
-            html = incorpora(f.read(), bundle)
-        for percorso, testo in ((args.output, html),
-                                (args.json, json.dumps(bundle, ensure_ascii=False, indent=2) if args.json else None)):
+        html = None
+        if not args.solo_dati:
+            with open(TEMPLATE, encoding="utf-8") as f:
+                html = incorpora(f.read(), bundle)
+        # tutti i controlli prima della prima scrittura: un errore non lascia file a metà
+        testo_bundle = json.dumps(bundle, ensure_ascii=False, indent=2)
+        if args.archivia:
+            _controlla_scrivibile(os.path.join(args.archivia, f"cruscotto-{bundle['generato_il']}.json"))
+        for percorso in (args.output, args.json):
+            if percorso:
+                _controlla_scrivibile(percorso)
+        archiviato = archivia(bundle, args.archivia) if args.archivia else None
+        for percorso, testo in ((args.output, html), (args.json, testo_bundle)):
             if percorso:
                 try:
                     with open(percorso, "w", encoding="utf-8") as f:
@@ -517,7 +661,12 @@ def main(argv=None):
         print(f"ERRORE: {e}", file=sys.stderr)
         raise SystemExit(1)
 
-    print(f"Cruscotto: {args.output}")
+    if args.solo_dati:
+        print("Dati del cruscotto: nessuna pagina scritta")
+    else:
+        print(f"Cruscotto: {args.output}")
+    if archiviato:
+        print(f"Archiviato: {archiviato[0]}" + (" (sovrascritta la foto dello stesso giorno)" if archiviato[1] else ""))
     for fonte in bundle["fonti"]:
         print(f"  {fonte['file']} → {fonte['tipo']}")
     for nome, script in ignorati:
@@ -530,8 +679,9 @@ def main(argv=None):
         print(f"  {ind['etichetta']}: {_valore(ind)}{nota}")
     if args.json:
         print(f"Bundle: {args.json}")
-    print("Il file resta nella cartella di lavoro. Pubblicarlo come Artifact lo mette su claude.ai: "
-          "farlo solo su richiesta esplicita.")
+    if not args.solo_dati:
+        print("Il file resta nella cartella di lavoro. Pubblicarlo come Artifact lo mette su claude.ai: "
+              "farlo solo su richiesta esplicita.")
     print("Strumento educativo: non costituisce consulenza finanziaria o fiscale.")
 
 
