@@ -94,6 +94,7 @@ h3 { font-size: 15px; margin: 18px 0 6px; font-weight: 600; }
 .grafico { width: 100%; margin: 6px 0 4px; }
 .grafico svg { display: block; width: 100%; height: auto; overflow: visible; }
 svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.unita { color: var(--muto); font-size: 12px; text-align: right; margin: 0 0 4px; }
 .legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 2px; font-size: 13px; color: var(--testo-2); }
 .legenda span { display: inline-flex; align-items: center; gap: 6px; }
 .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
@@ -171,8 +172,16 @@ footer .fonti { color: var(--muto); }
     return new Intl.NumberFormat("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: "always" });
   }
   function ok(x) { return typeof x === "number" && isFinite(x); }
+  // Versione anonimizzata: gli importi arrivano già come indice (generatore, --anonimo) e si scrivono senza simbolo,
+  // un decimale da 10 in su, due sotto («100,0», «7,69»).
+  var ANON = !!(B && B.anonimo);
+  var IND = ANON ? " (indice)" : "";
   function euro(x) {
     if (!ok(x)) return "n/d";
+    if (ANON) {
+      var t = nfDec(Math.abs(x) >= 10 ? 1 : 2).format(Math.abs(x));
+      return (x < 0 && /[1-9]/.test(t) ? "-" : "") + t;
+    }
     var v = Math.round(x);
     return (v < 0 ? "-€" : "€") + nf0.format(Math.abs(v));
   }
@@ -214,7 +223,10 @@ footer .fonti { color: var(--muto); }
     return t;
   }
   function colore(i) { return "var(" + SERIE[i % SERIE.length] + ")"; }
-  function contenitore(svg) { return el("div", { class: "grafico" }, svg); }
+  // «indice»: nella versione anonimizzata un grafico con importi porta «(indice)» sotto l'asse dei valori
+  function contenitore(svg, indice) {
+    return el("div", { class: "grafico" }, svg, indice && ANON ? el("div", { class: "unita", testo: "(indice)" }) : null);
+  }
   function legenda(voci) {
     var l = el("div", { class: "legenda" });
     voci.forEach(function (v) {
@@ -362,7 +374,7 @@ footer .fonti { color: var(--muto); }
       if (opz.fascia) voci.push({ nome: opz.fascia.nome, colore: "var(--fascia)" });
       box.appendChild(legenda(voci));
     }
-    box.appendChild(contenitore(s));
+    box.appendChild(contenitore(s, opz.fmtY === euro));
     return box;
   }
 
@@ -399,7 +411,7 @@ footer .fonti { color: var(--muto); }
     });
     var box = el("div", {});
     if (opz.serie.length > 1) box.appendChild(legenda(opz.serie.map(function (x) { return { nome: x.nome, colore: x.colore }; })));
-    box.appendChild(contenitore(s));
+    box.appendChild(contenitore(s, true));
     return box;
   }
 
@@ -428,6 +440,8 @@ footer .fonti { color: var(--muto); }
   // L'etichetta sta a sinistra (colonna larga quanto il nome più lungo, fino a un tetto) o sopra la barra su uno schermo stretto;
   // se non ci sta va a capo su due righe e, in ultimo, si accorcia: il nome intero resta nel <title>.
   function barre(righe, fmt, etichetta) {
+    if (ANON) righe = righe.filter(function (r) { return ok(r.valore); });       // un importo tolto non ha barra
+    if (!righe.length) return el("div");
     var W = larghezza(), sopra = W < 520, mr = 84, ml = 0, largo = W - 4;
     if (!sopra) {
       var tetto = Math.min(260, W * 0.42);
@@ -452,7 +466,7 @@ footer .fonti { color: var(--muto); }
                        r.nome + ": " + fmt(r.valore)));
       s.appendChild(testoSvg(ml + w + 6, y + 14, fmt(r.valore), { fill: "var(--testo)" }));
     });
-    return contenitore(s);
+    return contenitore(s, fmt === euro);
   }
 
   // Drift attorno a zero con le due bande: righe [{classe, drift, tight, wide, fuori}].
@@ -517,7 +531,8 @@ footer .fonti { color: var(--muto); }
         el("div", { class: "valore", "data-valore": ind.id, testo: v }),
         c ? el("div", { class: "fonte" }, "prima " + valoreVoce(c.formato, c.prima) + " · ",
                el("span", { style: "white-space: nowrap", testo: variazione(c) })) : null,
-        el("div", { class: "fonte", testo: (ind.nota ? ind.nota + " · " : "") + "fonte: " + ind.fonte })));
+        el("div", { class: "fonte", testo: (ANON && ind.formato === "euro" ? "(indice) · " : "") + (ind.nota ? ind.nota + " · " : "") +
+                                           "fonte: " + ind.fonte })));
     });
     s.appendChild(g);
     return s;
@@ -529,7 +544,7 @@ footer .fonti { color: var(--muto); }
   function sezioneConfronto(c) {
     if (!c) return null;
     var s = sezione("confronto", "Rispetto alla revisione del " + dataIt(c.data_precedente),
-      "Importi nominali, ognuno alla data della sua revisione: non sono corretti per l'inflazione.");
+      (ANON ? "Importi in indice, nominali" : "Importi nominali") + ", ognuno alla data della sua revisione: non sono corretti per l'inflazione.");
     if (c.versioni_diverse) {
       s.appendChild(el("p", { class: "avviso", testo: "La revisione precedente è stata generata con la versione " + c.plugin_precedente +
         " del plugin: parte delle differenze può venire da dati normativi e metodi aggiornati, non dalla tua situazione (vedi CHANGELOG)." }));
@@ -625,7 +640,7 @@ footer .fonti { color: var(--muto); }
       if (a.classi) s.appendChild(el("h3", { testo: "Target dell'allocatore" }));
       s.appendChild(barre([{ nome: "Azioni", valore: t.azioni / tot }, { nome: "Obbligazioni", valore: t.obbligazioni / tot },
                            { nome: "Liquidità", valore: t.liquidita / tot }], function (v) { return pct(v); }, "Allocazione target"));
-      s.appendChild(inTabella("Obiettivi e capitale allocato", tabella(["Obiettivo", "Profilo", "Richiesto", "Allocato", "Azioni"],
+      s.appendChild(inTabella("Obiettivi e capitale allocato" + IND, tabella(["Obiettivo", "Profilo", "Richiesto", "Allocato", "Azioni"],
         a.obiettivi.map(function (o) { return [o.nome, o.profilo, euro(o.richiesto), euro(o.allocato), pct(o.peso_az, 0)]; }),
         [false, false, true, true, true])));
     }
@@ -670,7 +685,7 @@ footer .fonti { color: var(--muto); }
       " simulazioni) contro la confidenza scelta, e il capitale finale tra P10 e P90 contro il target nominale.");
     s.appendChild(legenda([{ nome: "probabilità di successo", colore: "var(--s1)" }, { nome: "sotto la confidenza", colore: "var(--serio)" },
                            { nome: "confidenza / target", colore: "var(--testo)", linea: true },
-                           { nome: "capitale finale P10–P90", colore: "var(--fascia)" }]));
+                           { nome: "capitale finale P10–P90" + IND, colore: "var(--fascia)" }]));
     o.obiettivi.forEach(function (ob, i) {
       var r = el("div", { class: "riga" });
       r.appendChild(riga(ob.nome, el("span", { class: "valori" },
@@ -679,12 +694,13 @@ footer .fonti { color: var(--muto); }
       r.appendChild(trackQuota(ob.probabilita_successo, ob.confidenza,
                                ob.probabilita_successo >= ob.confidenza ? "var(--s1)" : "var(--serio)",
                                "Probabilità " + pct(ob.probabilita_successo) + " contro confidenza " + pct(ob.confidenza, 0)));
+      if (ANON && !(ob.capitale_finale && ok(ob.capitale_finale.mediana))) { s.appendChild(r); return; }
       r.appendChild(trackFascia(ob.capitale_finale, ob.target_nominale, euro));
-      r.appendChild(el("div", { class: "valori", testo: "Capitale finale: P10 " + euro(ob.capitale_finale.p10) + " · mediana " +
+      r.appendChild(el("div", { class: "valori", testo: "Capitale finale" + IND + ": P10 " + euro(ob.capitale_finale.p10) + " · mediana " +
         euro(ob.capitale_finale.mediana) + " · P90 " + euro(ob.capitale_finale.p90) + " · target " + euro(ob.target_nominale) }));
       s.appendChild(r);
     });
-    s.appendChild(inTabella("Versamenti in tabella", tabella(["Obiettivo", "Priorità", "Versamento", "Con confidenza", "Già accumulato"],
+    s.appendChild(inTabella("Versamenti in tabella" + IND, tabella(["Obiettivo", "Priorità", "Versamento", "Con confidenza", "Già accumulato"],
       o.obiettivi.map(function (ob) { return [ob.nome, ob.priorita, euro(ob.versamento_deterministico) + "/mese",
                                               euro(ob.versamento_confidenza) + "/mese", euro(ob.gia)]; })
         .concat([["Totale", "", euro(o.totale_versamento_deterministico) + "/mese", euro(o.totale_versamento_confidenza) + "/mese", ""]]),
@@ -701,7 +717,7 @@ footer .fonti { color: var(--muto); }
       g.obiettivi.map(function (o, i) { return { nome: o.nome, valori: o.quota_azionaria, colore: colore(i) }; }));
     s.appendChild(linee({ x: g.anni, serie: serie, ymax: 1, fmtY: function (v) { return pct(v, 0); }, fmtX: fx,
                           etichetta: "Quota azionaria nel tempo" }));
-    s.appendChild(el("h3", { testo: "Capitale proiettato per obiettivo" }));
+    s.appendChild(el("h3", { testo: "Capitale proiettato per obiettivo" + IND }));
     s.appendChild(colonneImpilate({ x: g.anni, fmtX: fx, etichetta: "Capitale proiettato per anno",
       serie: g.obiettivi.map(function (o, i) { return { nome: o.nome, valori: o.capitale_proiettato, colore: colore(i) }; }) }));
     s.appendChild(inTabella("Valori in tabella", tabella(["Anno", "Aggregato"].concat(g.obiettivi.map(function (o) { return o.nome; })),
@@ -721,22 +737,28 @@ footer .fonti { color: var(--muto); }
       r.appendChild(trackFascia(p.tasso_lordo, p.target, function (v) { return pct(v); }));
       r.appendChild(el("div", { class: "valori", testo: "P10 " + pct(p.tasso_lordo.p10) + " · mediana " + pct(p.tasso_lordo.mediana) + " · P90 " + pct(p.tasso_lordo.p90) }));
       s.appendChild(r);
-      var m = el("div", { class: "riga" });
-      m.appendChild(riga("Montante del fondo pensione al pensionamento", el("span", { class: "valori" }, "mediana ", cifra(euro(p.montante_fp.mediana)))));
-      m.appendChild(trackFascia(p.montante_fp, null, euro));
-      m.appendChild(el("div", { class: "valori", testo: "P10 " + euro(p.montante_fp.p10) + " · mediana " + euro(p.montante_fp.mediana) + " · P90 " + euro(p.montante_fp.p90) }));
-      s.appendChild(m);
+      if (!ANON || (p.montante_fp && ok(p.montante_fp.mediana))) {
+        var m = el("div", { class: "riga" });
+        m.appendChild(riga("Montante del fondo pensione al pensionamento" + IND, el("span", { class: "valori" }, "mediana ", cifra(euro(p.montante_fp.mediana)))));
+        m.appendChild(trackFascia(p.montante_fp, null, euro));
+        m.appendChild(el("div", { class: "valori", testo: "P10 " + euro(p.montante_fp.p10) + " · mediana " + euro(p.montante_fp.mediana) + " · P90 " + euro(p.montante_fp.p90) }));
+        s.appendChild(m);
+      }
     }
     if (p.netto) {
-      s.appendChild(el("h3", { testo: "Pensione netta annua per scenario" }));
+      s.appendChild(el("h3", { testo: "Pensione netta annua per scenario" + IND }));
       var righe = p.netto.scenari.map(function (sc) { return { nome: sc.nome, valore: sc.pensione_netta_totale }; });
       righe.push({ nome: "Ultimo stipendio netto", valore: p.netto.netto_ultimo_stipendio, colore: "var(--muto)" });
       s.appendChild(barre(righe, euro, "Pensione netta per scenario contro l'ultimo stipendio netto"));
-      s.appendChild(inTabella("Valori in tabella", tabella(["Scenario", "Pensione netta", "Sostituzione netta", "Sostituzione lorda"],
+      s.appendChild(inTabella("Valori in tabella" + IND, tabella(["Scenario", "Pensione netta", "Sostituzione netta", "Sostituzione lorda"],
         p.netto.scenari.map(function (sc) { return [sc.nome, euro(sc.pensione_netta_totale), pct(sc.tasso_sostituzione_netto), pct(sc.tasso_sostituzione_lordo)]; }),
         [false, true, true, true])));
     }
-    if (p.inps) {
+    if (p.inps && ANON && !ok(p.inps.pensione_inps_lorda_annua)) {
+      // gli importi lordi sono tolti: restano l'età e gli anni
+      s.appendChild(el("p", { class: "nota", testo: "Proiezione INPS: pensione a " + anni(p.inps.eta_pensionamento) + " anni, tra " +
+        anni(p.inps.anni_al_pensionamento) + " anni." }));
+    } else if (p.inps) {
       s.appendChild(el("p", { class: "nota", testo: "Pensione INPS lorda " + euro(p.inps.pensione_inps_lorda_annua) + " l'anno a " +
         anni(p.inps.eta_pensionamento) + " anni, tra " + anni(p.inps.anni_al_pensionamento) + " anni; montante contributivo " +
         euro(p.inps.montante_finale) + ", RAL finale " + euro(p.inps.ral_finale) + "." }));
@@ -747,7 +769,7 @@ footer .fonti { color: var(--muto); }
         anni(q.eta_pensione_vecchiaia) + " (" + anni(q.anni_ponte) + " anni da finanziare)" }));
       var rp = el("div", { class: "riga" });
       rp.appendChild(riga("Probabilità di coprire il ponte", el("span", { class: "valori" }, cifra(pct(q.probabilita_successo)),
-        " con " + euro(q.capitale_ponte) + " di capitale-ponte · soglia " + pct(soglia, 0))));
+        " con " + euro(q.capitale_ponte) + IND + " di capitale-ponte · soglia " + pct(soglia, 0))));
       rp.appendChild(trackQuota(q.probabilita_successo, soglia, q.probabilita_successo >= soglia ? "var(--s1)" : "var(--serio)",
         "Probabilità " + pct(q.probabilita_successo) + " contro la soglia " + pct(soglia, 0)));
       s.appendChild(rp);
@@ -756,12 +778,19 @@ footer .fonti { color: var(--muto); }
                            { nome: "Necessario per il 95%", valore: q.capitale_necessario["95%"], colore: "var(--muto)" }],
                           euro, "Capitale-ponte disponibile contro necessario"));
       s.appendChild(el("p", { class: "nota", testo: (q.rita.attiva ? "RITA dai " + anni(q.rita.eta_inizio) + " anni, rata netta " +
-        euro(q.rita.rata_netta) + " l'anno. " : "Senza RITA. ") + "Costo permanente dell'uscita anticipata: " +
-        euro(q.costo_permanente_lordo_annuo) + " l'anno di pensione lorda in meno, per sempre." }));
+        euro(q.rita.rata_netta) + IND + " l'anno. " : "Senza RITA. ") + "Costo permanente dell'uscita anticipata: " +
+        euro(q.costo_permanente_lordo_annuo) + IND + " l'anno di pensione lorda in meno, per sempre." }));
     }
     if (p.riscatto) {
       var k = p.riscatto;
       s.appendChild(el("h3", { testo: "Riscatto della laurea (" + anni(k.anni_riscatto) + " anni, " + k.modalita + ")" }));
+      if (ANON && !ok(k.onere_agevolato)) {
+        // gli importi sono tolti (importo di legge): restano anni, modalità, rientro e anticipo
+        s.appendChild(el("p", { class: "nota", testo: "Pensione a " + anni(k.eta_pensionamento) + " anni; rientro in " + anni(k.anni_per_rientrare) +
+          " anni di pensione. Pensione anticipata ordinaria: da " + anni(k.eta_anticipata_senza_riscatto) + " a " +
+          anni(k.eta_anticipata_con_riscatto) + " anni." }));
+        return s;
+      }
       s.appendChild(barre([{ nome: "Onere agevolato", valore: k.onere_agevolato },
                            { nome: "Onere ordinario", valore: k.onere_ordinario, colore: "var(--muto)" },
                            { nome: "Costo netto (" + k.modalita + ")", valore: k.costo_netto }],
@@ -790,12 +819,12 @@ footer .fonti { color: var(--muto); }
          el("div", { class: "valore", testo: pct(c.esposizione_finanziaria) })),
       el("div", { class: "tile" }, el("div", { class: "etichetta", testo: "Esposizione azionaria della ricchezza totale" }),
          el("div", { class: "valore", testo: pct(c.esposizione_totale) }))));
-    s.appendChild(el("h3", { testo: "Bilancio totale" }));
+    s.appendChild(el("h3", { testo: "Bilancio totale" + IND }));
     s.appendChild(barre(c.voci.map(function (v) { return { nome: v.nome, valore: v.valore }; }), euro, "Bilancio patrimoniale totale"));
     var frase = (FRASI_SORPASSO[c.stato_sorpasso] || FRASI_SORPASSO.non_prima_della_fine)(c.eta_sorpasso);
     var eta = c.proiezione.map(function (r) { return r.eta; });
     var indice = ok(c.eta_sorpasso) ? eta.indexOf(c.eta_sorpasso) : NaN;
-    s.appendChild(el("h3", { testo: "Patrimonio finanziario e capitale umano nel tempo" }));
+    s.appendChild(el("h3", { testo: "Patrimonio finanziario e capitale umano nel tempo" + IND }));
     s.appendChild(el("p", { class: "nota", testo: frase }));
     s.appendChild(linee({ x: eta, fmtX: function (e) { return anni(e); }, fmtY: euro, margineSx: 72, etichetta: "Patrimonio finanziario e capitale umano per età",
       serie: [{ nome: "Patrimonio finanziario", valori: c.proiezione.map(function (r) { return r.F; }), colore: colore(0) },
@@ -817,7 +846,7 @@ footer .fonti { color: var(--muto); }
   function sezioneFiscalita(f) {
     if (!f) return null;
     var s = sezione("fiscalita", "Fiscalità",
-      "Zainetto fiscale per broker e anno di scadenza (in euro 26%-equivalenti) e plus latenti compensabili.");
+      "Zainetto fiscale per broker e anno di scadenza (" + (ANON ? "importi in indice, 26%-equivalenti" : "in euro 26%-equivalenti") + ") e plus latenti compensabili.");
     var t = f.totali;
     s.appendChild(el("p", { class: "nota", testo: "Zainetto " + euro(t.zainetto_26_equivalente) + ", di cui in scadenza al 31/12 " +
       euro(t.zainetto_in_scadenza) + "; plus compensabili " + euro(t.plus_latenti_compensabili) + ", realizzabili a costo zero " +
@@ -834,7 +863,7 @@ footer .fonti { color: var(--muto); }
       s.appendChild(el("p", { class: "nota", testo: "Nessuna minus nello zainetto." }));
     }
     var broker = Object.keys(f.per_broker);
-    s.appendChild(tabella(["Broker", "Zainetto", "In scadenza", "Plus compensabili", "A costo zero", "Imposta risparmiabile"],
+    s.appendChild(tabella(["Broker", "Zainetto" + IND, "In scadenza", "Plus compensabili", "A costo zero", "Imposta risparmiabile"],
       broker.map(function (b) { var x = f.per_broker[b];
         return [b, euro(x.zainetto_26_equivalente), euro(x.zainetto_in_scadenza), euro(x.plus_latenti_compensabili),
                 euro(x.plus_realizzabili_a_costo_zero), euro(x.imposta_risparmiabile)]; }),
@@ -868,9 +897,9 @@ footer .fonti { color: var(--muto); }
       if (testo) p.appendChild(el("div", { class: "valori", testo: testo }));
       s.appendChild(p);
     });
-    s.appendChild(el("h3", { testo: "Imposta del piano: " + euro(r.imposta) }));
+    s.appendChild(el("h3", { testo: "Imposta del piano" + IND + ": " + euro(r.imposta) }));
     if (r.ordini.length) {
-      s.appendChild(tabella(["Broker", "Operazione", "Classe", "Categoria fiscale", "Importo", "Imposta", "Nota"],
+      s.appendChild(tabella(["Broker", "Operazione", "Classe", "Categoria fiscale", "Importo" + IND, "Imposta" + IND, "Nota"],
         r.ordini.map(function (o) { return [o.broker, o.operazione, o.classe || "", o.categoria_fiscale || "", euro(o.importo_eur),
                                             ok(o.imposta_eur) ? euro(o.imposta_eur) : "", o.nota || ""]; }),
         [false, false, false, false, true, true, false]));
@@ -883,13 +912,19 @@ footer .fonti { color: var(--muto); }
 
   function disegna() {
     var main = document.getElementById("cruscotto");
+    // nella versione anonimizzata un campo a null che nessun blocco prevede non deve far sparire la pagina: la sezione si salta
+    var prova = function (f) {
+      if (!ANON) return f();
+      try { return f(); } catch (e) { return null; }
+    };
     var sezioni = [
-      B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori, B.confronto) : null,
-      sezioneConfronto(B.confronto),
-      sezioneAllocazione(B.allocazione), sezioneLookThrough(B.look_through), sezioneObiettivi(B.obiettivi), sezioneGlide(B.glide_path),
-      sezionePensione(B.pensione), sezioneCapitaleUmano(B.capitale_umano), sezioneFiscalita(B.fiscalita),
-      sezioneRibilanciamento(B.ribilanciamento)
-    ].filter(function (x) { return x; });
+      function () { return B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori, B.confronto) : null; },
+      function () { return sezioneConfronto(B.confronto); },
+      function () { return sezioneAllocazione(B.allocazione); }, function () { return sezioneLookThrough(B.look_through); },
+      function () { return sezioneObiettivi(B.obiettivi); }, function () { return sezioneGlide(B.glide_path); },
+      function () { return sezionePensione(B.pensione); }, function () { return sezioneCapitaleUmano(B.capitale_umano); },
+      function () { return sezioneFiscalita(B.fiscalita); }, function () { return sezioneRibilanciamento(B.ribilanciamento); }
+    ].map(prova).filter(function (x) { return x; });
     main.replaceChildren.apply(main, sezioni.length ? sezioni :
       [el("p", { class: "avviso", testo: "Nessun dato da disegnare: rigenera il cruscotto con i JSON degli script." })]);
   }
@@ -904,7 +939,18 @@ footer .fonti { color: var(--muto); }
   }
   document.getElementById("testata").textContent = "Dati del " + String(B.generato_il || "").split("-").reverse().join("/") +
     " · wealth-management-it " + (B.plugin || "?");
-  document.getElementById("fonti").textContent = "Fonti: " + (B.fonti || []).map(function (f) { return f.file + " (" + f.tipo + ")"; }).join(", ");
+  if (ANON) {
+    // testata della versione anonimizzata: cosa è stato sostituito, cosa resta, il limite
+    var indiceBase = B.anonimo.base ? "gli importi sono un indice (base 100 = " + B.anonimo.base + "), " : "";
+    document.querySelector("header").appendChild(el("p", { class: "avviso", id: "nota-anonima", testo: "Versione anonimizzata: " + indiceBase +
+      (indiceBase ? "i" : "I") + " nomi di obiettivi e broker sono sostituiti. Restano età, anni, percentuali e settore del lavoro. " +
+      "Nasconde importi e nomi a chi legge; chi conosce già un tuo importo ne ricava gli altri, e dai rapporti rimasti si può stimare " +
+      "l'ordine di grandezza del reddito." }));
+  }
+  // le fonti senza «file» (versione anonimizzata) mostrano solo il tipo
+  document.getElementById("fonti").textContent = "Fonti: " + (B.fonti || []).map(function (f) {
+    return typeof f.file === "string" ? f.file + " (" + f.tipo + ")" : String(f.tipo || "");
+  }).filter(function (t) { return t; }).join(", ");
   disegna();
   var attesa = null;
   window.addEventListener("resize", function () { clearTimeout(attesa); attesa = setTimeout(disegna, 150); });

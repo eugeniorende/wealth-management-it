@@ -7084,6 +7084,57 @@ def t_t17_browser_confronto():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T17 cruscotto nel browser: versione anonimizzata senza euro né nomi, con la testata che dice cosa resta")
+def t_t17_browser_anonimo():
+    sync_playwright, lancia = browser()
+    tmp = tempfile.mkdtemp()
+    try:
+        prima, ora = _revisioni_di_prova(tmp)
+        rc, so, se, pieno, _ = _cruscotto(*ora, extra=("--precedente", prima))
+        rc, so, se, anon, html = _cruscotto(*ora, extra=("--precedente", prima, "--anonimo"))
+        assert rc == 0, se[-300:]
+        with sync_playwright() as p:
+            br = lancia(p)
+            try:
+                page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+                corpo = page.inner_text("body")
+                assert errori == [] and eccezioni == [], (errori, eccezioni)
+                assert "€" not in corpo, corpo[corpo.index("€") - 60:corpo.index("€") + 20]
+                nota = page.inner_text("#nota-anonima")
+                assert "Versione anonimizzata" in nota and "base 100 = capitale allocato" in nota, nota
+                assert "età" in nota and "settore del lavoro" in nota and "ordine di grandezza del reddito" in nota, nota
+                assert page.inner_text('[data-valore="capitale_allocato"]') == "100,0"
+                assert "Obiettivo 1" in corpo and "Broker A" in corpo and "(indice)" in corpo
+                for nome in [o["nome"] for o in pieno["obiettivi"]["obiettivi"]] + list(pieno["fiscalita"]["per_broker"]) + [f["file"] for f in pieno["fonti"]]:
+                    assert nome not in corpo, nome
+                pensione = page.inner_text("#sez-pensione")
+                assert "Pensione INPS lorda" not in pensione and "Onere agevolato" not in pensione and "n/d" not in pensione, pensione[-900:]
+                assert "Tasso di sostituzione lordo" in pensione and "Pensione netta" in pensione
+                for brutto in ("NaN", "undefined", "null", "Infinity"):
+                    assert brutto not in corpo, brutto
+                # nessun «€» nemmeno negli attributi e nei <title> dei grafici, che inner_text non vede
+                nascosti = page.evaluate("""() => Array.from(document.querySelectorAll("*")).filter(e => e.tagName !== "SCRIPT" && e.tagName !== "STYLE" &&
+                    (Array.from(e.attributes).some(a => a.value.includes("€")) || (e.tagName.toLowerCase() === "title" && e.textContent.includes("€")))).map(e => e.tagName)""")
+                assert nascosti == [], nascosti
+                stretta, errori, eccezioni, _ = _apri_cruscotto(br, html, larghezza=375)
+                assert stretta.evaluate("document.documentElement.scrollWidth") <= 375 and errori == [] and eccezioni == []
+                assert "€" not in stretta.inner_text("body")
+                # senza alcun importo la base è null: la testata non parla dell'indice
+                senza_base = html.replace('"anonimo": {"base": "capitale allocato"', '"anonimo": {"base": null')
+                assert senza_base != html
+                page, errori, eccezioni, _ = _apri_cruscotto(br, senza_base)
+                nota = page.inner_text("#nota-anonima")
+                assert "Versione anonimizzata" in nota and "indice" not in nota and "base 100" not in nota, nota
+                assert "Restano età, anni, percentuali e settore del lavoro" in nota and errori == [] and eccezioni == []
+                # la pagina normale non ha la testata anonima
+                page, errori, eccezioni, _ = _apri_cruscotto(br, _cruscotto(*ora, extra=("--precedente", prima))[4])
+                assert page.locator("#nota-anonima").count() == 0 and "(indice)" not in page.inner_text("body")
+            finally:
+                br.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 @test("T17 cruscotto: la skill chiede conferma prima di pubblicare, comando e README allineati")
 def t_t17_skill():
     skill_md = lambda s: os.path.join(SKILLS, s, "SKILL.md")
