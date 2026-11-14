@@ -6706,6 +6706,12 @@ def t_t17_archivio():
         open(os.path.join(tmp, "occupato"), "w", encoding="utf-8").write("x")
         rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--archivia", "occupato", "-o", "p.html", cwd=tmp)
         assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se and not os.path.exists(os.path.join(tmp, "p.html")), se
+        # la cartella di -o e di --json non si crea: errore prima di scrivere l'archivio
+        for sub, extra in (("arch", ("-o", "manca/p.html")), ("arch2", ("--json", "manca/b.json", "-o", "p2.html"))):
+            rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--archivia", sub, *extra, "--data", "2026-01-01", cwd=tmp)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and "impossibile scrivere" in se, (extra, rc, se)
+            assert not os.path.exists(os.path.join(tmp, sub)) and not os.path.exists(os.path.join(tmp, "manca")) \
+                and not os.path.exists(os.path.join(tmp, "p2.html")), (extra, os.listdir(tmp))
         # la revisione precedente: bundle di versione 2 e 1, pagina, cartella
         v2 = _bundle_di(tmp, "prima.json", js["alloc.json"], data="2025-11-20")
         nome, b = mod.leggi_precedente(v2, "2026-10-25")

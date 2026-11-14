@@ -527,13 +527,17 @@ def archivia(bundle, cartella):
     return percorso, sovrascritta
 
 
-def _controlla_scrivibile(percorso):
+def _controlla_scrivibile(percorso, crea_cartelle=False):
     """Prima della prima scrittura: ErroreDati se `percorso` (un file) non si potrà scrivere, perché la sua
-    cartella è un file o un file esiste già al posto di una cartella, o il percorso è una cartella."""
+    cartella è un file o un file esiste già al posto di una cartella, o il percorso è una cartella. Solo con
+    `crea_cartelle` (l'archivio) le cartelle mancanti vanno bene, perché le crea lo script; per -o e --json la
+    cartella deve già esistere."""
     p = os.path.abspath(percorso)
     if os.path.isdir(p):
         raise ErroreDati(f"impossibile scrivere {percorso}: è una cartella")
     cartella = os.path.dirname(p)
+    if not crea_cartelle and not os.path.exists(cartella):
+        raise ErroreDati(f"impossibile scrivere {percorso}: la cartella «{cartella}» non esiste")
     while not os.path.exists(cartella):
         cartella = os.path.dirname(cartella)
     if not os.path.isdir(cartella):
@@ -645,7 +649,7 @@ def main(argv=None):
         # tutti i controlli prima della prima scrittura: un errore non lascia file a metà
         testo_bundle = json.dumps(bundle, ensure_ascii=False, indent=2)
         if args.archivia:
-            _controlla_scrivibile(os.path.join(args.archivia, f"cruscotto-{bundle['generato_il']}.json"))
+            _controlla_scrivibile(os.path.join(args.archivia, f"cruscotto-{bundle['generato_il']}.json"), crea_cartelle=True)
         for percorso in (args.output, args.json):
             if percorso:
                 _controlla_scrivibile(percorso)
