@@ -120,6 +120,16 @@ footer .fonti { color: var(--muto); }
   header h1 { font-size: 22px; }
   section { padding: 14px 12px 16px; }
   .tile .valore { font-size: 22px; }
+  .tabella.compatta { overflow-x: visible; }
+  .compatta table, .compatta tbody { display: block; min-width: 0; }
+  .compatta thead { display: none; }
+  .compatta tr { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--griglia); }
+  .compatta td { border: 0; padding: 0; text-align: left; white-space: normal; }
+  .compatta td:not(.num), .compatta td.num:last-child { grid-column: 1 / -1; }
+  .compatta td:first-child { font-weight: 600; }
+  .compatta td:not(:first-child):not(.num) { color: var(--testo-2); }
+  .compatta td.num::before { content: attr(data-et) ": "; color: var(--testo-2); font-weight: 400; }
+  .compatta td.num:last-child { font-weight: 650; }
 }
 </style>
 </head>
@@ -219,16 +229,17 @@ footer .fonti { color: var(--muto); }
     i.style.background = "var(" + varColore + ")";
     return el("span", { class: "stato" }, i, nome);
   }
-  function tabella(intestazioni, righe, numeriche) {
+  // «compatta»: su schermo stretto ogni riga diventa un blocco (nome, poi «Prima: … Ora: …», poi la variazione), senza scorrere.
+  function tabella(intestazioni, righe, numeriche, compatta) {
     var thead = el("tr");
     intestazioni.forEach(function (h, j) { thead.appendChild(el("th", { class: numeriche[j] ? "num" : "", testo: h })); });
     var tbody = el("tbody");
     righe.forEach(function (r) {
       var tr = el("tr");
-      r.forEach(function (c, j) { tr.appendChild(el("td", { class: numeriche[j] ? "num" : "", testo: c })); });
+      r.forEach(function (c, j) { tr.appendChild(el("td", { class: numeriche[j] ? "num" : "", "data-et": intestazioni[j], testo: c })); });
       tbody.appendChild(tr);
     });
-    return el("div", { class: "tabella" }, el("table", {}, el("thead", {}, thead), tbody));
+    return el("div", { class: compatta ? "tabella compatta" : "tabella" }, el("table", {}, el("thead", {}, thead), tbody));
   }
   function inTabella(titolo, t) { return el("details", {}, el("summary", { testo: titolo }), t); }
   function sezione(id, titolo, nota) {
@@ -529,7 +540,7 @@ footer .fonti { color: var(--muto); }
       s.appendChild(el("h3", { testo: d[1] }));
       s.appendChild(tabella(["Voce", "Prima", "Ora", "Variazione"],
         voci.map(function (v) { return [v.etichetta, valoreVoce(v.formato, v.prima), valoreVoce(v.formato, v.ora), variazione(v)]; }),
-        [false, true, true, true]));
+        [false, true, true, true], true));
     });
     var presenti = c.obiettivi.filter(function (o) { return o.stato === "presente"; });
     if (presenti.length) {
@@ -552,7 +563,7 @@ footer .fonti { color: var(--muto); }
           righe.push([o.nome, q[1], valoreVoce(q[2], x.prima), valoreVoce(q[2], x.ora), variazione({ formato: q[2], delta: x.delta })]);
         });
       });
-      s.appendChild(tabella(["Obiettivo", "Quantità", "Prima", "Ora", "Variazione"], righe, [false, false, true, true, true]));
+      s.appendChild(tabella(["Obiettivo", "Quantità", "Prima", "Ora", "Variazione"], righe, [false, false, true, true, true], true));
     }
     var testi = c.obiettivi.filter(function (o) { return o.stato !== "presente"; }).map(function (o) {
       return o.nome + ": " + (o.stato === "nuovo" ? "nuovo, non c'era nella revisione precedente."

@@ -6981,6 +6981,17 @@ def t_t17_browser_confronto():
                 stretta, errori, eccezioni, _ = _apri_cruscotto(br, html, larghezza=375)
                 assert stretta.evaluate("document.documentElement.scrollWidth") <= 375 and errori == [] and eccezioni == []
                 assert stretta.evaluate(FUORI_DAL_GRAFICO) == []
+                # su telefono prima, ora e variazione di ogni riga si leggono senza scorrere, nemmeno dentro le tabelle
+                scorrono = stretta.evaluate("""() => Array.from(document.querySelectorAll("#sez-confronto, #sez-confronto *"))
+                    .filter(e => e instanceof HTMLElement && e.scrollWidth > e.clientWidth + 1).map(e => e.tagName + "." + e.className)""")
+                assert scorrono == [], scorrono
+                fuori = stretta.evaluate("""() => Array.from(document.querySelectorAll("#sez-confronto td, #sez-confronto li, #sez-confronto p"))
+                    .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > 375 || r.left < 0); })
+                    .map(e => e.textContent)""")
+                assert fuori == [], fuori
+                visibile = stretta.inner_text("#sez-confronto")
+                for atteso in ("+€10.000 (+7,7%)", "-10,0 punti", "€140.000", "Obiettivo rinominato"):
+                    assert atteso in visibile, atteso
                 page, errori, eccezioni, _ = _apri_cruscotto(br, html_senza)
                 assert page.locator("#sez-confronto").count() == 0 and errori == [] and eccezioni == []
             finally:
