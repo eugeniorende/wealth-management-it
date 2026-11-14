@@ -7094,6 +7094,21 @@ def t_excel_struttura():
         "un xlsx nuovo o rimosso: aggiornare STRUTTURA_XLSX"
 
 
+@test("Excel previdenziali: foglio Coefficienti con la tabella 2027-2028 del decreto, nessuna cella con il biennio vecchio")
+def t_coefficienti_excel_2027():
+    from openpyxl import load_workbook
+    for skill, nome in (("it-pianificazione", "proiezione-pensione.xlsx"),
+                        ("it-pianificazione-autonomi", "proiezione-pensione-autonomi.xlsx")):
+        wb = load_workbook(asset(skill, nome))
+        c = wb["Coefficienti"]
+        tabella = {c[f"A{r}"].value: (c[f"B{r}"].value, c[f"C{r}"].value) for r in range(5, 20)}
+        assert tabella == DECRETO_COEFF_2027, (nome, tabella)
+        assert "2027-2028" in c["A1"].value and "16 ottobre 2026" in c["A2"].value, (nome, c["A1"].value, c["A2"].value)
+        vecchie = [f"{ws.title}!{x.coordinate}" for ws in wb.worksheets for riga in ws.iter_rows() for x in riga
+                   if isinstance(x.value, str) and re.search(r"2025-2026|2025-26|20 novembre 2024|1,5-2,2%", x.value)]
+        assert not vecchie, f"{nome}: celle con il biennio o l'intervallo vecchio: {vecchie}"
+
+
 @test("T12 Excel: Riepilogo del pianificatore e Patrimonio del cruscotto letti dal ricalcolo, tracker con cache uguali al ricalcolo")
 def t_excel_valori_sentinella():
     from openpyxl import load_workbook
