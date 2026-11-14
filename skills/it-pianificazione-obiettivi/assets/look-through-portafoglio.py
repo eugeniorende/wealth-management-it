@@ -13,6 +13,8 @@ rete, nessun dato lascia la cartella di lavoro. Non è consulenza finanziaria.
 Regole applicate (references/composizione-etf.md, «Il look-through del portafoglio»):
 - per ogni dimensione (settori, paesi, titoli) contano solo le posizioni che la hanno nel CSV; i pesi si
   rinormalizzano sulla PARTE COPERTA e la copertura (quota del controvalore totale) sta sempre accanto;
+- le regioni (Nord America, America Latina e Caraibi, Europa, Asia, Oceania, Africa, Antartide) non si leggono dal
+  CSV: derivano dai paesi con la classificazione ONU M49, hanno la stessa copertura dei paesi e sommano a 1;
 - i titoli sono i primi N di ogni ETF, quindi la concentrazione che ne risulta è un MINIMO, non il totale;
 - lo stesso titolo scritto da due emittenti in modi diversi («Apple Inc.», «APPLE INC») si somma con una chiave
   normalizzata del nome (senza punteggiatura, suffissi societari e classi di azioni); «da» elenca gli ETF che
@@ -62,6 +64,48 @@ def _importatore():
 _imp = _importatore()
 SETTORI_GICS, PAESI, normalizza = _imp.SETTORI_GICS, _imp.PAESI, _imp.normalizza
 DIMENSIONI = ("settori", "paesi", "titoli")
+
+# Le regioni geografiche derivano dai paesi, non si leggono dai file degli emittenti. Fonte: «Standard country or area
+# codes for statistical use (M49)», Divisione di statistica dell'ONU, vista «Geographic Regions»,
+# https://unstats.un.org/unsd/methodology/m49/overview/, letta il 14/11/2026. Le Americhe si dividono nelle
+# sottoregioni «Northern America» e «Latin America and the Caribbean»; Europa, Asia, Oceania e Africa sono le regioni M49.
+# Due scelte fuori dallo standard (spec §7.3): Taiwan (TW), che M49 non elenca, sta in «asia»; l'Antartide (AQ), che
+# M49 lascia senza regione, ha la voce «antartide». Ogni codice di PAESI sta in una sola regione (lo verifica un test).
+REGIONI = {
+    "nord_america": ("Nord America", tuple("""
+    BM CA GL PM US
+    """.split())),
+    "america_latina": ("America Latina e Caraibi", tuple("""
+    AG AI AR AW BB BL BO BQ BR BS BV BZ CL CO CR CU CW DM DO EC FK GD GF GP GS GT GY HN HT JM KN KY LC
+    MF MQ MS MX NI PA PE PR PY SR SV SX TC TT UY VC VE VG VI
+    """.split())),
+    "europa": ("Europa", tuple("""
+    AD AL AT AX BA BE BG BY CH CZ DE DK EE ES FI FO FR GB GG GI GR HR HU IE IM IS IT JE LI LT LU LV MC
+    MD ME MK MT NL NO PL PT RO RS RU SE SI SJ SK SM UA VA
+    """.split())),
+    "asia": ("Asia", tuple("""
+    AE AF AM AZ BD BH BN BT CN CY GE HK ID IL IN IQ IR JO JP KG KH KP KR KW KZ LA LB LK MM MN MO MV MY
+    NP OM PH PK PS QA SA SG SY TH TJ TL TM TR TW UZ VN YE
+    """.split())),
+    "oceania": ("Oceania", tuple("""
+    AS AU CC CK CX FJ FM GU HM KI MH MP NC NF NR NU NZ PF PG PN PW SB TK TO TV UM VU WF WS
+    """.split())),
+    "africa": ("Africa", tuple("""
+    AO BF BI BJ BW CD CF CG CI CM CV DJ DZ EG EH ER ET GA GH GM GN GQ GW IO KE KM LR LS LY MA MG ML MR
+    MU MW MZ NA NE NG RE RW SC SD SH SL SN SO SS ST SZ TD TF TG TN TZ UG YT ZA ZM ZW
+    """.split())),
+    "antartide": ("Antartide", tuple("""
+    AQ
+    """.split())),
+}
+
+
+def regione_di(codice):
+    """La chiave della regione (una di REGIONI) di un codice ISO di PAESI."""
+    for chiave, (_, codici) in REGIONI.items():
+        if codice in codici:
+            return chiave
+    raise KeyError(codice)
 
 
 # ── Chiave dei titoli ────────────────────────────────────────────────────────
@@ -289,6 +333,13 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
     settori = [{"voce": k, "nome": SETTORI_GICS[k], "peso": w}
                for k, w in sorted(pesi["settori"].items(), key=lambda kv: -kv[1])]
     paesi = [{"voce": k, "nome": PAESI[k][0], "peso": w} for k, w in sorted(pesi["paesi"].items(), key=lambda kv: -kv[1])]
+    # le regioni sono i paesi già pesati, sommati per regione: stessa copertura dei paesi
+    pesi_regioni = {}
+    for k, w in pesi["paesi"].items():
+        r_k = regione_di(k)
+        pesi_regioni[r_k] = pesi_regioni.get(r_k, 0.0) + w
+    regioni = [{"voce": k, "nome": REGIONI[k][0], "peso": w} for k, w in sorted(pesi_regioni.items(), key=lambda kv: -kv[1])]
+    copertura["regioni"] = copertura["paesi"]
 
     # titoli: somma per chiave normalizzata; il nome viene dallo strumento che contribuisce di più
     V_t = sum(v["valore"] for v, _ in con if v["titoli"])
@@ -310,7 +361,7 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
                     for t in sorted(titoli.values(), key=lambda t: -t["peso"])]
     return {"controvalore_totale": totale, "posizioni": [v for v, _ in con], "senza_composizione": senza,
             "composizioni_senza_posizione": senza_posizione,
-            "copertura": copertura, "settori": settori, "paesi": paesi, "titoli": lista_titoli,
+            "copertura": copertura, "settori": settori, "paesi": paesi, "regioni": regioni, "titoli": lista_titoli,
             "n_titoli_report": n_report, "quota_primi_titoli": sum(t["peso"] for t in lista_titoli[:n_report]),
             "n_titoli_aggregati": len(lista_titoli), "avvisi": avvisi}
 
@@ -347,6 +398,8 @@ def stampa(r):
     if altri:
         riga += f" · altri {len(altri)} paesi {pct(sum(p['peso'] for p in altri))}"
     print("   " + (riga or "nessuna posizione con i paesi"))
+    if r["regioni"]:
+        print("   Per regione: " + " · ".join(f"{x['nome']} {pct(x['peso'])}" for x in r["regioni"]))
     print(f"\n3. PRIMI TITOLI (copertura {pct(r['copertura']['titoli'])}; i primi di ogni ETF, quindi un minimo della "
           "concentrazione)")
     if r["titoli"]:

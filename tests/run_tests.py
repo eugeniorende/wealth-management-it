@@ -6016,6 +6016,35 @@ def t_lt_chiave_titolo():
     assert m.chiave_titolo("S.A.") == "" and m.chiave_titolo("-") == "" and m.chiave_titolo("Co") == ""
 
 
+@test("T16 look-through: regioni derivate dai paesi (standard ONU M49), ogni codice ISO in una sola regione")
+def t_lt_regioni():
+    m = carica_modulo(asset(*LT))
+    codici = [c for _, cc in m.REGIONI.values() for c in cc]
+    assert sorted(codici) == sorted(m.PAESI) and len(codici) == len(set(codici)) == 249
+    assert list(m.REGIONI) == ["nord_america", "america_latina", "europa", "asia", "oceania", "africa", "antartide"]
+    for codice, regione in (("US", "nord_america"), ("CA", "nord_america"), ("BM", "nord_america"), ("MX", "america_latina"),
+                            ("BR", "america_latina"), ("GB", "europa"), ("RU", "europa"), ("TR", "asia"), ("IL", "asia"),
+                            ("CY", "asia"), ("SA", "asia"), ("JP", "asia"), ("TW", "asia"), ("AU", "oceania"),
+                            ("ZA", "africa"), ("EG", "africa"), ("AQ", "antartide")):
+        assert m.regione_di(codice) == regione, (codice, m.regione_di(codice))
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"),
+                                      "--posizioni", _broker_look_through(tmp), "--json", "lt.json", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.load(open(os.path.join(tmp, "lt.json"), encoding="utf-8"))
+        V_p = 13000 + 19500 + 2850                                                  # i due ETF e il BTP hanno i paesi
+        regioni = {x["voce"]: x for x in r["regioni"]}
+        assert abs(regioni["nord_america"]["peso"] - (13000 * .60 + 19500) / V_p) < 1e-12
+        assert abs(regioni["europa"]["peso"] - (13000 * .15 + 2850) / V_p) < 1e-12 and regioni["europa"]["nome"] == "Europa"
+        assert abs(regioni["asia"]["peso"] - 13000 * .25 / V_p) < 1e-12
+        assert [x["voce"] for x in r["regioni"]] == ["nord_america", "europa", "asia"]
+        assert abs(sum(x["peso"] for x in r["regioni"]) - 1) < 1e-12 and r["copertura"]["regioni"] == r["copertura"]["paesi"]
+        assert "Per regione: Nord America 77,2% · Europa 13,6% · Asia 9,2%" in so, so
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 @test("T16 look-through: valori chiusi sulle fixture, due broker sommati, BTP solo nei paesi, senza composizione")
 def t_lt_valori_chiusi():
     tmp = tempfile.mkdtemp()
@@ -6064,7 +6093,7 @@ def t_lt_valori_chiusi():
                                       "--posizioni", os.path.join(tmp, "broker.json"), "--json", "-", cwd=tmp)
         assert rc == 0, se[-300:]
         r = json.loads(so)
-        assert r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 1500 / tot} and r["settori"] == [] and r["titoli"][0]["peso"] == 1.0
+        assert r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 1500 / tot, "regioni": 0.0} and r["settori"] == [] and r["regioni"] == [] and r["titoli"][0]["peso"] == 1.0
         # il --dati del capitale umano come sorgente, con --posizioni ripetuto che somma
         dati = {"persona": {"profilo": "privato_stabile", "eta": 35},
                 "posizioni": [{"asset_class": "azionario", "valore": 1000, "isin": "IE00B5BMR087"},
