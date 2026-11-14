@@ -305,7 +305,9 @@ footer .fonti { color: var(--muto); }
     var passoX = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - ml) / 56))));
     xs.forEach(function (v, i) {
       if (i % passoX === 0 || (i === n - 1 && (n - 1) % passoX >= passoX / 2)) {
-        s.appendChild(testoSvg(X(i), H - 10, opz.fmtX(v), { "text-anchor": "middle", fill: "var(--muto)", "font-size": 11 }));
+        // l'ultima etichetta, se sporgerebbe dal grafico, si allinea al suo bordo destro
+        var fuori = X(i) + stimaTesto(opz.fmtX(v)) / 2 > W;
+        s.appendChild(testoSvg(X(i), H - 10, opz.fmtX(v), { "text-anchor": fuori ? "end" : "middle", fill: "var(--muto)", "font-size": 11 }));
       }
     });
     if (opz.fascia) {
@@ -390,19 +392,51 @@ footer .fonti { color: var(--muto); }
     return box;
   }
 
+  // Larghezza stimata di un'etichetta a 12 px (le maiuscole e le cifre pesano di più): serve a dimensionare la colonna.
+  function stimaTesto(t) {
+    var w = 0;
+    for (var i = 0; i < t.length; i++) w += /[A-Z0-9MW@%€]/.test(t[i]) ? 8.2 : /[ilj.,:;'|!tfr ]/.test(t[i]) ? 3.8 : 6.6;
+    return w;
+  }
+  // Spezza un nome in al massimo due righe che stanno in «largo»; se non basta, l'ultima finisce con «…».
+  function aCapo(nome, largo) {
+    if (stimaTesto(nome) <= largo) return [nome];
+    var parole = nome.split(" "), a = "", i = 0;
+    while (i < parole.length && stimaTesto(a ? a + " " + parole[i] : parole[i]) <= largo) { a = a ? a + " " + parole[i] : parole[i]; i++; }
+    var b = parole.slice(i).join(" ");
+    if (!a) { a = parole[0]; b = parole.slice(1).join(" "); }
+    var taglia = function (t) {
+      if (stimaTesto(t) <= largo) return t;
+      while (t.length > 1 && stimaTesto(t + "…") > largo) t = t.slice(0, -1);
+      return t + "…";
+    };
+    return b ? [taglia(a), taglia(b)] : [taglia(a)];
+  }
+
   // Barre orizzontali: righe [{nome, valore, colore?}], scala comune, valore alla punta.
+  // L'etichetta sta a sinistra (colonna larga quanto il nome più lungo, fino a un tetto) o sopra la barra su uno schermo stretto;
+  // se non ci sta va a capo su due righe e, in ultimo, si accorcia: il nome intero resta nel <title>.
   function barre(righe, fmt, etichetta) {
-    // su uno schermo stretto l'etichetta sta sopra la barra: a fianco verrebbe tagliata
-    var W = larghezza(), sopra = W < 520, riga = sopra ? 44 : 30, H = righe.length * riga + 4;
-    var ml = sopra ? 0 : Math.min(240, Math.max(120, W * 0.38)), mr = 84;
+    var W = larghezza(), sopra = W < 520, mr = 84, ml = 0, largo = W - 4;
+    if (!sopra) {
+      var tetto = Math.min(260, W * 0.42);
+      ml = Math.ceil(Math.min(tetto, Math.max(120, Math.max.apply(null, righe.map(function (r) { return stimaTesto(r.nome); }).concat([0])) + 16)));
+      largo = ml - 12;
+    }
+    var righeNome = righe.map(function (r) { return aCapo(r.nome, largo); });
+    var extra = (Math.max.apply(null, righeNome.map(function (n) { return n.length; }).concat([1])) - 1) * 14;
+    var riga = (sopra ? 44 : 30) + extra, H = righe.length * riga + 4;
     var max = Math.max.apply(null, righe.map(function (r) { return Math.abs(r.valore) || 0; }).concat([1]));
     var s = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": etichetta });
     righe.forEach(function (r, i) {
-      var y = i * riga + (sopra ? 20 : 6), w = (W - ml - mr) * Math.abs(r.valore) / max;
-      var lunghezza = sopra ? 48 : Math.floor(ml / 7);
-      var nome = r.nome.length > lunghezza ? r.nome.slice(0, lunghezza - 1) + "…" : r.nome;
-      s.appendChild(sopra ? testoSvg(0, y - 4, nome, { fill: "var(--testo-2)" })
-                          : testoSvg(ml - 8, y + 13, nome, { "text-anchor": "end", fill: "var(--testo-2)" }));
+      var y = i * riga + (sopra ? 20 + extra : 6), w = (W - ml - mr) * Math.abs(r.valore) / max, n = righeNome[i];
+      var base = sopra ? y - 4 - (n.length - 1) * 14 : y + 13 - (n.length - 1) * 7;
+      n.forEach(function (rigaNome, k) {
+        var t = sopra ? testoSvg(0, base + k * 14, rigaNome, { fill: "var(--testo-2)" })
+                      : testoSvg(ml - 8, base + k * 14, rigaNome, { "text-anchor": "end", fill: "var(--testo-2)" });
+        if (n.length > 1 || rigaNome !== r.nome) t.appendChild(sv("title", {})).textContent = r.nome;
+        s.appendChild(t);
+      });
       s.appendChild(sv("rect", { x: ml, y: y + 2, width: Math.max(1, w), height: 16, rx: 4, fill: r.colore || "var(--s1)" },
                        r.nome + ": " + fmt(r.valore)));
       s.appendChild(testoSvg(ml + w + 6, y + 14, fmt(r.valore), { fill: "var(--testo)" }));
@@ -445,17 +479,91 @@ footer .fonti { color: var(--muto); }
 
   // ═══════════════════ SEZIONI ═══════════════════
 
-  function sezioneIndicatori(lista) {
+  // Variazione tra due revisioni, neutra: segno e numero. Importi «+€10.000 (+7,7%)», quote «+1,4 punti».
+  function variazione(v) {
+    if (v.formato === "euro") {
+      if (!ok(v.delta)) return "n/d";
+      if (Math.round(v.delta) === 0) return "invariato";
+      var d = (v.delta > 0 ? "+" : "") + euro(v.delta);
+      if (!ok(v.delta_rel)) return d;
+      var r = nfDec(1).format(Math.abs(v.delta_rel) * 100) + "%";
+      return d + " (" + (v.delta_rel > 0.0005 ? "+" : v.delta_rel < -0.0005 ? "-" : "") + r + ")";
+    }
+    return ok(v.delta) && Math.abs(v.delta * 100) < 0.05 ? "invariato" : punti(v.delta);
+  }
+  function valoreVoce(formato, x) { return formato === "euro" ? euro(x) : pct(x); }
+  function dataIt(d) { return String(d || "").split("-").reverse().join("/"); }
+
+  function sezioneIndicatori(lista, confronto) {
     var s = sezione("indicatori", "In sintesi", null);
     var g = el("div", { class: "indicatori" });
+    var voci = {};
+    ((confronto && confronto.voci) || []).forEach(function (c) { voci[c.id] = c; });
     lista.forEach(function (ind) {
-      var v = ind.formato === "euro" ? euro(ind.valore) : pct(ind.valore);
+      var v = ind.formato === "euro" ? euro(ind.valore) : pct(ind.valore), c = voci[ind.id];
       g.appendChild(el("div", { class: "tile" },
         el("div", { class: "etichetta", testo: ind.etichetta }),
         el("div", { class: "valore", "data-valore": ind.id, testo: v }),
+        c ? el("div", { class: "fonte" }, "prima " + valoreVoce(c.formato, c.prima) + " · ",
+               el("span", { style: "white-space: nowrap", testo: variazione(c) })) : null,
         el("div", { class: "fonte", testo: (ind.nota ? ind.nota + " · " : "") + "fonte: " + ind.fonte })));
     });
     s.appendChild(g);
+    return s;
+  }
+
+  var SEZIONI_CONFRONTO = [["indicatori", "In sintesi"], ["allocazione", "Allocazione"], ["glide_path", "Glide path"], ["pensione", "Pensione"],
+                           ["capitale_umano", "Capitale umano"], ["fiscalita", "Fiscalità"], ["look_through", "Look-through"]];
+
+  function sezioneConfronto(c) {
+    if (!c) return null;
+    var s = sezione("confronto", "Rispetto alla revisione del " + dataIt(c.data_precedente),
+      "Importi nominali, ognuno alla data della sua revisione: non sono corretti per l'inflazione.");
+    if (c.versioni_diverse) {
+      s.appendChild(el("p", { class: "avviso", testo: "La revisione precedente è stata generata con la versione " + c.plugin_precedente +
+        " del plugin: parte delle differenze può venire da dati normativi e metodi aggiornati, non dalla tua situazione (vedi CHANGELOG)." }));
+    }
+    SEZIONI_CONFRONTO.forEach(function (d) {
+      var voci = c.voci.filter(function (v) { return v.sezione === d[0]; });
+      if (!voci.length) return;
+      s.appendChild(el("h3", { testo: d[1] }));
+      s.appendChild(tabella(["Voce", "Prima", "Ora", "Variazione"],
+        voci.map(function (v) { return [v.etichetta, valoreVoce(v.formato, v.prima), valoreVoce(v.formato, v.ora), variazione(v)]; }),
+        [false, true, true, true]));
+    });
+    var presenti = c.obiettivi.filter(function (o) { return o.stato === "presente"; });
+    if (presenti.length) {
+      s.appendChild(el("h3", { testo: "Obiettivi" }));
+      var barreProb = [];
+      presenti.forEach(function (o) {
+        if (!o.probabilita) return;
+        barreProb.push({ nome: o.nome + " · prima", valore: o.probabilita.prima, colore: "var(--s2)" });
+        barreProb.push({ nome: o.nome + " · ora", valore: o.probabilita.ora, colore: "var(--s1)" });
+      });
+      if (barreProb.length) {
+        s.appendChild(legenda([{ nome: "probabilità di successo prima", colore: "var(--s2)" }, { nome: "probabilità di successo ora", colore: "var(--s1)" }]));
+        s.appendChild(barre(barreProb, function (v) { return pct(v); }, "Probabilità di successo degli obiettivi, prima e ora"));
+      }
+      var righe = [];
+      presenti.forEach(function (o) {
+        [["probabilita", "Probabilità", "percento"], ["gia", "Già accumulato", "euro"], ["versamento", "Versamento mensile", "euro"]].forEach(function (q) {
+          var x = o[q[0]];
+          if (!x) return;
+          righe.push([o.nome, q[1], valoreVoce(q[2], x.prima), valoreVoce(q[2], x.ora), variazione({ formato: q[2], delta: x.delta })]);
+        });
+      });
+      s.appendChild(tabella(["Obiettivo", "Quantità", "Prima", "Ora", "Variazione"], righe, [false, false, true, true, true]));
+    }
+    var testi = c.obiettivi.filter(function (o) { return o.stato !== "presente"; }).map(function (o) {
+      return o.nome + ": " + (o.stato === "nuovo" ? "nuovo, non c'era nella revisione precedente."
+        : o.stato === "non_piu_presente" ? "non più presente rispetto alla revisione precedente."
+        : "nome ripetuto, non confrontato.");
+    });
+    if (testi.length) {
+      var u = el("ul", { class: "avvisi" });
+      testi.forEach(function (t) { u.appendChild(el("li", { testo: t })); });
+      s.appendChild(u);
+    }
     return s;
   }
 
@@ -765,7 +873,8 @@ footer .fonti { color: var(--muto); }
   function disegna() {
     var main = document.getElementById("cruscotto");
     var sezioni = [
-      B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori) : null,
+      B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori, B.confronto) : null,
+      sezioneConfronto(B.confronto),
       sezioneAllocazione(B.allocazione), sezioneLookThrough(B.look_through), sezioneObiettivi(B.obiettivi), sezioneGlide(B.glide_path),
       sezionePensione(B.pensione), sezioneCapitaleUmano(B.capitale_umano), sezioneFiscalita(B.fiscalita),
       sezioneRibilanciamento(B.ribilanciamento)

@@ -6887,6 +6887,20 @@ def t_t17_browser_rendering():
             br.close()
 
 
+FUORI_DAL_GRAFICO = """() => {
+  var fuori = [];
+  document.querySelectorAll("svg").forEach(function (svg) {
+    var r = svg.getBoundingClientRect();
+    svg.querySelectorAll("text").forEach(function (t) {
+      var q = t.getBoundingClientRect();
+      if (q.width && (q.left < r.left - 0.5 || q.right > r.right + 0.5 || q.top < r.top - 0.5 || q.bottom > r.bottom + 0.5))
+        fuori.push(t.textContent);
+    });
+  });
+  return fuori;
+}"""
+
+
 @test("T17 cruscotto nel browser: numeri in italiano, nomi intatti, null senza NaN, tema scuro, 375px")
 def t_t17_browser_contenuti():
     sync_playwright, lancia = browser()
@@ -6908,6 +6922,11 @@ def t_t17_browser_contenuti():
         br = lancia(p)
         try:
             page, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti)
+            # le etichette lunghe delle barre non escono dal proprio grafico, a scrivania come a 375 px
+            for larg in (1200, 375):
+                pg, errori, eccezioni, _ = _apri_cruscotto(br, html_tutti, larghezza=larg)
+                fuori = pg.evaluate(FUORI_DAL_GRAFICO)
+                assert fuori == [], (larg, fuori)
             assert page.inner_text('[data-valore="prob-0"]') == formato_it_percento(b_tutti["obiettivi"]["obiettivi"][0]["probabilita_successo"])
             assert page.inner_text('[data-valore="sostituzione_netta"]') == formato_it_percento(ind["sostituzione_netta"]["valore"])
             assert page.inner_text('[data-valore="capitale_allocato"]') == "€130.000", page.inner_text('[data-valore="capitale_allocato"]')
@@ -6934,6 +6953,40 @@ def t_t17_browser_contenuti():
     src = open(asset("it-revisione", "cruscotto.html"), encoding="utf-8").read()
     for vietato in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"):
         assert vietato not in src, vietato
+
+
+@test("T17 cruscotto nel browser: sezione del confronto con le variazioni all'italiana, assente senza revisione precedente")
+def t_t17_browser_confronto():
+    sync_playwright, lancia = browser()
+    tmp = tempfile.mkdtemp()
+    try:
+        prima, ora = _revisioni_di_prova(tmp)
+        rc, so, se, b, html = _cruscotto(*ora, extra=("--precedente", prima))
+        assert rc == 0, se[-300:]
+        rc, _, se, _, html_senza = _cruscotto(*ora)
+        with sync_playwright() as p:
+            br = lancia(p)
+            try:
+                page, errori, eccezioni, _ = _apri_cruscotto(br, html)
+                assert errori == [] and eccezioni == [], (errori, eccezioni)
+                assert page.locator("section[id^=sez-]").nth(1).get_attribute("id") == "sez-confronto"
+                testo = page.inner_text("#sez-confronto")
+                assert "Rispetto alla revisione del 20/11/2025" in testo and "+€10.000 (+7,7%)" in testo and "-10,0 punti" in testo, testo[:1500]
+                assert "versione 0.11.0" in testo and "CHANGELOG" in testo and "importi nominali" in testo.lower(), testo[:800]
+                assert "Obiettivo rinominato" in testo and "nuovo" in testo and "non più presente" in testo, testo[-800:]
+                assert page.locator("#sez-confronto svg").count() >= 1 and page.locator("#sez-confronto table").count() >= 1
+                assert "+€10.000" in page.inner_text("#sez-indicatori")
+                for brutto in ("NaN", "undefined", "null", "Infinity"):
+                    assert brutto not in testo, brutto
+                stretta, errori, eccezioni, _ = _apri_cruscotto(br, html, larghezza=375)
+                assert stretta.evaluate("document.documentElement.scrollWidth") <= 375 and errori == [] and eccezioni == []
+                assert stretta.evaluate(FUORI_DAL_GRAFICO) == []
+                page, errori, eccezioni, _ = _apri_cruscotto(br, html_senza)
+                assert page.locator("#sez-confronto").count() == 0 and errori == [] and eccezioni == []
+            finally:
+                br.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 @test("T17 cruscotto: la skill chiede conferma prima di pubblicare, comando e README allineati")
