@@ -5377,14 +5377,14 @@ def t_ce_uscita():
         with open(out, "rb") as f:
             assert f.read().startswith(b"\xef\xbb\xbf")
         righe = testo.splitlines()
-        assert righe[0] == "# compilato a mano" and righe[1] == "strumento;dimensione;voce;peso", righe[:3]
-        assert righe[2:4] == ["ETF Europa;settore;Financials;60,00", "ETF Europa;settore;Industrials;40,00"], righe[2:4]
+        assert righe[0] == "# compilato a mano" and righe[1] == "strumento;dimensione;voce;peso;isin", righe[:3]
+        assert righe[2:4] == ["ETF Europa;settore;Financials;60,00;", "ETF Europa;settore;Industrials;40,00;"], righe[2:4]
         assert sum(1 for r in righe if r.startswith("# ETF MSCI World:")) == 1, righe
         commento = next(r for r in righe if r.startswith("# ETF MSCI World:"))
         assert re.fullmatch(r"# ETF MSCI World: iShares, composizione-ishares-en\.csv, posizioni al 30/09/2026, "
                             r"importato il \d\d/\d\d/\d{4}; esclusi liquidità e derivati 1,00%", commento), commento
         mw = [r for r in righe if r.startswith("ETF MSCI World;")]
-        assert mw[0] == "ETF MSCI World;settore;Information Technology;40,40" and "ETF MSCI World;paese;KR;10,10" in mw, mw
+        assert mw[0] == "ETF MSCI World;settore;Information Technology;40,40;" and "ETF MSCI World;paese;KR;10,10;" in mw, mw
         assert len(mw) == 16 and not any(";Energy;100" in r for r in righe), mw   # 5 settori, 5 paesi, 6 titoli (look-through)
         for dim in ("settore", "paese"):
             tot = sum(float(r.split(";")[3].replace(",", ".")) for r in mw if r.split(";")[1] == dim)
@@ -5418,10 +5418,10 @@ def t_ce_uscita():
             f.write("isin;quota\nIE00;1\n")
         rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "A", "--out", strano, cwd=tmp)
         assert rc == 1 and open(strano, encoding="utf-8").read() == "isin;quota\nIE00;1\n", se[-300:]
-        # il CSV scritto si rilegge con csv senza perdite: quattro campi per riga dati
+        # il CSV scritto si rilegge con csv senza perdite: cinque campi per riga dati
         dati = [r for r in csv.reader(io.StringIO(open(out, encoding="utf-8-sig").read()), delimiter=";")
                 if r and not r[0].startswith("#")]
-        assert all(len(r) == 4 for r in dati), dati
+        assert all(len(r) == 5 for r in dati), dati
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -5935,9 +5935,9 @@ def t_lt_importatore_titoli():
         assert rc == 0, se[-300:]
         righe = [r for r in open(out, encoding="utf-8-sig").read().splitlines() if ";titolo;" in r]
         # pesi nel fondo, non rinormalizzati; liquidità e future fuori; ordine per peso
-        assert righe == ["IE00B4L5Y983;titolo;ALPHA CORP;30,00", "IE00B4L5Y983;titolo;BETA BANK;20,00",
-                         "IE00B4L5Y983;titolo;GAMMA PHARMA;15,00", "IE00B4L5Y983;titolo;DELTA INDUSTRIES;15,00",
-                         "IE00B4L5Y983;titolo;EPSILON SOFT;10,00", "IE00B4L5Y983;titolo;ZETA ENERGY;9,00"], righe
+        assert righe == ["IE00B4L5Y983;titolo;ALPHA CORP;30,00;", "IE00B4L5Y983;titolo;BETA BANK;20,00;",
+                         "IE00B4L5Y983;titolo;GAMMA PHARMA;15,00;", "IE00B4L5Y983;titolo;DELTA INDUSTRIES;15,00;",
+                         "IE00B4L5Y983;titolo;EPSILON SOFT;10,00;", "IE00B4L5Y983;titolo;ZETA ENERGY;9,00;"], righe
         s = json.load(open(js, encoding="utf-8"))["strumenti"][0]
         assert s["strumento"] == "IE00B4L5Y983" and s["primi_titoli"][0] == {"nome": "ALPHA CORP", "isin": None, "peso": 0.30}, s["primi_titoli"][:1]
         assert "Primi titoli: ALPHA CORP 30,00%" in so, so[-600:]
@@ -6109,6 +6109,72 @@ def t_lt_valori_chiusi():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T16 look-through: composizione.csv a cinque colonne con l'ISIN dei titoli, file a tre e a quattro colonne ancora letti")
+def t_lt_colonna_isin():
+    cu, lt = carica_modulo(asset(*CU)), carica_modulo(asset(*LT))
+    tmp = tempfile.mkdtemp()
+    try:
+        out = os.path.join(tmp, "composizione.csv")
+        shutil.copy(os.path.join(FIXTURES, "composizione-look-through.csv"), out)    # quattro colonne, come dalla 0.12.0
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-amundi-fr.csv"), "--isin", "LU0000000001",
+                                      "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"), "--isin", "IE0000000002",
+                                      "--out", out, cwd=tmp)
+        assert rc == 0 and "quattro colonne" in so, (so[-400:], se[-300:])
+        dati = [r for r in open(out, encoding="utf-8-sig").read().splitlines() if r and not r.startswith("#")]
+        assert dati[0] == "strumento;dimensione;voce;peso;isin" and all(r.count(";") == 4 for r in dati), dati[:3]
+        assert "LU0000000001;titolo;ALPHA CORP;30,00;US0000000001" in dati          # Amundi ha la colonna «Code ISIN»
+        assert "IE0000000002;titolo;ALPHA CORP;30,00;" in dati                      # iShares non la ha: campo vuoto
+        assert "IE00B4L5Y983;titolo;APPLE INC;5,00;" in dati and "IT0005454241;paese;IT;100,00;" in dati   # righe di prima
+        assert abs(cu.leggi_composizione(out)["IE00B4L5Y983"]["Health Care"] - 0.5) < 1e-9
+        comp = lt.leggi_composizione(out)
+        assert comp["LU0000000001"]["isin"]["ALPHA CORP"] == "US0000000001" and comp["IE0000000002"]["isin"] == {}
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"), "--isin", "IE0000000002",
+                                      "--out", out, cwd=tmp)
+        assert rc == 0 and "quattro colonne" not in so, so[-300:]
+        assert open(out, encoding="utf-8-sig").read().count("IE0000000002;titolo;") == 6
+        # Review Focus 1 e 2: una riga a mano senza il quinto campo, un ISIN in minuscolo con gli spazi
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("DE0007164600;titolo;SAP SE;100\nDE0007164601;titolo;Apple;100; us0000000011 \n")
+        comp = lt.leggi_composizione(out)
+        assert comp["DE0007164600"]["isin"] == {} and comp["DE0007164601"]["isin"] == {"Apple": "US0000000011"}
+        assert "DE0007164600" not in cu.leggi_composizione(out)                     # sole righe titolo: nessun settore
+        with open(out, "a", encoding="utf-8") as f:
+            f.write("DE0007164602;titolo;Storto;100;US123\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", out, "--posizioni", _broker_look_through(tmp), cwd=tmp)
+        assert rc == 1 and "ISIN" in se and "US123" in se and "Traceback" not in se, se[-300:]
+        # il formato a tre colonne resta leggibile dai due lettori
+        tre = os.path.join(tmp, "tre.csv")
+        open(tre, "w", encoding="utf-8").write("strumento;settore;peso\nIE00B4L5Y983;Energy;100\n")
+        assert cu.leggi_composizione(tre) == {"IE00B4L5Y983": {"Energy": 1.0}} and lt.leggi_composizione(tre)["IE00B4L5Y983"]["settori"] == {"Energy": 1.0}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 look-through: titoli uniti per ISIN o per nome (componenti connesse), ISIN dei gruppi nel JSON")
+def t_lt_titoli_isin():
+    tmp = tempfile.mkdtemp()
+    try:
+        rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(FIXTURES, "composizione-look-through-v5.csv"),
+                                      "--posizioni", _broker_look_through(tmp), "--json", "lt.json", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.load(open(os.path.join(tmp, "lt.json"), encoding="utf-8"))
+        V_s = 13000 + 19500
+        t = {x["nome"]: x for x in r["titoli"]}
+        assert [x["nome"] for x in r["titoli"]] == ["Apple Inc.", "ALPHABET INC CLASS A", "TAIWAN SEMICONDUCTOR MANUFACTURING", "NESTLE SA"]
+        # una riga con l'ISIN e una senza, stesso nome: un titolo solo
+        assert abs(t["Apple Inc."]["peso"] - (13000 * .05 + 19500 * .07) / V_s) < 1e-12 and t["Apple Inc."]["isin"] == ["US0000000011"]
+        # nomi che la chiave non unisce, stesso ISIN: un titolo solo
+        tsmc = t["TAIWAN SEMICONDUCTOR MANUFACTURING"]
+        assert abs(tsmc["peso"] - (13000 * .04 + 19500 * .02) / V_s) < 1e-12 and tsmc["isin"] == ["US0000000029"]
+        assert tsmc["da"] == ["IE00B4L5Y983", "IE00B5BMR087"]
+        # due classi di azioni, due ISIN, stessa chiave del nome: restano un titolo
+        assert abs(t["ALPHABET INC CLASS A"]["peso"] - 19500 * .055 / V_s) < 1e-12
+        assert t["ALPHABET INC CLASS A"]["isin"] == ["US0000000037", "US0000000045"]
+        assert t["NESTLE SA"]["isin"] == [] and r["n_titoli_aggregati"] == 4
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 @test("T16 look-through: errori con rc 1 (CSV, posizioni, valori), avvisi sul valore zero")
 def t_lt_errori():
     tmp = tempfile.mkdtemp()
@@ -6125,7 +6191,7 @@ def t_lt_errori():
             return os.path.join(tmp, nome)
         assert "non trovato" in caso("--composizione", os.path.join(tmp, "no.csv"), "--posizioni", broker)
         assert "colonne" in caso("--composizione", scrivi("colonne.csv", "isin;settore;peso\nX;Energy;100\n"), "--posizioni", broker)
-        assert "valuta" in caso("--composizione", scrivi("dim.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;valuta;USD;100\n"),
+        assert "rating" in caso("--composizione", scrivi("dim.csv", "strumento;dimensione;voce;peso\nIE00B4L5Y983;rating;AAA;100\n"),
                                 "--posizioni", broker)
         assert "manca la lista posizioni" in caso("--composizione", comp, "--posizioni", scrivi("senza.json", '{"persona": {}}'))
         assert "posizioni[0]" in caso("--composizione", comp, "--posizioni",

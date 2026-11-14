@@ -25,7 +25,8 @@ Regole applicate (references/composizione-etf.md):
 - settori: gli 11 GICS con il nome inglese, come in capitale-umano.py; paesi: codice ISO 3166-1 alpha-2;
 - un file in classificazione ICB (FTSE) dà solo i paesi: ICB → GICS non si converte senza errore;
 - i primi N_TITOLI titoli per peso (liquidità e derivati esclusi) si scrivono come righe «titolo», con il peso
-  nel fondo NON rinormalizzato: servono al look-through del portafoglio (look-through-portafoglio.py).
+  nel fondo NON rinormalizzato, e l'ISIN del titolo quando il file lo ha: servono al look-through del portafoglio
+  (look-through-portafoglio.py). composizione.csv ha cinque colonne: strumento;dimensione;voce;peso;isin.
 
 Limiti dichiarati: le posizioni sono quelle del fondo a una data (per un ETF sintetico il paniere di collaterale,
 non l'esposizione); il paese è quello che l'emittente riporta (domicilio, rischio o negoziazione); niente PDF né
@@ -1151,7 +1152,7 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
 
 # ── composizione.csv ────────────────────────────────────────────────────────
 
-_INTESTAZIONE_OUT = "strumento;dimensione;voce;peso"
+_INTESTAZIONE_OUT = "strumento;dimensione;voce;peso;isin"
 
 
 def _linea(campi):
@@ -1170,13 +1171,15 @@ def _peso_vecchio(testo, path, strumento):
 
 
 def leggi_out(path):
-    """Il composizione.csv esistente: (commenti in testa, blocchi, vecchio formato?). Un blocco è (strumento,
+    """Il composizione.csv esistente: (commenti in testa, blocchi, formato trovato). Un blocco è (strumento,
     righe di testo), con il suo commento «# <strumento>: …» scritto dall'importatore; ogni altro commento è
     libero e forma un blocco senza strumento, che resta al suo posto a ogni reimport.
-    Il vecchio formato strumento;settore;peso si converte nel nuovo, con i pesi in percento. Colonne
-    sconosciute: ERRORE, perché un file che non si capisce non si sovrascrive."""
+    Il formato trovato è None (file assente), «settore» (strumento;settore;peso), «quattro»
+    (strumento;dimensione;voce;peso) o «cinque» (con l'isin). I primi due si convertono nel formato a cinque
+    colonne, con i pesi in percento e il quinto campo vuoto. Colonne sconosciute: ERRORE, perché un file che non
+    si capisce non si sovrascrive."""
     if not os.path.exists(path):
-        return [], [], False
+        return [], [], None
     with open(path, "rb") as f:
         grezzo = f.read()
     try:
@@ -1194,7 +1197,8 @@ def leggi_out(path):
         campi = [c.strip() for c in next(csv.reader([linea], delimiter=";"))]
         if colonne is None:
             colonne = [c.lower() for c in campi if c]
-            if colonne not in (["strumento", "settore", "peso"], ["strumento", "dimensione", "voce", "peso"]):
+            if colonne not in (["strumento", "settore", "peso"], ["strumento", "dimensione", "voce", "peso"],
+                               ["strumento", "dimensione", "voce", "peso", "isin"]):
                 errore(f"--out {path}: colonne non riconosciute ({';'.join(campi)}): non lo sovrascrivo, scegli "
                        f"un altro --out o usa le colonne {_INTESTAZIONE_OUT}")
             continue
@@ -1212,11 +1216,13 @@ def leggi_out(path):
         if colonne[1] == "settore":
             vecchi.setdefault(strumento, []).append((riga.get("settore", ""),) + _peso_vecchio(riga.get("peso", ""), path, strumento))
         else:
+            if len(colonne) == 4:                   # quattro colonne: il quinto campo, vuoto, si aggiunge
+                linea = _linea(campi[:4] + [""])
             blocchi[-1][1].append(linea)
     if in_sospeso:
         blocchi.append((None, in_sospeso))
-    vecchio = colonne is not None and colonne[1] == "settore"
-    if vecchio:                                     # pesi in frazione o in percento per strumento, come leggi_composizione
+    formato = None if colonne is None else {3: "settore", 4: "quattro", 5: "cinque"}[len(colonne)]
+    if formato == "settore":                        # pesi in frazione o in percento per strumento, come leggi_composizione
         for strumento, righe in blocchi:
             if strumento is None:
                 continue
@@ -1224,8 +1230,8 @@ def leggi_out(path):
             percento = sum(p for _, p, _ in voci) > 1.5
             for settore, peso, con_segno in voci:
                 peso = peso if (percento or con_segno) else peso * 100
-                righe.append(_linea([strumento, "settore", settore, numero(peso, 2)]))
-    return testa, blocchi, vecchio
+                righe.append(_linea([strumento, "settore", settore, numero(peso, 2), ""]))
+    return testa, blocchi, formato
 
 
 def _data_italiana(iso):
@@ -1256,8 +1262,9 @@ def righe_strumento(c, oggi):
         commento += "; replica sintetica: posizioni del collaterale, non esposizione all'indice"
     righe = [commento]
     for dim, plurale in _DIMENSIONI:
-        righe += [_linea([c["strumento"], dim, voce, numero(peso * 100, 2)]) for voce, peso in c[plurale].items()]
-    righe += [_linea([c["strumento"], "titolo", t["nome"], numero(t["peso"] * 100, 2)]) for t in c["primi_titoli"]]
+        righe += [_linea([c["strumento"], dim, voce, numero(peso * 100, 2), ""]) for voce, peso in c[plurale].items()]
+    righe += [_linea([c["strumento"], "titolo", t["nome"], numero(t["peso"] * 100, 2), t["isin"] or ""])
+              for t in c["primi_titoli"]]
     return righe
 
 
@@ -1292,7 +1299,7 @@ def verifica_destinazione(path, opzione):
 
 # ── Report ──────────────────────────────────────────────────────────────────
 
-def stampa(composizioni, out, conservati, vecchio):
+def stampa(composizioni, out, conservati, formato):
     print("IMPORTAZIONE DELLA COMPOSIZIONE DEGLI ETF (settori GICS, paesi ISO; pesi rinormalizzati a 100 dopo "
           "liquidità, derivati e righe non classificate)")
     for c in composizioni:
@@ -1316,8 +1323,10 @@ def stampa(composizioni, out, conservati, vecchio):
     importati = "1 strumento importato" if len(composizioni) == 1 else f"{len(composizioni)} strumenti importati"
     print(f"\nScritto {out}: {importati}"
           + (f"; conservati senza modifiche: {', '.join(conservati)}" if conservati else ""))
-    if vecchio:
+    if formato == "settore":
         print("   Il file esistente era nel vecchio formato strumento;settore;peso: convertito nel nuovo, stessi pesi.")
+    elif formato == "quattro":
+        print("   Il file esistente aveva quattro colonne: aggiunta la colonna isin, stesse righe.")
     print("Non è consulenza: è la composizione dichiarata dall'emittente alla data del file, da riguardare a ogni revisione.")
 
 
@@ -1346,7 +1355,7 @@ def main():
     verifica_destinazione(args.out, "--out")
     if args.json and args.json != "-":
         verifica_destinazione(args.json, "--json")
-    testa, blocchi, vecchio = leggi_out(args.out)
+    testa, blocchi, formato = leggi_out(args.out)
     composizioni = [componi(path, strumento, args.emittente) for path, strumento in zip(args.file, args.strumento)]
     scrivi_out(args.out, testa, blocchi, composizioni, datetime.date.today().strftime("%d/%m/%Y"))
     risultato = {"strumenti": composizioni, "out": args.out}
@@ -1354,7 +1363,7 @@ def main():
         print(json.dumps(risultato, ensure_ascii=False, indent=2))
         return
     conservati = [s for s, _ in blocchi if s is not None and s not in set(args.strumento)]
-    stampa(composizioni, args.out, conservati, vecchio)
+    stampa(composizioni, args.out, conservati, formato)
     if args.json:
         scrivi_json(args.json, risultato)
 

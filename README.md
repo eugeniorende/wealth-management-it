@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 188 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007), l'importatore della composizione degli ETF (layout sintetici dei cinque emittenti, esclusioni, fusione del CSV), il look-through del portafoglio (valori chiusi, chiave dei titoli, sezione del cruscotto) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 190 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007), l'importatore della composizione degli ETF (layout sintetici dei cinque emittenti, esclusioni, fusione del CSV), il look-through del portafoglio (valori chiusi, chiave dei titoli, sezione del cruscotto) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -92,12 +92,12 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-pianificazione-autonomi/assets/proiezione-pensione-autonomi.xlsx` | 7: Excel previdenziali; T12 Excel; coerenza tra skill; proiezione-pensione-autonomi.xlsx ×4 |
 | `it-pianificazione-obiettivi/assets/allocatore-capitale.py` | 18: T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 … |
 | `it-pianificazione-obiettivi/assets/asset-location-optimizer.py` | 9: T9 formati; T9 interfaccia ×2; T9 lettore unico del pianificatore; asset-location; obiettivi ×3; smoke |
-| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 30: T15 capitale umano ×11; T16 composizione ETF ×3; T16 look-through ×2; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione … |
+| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 31: T15 capitale umano ×11; T16 composizione ETF ×3; T16 look-through ×3; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione … |
 | `it-pianificazione-obiettivi/assets/decumulo-obiettivi.py` | 9: T12 rami avanzati; T9 formati; T9 interfaccia ×2; decumulo-obiettivi; obiettivi; serie storica ×2 … |
 | `it-pianificazione-obiettivi/assets/esempio-composizione.csv` | 13: T15 capitale umano; T16 composizione ETF; T16 look-through ×2; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione |
 | `it-pianificazione-obiettivi/assets/glidepath-obiettivi.py` | 21: T12 rami avanzati; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione … |
-| `it-pianificazione-obiettivi/assets/importa-composizione-etf.py` | 19: T16 composizione ETF ×14; T16 look-through ×2; T9 formati; T9 interfaccia ×2 |
-| `it-pianificazione-obiettivi/assets/look-through-portafoglio.py` | 18: T16 look-through ×6; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 |
+| `it-pianificazione-obiettivi/assets/importa-composizione-etf.py` | 20: T16 composizione ETF ×14; T16 look-through ×3; T9 formati; T9 interfaccia ×2 |
+| `it-pianificazione-obiettivi/assets/look-through-portafoglio.py` | 20: T16 look-through ×8; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 formati; T9 interfaccia ×2 |
 | `it-pianificazione-obiettivi/assets/montecarlo-obiettivi.py` | 25: T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 --json di glide path e Monte Carlo degli obiettivi; T9 contratto di input della revisione; T9 formati … |
 | `it-pianificazione-obiettivi/assets/pianificatore-obiettivi.xlsx` | 27: T12 Excel ×2; T16 look-through; T17 cruscotto ×6; T17 cruscotto nel browser ×2; T9 contratto di input della revisione; T9 interfaccia … |
 | `it-pianificazione-obiettivi/assets/profili-capitale-umano.csv` | 1: T15 capitale umano |
@@ -110,7 +110,7 @@ Per ogni strumento del plugin, i test che lo esercitano (contati dal runner: que
 | `it-revisione/assets/tracker-secchielli.xlsx` | 4: T12 Excel ×2; bande di ribilanciamento; tracker-secchielli |
 | `it-tax-optimization/assets/esempio-estratto.csv` | 2: T2 importatore ×2 |
 | `it-tax-optimization/assets/esempio-zainetto.csv` | 2: T2 importatore ×2 |
-| `it-tax-optimization/assets/importa-estratto-broker.py` | 28: T14 postura e fonti; T16 look-through ×4; T17 cruscotto ×7; T17 cruscotto nel browser ×2; T2 importatore ×6; T3 … |
+| `it-tax-optimization/assets/importa-estratto-broker.py` | 30: T14 postura e fonti; T16 look-through ×6; T17 cruscotto ×7; T17 cruscotto nel browser ×2; T2 importatore ×6; T3 … |
 
 ### Freshness fiscale
 

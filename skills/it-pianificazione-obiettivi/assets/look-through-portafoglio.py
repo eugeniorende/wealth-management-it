@@ -35,6 +35,7 @@ import csv
 import importlib.util
 import json
 import os
+import re
 
 from motore_bootstrap import cli, errore, euro, numero, pct, scrivi_json
 
@@ -64,6 +65,7 @@ def _importatore():
 _imp = _importatore()
 SETTORI_GICS, PAESI, normalizza = _imp.SETTORI_GICS, _imp.PAESI, _imp.normalizza
 DIMENSIONI = ("settori", "paesi", "titoli")
+ISIN_TITOLO = re.compile(r"[A-Z]{2}[A-Z0-9]{9}[0-9]")
 
 # Le regioni geografiche derivano dai paesi, non si leggono dai file degli emittenti. Fonte: «Standard country or area
 # codes for statistical use (M49)», Divisione di statistica dell'ONU, vista «Geographic Regions»,
@@ -154,8 +156,10 @@ def _numero_csv(testo):
 
 
 def leggi_composizione(path, avvisi=None):
-    """{chiave: {"settori": {GICS: frazione}, "paesi": {ISO: frazione}, "titoli": {nome: frazione}}} dal CSV
-    dell'importatore (strumento;dimensione;voce;peso) o dal vecchio strumento;settore;peso (solo settori).
+    """{chiave: {"settori": {GICS: frazione}, "paesi": {ISO: frazione}, "titoli": {nome: frazione},
+    "isin": {nome del titolo: ISIN}}} dal CSV dell'importatore (strumento;dimensione;voce;peso;isin, o senza l'ultima
+    colonna) o dal vecchio strumento;settore;peso (solo settori). L'ISIN è del solo titolo, non è una dimensione;
+    le righe «valuta» si saltano (le legge un'altra parte dello script).
     Pesi in percento o in frazione, per strumento e dimensione: settori e paesi come in capitale-umano.py (somma
     sopra 1,5 → percento); i titoli seguono la scala delle altre dimensioni dello strumento, o sono percento se
     uno supera 1; nei casi in cui la scala dei titoli è un'inferenza (pesi tutti fino a 1) un avviso lo dice.
@@ -172,13 +176,13 @@ def leggi_composizione(path, avvisi=None):
     righe = [r for r in testo.splitlines() if r.strip(" ;\t") and not r.lstrip().startswith("#")]
     lettore = csv.DictReader(righe, delimiter=";")
     colonne = [c.strip().lower() for c in lettore.fieldnames or () if c.strip()]
-    if colonne == ["strumento", "dimensione", "voce", "peso"]:
+    if colonne in (["strumento", "dimensione", "voce", "peso"], ["strumento", "dimensione", "voce", "peso", "isin"]):
         vecchio = False
     elif colonne == ["strumento", "settore", "peso"]:
         vecchio = True
     else:
         errore(f"--composizione {path}: colonne non riconosciute ({';'.join(colonne)}): servono "
-               "strumento;dimensione;voce;peso (da importa-composizione-etf.py) o strumento;settore;peso")
+               "strumento;dimensione;voce;peso;isin (da importa-composizione-etf.py), la stessa senza isin o strumento;settore;peso")
     comp, percento = {}, {}
     for r in lettore:
         r = {k.strip().lower(): (v or "").strip() for k, v in r.items() if k is not None}
@@ -188,10 +192,12 @@ def leggi_composizione(path, avvisi=None):
         if vecchio:
             dim, voce = "settori", r["settore"]
         else:
-            dim = {"settore": "settori", "paese": "paesi", "titolo": "titoli"}.get(r["dimensione"])
-            if dim is None:
+            dim = {"settore": "settori", "paese": "paesi", "titolo": "titoli", "valuta": None}.get(r["dimensione"], "?")
+            if dim == "?":
                 errore(f"--composizione: dimensione {r['dimensione']!r} sconosciuta ({strumento}): "
-                       "attese «settore», «paese» o «titolo»")
+                       "attese «settore», «paese», «valuta» o «titolo»")
+            if dim is None:                         # «valuta»: riconosciuta, per ora saltata
+                continue
             voce = r["voce"]
         if dim == "settori" and voce not in SETTORI_GICS:
             errore(f"--composizione: settore {voce!r} non GICS ({strumento}): usa uno di {', '.join(SETTORI_GICS)}")
@@ -205,8 +211,14 @@ def leggi_composizione(path, avvisi=None):
             errore(f"--composizione: peso {r['peso']!r} non numerico ({strumento})")
         if r["peso"].endswith("%"):
             percento[(strumento, dim)] = True
-        voci = comp.setdefault(strumento, {d: {} for d in DIMENSIONI})[dim]
+        scheda = comp.setdefault(strumento, {d: {} for d in DIMENSIONI + ("isin",)})
+        voci = scheda[dim]
         voci[voce] = voci.get(voce, 0.0) + peso
+        isin = r.get("isin", "").strip().upper()
+        if dim == "titoli" and isin:
+            if not ISIN_TITOLO.fullmatch(isin):
+                errore(f"--composizione: ISIN {r['isin']!r} malformato per il titolo {voce!r} ({strumento})")
+            scheda["isin"][voce] = isin
     for strumento, dims in comp.items():
         scala_nota = None
         for dim in ("settori", "paesi"):
@@ -341,23 +353,39 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
     regioni = [{"voce": k, "nome": REGIONI[k][0], "peso": w} for k, w in sorted(pesi_regioni.items(), key=lambda kv: -kv[1])]
     copertura["regioni"] = copertura["paesi"]
 
-    # titoli: somma per chiave normalizzata; il nome viene dallo strumento che contribuisce di più
+    # titoli: due righe sono lo stesso titolo se hanno lo stesso ISIN o la stessa chiave del nome (componenti
+    # connesse, con una union-find sui nodi «ISIN» e «nome»); il nome viene dallo strumento che contribuisce di più
+    padre = {}
+    def radice(x):
+        padre.setdefault(x, x)
+        while padre[x] != x:
+            padre[x] = padre[padre[x]]
+            x = padre[x]
+        return x
+    righe_titoli = []
     V_t = sum(v["valore"] for v, _ in con if v["titoli"])
-    titoli = {}
     for v, c in con:
         for nome, peso in c["titoli"].items():
             k = chiave_titolo(nome)
             if not k:
                 avvisi.append(f"titolo «{nome}» di {v['chiave']} ignorato: dopo la pulizia del nome non resta nulla")
                 continue
-            contributo = v["valore"] * peso / V_t
-            t = titoli.setdefault(k, {"peso": 0.0, "nomi": {}, "da": {}})
-            t["peso"] += contributo
-            t["nomi"][nome] = t["nomi"].get(nome, 0.0) + contributo
-            t["da"][v["chiave"]] = t["da"].get(v["chiave"], 0.0) + contributo
+            isin = c["isin"].get(nome)
+            radice(("nome", k))
+            if isin:
+                padre[radice(("isin", isin))] = radice(("nome", k))
+            righe_titoli.append((v, nome, k, isin, v["valore"] * peso / V_t))
+    titoli = {}
+    for v, nome, k, isin, contributo in righe_titoli:
+        t = titoli.setdefault(radice(("nome", k)), {"peso": 0.0, "nomi": {}, "da": {}, "isin": set()})
+        t["peso"] += contributo
+        t["nomi"][nome] = t["nomi"].get(nome, 0.0) + contributo
+        t["da"][v["chiave"]] = t["da"].get(v["chiave"], 0.0) + contributo
+        if isin:
+            t["isin"].add(isin)
     lista_titoli = [{"nome": max(t["nomi"], key=t["nomi"].get), "peso": t["peso"],
                      "da": [s for s, _ in sorted(t["da"].items(), key=lambda kv: -kv[1])],
-                     "diretto": all(s in diretti for s in t["da"])}
+                     "diretto": all(s in diretti for s in t["da"]), "isin": sorted(t["isin"])}
                     for t in sorted(titoli.values(), key=lambda t: -t["peso"])]
     return {"controvalore_totale": totale, "posizioni": [v for v, _ in con], "senza_composizione": senza,
             "composizioni_senza_posizione": senza_posizione,
