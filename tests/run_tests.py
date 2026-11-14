@@ -7455,6 +7455,12 @@ def t_t17_skill():
     nr = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.12.0")[0]
     assert "confronto" in nr.lower() and "anonimizzata" in nr and "--solo-dati" in nr
     assert "--anonimo" in comando
+    # fix round 1: il confronto si decide prima di archiviare, un errore di --precedente non perde la foto, il limite si dichiara
+    assert "prima di archiviare" in passo3 and "rilancia senza `--precedente`" in passo3, passo3[-1500:]
+    assert "ordine di grandezza del reddito" in passo and "ordine di grandezza del reddito" in comando
+    out = readme.split("### Output")[1].split("\n## ")[0]
+    assert "--anonimo" in out and "ordine di grandezza del reddito" in out and "senza nomi" not in out, out[-900:]
+    assert "nomi che hai dato a obiettivi e broker" in dati, dati[-1500:]
 
 
 @test("T16 look-through: il cruscotto riconosce il JSON, il bundle non porta posizioni né ISIN, la sezione in pagina")

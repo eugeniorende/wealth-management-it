@@ -33,7 +33,7 @@
 
 ## 2. Cosa è cambiato — dall'ultima revisione
 
-- **Rispetto alla revisione del [data]** (dal confronto del cruscotto): [le variazioni principali, con i numeri di `confronto`]
+- **Rispetto alla revisione del [data]** (dal confronto del cruscotto): [le variazioni principali, con i numeri di `confronto`] *(alla prima revisione, senza confronto, togli questa riga)*
 - **Versamenti**: ho versato € [—] contro i € [—] pianificati. [in linea / sotto / sopra]
 - **Drift dell'allocazione**: [quali classi si sono spostate, di quanto]
 - **Eventi della vita**: [variazioni di reddito, figli, casa, passaggio dipendente↔P.IVA, eredità… o "nessuno"]

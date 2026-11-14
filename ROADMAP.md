@@ -252,8 +252,8 @@ Il proprietario ha chiesto di completare le voci rimaste aperte: gli «sviluppi 
 ### Linea di taglio e rilascio della 0.13.0
 
 - Dentro: le ondate 0 e 1 del programma di completamento (dati già pubblicati; look-through e cruscotto). Skill: it-pianificazione-obiettivi 0.25, it-revisione 0.10, it-rebalance 0.8, it-pianificazione 0.14, it-pianificazione-autonomi 0.6, it-tax-optimization 0.11.
-- [ ] `release/0.13.0` da `develop` (versione nei manifest, sezione v0.13.0 del changelog al posto di «Non rilasciato», README e ROADMAP) → pull request su `main` con merge commit → tag `v0.13.0` dato dal proprietario → `release.yml` → merge back di `main` su `develop`.
 - [ ] Pull request del branch di lavoro su `develop`, prima del release branch.
+- [ ] `release/0.13.0` da `develop` (versione nei manifest, sezione v0.13.0 del changelog al posto di «Non rilasciato», README e ROADMAP) → pull request su `main` con merge commit → tag `v0.13.0` dato dal proprietario → `release.yml` → merge back di `main` su `develop`.
 - [ ] Prove manuali: installazione da un account senza accesso, caricamento in Cowork, pubblicazione del cruscotto come Artifact (anche della versione anonimizzata).
 - Freshness: nessun marcatore scade prima del 2027-06; il passo 1 di «Release» nel README chiede comunque di riverificarli.
 
