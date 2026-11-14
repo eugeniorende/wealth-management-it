@@ -387,7 +387,7 @@ Expected: FAIL sul confronto dei pesi.
 
 - [ ] **Step 4: Aggiorna `capitale-umano.py`**: i pesi del test; nel commento la data della scheda (30/10/2026) e, sulla stessa riga della fonte, `Verificato: AAAA-MM`. Aggiungi il file a `OBBLIGATI_FRESHNESS`, dopo `capitale-umano.md`.
 
-- [ ] **Step 5: Versione della skill e passo di rilascio.** `metadata.version: "0.25"` in `skills/it-pianificazione-obiettivi/SKILL.md`; README: `v0.25` nella tabella delle skill e, nel passo 1 di «Release», la frase `aggiornare PESI_MONDO di capitale-umano.py dalla scheda MSCI ACWI del mese, con il suo marcatore`; CHANGELOG: `#### v0.25 (plugin 0.13.0)` in testa a `### it-pianificazione-obiettivi`, con una riga sui pesi di ottobre 2026.
+- [ ] **Step 5: Versione della skill e passo di rilascio.** `metadata.version: "0.25"` in `skills/it-pianificazione-obiettivi/SKILL.md`; README: `v0.25` nella tabella delle skill e, nel passo 1 di «Release», la frase `aggiornare PESI_MONDO di capitale-umano.py dalla scheda MSCI ACWI del mese, con il suo marcatore`; CHANGELOG: `#### v0.25 (plugin 0.13.0)` in testa a `### it-pianificazione-obiettivi`, con una riga sui pesi di ottobre 2026. Due test esistenti cercano la versione vecchia nel testo della skill (`t_ce_documentazione` e `t_lt_documentazione`, `'version: "0.24"'`): diventa `'version: "0.25"'` in entrambi.
 
 - [ ] **Step 6: Lancia i test**
 
