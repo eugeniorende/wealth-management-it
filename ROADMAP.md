@@ -1,6 +1,6 @@
 # Roadmap
 
-Stato al 7/11/2026: 0.12.0 rilasciata il 7/11/2026 (PR #60 su `main`, tag `v0.12.0`, GitHub Release con lo zip, merge back PR #61), con T13 (PR #54), T15 capitale umano (PR #55 e #56), T17 cruscotto grafico (PR #57), T16 importatore della composizione degli ETF (PR #58) e il ciclo deciso l'1/11/2026 (PR #59: look-through del portafoglio, ponte e riscatto nel cruscotto, lingue tedesca e francese, file reali degli emittenti). Prima: 0.11.0 del 24/10/2026 (T9, T12, T14 e pre-pubblicazione) e 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11). Il repository è pubblico dal 24/10/2026, con un ruleset su `main` e `develop`; l'icona del plugin non si aggiunge. Restano al proprietario le prove di installazione da un account senza accesso e in Cowork, e la prova della pubblicazione del cruscotto come Artifact. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
+Stato al 14/11/2026: deciso il programma di completamento delle voci rimaste aperte (cinque ondate, tre rilasci: vedi «Programma di completamento» più sotto); l'ondata 0 è fatta sul branch di lavoro e aspetta il merge su `develop` (coefficienti di trasformazione 2027-2028, tasso di capitalizzazione 2026, pesi MSCI ACWI di ottobre, tabella dei dati normativi del README vincolata da un test). 0.12.0 rilasciata il 7/11/2026 (PR #60 su `main`, tag `v0.12.0`, GitHub Release con lo zip, merge back PR #61), con T13 (PR #54), T15 capitale umano (PR #55 e #56), T17 cruscotto grafico (PR #57), T16 importatore della composizione degli ETF (PR #58) e il ciclo deciso l'1/11/2026 (PR #59: look-through del portafoglio, ponte e riscatto nel cruscotto, lingue tedesca e francese, file reali degli emittenti). Prima: 0.11.0 del 24/10/2026 (T9, T12, T14 e pre-pubblicazione) e 0.10.0 del 22/10/2026 (ondata 0, T1-T8, T10, T11). Il repository è pubblico dal 24/10/2026, con un ruleset su `main` e `develop`; l'icona del plugin non si aggiunge. Restano al proprietario le prove di installazione da un account senza accesso e in Cowork, e la prova della pubblicazione del cruscotto come Artifact. La base è l'[audit di ottobre 2026](docs/audit-2026-10.md): 65 problemi confermati (11 di gravità alta, 40 media, 14 bassa), raccolti in 14 temi. Ogni voce cita gli ID dei finding. Il dettaglio (file e righe, evidenza, correzioni dei verificatori, fonti) è nel report.
 
 ## Decisioni
 
@@ -199,7 +199,7 @@ Prese il 20/10/2026.
   - [x] Integrazione in `it-revisione` (contratto di input e template).
   - [x] Test con valori chiusi, invarianti e il caso di Ibbotson et al. 2007.
   - [x] Gli otto minori della revisione finale: proiezione a tre contenitori con TFR e contributi trasferiti, orizzonte dei pensionati, P50, sensibilità in punti, `stato_sorpasso`, chiavi non riconosciute, mediana del Monte Carlo spiegata.
-  - Sviluppi successivi, da decidere: secondo reddito del nucleo; volatilità personale del reddito dall'estratto INPS (`importa-previdenza.py`); aggiustamento dei target (il capitale umano che modifica l'allocazione); polizza vita (Ibbotson et al. cap. 3; Chen et al. 2006).
+  - Sviluppi successivi, nel programma di completamento (ondate 2 e 4): secondo reddito del nucleo; volatilità personale del reddito dall'estratto INPS (`importa-previdenza.py`); aggiustamento dei target (il capitale umano che modifica l'allocazione); polizza vita (Ibbotson et al. cap. 3; Chen et al. 2006).
 - [x] **T17 Cruscotto grafico e Artifact** (P2, M): spec `docs/sviluppo/specs/2026-10-25-cruscotto-grafico-design.md`, piano `docs/sviluppo/piani/2026-10-25-cruscotto-grafico.md`.
   - [x] `ribilanciamento-multibroker.py --json`.
   - [x] `genera-cruscotto.py`: firme dei JSON, bundle minimo, errori espliciti.
@@ -208,11 +208,11 @@ Prese il 20/10/2026.
   - [x] Passo 6 di it-revisione e comando `/cruscotto`, con la conferma prima di pubblicare l'Artifact.
   - [ ] Prova manuale della pubblicazione in claude.ai e in Cowork alla prossima release.
   - [x] Ponte pensione e riscatto della laurea nella sezione Pensione del cruscotto (1/11/2026): i due JSON, prima riconosciuti e saltati, disegnano probabilità e capitale del ponte, RITA e costo permanente, oneri e rientro del riscatto.
-  - Sviluppi successivi, da decidere: confronto tra due revisioni; versione anonimizzata per la condivisione.
+  - Sviluppi successivi, nel programma di completamento (ondata 1): confronto tra due revisioni; versione anonimizzata per la condivisione.
 - [ ] **T16 Fonti dati esterne e connettori** (P2). Principio: gli script di calcolo restano offline; il dato si procura a parte (importatore su file, o Claude che lo scarica nella cartella di lavoro) e lo script legge un file locale. Per ogni fonte si annotano licenza (quelle a pagamento non si ridistribuiscono nel repository) e mese di verifica.
 
   - [x] **Composizione degli ETF** (alta priorità): spec `docs/sviluppo/specs/2026-10-25-composizione-etf-design.md`, piano `docs/sviluppo/piani/2026-10-25-composizione-etf.md`. `importa-composizione-etf.py` legge i file delle posizioni di iShares, Xtrackers, Vanguard, Amundi e SPDR (CSV o XLSX, italiano o inglese) e scrive `composizione.csv` per settore GICS e paese ISO; `capitale-umano.py` lo legge per la diagnosi 4, accanto al vecchio formato compilato a mano. Layout di Xtrackers e SPDR verificati su file reali il 25/10/2026; iShares (sito italiano, CSV), Vanguard (sito italiano, XLSX in ICB) e Amundi (sito italiano, «Composizione dell'indice» letta come file di ripartizione) su file reali forniti dal proprietario il 7/11/2026. Nello stesso giorno anche il «Fund Holdings» di Amundi (ETF a swap, replica sintetica segnalata) e il «Constituent» di Xtrackers dal sito tedesco. Restano da confermare: iShares dal sito britannico, Amundi dai siti tedesco e francese.
-  - [x] **Look-through del portafoglio** (evolutiva C, decisa l'1/11/2026): spec `docs/sviluppo/specs/2026-11-01-look-through-design.md`, piano `docs/sviluppo/piani/2026-11-01-look-through.md`. `look-through-portafoglio.py` aggrega settori, paesi e primi titoli su tutte le posizioni, pesati per controvalore, con la copertura per dimensione; le posizioni arrivano dall'estratto del broker (`importa-estratto-broker.py --json`) o dal `--dati` del capitale umano, con l'ISIN come chiave (`--isin` dell'importatore); `capitale-umano.py` legge il campo `isin`; l'importatore scrive le righe `titolo` (primi dieci, peso nel fondo); `--json` per `it-revisione` e sezione «Look-through» del cruscotto. Sviluppi successivi, da decidere: regioni come dimensione; ISIN dei titoli nel CSV per sommare senza la chiave del nome; valuta di denominazione.
+  - [x] **Look-through del portafoglio** (evolutiva C, decisa l'1/11/2026): spec `docs/sviluppo/specs/2026-11-01-look-through-design.md`, piano `docs/sviluppo/piani/2026-11-01-look-through.md`. `look-through-portafoglio.py` aggrega settori, paesi e primi titoli su tutte le posizioni, pesati per controvalore, con la copertura per dimensione; le posizioni arrivano dall'estratto del broker (`importa-estratto-broker.py --json`) o dal `--dati` del capitale umano, con l'ISIN come chiave (`--isin` dell'importatore); `capitale-umano.py` legge il campo `isin`; l'importatore scrive le righe `titolo` (primi dieci, peso nel fondo); `--json` per `it-revisione` e sezione «Look-through» del cruscotto. Sviluppi successivi, nel programma di completamento (ondata 1): regioni come dimensione; ISIN dei titoli nel CSV per sommare senza la chiave del nome; valuta di denominazione.
   - [x] **Lingue tedesca e francese** (1/11/2026): sinonimi delle intestazioni, dei settori GICS (con i nomi ICB esclusivi), dei paesi dei file reali, delle esclusioni e delle etichette della data per gli export di Xtrackers e Amundi dai siti tedesco e francese; solo dati nelle tabelle, nessun cambio al motore; verificato su file sintetici (`composizione-xtrackers-de.csv`, `composizione-amundi-fr.csv`), da confermare su un file reale come iShares, Vanguard e Amundi.
 
   | Priorità | Dato | Serve per | Fonte | Forma |
@@ -223,13 +223,31 @@ Prese il 20/10/2026.
   | Media | Parametri NASpI | `sostituzione_naspi` | Circolare INPS annuale sui massimali | Manuale, nella freshness |
   | Bassa | Volatilità delle retribuzioni per settore | `sigma_h` dei profili | ISTAT (retribuzioni contrattuali); Eurostat SES; Banca d'Italia SHIW | Calibrazione una tantum, citata nel CSV |
   | Bassa | Rendimenti azionari europei e mondiali | Correlazioni e bootstrap non solo USA | Kenneth French Data Library (gratuita); MSCI, DMS (a pagamento) | CSV sostitutivo di `rendimenti-storici.csv` |
-  | Bassa | Pesi settoriali dell'indice mondiale | `PESI_MONDO` di `capitale-umano.py` | Scheda MSCI ACWI | Manuale a ogni release |
+  | Bassa, fatta | Pesi settoriali dell'indice mondiale | `PESI_MONDO` di `capitale-umano.py` | Scheda MSCI ACWI | A ogni release, con marcatore |
 
 ### Linea di taglio e rilascio della 0.12.0
 
 - Dentro: T13, T15, T16 (importatore, look-through, lingue, file reali), T17 (cruscotto, ponte e riscatto). Skill: it-pianificazione-obiettivi 0.24, it-revisione 0.9, it-rebalance 0.8, it-pianificazione 0.13, it-pianificazione-autonomi 0.5, it-tax-optimization 0.11.
 - [x] `release/0.12.0` da `develop` il 7/11/2026 (versione nei manifest, sezione v0.12.0 del changelog, README e ROADMAP) → PR #60 su `main` con merge commit (`9119a7a`) → tag `v0.12.0` dato dal proprietario → `release.yml` (run 42378501167) verde, GitHub Release con lo zip di 92 file → merge back di `main` su `develop` con la PR #61.
 - Freshness: nessun marcatore scade prima del 2027-06, quindi `release.yml` è passato senza riverifiche.
+
+### Programma di completamento (deciso il 14/11/2026)
+
+Il proprietario ha chiesto di completare le voci rimaste aperte: gli «sviluppi successivi» di T15, T16 e T17, le righe ancora da fare della tabella delle fonti di T16 e i dati già usciti del calendario del README. Spec: `docs/sviluppo/specs/2026-11-14-completamento-roadmap-design.md`. Cinque ondate e tre rilasci, che sono obiettivi e non impegni; le ondate 2, 3 e 4 avranno ciascuna la propria spec prima del piano.
+
+- [x] **Ondata 0 — dati già pubblicati e igiene** (0.13.0), fatta il 14/11/2026 sul branch di lavoro, da unire a `develop`: piano `docs/sviluppo/piani/2026-11-14-ondata-0-dati-pubblicati.md`.
+  - [x] Coefficienti di trasformazione 2027-2028 (decreto direttoriale del 16/10/2026) in script, reference, skill e nei due Excel previdenziali.
+  - [x] Tasso di capitalizzazione 2026 (nota ISTAT del 16/10/2026) e anno corrente fissabile in `importa-previdenza.py`.
+  - [x] `PESI_MONDO` dalla scheda MSCI ACWI del 30/10/2026, con il marcatore obbligatorio.
+  - [x] Tabella «Stato dei dati normativi» del README vincolata da un test.
+- [ ] **Ondata 1 — cruscotto e look-through** (0.13.0, entro metà dicembre 2026): piani `docs/sviluppo/piani/2026-11-14-ondata-1-look-through.md` e `docs/sviluppo/piani/2026-11-14-ondata-1-cruscotto.md`.
+  - [ ] Look-through: regioni come dimensione, ISIN dei titoli in `composizione.csv`, valuta di denominazione.
+  - [ ] Cruscotto: archivio e confronto tra due revisioni, versione anonimizzata per la condivisione.
+- [ ] **Ondata 2 — capitale umano, il modello** (0.14.0): volatilità personale del reddito dall'estratto INPS; secondo reddito del nucleo.
+- [ ] **Ondata 3 — calibrazione e parametri 2027** (0.14.0, da febbraio 2027, quando sono uscite le circolari INPS): `R_F`, `p_u` e `durata_anni`, NASpI, `sigma_h`, rendimenti azionari non USA, parametri 2027 del calendario.
+- [ ] **Ondata 4 — postura** (0.15.0, prima di giugno 2027 o dopo la riverifica dei marcatori): polizza vita; aggiustamento dei target, che aspetta dal proprietario la decisione sulla postura.
+
+Fuori dal programma, perché non si chiudono con il lavoro: le riverifiche di giugno e ottobre 2027, la citazione principale sul testo unico nuovo quando la prassi dell'Agenzia lo segue, i correttivi del D.Lgs. 117/2026. Restano nel calendario del README.
 
 ## Fuori dal codice
 

@@ -7389,6 +7389,18 @@ def t_tabella_dati_normativi():
         assert f"| `{rel}` |" in r.stdout, f"{rel} assente dalla tabella"
 
 
+# Il nome non contiene la parola del filtro: la CI delle PR lancia la suite con --skip su quella parola,
+# e questo test deve girare lì (la tabella dipende dai marcatori, non dalla data di oggi).
+@test("igiene: la tabella «Stato dei dati normativi» del README è quella generata dal runner")
+def t_tabella_dati_normativi_readme():
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    marcatore = "<!-- generata con: python tests/run_tests.py --tabella-freshness -->"
+    assert marcatore in readme, "README senza la tabella dello stato dei dati normativi"
+    nel_readme = readme.split(marcatore)[1].strip().split("\n\n")[0].strip()
+    assert nel_readme == tabella_freshness(), ("la tabella del README è diversa da quella generata: "
+                                               "rigenerarla con python tests/run_tests.py --tabella-freshness")
+
+
 # ═══════════════════════ T14: authoring, documentazione e packaging ═══════════════════════
 
 def _frontmatter(path):

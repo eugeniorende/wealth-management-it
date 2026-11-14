@@ -71,7 +71,7 @@ La suite di test protegge la meccanica di calcolo di tutti gli script:
 python tests/run_tests.py
 ```
 
-La suite conta 186 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007), l'importatore della composizione degli ETF (layout sintetici dei cinque emittenti, esclusioni, fusione del CSV), il look-through del portafoglio (valori chiusi, chiave dei titoli, sezione del cruscotto) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
+La suite conta 187 test (il numero è l'unico nel README e un test di igiene lo confronta con i decoratori `@test` del runner) e gira in meno di un minuto, con le dipendenze dei Prerequisiti e, per i test che ricalcolano gli Excel, LibreOffice. Coprono: igiene del repo e della CI (manifest, pipe nei workflow, disclaimer nei comandi, valori normativi superati), compilazione, parser previdenziali su fixture sintetiche, valori chiusi (proiezione INPS, netto pensione, detrazione pensionati nell'Excel), invarianti di allocatore, Monte Carlo e bootstrap, gli Excel ricalcolati in locale italiano (nessuna cella in errore, cache aggiornate), le regressioni dei bug trovati con l'uso e con l'audit, la lente del capitale umano (valori chiusi, Monte Carlo riproducibile, il caso di Ibbotson et al. 2007), l'importatore della composizione degli ETF (layout sintetici dei cinque emittenti, esclusioni, fusione del CSV), il look-through del portafoglio (valori chiusi, chiave dei titoli, sezione del cruscotto) e la freshness dei dati normativi. Diverse regressioni sono state validate per mutazione: rompendo deliberatamente il codice, i test falliscono.
 
 ### Copertura degli strumenti
 
@@ -121,7 +121,6 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 <!-- generata con: python tests/run_tests.py --tabella-freshness -->
 | File | Verificato | Valido fino a |
 |---|---|---|
-| `it-pianificazione/assets/proiezione-inps.py` | 2026-06 | 2027-06 |
 | `it-tax-optimization/references/aliquote-12-5-26.md` | 2026-06 | 2027-06 |
 | `it-tax-optimization/references/etf-trap-redditi-capitale.md` | 2026-06 | 2027-06 |
 | `it-tax-optimization/references/regime-dichiarativo.md` | 2026-06 | 2027-06 |
@@ -131,8 +130,10 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 | `it-pianificazione-autonomi/references/fiscalita-forfettario.md` | 2026-10 | 2027-10 |
 | `it-pianificazione-autonomi/references/previdenza-gestione-separata.md` | 2026-10 | 2027-10 |
 | `it-pianificazione-obiettivi/references/asset-location.md` | 2026-10 | 2027-10 |
+| `it-pianificazione-obiettivi/references/capitale-umano.md` | 2026-10 | 2027-10 |
 | `it-pianificazione/SKILL.md` | 2026-10 | 2027-10 |
-| `it-pianificazione/assets/importa-previdenza.py` | 2026-10 | 2027-10 |
+| `it-pianificazione/assets/proiezione-inps.py` | 2026-10 | 2027-10 |
+| `it-pianificazione/assets/riscatto-laurea.py` | 2026-10 | 2027-10 |
 | `it-pianificazione/references/previdenza-complementare.md` | 2026-10 | 2027-10 |
 | `it-pianificazione/references/previdenza-obbligatoria.md` | 2026-10 | 2027-10 |
 | `it-rebalance/SKILL.md` | 2026-10 | 2027-10 |
@@ -146,19 +147,25 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 | `it-tax-optimization/references/mappa-nuovo-tuir.md` | 2026-10 | 2027-10 |
 | `it-tax-optimization/references/multi-intermediario.md` | 2026-10 | 2027-10 |
 | `it-tax-optimization/references/successione-donazione.md` | 2026-10 | 2027-10 |
+| `it-pianificazione-obiettivi/assets/capitale-umano.py` | 2026-11 | 2027-11 |
+| `it-pianificazione/assets/importa-previdenza.py` | 2026-11 | 2027-11 |
 
-**Calendario dei parametri da riverificare** (stato a ottobre 2026):
+**Calendario dei parametri da riverificare** (stato a novembre 2026):
 
 | Quando | Cosa | Dove nel plugin |
 |---|---|---|
+| a ogni release | Pesi settoriali MSCI ACWI, dalla scheda mensile dell'indice | `capitale-umano.py` |
 | dicembre 2026 | Legge di bilancio 2027: IRPEF, plafond del fondo pensione, cripto, bollo, Tobin tax | SKILL.md e reference di it-tax-optimization, it-pianificazione, it-rebalance; `netto-pensione.py` |
-| entro fine 2026 | Decreto sui coefficienti di trasformazione 2027-2028 (il precedente è del 20/11/2024) | `previdenza-obbligatoria.md`, foglio Coefficienti di `proiezione-pensione.xlsx`, `proiezione-inps.py` |
+| quando esce | Gazzetta Ufficiale con il decreto del 16/10/2026 sui coefficienti 2027-2028: aggiungere gli estremi alla citazione | `previdenza-obbligatoria.md`, foglio Coefficienti dei due Excel |
 | 1° gennaio 2027 | Nuovi testi unici (TUIR D.Lgs. 117/2026 e collegati): cambiano gli articoli citati. Le doppie citazioni ci sono già, verificate su Normattiva il 22/10/2026; restano due punti aperti nella mappa (rinvii del DM 21/02/2013, probabile refuso dell'art. 306 c. 6) | `it-tax-optimization/references/mappa-nuovo-tuir.md` |
 | gennaio 2027 | Aggiornamento annuale della serie Damodaran e della CPI USA di dicembre 2026 (BLS, colonna inflazione) | `rendimenti-storici.csv` (due copie identiche) |
 | gennaio-febbraio 2027 | Circolari INPS su massimale, minimale e prima fascia 2027; aliquote della Gestione Separata | it-pianificazione, it-pianificazione-autonomi |
 | 2027-2028 | Requisiti di pensione già noti (Circ. INPS 28/2026), da applicare alla data | `previdenza-obbligatoria.md`, `previdenza-gestione-separata.md` |
 | giugno-luglio 2027 | Scadono i marcatori di giugno-luglio 2026: suite completa e workflow di release falliscono finché non si riverifica | tabella sopra |
 | ottobre 2027 | Scadono i marcatori di ottobre 2026 | tabella sopra |
+| ottobre-novembre 2027 | Tasso di capitalizzazione 2027 (nota ISTAT) | `importa-previdenza.py`, `previdenza-obbligatoria.md` |
+| novembre 2027 | Scadono i marcatori di novembre 2026 | tabella sopra |
+| autunno 2028 | Decreto sui coefficienti di trasformazione 2029-2030 (l'ultimo è del 16/10/2026) | `previdenza-obbligatoria.md`, foglio Coefficienti dei due Excel, `proiezione-inps.py`, `ponte-pensione.py` |
 
 ### Changelog
 
