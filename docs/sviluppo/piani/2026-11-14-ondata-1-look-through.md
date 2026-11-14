@@ -534,3 +534,7 @@ Expected: tutti i test passati, nessuno saltato.
 git add skills README.md CHANGELOG.md ROADMAP.md tests/run_tests.py
 git commit -m "docs: regioni, ISIN dei titoli e valuta in reference, skill, README, CHANGELOG e ROADMAP (T16)"
 ```
+
+### Chiusura
+
+Prima del merge su `develop`: la revisione finale prevista dal modo di esecuzione scelto e, se il proprietario la chiede, la revisione avversariale del repository (`docs/sviluppo/workflows/review-tema-roadmap.js`, § 4 di `HANDOFF.md`). Le correzioni vanno in un commit a parte, che ne riporta l'esito. La pull request si apre quando il proprietario la chiede.

@@ -109,7 +109,7 @@ Expected: FAIL con `AttributeError: … has no attribute 'COEFF_VIGENTI'`.
 Run: `python3 tests/run_tests.py --only "coefficienti 2027-2028"`, poi `--only "riscatto della laurea"`, poi `--only "rami avanzati"`
 Expected: PASS.
 Run: la suite completa (vedi Global Constraints).
-Expected: falliscono solo i test che il Task 3 rimette a posto, se ce ne sono (Excel contro script), e i due test di igiene del README. Annota i nomi: ogni altro fallimento è un valore chiuso che dipende dal coefficiente e va ricalcolato qui, non lasciato rosso.
+Expected: possono fallire solo tre gruppi, da annotare per nome: i due test di igiene del README (li chiude lo Step 9), i test che confrontano una reference con uno script (li chiude il Task 2) e quelli che confrontano la tabella dell'Excel con lo script (li chiude il Task 3). Ogni altro fallimento è un valore chiuso che dipende dal coefficiente: va ricalcolato qui, non lasciato rosso.
 
 - [ ] **Step 9: Aggiorna README (conteggio e tabella dei test) e fai il commit**
 
@@ -362,7 +362,7 @@ git commit -m "feat: tasso di capitalizzazione 2026 (nota ISTAT 16/10/2026), ann
 **Interfaces:**
 - Produces: `PESI_MONDO` con i pesi della scheda del 30/10/2026; `it-pianificazione-obiettivi/assets/capitale-umano.py` in `OBBLIGATI_FRESHNESS`.
 
-- [ ] **Step 1: Rileggi la scheda MSCI ACWI** (sezione «Sector Weights»). Se è uscita quella di novembre, usa quella e aggiorna valori e data nel test.
+- [ ] **Step 1: Rileggi la scheda MSCI ACWI** (sezione «Sector Weights»). Se è uscita quella di novembre, usa quella e aggiorna valori e data nel test. Se la scheda non si raggiunge, il task si ferma qui: i pesi restano quelli di settembre, senza marcatore e senza la voce in `OBBLIGATI_FRESHNESS`, e la voce si segnala al proprietario (spec §6.3).
 
 - [ ] **Step 2: Scrivi il test**
 
@@ -456,3 +456,7 @@ Expected: tutti i test passati, nessuno saltato.
 git add README.md CHANGELOG.md ROADMAP.md tests/run_tests.py
 git commit -m "docs: tabella della freshness vincolata da un test, calendario, changelog e programma in ROADMAP"
 ```
+
+### Chiusura
+
+Prima del merge su `develop`: la revisione finale prevista dal modo di esecuzione scelto e, se il proprietario la chiede, la revisione avversariale del repository (`docs/sviluppo/workflows/review-tema-roadmap.js`, § 4 di `HANDOFF.md`). Le correzioni vanno in un commit a parte, che ne riporta l'esito. La pull request si apre quando il proprietario la chiede.
