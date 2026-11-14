@@ -516,16 +516,19 @@ footer .fonti { color: var(--muto); }
   function sezioneLookThrough(l) {
     if (!l) return null;
     var s = sezione("look_through", "Look-through",
-      "Cosa contengono gli ETF messi insieme, pesati per controvalore: settori, paesi e primi titoli. I pesi sono sulla parte coperta; la copertura è la quota del controvalore che ha quella dimensione.");
+      "Cosa contengono gli ETF messi insieme, pesati per controvalore: settori, regioni, paesi, valute e primi titoli. I pesi sono sulla parte coperta; la copertura è la quota del controvalore che ha quella dimensione.");
     if (l.n_senza_composizione > 0) {
       s.appendChild(el("p", { class: "nota", testo: l.n_senza_composizione + (l.n_senza_composizione === 1 ? " posizione senza composizione" : " posizioni senza composizione") +
         " su " + l.n_posizioni + " (" + pct(l.quota_senza_composizione) + " del controvalore): non entra nei pesi." }));
     }
     var fmt = function (v) { return pct(v); };
-    [["Settori", "settori", "Settori aggregati del portafoglio"], ["Paesi", "paesi", "Paesi aggregati del portafoglio"]].forEach(function (d) {
+    [["Settori", "settori", "Settori aggregati del portafoglio"], ["Regioni", "regioni", "Regioni aggregate del portafoglio"],
+     ["Paesi", "paesi", "Paesi aggregati del portafoglio"], ["Valute", "valute", "Valute aggregate del portafoglio"]].forEach(function (d) {
+      if (!l[d[1]]) return;      // un JSON della 0.12.0 non ha regioni né valute: il grafico manca
       s.appendChild(el("h3", { testo: d[0] + " (copertura " + pct(l.copertura[d[1]]) + ")" }));
       if (l[d[1]].length) s.appendChild(barre(l[d[1]].map(function (x) { return { nome: x.nome, valore: x.peso }; }), fmt, d[2]));
       else s.appendChild(el("p", { class: "nota", testo: "Nessuna posizione con " + d[0].toLowerCase() + " nella composizione." }));
+      if (d[1] === "valute" && ok(l.quota_euro)) s.appendChild(el("p", { class: "nota", testo: "In euro: " + pct(l.quota_euro) + " della parte coperta." }));
     });
     s.appendChild(el("h3", { testo: "Primi titoli (copertura " + pct(l.copertura.titoli) + ")" }));
     if (l.titoli.length) {

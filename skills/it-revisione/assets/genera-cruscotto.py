@@ -165,7 +165,9 @@ def _allocazione(alloc, rib):
 
 def _look_through(lt):
     """Solo gli aggregati del look-through: le posizioni dell'utente (nomi, ISIN) restano fuori dalla pagina,
-    ne passa il numero e la quota di quelle senza composizione. Paesi oltre i primi dieci sommati in «altri»."""
+    ne passa il numero e la quota di quelle senza composizione. Paesi oltre i primi dieci sommati in «altri», valute oltre le
+    prime otto in «altre N valute». Regioni, valute e quota in euro sono facoltative (un JSON della 0.12.0 non le ha): se
+    mancano valgono None e la pagina salta i due grafici. Gli ISIN dei titoli non passano."""
     if not lt:
         return None
     f, d = lt
@@ -175,13 +177,23 @@ def _look_through(lt):
     paesi, altri = voci("paesi")[:10], voci("paesi")[10:]
     if altri:
         paesi.append({"nome": f"altri {len(altri)} paesi", "peso": sum(p["peso"] for p in altri)})
+    valute = voci("valute") if "valute" in d else None
+    if valute is not None and len(valute) > 8:
+        resto = valute[8:]
+        valute = valute[:8] + [{"nome": f"altre {len(resto)} valute", "peso": sum(v["peso"] for v in resto)}]
+    copertura = {k: numero_di(d, f"copertura.{k}", f) for k in ("settori", "paesi", "titoli")}
+    for k in ("regioni", "valute"):
+        if k in d:
+            copertura[k] = numero_di(d, f"copertura.{k}", f)
     senza = lista_di(d, "senza_composizione", f)
     # i titoli «diretti» sono posizioni dell'utente descritte a mano: restano fuori dalla pagina, se ne dice il numero
     n_report = numero_di(d, "n_titoli_report", f)
     titoli = [t for t, x in zip(voci("titoli"), lista_di(d, "titoli", f)) if not x.get("diretto")]
     return {
-        "copertura": {k: numero_di(d, f"copertura.{k}", f) for k in ("settori", "paesi", "titoli")},
-        "settori": voci("settori"), "paesi": paesi, "titoli": titoli[:n_report],
+        "copertura": copertura,
+        "settori": voci("settori"), "regioni": voci("regioni") if "regioni" in d else None, "paesi": paesi,
+        "valute": valute, "quota_euro": numero_di(d, "quota_euro", f, nullo=True) if "quota_euro" in d else None,
+        "titoli": titoli[:n_report],
         "n_titoli_diretti": len(voci("titoli")) - len(titoli),
         "quota_primi_titoli": numero_di(d, "quota_primi_titoli", f),
         "n_posizioni": len(lista_di(d, "posizioni", f)) + len(senza),
@@ -357,8 +369,10 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - allocazione: target_aggregato {azioni, obbligazioni, liquidita, totale} | None, capitale, obiettivi
       [{nome, profilo, tipo, richiesto, allocato, peso_az}], classi [{classe, peso, target, tight, wide,
       fuori_banda, risultante}] | None (dal ribilanciamento);
-    - look_through: copertura {settori, paesi, titoli}, settori e titoli [{nome, peso}] (i titoli delle posizioni dirette
-      esclusi, contati in n_titoli_diretti), paesi [{nome, peso}] con «altri N paesi» oltre i primi dieci,
+    - look_through: copertura {settori, paesi, titoli, e regioni, valute se il JSON le ha}, settori e titoli [{nome, peso}]
+      (i titoli delle posizioni dirette esclusi, contati in n_titoli_diretti), paesi [{nome, peso}] con «altri N paesi»
+      oltre i primi dieci, regioni [{nome, peso}] | None, valute [{nome, peso}] | None (le prime otto, poi «altre N valute»),
+      quota_euro (quota in euro della parte coperta dalle valute) | None; senza le chiavi nuove, None;
       quota_primi_titoli, n_posizioni, n_senza_composizione, quota_senza_composizione;
     - obiettivi: modello, n_sim, obiettivi [{nome, profilo, priorita, anni, target_oggi, target_nominale, gia,
       probabilita_successo, capitale_finale {p10, mediana, p90}, versamento_deterministico,

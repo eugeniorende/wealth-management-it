@@ -6425,7 +6425,7 @@ def _json_esempio():
             ("broker-lt.json", asset("it-tax-optimization", "importa-estratto-broker.py"),
              [os.path.join(FIXTURES, "estratto-look-through.csv"), "--anno", "2026"]),
             ("lt.json", OB("look-through-portafoglio.py"),
-             ["--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"), "--posizioni", "broker-lt.json"]),
+             ["--composizione", os.path.join(FIXTURES, "composizione-look-through-v5.csv"), "--posizioni", "broker-lt.json"]),
         ]
         for nome, script, args in lanci:
             rc, out = run_script(script, *args, "--json", nome, cwd=tmp)
@@ -6747,11 +6747,23 @@ def t_lt_cruscotto():
     assert rc == 0, se[-300:]
     lt, r = b["look_through"], json.load(open(js["lt.json"], encoding="utf-8"))
     assert set(lt) == {"copertura", "settori", "paesi", "titoli", "quota_primi_titoli", "n_posizioni", "n_senza_composizione",
-                       "quota_senza_composizione", "n_titoli_diretti"}, set(lt)
+                       "quota_senza_composizione", "n_titoli_diretti", "regioni", "valute", "quota_euro"}, set(lt)
     assert lt["settori"][0] == {"nome": "Finanza", "peso": r["settori"][0]["peso"]} and lt["n_senza_composizione"] == 1
     assert lt["paesi"][0]["nome"] == "Stati Uniti" and lt["titoli"][0]["nome"] == "Apple Inc." and lt["n_posizioni"] == 4
     for vietato in ("IE00B4L5Y983", "DE0007164600", "SAP SE", "iShares Core MSCI World", "BTP Futura"):
         assert vietato not in html, vietato
+    assert lt["regioni"][0] == {"nome": "Nord America", "peso": r["regioni"][0]["peso"]} and lt["valute"][0]["nome"] == "Dollaro USA"
+    assert lt["quota_euro"] == r["quota_euro"] and set(lt["copertura"]) == {"settori", "paesi", "titoli", "regioni", "valute"}
+    assert "US0000000011" not in html and "US0000000011" not in json.dumps(b), "l'ISIN di un titolo è finito nella pagina"
+    # un JSON della 0.12.0, senza le chiavi nuove: accettato, i due grafici mancano
+    def come_prima(d):
+        for k in ("regioni", "valute", "quota_euro"):
+            d.pop(k)
+        d["copertura"] = {k: d["copertura"][k] for k in ("settori", "paesi", "titoli")}
+        for t in d["titoli"]:
+            t.pop("isin")
+    rc, _, se, b_v, html_vecchio = _cruscotto(_json_variante("lt.json", come_prima))
+    assert rc == 0 and b_v["look_through"]["regioni"] is None and b_v["look_through"]["valute"] is None, se[-300:]
     assert "lt.json → look_through" in so and "look_through" in so.split("Sezioni:")[1], so
     # revisione finale I1: una posizione diretta descritta a mano con una riga «titolo» è una posizione dell'utente e non
     # entra nella pagina; M3: N_TITOLI_REPORT taglia la lista e la quota insieme
@@ -6787,10 +6799,14 @@ def t_lt_cruscotto():
         try:
             page, errori, eccezioni, _ = _apri_cruscotto(br, html)
             assert errori == [] and eccezioni == [], (errori, eccezioni)
-            assert page.locator("#sez-look_through svg").count() >= 2
+            assert page.locator("#sez-look_through svg").count() >= 5        # settori, regioni, paesi, valute, primi titoli
             testo = page.inner_text("#sez-look_through")
             assert "1 posizione senza composizione" in testo and "minimo della concentrazione" in testo, testo[:800]
             assert formato_it_percento(lt["copertura"]["settori"]) in testo, testo[:800]
+            assert "Regioni (copertura" in testo and "Valute (copertura" in testo and "In euro:" in testo, testo[:1200]
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_vecchio)
+            testo = page.inner_text("#sez-look_through")
+            assert errori == [] and eccezioni == [] and "Regioni (copertura" not in testo and "Valute (copertura" not in testo, testo[:600]
             page, errori, eccezioni, _ = _apri_cruscotto(br, html_dirette)
             testo = page.inner_text("#sez-look_through")
             assert errori == [] and "2 titoli di posizioni dirette non mostrati" in testo and "BTP" not in testo, testo[-600:]
