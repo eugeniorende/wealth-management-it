@@ -14,13 +14,16 @@ Artifact su claude.ai, ma solo se l'utente lo chiede (vedi SKILL.md, «Cruscotto
 Uso (dalla cartella di lavoro):
     python "${CLAUDE_SKILL_DIR}/assets/genera-cruscotto.py" --from alloc.json --from mc.json ... \
         [-o cruscotto.html] [--json bundle.json] [--data AAAA-MM-GG] \
-        [--archivia [CARTELLA]] [--solo-dati] [--precedente FILE|CARTELLA]
+        [--archivia [CARTELLA]] [--solo-dati] [--precedente FILE|CARTELLA] [--anonimo]
 
 Archivio: --archivia scrive anche il bundle in CARTELLA/cruscotto-AAAA-MM-GG.json (default revisioni/, creata
 se manca; la data è quella di generato_il, e un secondo lancio nello stesso giorno sovrascrive la foto del
 giorno). --solo-dati compone, archivia e legge la revisione precedente senza scrivere la pagina (vuole --json o
 --archivia, non accetta -o). --precedente indica la revisione con cui confrontare: un bundle, una pagina
 generata dal plugin o una cartella di foto (si prende la più recente con data precedente a quella corrente).
+Versione anonimizzata: --anonimo scrive (di default in cruscotto-anonimo.html) una pagina da mostrare ad altri, senza
+importi in euro (diventano un indice, un solo fattore per tutta la pagina), senza nomi di obiettivi, broker e file e senza
+i testi liberi. Non si usa con --archivia: l'archivio serve al confronto e tiene gli importi veri.
 
 ONESTÀ METODOLOGICA
 - Il cruscotto disegna i numeri degli script, non ne calcola di nuovi: ogni valore della pagina
@@ -33,6 +36,7 @@ Questo strumento è educativo e non costituisce consulenza finanziaria o fiscale
 """
 
 import argparse
+import copy
 import datetime
 import json
 import math
@@ -406,7 +410,8 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - confronto: None, o con --precedente {data_precedente, plugin_precedente, versioni_diverse, voci [{sezione, id,
       etichetta, formato, prima, ora, delta, delta_rel}], obiettivi [{nome, stato, probabilita, gia, versamento}]}
       (vedi confronta());
-    - anonimo: None (lo compila la versione anonimizzata).
+    - anonimo: None, o nella versione anonimizzata {base, obiettivi, broker}: l'etichetta della base dell'indice (None se la
+      pagina non ha importi) e quanti nomi di obiettivi e di broker sono stati sostituiti (vedi anonimizza()).
     Una sezione senza fonte è None. ErroreDati per un campo mancante, con il file e la chiave."""
     s = sorgenti.get
     bundle = {
@@ -580,6 +585,233 @@ def confronta(prima, ora):
             "versioni_diverse": plugin_prima != plugin_ora, "voci": voci, "obiettivi": _confronta_obiettivi(prima, ora)}
 
 
+# ═══════════════════════════ LA VERSIONE ANONIMIZZATA ═══════════════════════════
+
+# Ogni campo numerico del bundle è dichiarato qui: importo in euro o no. Il percorso ha i punti tra le chiavi, «[]» per
+# gli elementi di una lista e «{}» per i valori di un dizionario a chiavi libere (CHIAVI_LIBERE). Un campo numerico
+# aggiunto al bundle e non dichiarato è un errore del test T17: non può portare un importo nella pagina anonima per
+# dimenticanza. Nel dubbio si guarda come il template stampa il campo: euro(...) vuol dire importo.
+CAMPI_EURO = frozenset({
+    "allocazione.capitale",
+    "allocazione.target_aggregato.azioni", "allocazione.target_aggregato.obbligazioni",
+    "allocazione.target_aggregato.liquidita", "allocazione.target_aggregato.totale",
+    "allocazione.obiettivi[].richiesto", "allocazione.obiettivi[].allocato",
+    "obiettivi.obiettivi[].target_oggi", "obiettivi.obiettivi[].target_nominale", "obiettivi.obiettivi[].gia",
+    "obiettivi.obiettivi[].versamento_deterministico", "obiettivi.obiettivi[].versamento_confidenza",
+    "obiettivi.obiettivi[].capitale_finale.p10", "obiettivi.obiettivi[].capitale_finale.mediana",
+    "obiettivi.obiettivi[].capitale_finale.p90",
+    "obiettivi.totale_versamento_deterministico", "obiettivi.totale_versamento_confidenza",
+    "glide_path.obiettivi[].capitale_proiettato[]",
+    "pensione.inps.pensione_inps_lorda_annua", "pensione.inps.montante_finale", "pensione.inps.ral_finale",
+    "pensione.montante_fp.p10", "pensione.montante_fp.mediana", "pensione.montante_fp.p90",
+    "pensione.netto.netto_ultimo_stipendio", "pensione.netto.netto_pensione_inps",
+    "pensione.netto.scenari[].pensione_netta_totale",
+    "pensione.ponte.capitale_ponte", "pensione.ponte.costo_permanente_lordo_annuo",
+    "pensione.ponte.capitale_necessario.85%", "pensione.ponte.capitale_necessario.95%", "pensione.ponte.rita.rata_netta",
+    "pensione.riscatto.onere_agevolato", "pensione.riscatto.onere_ordinario", "pensione.riscatto.costo_netto",
+    "pensione.riscatto.rata_mensile", "pensione.riscatto.delta_pensione_lorda_annua",
+    "capitale_umano.voci[].valore", "capitale_umano.proiezione[].F", "capitale_umano.proiezione[].HC",
+    "fiscalita.totali.totale_valore", "fiscalita.totali.zainetto_26_equivalente", "fiscalita.totali.zainetto_in_scadenza",
+    "fiscalita.totali.zainetto_scaduto", "fiscalita.totali.plus_latenti_compensabili",
+    "fiscalita.totali.plus_realizzabili_a_costo_zero", "fiscalita.totali.imposta_risparmiabile",
+    "fiscalita.per_broker.{}.plus_latenti_compensabili", "fiscalita.per_broker.{}.zainetto_26_equivalente",
+    "fiscalita.per_broker.{}.zainetto_in_scadenza", "fiscalita.per_broker.{}.plus_realizzabili_a_costo_zero",
+    "fiscalita.per_broker.{}.imposta_risparmiabile",
+    "fiscalita.zainetto[].importo_26_equivalente",
+    "ribilanciamento.totale", "ribilanciamento.totale_post", "ribilanciamento.imposta", "ribilanciamento.prelievo",
+    "ribilanciamento.zainetto.{}", "ribilanciamento.ordini[].importo_eur", "ribilanciamento.ordini[].imposta_eur",
+    "confronto.obiettivi[].gia.prima", "confronto.obiettivi[].gia.ora", "confronto.obiettivi[].gia.delta",
+    "confronto.obiettivi[].versamento.prima", "confronto.obiettivi[].versamento.ora", "confronto.obiettivi[].versamento.delta",
+})
+CAMPI_NON_EURO = frozenset({
+    "versione",
+    "allocazione.classi[].peso", "allocazione.classi[].target", "allocazione.classi[].tight", "allocazione.classi[].wide",
+    "allocazione.classi[].risultante", "allocazione.obiettivi[].peso_az",
+    "look_through.copertura.settori", "look_through.copertura.paesi", "look_through.copertura.titoli",
+    "look_through.copertura.regioni", "look_through.copertura.valute",
+    "look_through.settori[].peso", "look_through.regioni[].peso", "look_through.paesi[].peso",
+    "look_through.valute[].peso", "look_through.titoli[].peso", "look_through.quota_euro",
+    "look_through.quota_primi_titoli", "look_through.n_titoli_diretti", "look_through.n_posizioni",
+    "look_through.n_senza_composizione", "look_through.quota_senza_composizione",
+    "obiettivi.n_sim", "obiettivi.obiettivi[].anni", "obiettivi.obiettivi[].probabilita_successo",
+    "obiettivi.obiettivi[].confidenza",
+    "glide_path.anni[]", "glide_path.portafoglio[]", "glide_path.obiettivi[].quota_azionaria[]",
+    "pensione.inps.eta_pensionamento", "pensione.inps.anni_al_pensionamento",
+    "pensione.tasso_lordo.p10", "pensione.tasso_lordo.mediana", "pensione.tasso_lordo.p90",
+    "pensione.target", "pensione.prob_target",
+    "pensione.netto.scenari[].tasso_sostituzione_netto", "pensione.netto.scenari[].tasso_sostituzione_lordo",
+    "pensione.ponte.eta_uscita", "pensione.ponte.eta_pensione_vecchiaia", "pensione.ponte.anni_ponte",
+    "pensione.ponte.probabilita_successo", "pensione.ponte.rita.eta_inizio",
+    "pensione.riscatto.anni_riscatto", "pensione.riscatto.rate_mensili", "pensione.riscatto.eta_pensionamento",
+    "pensione.riscatto.anni_per_rientrare", "pensione.riscatto.eta_anticipata_senza_riscatto",
+    "pensione.riscatto.eta_anticipata_con_riscatto",
+    "capitale_umano.esposizione_finanziaria", "capitale_umano.esposizione_totale", "capitale_umano.eta_sorpasso",
+    "capitale_umano.proiezione[].eta", "capitale_umano.proiezione[].esposizione", "capitale_umano.proiezione[].p10",
+    "capitale_umano.proiezione[].p90", "capitale_umano.settore.quota_settore_fin", "capitale_umano.settore.peso_mondo",
+    "fiscalita.zainetto[].anno", "fiscalita.avvisi_omessi",
+    "ribilanciamento.drift.{}.peso", "ribilanciamento.drift.{}.target", "ribilanciamento.drift.{}.drift",
+    "ribilanciamento.drift.{}.tight", "ribilanciamento.drift.{}.wide", "ribilanciamento.risultante.{}",
+    "confronto.voci[].delta_rel",
+    "confronto.obiettivi[].probabilita.prima", "confronto.obiettivi[].probabilita.ora",
+    "confronto.obiettivi[].probabilita.delta",
+})
+# Importi solo se il campo «formato» dello stesso oggetto è «euro»: gli indicatori e le voci del confronto sono di
+# formati diversi (euro, percento).
+CAMPI_EURO_SE_FORMATO = ("indicatori[].valore", "confronto.voci[].prima", "confronto.voci[].ora", "confronto.voci[].delta")
+# Dizionari le cui chiavi sono nomi dell'utente o classi: nel percorso la chiave diventa «{}».
+CHIAVI_LIBERE = frozenset({"fiscalita.per_broker", "ribilanciamento.zainetto", "ribilanciamento.drift",
+                           "ribilanciamento.risultante"})
+# Importi lordi che la versione anonima azzera: mai il lordo e il netto della stessa grandezza (l'IRPEF è progressiva e
+# pubblica: il rapporto tra netto e lordo farebbe stimare il livello del reddito). Il riscatto, importo di legge, si
+# azzera per intero (ogni suo campo in euro).
+CAMPI_LORDI = frozenset({"pensione.inps.pensione_inps_lorda_annua", "pensione.inps.montante_finale",
+                         "pensione.inps.ral_finale"})
+# Le basi dell'indice, in ordine di preferenza: (etichetta, percorso nel bundle).
+BASI_INDICE = (
+    ("capitale allocato", ("allocazione", "capitale")),
+    ("valore in portafoglio", ("fiscalita", "totali", "totale_valore")),
+    ("patrimonio finanziario di oggi", ("capitale_umano", "proiezione", 0, "F")),
+    ("totale del ribilanciamento", ("ribilanciamento", "totale")),
+    ("netto dell'ultimo stipendio", ("pensione", "netto", "netto_ultimo_stipendio")),
+    ("capitale-ponte", ("pensione", "ponte", "capitale_ponte")),
+)
+BASE_MASSIMO = "importo più grande della pagina"
+
+
+def _percorre(nodo, percorso=""):
+    """Ogni numero del bundle come (percorso generalizzato, valore, contenitore, chiave): i booleani non sono numeri."""
+    if isinstance(nodo, dict):
+        for chiave, valore in nodo.items():
+            figlio = f"{percorso}.{{}}" if percorso in CHIAVI_LIBERE else (f"{percorso}.{chiave}" if percorso else str(chiave))
+            if isinstance(valore, (dict, list)):
+                yield from _percorre(valore, figlio)
+            elif _e_numero(valore):
+                yield figlio, valore, nodo, chiave
+    elif isinstance(nodo, list):
+        for i, valore in enumerate(nodo):
+            if isinstance(valore, (dict, list)):
+                yield from _percorre(valore, f"{percorso}[]")
+            elif _e_numero(valore):
+                yield f"{percorso}[]", valore, nodo, i
+
+
+def foglie_numeriche(bundle):
+    """[(percorso generalizzato, valore)] di ogni numero del bundle. Sintassi dei percorsi: punti tra le chiavi, «[]»
+    per gli elementi di una lista, «{}» per i valori di un dizionario a chiavi libere."""
+    return [(p, v) for p, v, _, _ in _percorre(bundle)]
+
+
+def classifica(percorso):
+    """«euro», «altro», «dipende» (importo solo se il formato dello stesso oggetto è euro) o None se non dichiarato."""
+    if percorso in CAMPI_EURO:
+        return "euro"
+    if percorso in CAMPI_NON_EURO:
+        return "altro"
+    if percorso in CAMPI_EURO_SE_FORMATO:
+        return "dipende"
+    return None
+
+
+def _e_importo(percorso, contenitore):
+    tipo = classifica(percorso)
+    return tipo == "euro" or (tipo == "dipende" and isinstance(contenitore, dict) and contenitore.get("formato") == "euro")
+
+
+def base_indice(bundle):
+    """(etichetta, valore) della base dell'indice: la prima base non nulla e maggiore di zero tra capitale allocato,
+    valore in portafoglio, patrimonio finanziario di oggi, totale del ribilanciamento, netto dell'ultimo stipendio,
+    capitale-ponte; in mancanza l'importo più grande del bundle. None se il bundle non ha importi."""
+    for etichetta, percorso in BASI_INDICE:
+        valore = _via(bundle, *percorso)
+        if _e_numero(valore) and valore > 0:
+            return etichetta, valore
+    massimo = max((abs(v) for p, v, c, _ in _percorre(bundle) if _e_importo(p, c)), default=0)
+    return (BASE_MASSIMO, massimo) if massimo > 0 else None
+
+
+def _lettera(i):
+    """A, B, … Z, AA, AB, …"""
+    lettere, i = "", i + 1
+    while i:
+        i, resto = divmod(i - 1, 26)
+        lettere = chr(65 + resto) + lettere
+    return lettere
+
+
+def _elementi(b, *percorso):
+    elenco = _via(b, *percorso)
+    return [x for x in elenco if isinstance(x, dict)] if isinstance(elenco, list) else []
+
+
+def anonimizza(bundle):
+    """Una copia del bundle trasformata secondo la spec §7.2; l'argomento non cambia.
+    - Ogni importo in euro diventa un indice: importo × 100 / base, un solo fattore per tutta la pagina (la base la
+      sceglie base_indice(), dichiarata in anonimo.base); senza importi la base è None e nulla cambia.
+    - Azzerati (None): gli importi del riscatto, gli importi lordi della proiezione INPS (CAMPI_LORDI) e la voce
+      «pensione_inps_lorda» del confronto.
+    - Nomi: «Obiettivo 1…n» e «Broker A, B…» per ordine di prima comparsa, gli stessi in ogni sezione (anche chiavi di
+      dizionario, nota dell'indicatore, confronto). Dalle fonti restano solo i tipi.
+    - Testi liberi tolti: gli avvisi della fiscalità (contati in avvisi_omessi), la nota degli ordini, il motivo del drift.
+    Il resto (percentuali, probabilità, anni, età, date, conteggi, classi, profili, esiti, aggregati del look-through)
+    resta com'è. anonimo = {base, obiettivi, broker}: l'etichetta della base e quanti nomi sono stati sostituiti."""
+    b = copy.deepcopy(bundle)
+    # 1. i lordi e gli importi di legge escono prima di scegliere la base: l'indice non li vede
+    for percorso, _, contenitore, chiave in list(_percorre(b)):
+        if percorso in CAMPI_LORDI or (percorso.startswith("pensione.riscatto.") and classifica(percorso) == "euro"):
+            contenitore[chiave] = None
+    if isinstance(b.get("confronto"), dict):
+        b["confronto"]["voci"] = [v for v in b["confronto"].get("voci") or []
+                                  if not (isinstance(v, dict) and v.get("id") == "pensione_inps_lorda")]
+    # 2. nomi: gli obiettivi (per nome senza spazi ai bordi, come nel confronto) e i broker, per ordine di prima comparsa
+    obiettivi, broker = {}, {}
+    def etichetta(mappa, nome, modello):
+        chiave = nome.strip() if isinstance(nome, str) else nome
+        return mappa.setdefault(chiave, modello(len(mappa)))
+    ob = lambda n: etichetta(obiettivi, n, lambda i: f"Obiettivo {i + 1}")        # noqa: E731
+    br = lambda n: etichetta(broker, n, lambda i: f"Broker {_lettera(i)}")        # noqa: E731
+    for o in _elementi(b, "allocazione", "obiettivi") + _elementi(b, "obiettivi", "obiettivi") + \
+            _elementi(b, "glide_path", "obiettivi"):
+        if isinstance(o.get("nome"), str):
+            o["nome"] = ob(o["nome"])
+    for ind in _elementi(b, "indicatori"):
+        if isinstance(ind.get("nota"), str) and ind["nota"].strip():      # la nota nomina un obiettivo: stesso nome, stessa etichetta
+            ind["nota"] = ob(ind["nota"])
+        elif ind.get("nota"):
+            ind["nota"] = None
+    for o in _elementi(b, "confronto", "obiettivi"):
+        if isinstance(o.get("nome"), str):
+            o["nome"] = ob(o["nome"])
+    fisc = b.get("fiscalita")
+    if isinstance(fisc, dict):
+        if isinstance(fisc.get("per_broker"), dict):
+            fisc["per_broker"] = {br(nome): v for nome, v in fisc["per_broker"].items()}
+        for z in _elementi(b, "fiscalita", "zainetto"):
+            if isinstance(z.get("broker"), str):
+                z["broker"] = br(z["broker"])
+        fisc["avvisi_omessi"] = (fisc.get("avvisi_omessi") or 0) + len(fisc.get("avvisi") or [])
+        fisc["avvisi"] = []
+    rib = b.get("ribilanciamento")
+    if isinstance(rib, dict):
+        if isinstance(rib.get("zainetto"), dict):
+            rib["zainetto"] = {br(nome): v for nome, v in rib["zainetto"].items()}
+        for o in _elementi(b, "ribilanciamento", "ordini"):
+            if isinstance(o.get("broker"), str):
+                o["broker"] = br(o["broker"])
+            o["nota"] = None
+        for d in (rib.get("drift") or {}).values():
+            if isinstance(d, dict):
+                d["motivo"] = None
+    b["fonti"] = [{"tipo": f.get("tipo")} for f in b.get("fonti") or [] if isinstance(f, dict)]
+    # 3. l'indice: un solo fattore per tutti gli importi (con la base a None gli importi sono tutti zero e restano zero)
+    base = base_indice(b)
+    if base:
+        for percorso, valore, contenitore, chiave in list(_percorre(b)):
+            if _e_importo(percorso, contenitore):
+                contenitore[chiave] = valore * 100 / base[1]
+    b["anonimo"] = {"base": base[0] if base else None, "obiettivi": len(obiettivi), "broker": len(broker)}
+    return b
+
+
 def incorpora(template, bundle):
     """Il template con il bundle al posto del segnaposto. Ogni «<» del JSON diventa \\u003c: nessuna stringa
     dei dati può chiudere il tag <script> che lo contiene."""
@@ -745,9 +977,9 @@ def versione_plugin():
         return "?"
 
 
-def _valore(ind):
+def _valore(ind, anonimo=False):
     if ind["formato"] == "euro":
-        return f"€{numero(ind['valore'])}"
+        return f"indice {numero(ind['valore'], 1)}" if anonimo else f"€{numero(ind['valore'])}"
     return f"{numero(ind['valore'] * 100, 1)}%"
 
 
@@ -775,6 +1007,9 @@ def main(argv=None):
                     help="compone, archivia e confronta senza scrivere la pagina (vuole --json o --archivia, non -o)")
     ap.add_argument("--precedente", metavar="FILE|CARTELLA",
                     help="la revisione con cui confrontare: un bundle, una pagina del plugin o una cartella di foto")
+    ap.add_argument("--anonimo", action="store_true",
+                    help="versione da mostrare ad altri: importi in euro come indice, senza nomi di obiettivi, broker e file "
+                         "(default di -o: cruscotto-anonimo.html; non si usa con --archivia)")
     args = ap.parse_args(argv)
     if not args.sorgenti:
         ap.error("serve almeno un --from FILE")
@@ -782,8 +1017,10 @@ def main(argv=None):
         ap.error("--solo-dati non scrive la pagina: non si usa con -o")
     if args.solo_dati and not (args.json or args.archivia):
         ap.error("--solo-dati vuole --json o --archivia: altrimenti non scrive nulla")
+    if args.anonimo and args.archivia:
+        ap.error("--anonimo non si usa con --archivia: l'archivio serve al confronto e tiene gli importi veri")
     if not args.solo_dati and not args.output:
-        args.output = "cruscotto.html"
+        args.output = "cruscotto-anonimo.html" if args.anonimo else "cruscotto.html"
     try:
         data = datetime.date.today().isoformat()
         if args.data:
@@ -798,6 +1035,8 @@ def main(argv=None):
         bundle = componi_bundle(sorgenti, data, versione_plugin())
         if precedente:
             bundle["confronto"] = confronta(precedente[1], bundle)
+        if args.anonimo:
+            bundle = anonimizza(bundle)
         html = None
         if not args.solo_dati:
             with open(TEMPLATE, encoding="utf-8") as f:
@@ -828,19 +1067,24 @@ def main(argv=None):
     if archiviato:
         print(f"Archiviato: {archiviato[0]}" + (" (sovrascritta la foto dello stesso giorno)" if archiviato[1] else ""))
     for fonte in bundle["fonti"]:
-        print(f"  {fonte['file']} → {fonte['tipo']}")
+        print(f"  {fonte['tipo']}" if args.anonimo else f"  {fonte['file']} → {fonte['tipo']}")
     for nome, script in ignorati:
-        print(f"  ℹ {nome} ({script}) ignorato: il cruscotto non lo usa")
+        print(f"  ℹ {script} ignorato: il cruscotto non lo usa" if args.anonimo else
+              f"  ℹ {nome} ({script}) ignorato: il cruscotto non lo usa")
     sezioni = [k for k in ("allocazione", "look_through", "obiettivi", "glide_path", "pensione", "capitale_umano",
                            "fiscalita", "ribilanciamento") if bundle[k]]
     print(f"Sezioni: {', '.join(sezioni)}")
     for ind in bundle["indicatori"]:
         nota = f" ({ind['nota']})" if ind["nota"] else ""
-        print(f"  {ind['etichetta']}: {_valore(ind)}{nota}")
+        print(f"  {ind['etichetta']}: {_valore(ind, args.anonimo)}{nota}")
     if bundle["confronto"]:
         c, d = bundle["confronto"], bundle["confronto"]["data_precedente"]
-        print(f"Confronto con la revisione del {d[8:]}/{d[5:7]}/{d[:4]} ({precedente[0]}): "
+        print(f"Confronto con la revisione del {d[8:]}/{d[5:7]}/{d[:4]}{'' if args.anonimo else f' ({precedente[0]})'}: "
               f"{len(c['voci'])} grandezze, {len(c['obiettivi'])} obiettivi")
+    if args.anonimo:
+        a = bundle["anonimo"]
+        indice = f"importi come indice (base 100 = {a['base']})" if a["base"] else "nessun importo in euro nella pagina, quindi nessun indice"
+        print(f"Versione anonimizzata: {indice}; {a['obiettivi']} obiettivi e {a['broker']} broker rinominati")
     if args.json:
         print(f"Bundle: {args.json}")
     if not args.solo_dati:

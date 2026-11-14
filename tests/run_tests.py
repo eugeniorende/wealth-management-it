@@ -6814,6 +6814,73 @@ def t_t17_confronto():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@test("T17 cruscotto: versione anonimizzata, importi come indice, nomi sostituiti, nessun campo numerico non classificato")
+def t_t17_anonimo():
+    import copy
+    G = asset("it-revisione", "genera-cruscotto.py")
+    mod, js = carica_modulo(G), _json_esempio()
+    tmp = tempfile.mkdtemp()
+    try:
+        prima, ora = _revisioni_di_prova(tmp)
+        rc, so, se, pieno, _ = _cruscotto(*ora, extra=("--precedente", prima))
+        assert rc == 0, se[-300:]
+        rc, so, se, anon, html = _cruscotto(*ora, extra=("--precedente", prima, "--anonimo"))
+        assert rc == 0, se[-300:]
+        # la guardia: ogni numero del bundle completo è dichiarato importo oppure no
+        non_classificati = sorted({p for p, _ in mod.foglie_numeriche(pieno) if mod.classifica(p) is None})
+        assert not non_classificati, f"campi numerici non classificati: {non_classificati}"
+        assert mod.classifica("allocazione.capitale") == "euro" and mod.classifica("obiettivi.obiettivi[].probabilita_successo") == "altro"
+        assert mod.classifica("indicatori[].valore") == "dipende" and not (mod.CAMPI_EURO & mod.CAMPI_NON_EURO)
+        # indice: un solo fattore, la base vale 100, i rapporti si conservano, il resto non cambia
+        cap = pieno["allocazione"]["capitale"]
+        assert anon["anonimo"]["base"] == "capitale allocato" and anon["allocazione"]["capitale"] == 100
+        assert abs(anon["fiscalita"]["totali"]["totale_valore"] - 100 * pieno["fiscalita"]["totali"]["totale_valore"] / cap) < 1e-9
+        o_p, o_a = pieno["obiettivi"]["obiettivi"][0], anon["obiettivi"]["obiettivi"][0]
+        assert abs(o_a["gia"] * o_p["target_nominale"] - o_p["gia"] * o_a["target_nominale"]) < 1e-6
+        assert o_a["probabilita_successo"] == o_p["probabilita_successo"] and o_a["anni"] == o_p["anni"] and o_a["nome"] == "Obiettivo 1"
+        assert anon["pensione"]["netto"]["scenari"] and all(a["tasso_sostituzione_netto"] == p["tasso_sostituzione_netto"]
+                                                            for a, p in zip(anon["pensione"]["netto"]["scenari"], pieno["pensione"]["netto"]["scenari"]))
+        assert anon["capitale_umano"]["settore"] == pieno["capitale_umano"]["settore"] and anon["look_through"] == pieno["look_through"]
+        # nomi, file, testi
+        testo = json.dumps(anon, ensure_ascii=False)
+        nomi = [o["nome"] for o in pieno["obiettivi"]["obiettivi"]] + list(pieno["fiscalita"]["per_broker"]) + [f["file"] for f in pieno["fonti"]]
+        assert nomi and all(n not in testo for n in nomi), [n for n in nomi if n in testo]
+        assert anon["anonimo"]["obiettivi"] >= len(pieno["obiettivi"]["obiettivi"]) and anon["anonimo"]["broker"] >= len(pieno["fiscalita"]["per_broker"])
+        assert all(set(f) == {"tipo"} for f in anon["fonti"]) and anon["fiscalita"]["avvisi"] == []
+        assert anon["fiscalita"]["avvisi_omessi"] == pieno["fiscalita"]["avvisi_omessi"] + len(pieno["fiscalita"]["avvisi"])
+        assert all(o["nota"] is None for o in anon["ribilanciamento"]["ordini"]) and all(d["motivo"] is None for d in anon["ribilanciamento"]["drift"].values())
+        assert [d["esito"] for d in anon["ribilanciamento"]["drift"].values()] == [d["esito"] for d in pieno["ribilanciamento"]["drift"].values()]
+        etichette = {o["nome"] for o in anon["obiettivi"]["obiettivi"]} | {o["nome"] for o in anon["allocazione"]["obiettivi"]}
+        assert etichette <= {f"Obiettivo {i}" for i in range(1, 20)} and {o["nome"] for o in anon["confronto"]["obiettivi"]} <= {f"Obiettivo {i}" for i in range(1, 20)}
+        # nessun importo vero resta tra gli importi, né il simbolo dell'euro nel blocco dei dati
+        veri = {round(v) for p, v in mod.foglie_numeriche(pieno) if mod.classifica(p) == "euro" and abs(v) >= 1000}
+        rimasti = {round(v) for p, v in mod.foglie_numeriche(anon) if mod.classifica(p) == "euro"}
+        assert veri and not (veri & rimasti), sorted(veri & rimasti)
+        blocco = re.search(r'<script id="dati" type="application/json">(.*?)</script>', html, re.S).group(1)
+        assert "€" not in blocco and json.loads(blocco) == anon
+        # mai il lordo e il netto della stessa grandezza; niente importi di legge del riscatto
+        inps = anon["pensione"]["inps"]
+        assert inps["pensione_inps_lorda_annua"] is None and inps["montante_finale"] is None and inps["ral_finale"] is None
+        assert inps["eta_pensionamento"] == pieno["pensione"]["inps"]["eta_pensionamento"]
+        ris = anon["pensione"]["riscatto"]
+        assert ris["onere_agevolato"] is None and ris["costo_netto"] is None and ris["rata_mensile"] is None and ris["delta_pensione_lorda_annua"] is None
+        assert ris["anni_riscatto"] == pieno["pensione"]["riscatto"]["anni_riscatto"] and ris["modalita"] == pieno["pensione"]["riscatto"]["modalita"]
+        assert "pensione_inps_lorda" not in {v["id"] for v in anon["confronto"]["voci"]} and "pensione_inps_lorda" in {v["id"] for v in pieno["confronto"]["voci"]}
+        # Review Focus 4: una base a zero si salta; senza importi non c'è indice
+        b0 = copy.deepcopy(pieno)
+        b0["allocazione"]["capitale"] = 0
+        assert mod.base_indice(b0)[0] == "valore in portafoglio"
+        assert mod.base_indice({"versione": 2, "indicatori": [], "obiettivi": None}) is None
+        # riga di comando: nome di default, niente archivio, stdout senza euro
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--anonimo", "--data", "2026-10-25", cwd=tmp)
+        assert rc == 0 and os.path.isfile(os.path.join(tmp, "cruscotto-anonimo.html")) and not os.path.exists(os.path.join(tmp, "cruscotto.html")), se
+        assert "Versione anonimizzata" in so and "base 100 = capitale allocato" in so and "€" not in so, so
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--anonimo", "--archivia", cwd=tmp)
+        assert rc == 2 and "--archivia" in se, (rc, se[-200:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # Il rendering si verifica in Chromium con Playwright per Python. Senza Playwright i test sono saltati,
 # salvo RICHIEDI_BROWSER=1 (la CI). PLAYWRIGHT_CHROMIUM_EXECUTABLE indica un Chromium già installato
 # fuori dalla cache di Playwright.
