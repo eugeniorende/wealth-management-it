@@ -6142,6 +6142,20 @@ def t_lt_colonna_isin():
             f.write("DE0007164602;titolo;Storto;100;US123\n")
         rc, so, se = run_script_split(asset(*LT), "--composizione", out, "--posizioni", _broker_look_through(tmp), cwd=tmp)
         assert rc == 1 and "ISIN" in se and "US123" in se and "Traceback" not in se, se[-300:]
+        # un ISIN dell'emittente che non ha la forma di un ISIN (un SEDOL) non entra nel CSV; in minuscolo si normalizza
+        emi = os.path.join(tmp, "emittente-isin.csv")
+        with open(emi, "w", encoding="utf-8") as f:
+            f.write("Name,Sector,Asset Class,Location,ISIN,Weight (%)\n"
+                    "UNO SPA,Energy,Equity,United States, us0000000011 ,50.00\n"
+                    "DUE SPA,Energy,Equity,United States,B0SWJX3,30.00\n"
+                    "TRE SPA,Energy,Equity,United States,US0000000029,20.00\n")
+        pulito = os.path.join(tmp, "pulito.csv")
+        rc, so, se = run_script_split(asset(*CE), "--file", emi, "--strumento", "IE0000000003", "--out", pulito, cwd=tmp)
+        assert rc == 0, se[-300:]
+        righe = open(pulito, encoding="utf-8-sig").read().splitlines()
+        assert "IE0000000003;titolo;UNO SPA;50,00;US0000000011" in righe, righe
+        assert "IE0000000003;titolo;DUE SPA;30,00;" in righe and "IE0000000003;titolo;TRE SPA;20,00;US0000000029" in righe, righe
+        assert lt.leggi_composizione(pulito)["IE0000000003"]["isin"] == {"UNO SPA": "US0000000011", "TRE SPA": "US0000000029"}
         # il formato a tre colonne resta leggibile dai due lettori
         tre = os.path.join(tmp, "tre.csv")
         open(tre, "w", encoding="utf-8").write("strumento;settore;peso\nIE00B4L5Y983;Energy;100\n")

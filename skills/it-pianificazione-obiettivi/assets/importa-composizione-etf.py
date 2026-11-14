@@ -986,9 +986,7 @@ def componi(path, strumento, forzato=None):
         nome_titolo = cella(r, "nome")
         if "nome" in col and not _vuota(nome_titolo) and not _segnaposto(nome_titolo):
             isin_titolo = cella(r, "isin")
-            candidati.append((str(nome_titolo).strip(),
-                              None if _vuota(isin_titolo) or _segnaposto(isin_titolo) else str(isin_titolo).strip(),
-                              peso))
+            candidati.append((str(nome_titolo).strip(), _isin_titolo(isin_titolo), peso))
         for dim, _ in _DIMENSIONI:
             if dim not in col:
                 continue
@@ -1153,6 +1151,16 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
 # ── composizione.csv ────────────────────────────────────────────────────────
 
 _INTESTAZIONE_OUT = "strumento;dimensione;voce;peso;isin"
+_ISIN_TITOLO = re.compile(r"[A-Z]{2}[A-Z0-9]{9}[0-9]")      # la stessa forma di look-through-portafoglio.py
+
+
+def _isin_titolo(valore):
+    """L'ISIN di un titolo, maiuscolo, se la cella ha la forma di un ISIN; altrimenti None (vuota, segnaposto, un
+    SEDOL o un altro codice): il titolo si somma per nome, e il CSV non porta mai un ISIN che il look-through rifiuta."""
+    if _vuota(valore) or _segnaposto(valore):
+        return None
+    codice = str(valore).strip().upper()
+    return codice if _ISIN_TITOLO.fullmatch(codice) else None
 
 
 def _linea(campi):
