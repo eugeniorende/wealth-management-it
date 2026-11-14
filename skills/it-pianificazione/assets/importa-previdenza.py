@@ -25,9 +25,10 @@ quando l'output finisce in chat o in un documento condiviso.
 
 ONESTÀ METODOLOGICA
 - La ricostruzione del montante è un'approssimazione (±qualche %): l'estratto conto elenca i
-  contributi ma non li capitalizza. La tabella dei tassi copre 1996-2025; il tasso dell'anno in
-  corso non è ancora pubblicato, quindi il montante al 31/12 dell'anno scorso non è ancora
-  rivalutato per quest'anno (i contributi dell'anno, per legge, si rivalutano solo dall'anno dopo).
+  contributi ma non li capitalizza. La tabella dei tassi copre 1996-2026; finché il tasso dell'anno
+  in corso non è pubblicato (l'ISTAT lo comunica in ottobre-novembre), il montante al 31/12 dell'anno
+  scorso non è ancora rivalutato per quest'anno, e un avviso lo dice (i contributi dell'anno, per
+  legge, si rivalutano solo dall'anno dopo).
   Il valore ESATTO è nel servizio "La mia pensione futura" sul portale INPS: se lo hai, usa quello.
 - Solo il sistema contributivo: le retribuzioni prima del 1996 appartengono alla quota retributiva
   (L. 335/1995 art. 1 c. 12-13), che lo script non calcola; restano fuori dal montante e un avviso
@@ -46,15 +47,18 @@ from motore_bootstrap import cli, errore, numero, pct, scrivi_json
 # ============================== PARAMETRI ==============================
 
 ALIQUOTA_COMPUTO = 0.33   # aliquota di computo IVS dipendenti (artigiani e commercianti 0,24; gestione separata 0,25, sul 26,07% versato)
+ANNO_CORRENTE = None      # anno a cui si ferma la ricostruzione del montante: None = l'anno di oggi. Si fissa con
+                          # --set ANNO_CORRENTE=2026 per ripetere un conto; l'età resta calcolata sulla data di oggi
 
 # Tassi di capitalizzazione del montante (L. 335/1995 art. 1 c. 8-9: variazione media quinquennale
 # del PIL nominale calcolata dall'ISTAT, mai sotto 1 dal DL 65/2015 art. 5, con recupero sugli anni
 # successivi, tranne per il 2014).
 # Convenzione: TASSO[X] rivaluta al 31/12/X il montante accumulato fino al 31/12/(X-1); vale per le
 # pensioni con decorrenza dall'anno X+1. Le tabelle INPS etichettano lo stesso valore col 31/12/(X-1).
-# Tassi ISTAT 1996-2025 dalla nota ISTAT del 16/10/2025 (lavoro.gov.it), regola del minimo e del
-# recupero dal DL 65/2015 — Verificato: 2026-10. I valori applicati da INPS per 2014, 2021 e 2022
-# (minimo e recupero) vengono dai messaggi INPS 840/2024 e 707/2026, letti in copia.
+# Tassi ISTAT 1996-2026: nota ISTAT prot. 2582754/26 del 16/10/2026 (lavoro.gov.it), con la serie
+# allegata; regola del minimo e del recupero dal DL 65/2015 — Verificato: 2026-11. I valori applicati
+# da INPS per 2014, 2021 e 2022 (minimo e recupero) vengono dai messaggi INPS 840/2024 e 707/2026,
+# letti in copia.
 TASSI_CAPITALIZZAZIONE = {
     1996: 1.062054,   # rivaluta il montante al 31/12/1995, che nel contributivo è zero (INPS pubblica dal 1997)
     1997: 1.055871, 1998: 1.053597, 1999: 1.056503, 2000: 1.051781, 2001: 1.047781,
@@ -69,6 +73,7 @@ TASSI_CAPITALIZZAZIONE = {
     2023: 1.023082,
     2024: 1.036622,
     2025: 1.040445,   # rivaluta il montante al 31/12/2024 (decorrenze 2026)
+    2026: 1.063359,   # rivaluta il montante al 31/12/2025 (decorrenze 2027)
 }
 # Anni senza tasso: quelli dopo l'ultimo pubblicato (l'ISTAT lo comunica in ottobre-novembre
 # dell'anno stesso). Nessuna rivalutazione inventata: il montante resta quello dell'ultimo tasso.
@@ -283,6 +288,10 @@ def main():
     path_xml = args.estratto_inps
     path_csv = args.storico_fondo
     oggi = datetime.date.today()
+    anno_corrente = oggi.year if ANNO_CORRENTE is None else ANNO_CORRENTE
+    if isinstance(anno_corrente, bool) or not isinstance(anno_corrente, int) \
+            or not INIZIO_CONTRIBUTIVO <= anno_corrente <= 2100:
+        errore(f"ANNO_CORRENTE = {ANNO_CORRENTE!r}: serve un anno, per esempio {oggi.year}")
 
     # ------------------------------ INPS ------------------------------
     anag, righe = leggi_estratto_inps(path_xml)
@@ -316,7 +325,7 @@ def main():
     for a in sorted(retrib):
         print(f"  {a:<6}{numero(retrib[a]):>15}{sett[a]:>11}")
 
-    montante, nominali, anni_def = ricostruisci_montante(retrib, oggi.year)
+    montante, nominali, anni_def = ricostruisci_montante(retrib, anno_corrente)
     anni_completi = [a for a in retrib if sett[a] >= 52]
     ral_rif = retrib[max(anni_completi)] if anni_completi else retrib[max(retrib)]
 
@@ -376,8 +385,8 @@ def main():
                 tot = sum(v.values())
                 print(f"  {a:<6}{numero(v.get('iscritto',0)):>10}{numero(v.get('azienda',0)):>10}"
                       f"{numero(v.get('TFR',0)):>10}{numero(tot):>10}")
-            ultimo_anno_v = max(a for a in versamenti if a < oggi.year) if \
-                [a for a in versamenti if a < oggi.year] else max(versamenti)
+            ultimo_anno_v = max(a for a in versamenti if a < anno_corrente) if \
+                [a for a in versamenti if a < anno_corrente] else max(versamenti)
             v_annuo = sum(versamenti[ultimo_anno_v].values())
 
     # -------------------------- PARAMETRI PRONTI --------------------------

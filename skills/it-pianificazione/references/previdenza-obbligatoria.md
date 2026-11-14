@@ -36,8 +36,8 @@ Step 2: Rivalutazione montante
 
   montante(t) = montante(t-1) × (1 + tasso_PIL(t)) + contributo_anno(t)
 
-  Tasso nominale: media ~2,8% annuo nel 1996-2025 e ~1,8% annuo nel 2006-2025
-  (da 0% a 6,2% nei singoli anni). Nel 2014 e nel 2021 il coefficiente è stato 1,
+  Tasso nominale: media ~2,9% annuo nel 1996-2026 e ~2,0% annuo nel 2006-2026
+  (da 0% a 6,3% nei singoli anni). Nel 2014 e nel 2021 il coefficiente è stato 1,
   cioè rivalutazione nulla: l'ISTAT dava −0,19% e −0,02%, portati a 1 dal
   DL 65/2015. In euro di oggi conta il PIL REALE, cioè il nominale meno
   l'inflazione: ~0,5% annuo
@@ -273,4 +273,4 @@ Per questa ragione la **complementare diventa strutturalmente necessaria**, non 
 
 ---
 *Massimale e prima fascia 2026 (Circ. INPS 6/2026), requisiti di vecchiaia, anticipata e precoci 2026-2028 (Circ. INPS 19/2026 e 28/2026, All. 2), detrazione pensionati (art. 13 c. 3 e 3-bis TUIR; dal 2027 art. 13 c. 3 e 4 D.Lgs. 117/2026) — Verificato: 2026-10.*
-*Meccanica di rivalutazione del montante (L. 335/1995 art. 1 c. 8-9, minimo 1 dal DL 65/2015 art. 5), massimale rivalutato sui prezzi (L. 335/1995 art. 2 c. 18) e tassi 1996-2025 (nota ISTAT del 16/10/2025) — Verificato: 2026-10.*
+*Meccanica di rivalutazione del montante (L. 335/1995 art. 1 c. 8-9, minimo 1 dal DL 65/2015 art. 5), massimale rivalutato sui prezzi (L. 335/1995 art. 2 c. 18) — Verificato: 2026-10. Tassi 1996-2026 (nota ISTAT prot. 2582754/26 del 16/10/2026, con la serie allegata) — Verificato: 2026-11.*

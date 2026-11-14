@@ -740,29 +740,33 @@ def _estratto_inps_xml(retrib_per_anno, path):
                 '</Contributi></RegimeGenerale></EstrattoConto>')
 
 
-@test("importa-previdenza: tassi di capitalizzazione ufficiali 1996-2025, solo contributi dal 1996, avvisi veri")
+@test("importa-previdenza: tassi di capitalizzazione ufficiali 1996-2026, solo contributi dal 1996, avvisi veri")
 def t_tassi_capitalizzazione():
     # REGRESSIONE F062: tabella limitata al 2021-2025, default 1,01 per gli anni precedenti
     # (sottostima ~8% per chi ha iniziato a fine anni '90) e anche per l'anno in corso, non pubblicato.
     # Revisione T5: i contributi prima del 1996 entravano nel montante e si rivalutavano (×2,31)
     # mentre l'avviso diceva il contrario, e l'avviso perdeva il primo anno (carriera dal 1995: nessuno).
-    ufficiali = {  # nota ISTAT 16/10/2025 (lavoro.gov.it); 2014 e 2021 a 1, 2022 con recupero (DL 65/2015 art. 5)
+    ufficiali = {  # nota ISTAT prot. 2582754/26 del 16/10/2026 (lavoro.gov.it), serie allegata; 2014 e 2021 a 1,
+                   # 2022 con recupero (DL 65/2015 art. 5)
         1996: 1.062054,
         1997: 1.055871, 1998: 1.053597, 1999: 1.056503, 2000: 1.051781, 2001: 1.047781, 2002: 1.043698,
         2003: 1.041614, 2004: 1.039272, 2005: 1.040506, 2006: 1.035386, 2007: 1.033937, 2008: 1.034625,
         2009: 1.033201, 2010: 1.017935, 2011: 1.016165, 2012: 1.011344, 2013: 1.001643, 2014: 1.000000,
         2015: 1.005058, 2016: 1.004684, 2017: 1.005205, 2018: 1.013478, 2019: 1.018254, 2020: 1.019199,
-        2021: 1.000000, 2022: 1.009756, 2023: 1.023082, 2024: 1.036622, 2025: 1.040445}
+        2021: 1.000000, 2022: 1.009756, 2023: 1.023082, 2024: 1.036622, 2025: 1.040445, 2026: 1.063359}
     m = carica_modulo(asset("it-pianificazione", "importa-previdenza.py"))
     for anno, tasso in ufficiali.items():
         assert m.TASSI_CAPITALIZZAZIONE.get(anno) == tasso, f"tasso {anno}: {m.TASSI_CAPITALIZZAZIONE.get(anno)} ≠ {tasso}"
     retrib = {a: 30_000.0 for a in range(1998, 2026)}
     montante, _, mancanti = m.ricostruisci_montante(retrib, 2026)
     atteso = 0.0
-    for anno in range(1998, 2027):  # il 2026 non ha ancora un tasso: il montante al 31/12/2025 resta lì
+    for anno in range(1998, 2027):  # il 2026 ha il suo tasso: il montante al 31/12/2025 si rivaluta
         atteso = atteso * ufficiali.get(anno, 1.0) + retrib.get(anno, 0.0) * 0.33
     assert abs(montante - atteso) < 0.01, f"montante {montante:,.2f} ≠ {atteso:,.2f}"
-    assert mancanti == [2026], f"anni senza tasso pubblicato: {mancanti}"
+    assert mancanti == [], f"anni senza tasso pubblicato: {mancanti}"
+    # Review Focus 4: nel 2027, prima del tasso 2027, il montante resta quello del 31/12/2026
+    montante_2027, _, mancanti = m.ricostruisci_montante(retrib, 2027)
+    assert mancanti == [2027] and abs(montante_2027 - montante) < 0.01, (mancanti, montante_2027)
     # posizione mista: le retribuzioni prima del 1996 non entrano nel montante contributivo
     # (L. 335/1995 art. 1 c. 12-13: quota retributiva), né come nominali né rivalutate
     dal96 = {a: 30_000.0 for a in range(1996, 2026)}
@@ -771,23 +775,28 @@ def t_tassi_capitalizzazione():
         misto, nom, _ = m.ricostruisci_montante({**prima, **dal96}, 2026)
         assert abs(misto - solo96) < 0.01 and abs(nom - nom96) < 0.01, \
             f"{sorted(prima)}: montante {misto:,.2f} ≠ {solo96:,.2f} dei soli contributi dal 1996"
-    rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"),
-                         os.path.join(FIXTURES, "estratto-inps-test.xml"))
-    assert rc == 0, out[-300:]
-    assert "sono i primi anni" not in out and "non ancora pubblicat" in out, out[-600:]
+    # l'anno corrente si fissa con --set: il test non dipende dalla data in cui gira
+    P, X = asset("it-pianificazione", "importa-previdenza.py"), os.path.join(FIXTURES, "estratto-inps-test.xml")
+    rc, out = run_script(P, X, "--set", "ANNO_CORRENTE=2026")
+    assert rc == 0 and "non ancora pubblicat" not in out and "sono i primi anni" not in out, out[-600:]
     assert "prima del 1996" not in out, "carriera dal 2023: nessun avviso sugli anni prima del 1996"
+    rc, out = run_script(P, X, "--set", "ANNO_CORRENTE=2027")
+    assert rc == 0 and "tasso 2027 non ancora pubblicato" in out and "31/12/2026" in out, out[-600:]
+    # Review Focus 3: un valore che non è un anno
+    for cattivo in ("ANNO_CORRENTE=1990", "ANNO_CORRENTE=2026.5", "ANNO_CORRENTE='prossimo'"):
+        rc, so, se = run_script_split(P, X, "--set", cattivo)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "ANNO_CORRENTE" in se and "Traceback" not in se, (cattivo, se[-200:])
     tmp = tempfile.mkdtemp()
     try:
         for inizio, intervallo in ((1995, "(1995,"), (1990, "(1990-1995,")):
             xml = os.path.join(tmp, f"da{inizio}.xml")
             _estratto_inps_xml({a: 30_000 for a in range(inizio, 2026)}, xml)
-            rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), xml)
+            rc, out = run_script(asset("it-pianificazione", "importa-previdenza.py"), xml, "--set", "ANNO_CORRENTE=2026")
             assert rc == 0, out[-300:]
             avviso = next((r for r in out.splitlines() if "prima del 1996" in r), "")
             assert intervallo in avviso and "retributiv" in avviso, f"carriera dal {inizio}: avviso «{avviso.strip()}»"
             assert "non sono rivalutati" not in out, f"carriera dal {inizio}: avviso falso sulla rivalutazione"
-            atteso = m.ricostruisci_montante({a: 30_000.0 for a in range(1996, 2026)},
-                                             __import__("datetime").date.today().year)[0]
+            atteso = m.ricostruisci_montante({a: 30_000.0 for a in range(1996, 2026)}, 2026)[0]
             assert abs(euro(out, "MONTANTE CONTRIBUTIVO RICOSTRUITO") - atteso) <= 1, \
                 f"carriera dal {inizio}: il montante stampato deve contare solo i contributi dal 1996"
     finally:
@@ -1440,8 +1449,8 @@ def t_requisiti_e_link_inps():
             prodotto *= tassi[anno]
         return prodotto ** (1 / (a - da + 1)) - 1
     for da in (1996, 2006):
-        cifra = f"~{media(da, 2025) * 100:.1f}%".replace(".", ",")
-        assert f"{cifra} annuo nel {da}-2025" in dip, f"previdenza-obbligatoria.md: media {da}-2025 attesa {cifra}"
+        cifra = f"~{media(da, 2026) * 100:.1f}%".replace(".", ",")
+        assert f"{cifra} annuo nel {da}-2026" in dip, f"previdenza-obbligatoria.md: media {da}-2026 attesa {cifra}"
     assert "1,5-2,5% annuo negli ultimi decenni" not in dip
     # mypensione.it non è un dominio INPS: le credenziali SPID vanno solo sul portale INPS
     for rel, testo in _file_testo(SKILLS, os.path.join(ROOT, "commands")):
