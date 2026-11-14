@@ -520,7 +520,6 @@ PG;Papua-Neuguinea|Papouasie-Nouvelle-Guinée
 _PAESI_DE_FR = {codice: tuple(nomi.split("|")) for codice, nomi in
                 (r.split(";") for r in _ELENCO_PAESI_DE_FR.strip().splitlines())}
 
-# ── Righe da escludere ──────────────────────────────────────────────────────
 # ── Valute ──────────────────────────────────────────────────────────────────
 # Codice ISO 4217 → nome italiano, per il report. Un codice valido che manca qui si scrive e si riporta col codice.
 VALUTE = {
@@ -555,6 +554,12 @@ PAROLE_COPERTURA = ("hedged", "hedge", "copertura del cambio", "con copertura", 
                     "währungsgesichert", "abgesichert")
 
 
+def _testo_cercabile(testo):
+    """Il testo normalizzato con il trattino basso (che normalizza() conserva) come separatore di parole: «world_eur_hedged»
+    contiene la parola «hedged» come «world-eur-hedged»."""
+    return " " + normalizza(testo).replace("_", " ")
+
+
 def codice_valuta(valore):
     """Il codice ISO 4217 di una cella (unità minori e alias riportati alla valuta), o None se non è un codice noto."""
     codice = str(valore if valore is not None else "").strip().upper()
@@ -567,6 +572,7 @@ def nome_valuta(codice):
     return VALUTE.get(codice, codice)
 
 
+# ── Righe da escludere ──────────────────────────────────────────────────────
 # Asset class o settore che indicano liquidità e derivati: esclusi da tutte le dimensioni
 VALORI_LIQUIDITA = ("cash", "cash and/or derivatives", "cash and derivatives", "cash collateral and margins",
                     "money market", "fx", "futures", "future", "forward", "forwards", "swap", "swaps",
@@ -1223,9 +1229,10 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
     sintetica = any(f" {parola}" in f" {testo_preambolo}" for parola in ("synthetic", "sintetic", "synthetisch", "synthetique"))
     if sintetica:
         avvisi.append("replica sintetica dichiarata nel file: le posizioni sono il paniere di collaterale dello swap, non "
-                      "l'esposizione all'indice; settori, paesi e titoli descrivono il collaterale")
+                      "l'esposizione all'indice; settori, paesi, valute e titoli descrivono il collaterale")
     # classe con copertura del cambio: le valute dei titoli non sono l'esposizione (lo script non lo decide da solo)
-    coperta = any(f" {parola}" in " " + normalizza(f"{testo_preambolo} {file}") for parola in PAROLE_COPERTURA)
+    cercabile = _testo_cercabile(f"{testo_preambolo} {file}")
+    coperta = any(f" {normalizza(parola)}" in cercabile for parola in PAROLE_COPERTURA)
     if coperta and not copertura:
         avvisi.append("il file sembra di una classe con copertura del cambio: le valute dei titoli non sono "
                       f"l'esposizione; se è così reimporta con --copertura {strumento}=EUR")
@@ -1415,7 +1422,8 @@ def stampa(composizioni, out, conservati, formato):
         if c["paesi"]:
             print("   Paesi: " + " · ".join(f"{PAESI[k][0]} {pct(v, 2)}" for k, v in list(c["paesi"].items())[:5]))
         if c["valute"]:
-            print("   Valute: " + " · ".join(f"{nome_valuta(k)} {pct(v, 2)}" for k, v in list(c["valute"].items())[:5]))
+            print("   Valute: " + " · ".join(f"{nome_valuta(k)} {pct(v, 2)}" for k, v in list(c["valute"].items())[:5])
+                  + (" (copertura del cambio dichiarata dall'utente)" if c["copertura_cambio"] else ""))
         if c["primi_titoli"]:
             print("   Primi titoli: " + " · ".join(f"{t['nome']} {pct(t['peso'], 2)}" for t in c["primi_titoli"][:5])
                   + " (peso nel fondo)")

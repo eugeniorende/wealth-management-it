@@ -5915,6 +5915,9 @@ def t_ce_file_reali():
         assert r2(sw["paesi"]) == {"US": 50.51, "DE": 30.30, "CH": 19.19} and abs(sw["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9, sw
         assert sw["primi_titoli"][0] == {"nome": "AMAZON.COM INC", "isin": "US0231351067", "peso": 0.5}, sw["primi_titoli"]
         assert any("sintetica" in a and "collaterale" in a for a in sw["avvisi"]), sw["avvisi"]
+        # anche le valute dei titoli descrivono il collaterale (USD 50,5%, EUR 30,3%, CHF 19,2%): il motivo è nell'avviso
+        assert r2(sw["valute"]) == {"USD": 50.51, "EUR": 30.30, "CHF": 19.19}, sw["valute"]
+        assert any("settori, paesi, valute e titoli descrivono il collaterale" in a for a in sw["avvisi"]), sw["avvisi"]
         assert sum(1 for a in sw["avvisi"] if "stili" in a) == 1, sw["avvisi"]     # il file si apre una volta sola
         assert a["replica_sintetica"] is False and it["replica_sintetica"] is False
         rc, so, se = run_script_split(asset(*CE), "--file", _xlsx_reale("amundi-holdings-swap", tmp), "--isin", "LU0496786657",
@@ -6132,7 +6135,7 @@ def t_lt_colonna_isin():
         assert "IE00B4L5Y983;titolo;APPLE INC;5,00;" in dati and "IT0005454241;paese;IT;100,00;" in dati   # righe di prima
         assert abs(cu.leggi_composizione(out)["IE00B4L5Y983"]["Health Care"] - 0.5) < 1e-9
         comp = lt.leggi_composizione(out)
-        assert comp["LU0000000001"]["isin"]["ALPHA CORP"] == "US0000000001" and comp["IE0000000002"]["isin"] == {}
+        assert comp["LU0000000001"]["isin"]["ALPHA CORP"] == ("US0000000001",) and comp["IE0000000002"]["isin"] == {}
         rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(FIXTURES, "composizione-ishares-en.csv"), "--isin", "IE0000000002",
                                       "--out", out, cwd=tmp)
         assert rc == 0 and "quattro colonne" not in so, so[-300:]
@@ -6141,7 +6144,7 @@ def t_lt_colonna_isin():
         with open(out, "a", encoding="utf-8") as f:
             f.write("DE0007164600;titolo;SAP SE;100\nDE0007164601;titolo;Apple;100; us0000000011 \n")
         comp = lt.leggi_composizione(out)
-        assert comp["DE0007164600"]["isin"] == {} and comp["DE0007164601"]["isin"] == {"Apple": "US0000000011"}
+        assert comp["DE0007164600"]["isin"] == {} and comp["DE0007164601"]["isin"] == {"Apple": ("US0000000011",)}
         assert "DE0007164600" not in cu.leggi_composizione(out)                     # sole righe titolo: nessun settore
         with open(out, "a", encoding="utf-8") as f:
             f.write("DE0007164602;titolo;Storto;100;US123\n")
@@ -6160,7 +6163,7 @@ def t_lt_colonna_isin():
         righe = open(pulito, encoding="utf-8-sig").read().splitlines()
         assert "IE0000000003;titolo;UNO SPA;50,00;US0000000011" in righe, righe
         assert "IE0000000003;titolo;DUE SPA;30,00;" in righe and "IE0000000003;titolo;TRE SPA;20,00;US0000000029" in righe, righe
-        assert lt.leggi_composizione(pulito)["IE0000000003"]["isin"] == {"UNO SPA": "US0000000011", "TRE SPA": "US0000000029"}
+        assert lt.leggi_composizione(pulito)["IE0000000003"]["isin"] == {"UNO SPA": ("US0000000011",), "TRE SPA": ("US0000000029",)}
         # il formato a tre colonne resta leggibile dai due lettori
         tre = os.path.join(tmp, "tre.csv")
         open(tre, "w", encoding="utf-8").write("strumento;settore;peso\nIE00B4L5Y983;Energy;100\n")
@@ -6190,6 +6193,20 @@ def t_lt_titoli_isin():
         assert abs(t["ALPHABET INC CLASS A"]["peso"] - 19500 * .055 / V_s) < 1e-12
         assert t["ALPHABET INC CLASS A"]["isin"] == ["US0000000037", "US0000000045"]
         assert t["NESTLE SA"]["isin"] == [] and r["n_titoli_aggregati"] == 4
+        # un emittente che ripete il nome con due ISIN (obbligazioni): nessun ISIN si perde, un altro ETF con uno dei due si somma
+        rip = os.path.join(tmp, "ripetuti.csv")
+        with open(rip, "w", encoding="utf-8") as f:
+            f.write("strumento;dimensione;voce;peso;isin\nIE0000000001;titolo;TREASURY NOTE;10;US0000000011\n"
+                    "IE0000000001;titolo;TREASURY NOTE;5;US0000000029\nIE0000000002;titolo;UST 2030;4;US0000000011\n")
+        pos = os.path.join(tmp, "pos-ripetuti.json")
+        with open(pos, "w", encoding="utf-8") as f:
+            json.dump({"posizioni": [{"isin": "IE0000000001", "valore": 1000}, {"isin": "IE0000000002", "valore": 1000}]}, f)
+        rc, so, se = run_script_split(asset(*LT), "--composizione", rip, "--posizioni", pos, "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.loads(so)
+        assert [x["nome"] for x in r["titoli"]] == ["TREASURY NOTE"] and r["n_titoli_aggregati"] == 1, r["titoli"]
+        assert abs(r["titoli"][0]["peso"] - (1000 * .15 + 1000 * .04) / 2000) < 1e-12, r["titoli"]   # sommato una volta sola
+        assert r["titoli"][0]["isin"] == ["US0000000011", "US0000000029"] and r["titoli"][0]["da"] == ["IE0000000001", "IE0000000002"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -6237,9 +6254,15 @@ def t_lt_importatore_valuta():
         rc, so, se = run_script_split(asset(*CE), "--file", scrivi("ignota.csv", "A,Energy,Equity,Italy,ABC,100\n"),
                                       "--strumento", "I", "--out", out, cwd=tmp)
         assert rc == 1 and "valute non riconosciute" in se and "ABC" in se and not os.path.exists(out), se[-300:]
+        # con --copertura le valute del file non si leggono: un codice sconosciuto nella colonna non ferma l'importazione
+        rc, so, se = run_script_split(asset(*CE), "--file", os.path.join(tmp, "ignota.csv"), "--strumento", "I", "--copertura", "I=EUR",
+                                      "--out", out, cwd=tmp)
+        assert rc == 0 and "I;valuta;EUR;100,00;" in open(out, encoding="utf-8-sig").read(), (so[-300:], se[-300:])
+        os.remove(out)
         rc, so, se = run_script_split(asset(*CE), "--file", g, "--strumento", "U", "--copertura", "U=EUR",
                                       "--out", out, "--json", js, cwd=tmp)
         assert rc == 0, se[-300:]
+        assert "Valute: Euro 100,00% (copertura del cambio dichiarata dall'utente)" in so, so   # F4.4: il report lo dice
         testo = open(out, encoding="utf-8-sig").read()
         assert [r for r in testo.splitlines() if ";valuta;" in r] == ["U;valuta;EUR;100,00;"], testo
         assert "copertura del cambio in EUR" in next(r for r in testo.splitlines() if r.startswith("# U:")), testo
@@ -6257,6 +6280,29 @@ def t_lt_importatore_valuta():
         c = m.componi(coperto, "H")
         assert any("copertura del cambio" in a and "--copertura H=EUR" in a for a in c["avvisi"]), c["avvisi"]
         assert not any("copertura del cambio" in a for a in m.componi(coperto, "H", copertura="EUR")["avvisi"])
+        # l'avviso della classe coperta vale anche per i nomi con il trattino basso, le maiuscole e il tedesco; «unhedged» no
+        def n_avvisi(path):
+            return sum(1 for a in m.componi(path, "H")["avvisi"] if "classe con copertura del cambio" in a)
+        for nome in ("world_eur_hedged.csv", "IWDE_EUR_Hedged_holdings.csv", "world-eur-hedged.csv", "world eur hedged.csv"):
+            copia = os.path.join(tmp, nome)
+            shutil.copy(g, copia)
+            assert n_avvisi(copia) == 1, nome
+        for nome in ("world_eur_unhedged.csv", "World-Unhedged.csv"):
+            copia = os.path.join(tmp, nome)
+            shutil.copy(g, copia)
+            assert n_avvisi(copia) == 0, nome
+        for frase, atteso in (("Anteilsklasse: Währungsgesichert (EUR)", 1), ("Anteilsklasse: abgesichert in EUR", 1),
+                              ("Share class: unhedged", 0), ("Classe di azioni: con copertura del cambio", 1)):
+            copia = os.path.join(tmp, "preambolo.csv")
+            with open(copia, "w", encoding="utf-8") as f:
+                f.write(frase + "\n" + open(g, encoding="utf-8").read())
+            assert n_avvisi(copia) == atteso, frase
+        # due colonne per la valuta: vince «Market Currency» (la valuta di negoziazione), non «Currency»
+        doppia = os.path.join(tmp, "doppia.csv")
+        open(doppia, "w", encoding="utf-8").write("Name,Sector,Asset Class,Location,Currency,Market Currency,Weight (%)\n"
+                                                  "A,Energy,Equity,Italy,USD,GBP,60\nB,Energy,Equity,Italy,USD,EUR,40\n")
+        c = m.componi(doppia, "D")
+        assert c["colonne"]["valuta"] == "Market Currency" and r2(c["valute"]) == {"GBP": 60.0, "EUR": 40.0}, (c["colonne"], c["valute"])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -6278,6 +6324,11 @@ def t_lt_valute():
         assert [x["voce"] for x in r["valute"]] == ["USD", "JPY", "EUR", "GBP"] and abs(sum(x["peso"] for x in r["valute"]) - 1) < 1e-12
         assert abs(r["copertura"]["valute"] - V_v / tot) < 1e-12 and all(p["valute"] is True for p in r["posizioni"])
         assert "4. VALUTE (copertura 95,9%)" in so and "In euro: 8,1% della parte coperta" in so, so
+        # una sola valuta oltre il limite del report: «altra 1 valuta», non «altre 1 valute»
+        rc, so, se = run_script_split(asset(*LT), "--composizione", v5, "--posizioni", broker, "--set", "N_VALUTE_REPORT=3", cwd=tmp)
+        assert rc == 0 and "altra 1 valuta " in so and "altre 1 valute" not in so, so
+        rc, so, se = run_script_split(asset(*LT), "--composizione", v5, "--posizioni", broker, "--set", "N_VALUTE_REPORT=2", cwd=tmp)
+        assert rc == 0 and "altre 2 valute " in so, so
         # il file a quattro colonne non ha valute: copertura zero, nessuna quota
         rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"),
                                       "--posizioni", broker, "--json", "-", cwd=tmp)
@@ -6290,6 +6341,19 @@ def t_lt_valute():
         r = json.loads(so)
         assert rc == 0 and r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 0.0, "regioni": 0.0, "valute": 1500 / tot}, r["copertura"]
         assert r["quota_euro"] == 0.0 and r["valute"] == [{"voce": "USD", "nome": "Dollaro USA", "peso": 1.0}]
+        # l'unità minore scritta a mano vale la sua valuta (GBX è GBP), come nell'importatore
+        alias = os.path.join(tmp, "alias.csv")
+        open(alias, "w", encoding="utf-8").write("strumento;dimensione;voce;peso;isin\nDE0007164600;valuta;GBX;100;\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", alias, "--posizioni", broker, "--json", "-", cwd=tmp)
+        assert rc == 0, se[-300:]
+        assert json.loads(so)["valute"] == [{"voce": "GBP", "nome": "Sterlina britannica", "peso": 1.0}], so
+        # la dimensione nel messaggio concorda: «i pesi delle valute», «i pesi dei settori»
+        for dim, voce, atteso in (("valuta", "USD", "i pesi delle valute di"), ("settore", "Energy", "i pesi dei settori di"),
+                                  ("paese", "US", "i pesi dei paesi di")):
+            somma = os.path.join(tmp, "somma.csv")
+            open(somma, "w", encoding="utf-8").write(f"strumento;dimensione;voce;peso;isin\nDE0007164600;{dim};{voce};50;\n")
+            rc, so, se = run_script_split(asset(*LT), "--composizione", somma, "--posizioni", broker, cwd=tmp)
+            assert rc == 1 and atteso in se and "sommano a" in se, (dim, se[-300:])
         storta = os.path.join(tmp, "storta.csv")
         open(storta, "w", encoding="utf-8").write("strumento;dimensione;voce;peso;isin\nDE0007164600;valuta;Dollari;100;\n")
         rc, so, se = run_script_split(asset(*LT), "--composizione", storta, "--posizioni", broker, cwd=tmp)
@@ -6780,6 +6844,14 @@ def t_lt_cruscotto():
     v10 = b_10["look_through"]["valute"]
     assert len(v10) == 9 and v10[-1]["nome"] == "altre 2 valute" and abs(v10[-1]["peso"] - (.004 + .003)) < 1e-12, v10
     assert v10[7]["nome"] == "SEK" and b_10["look_through"]["quota_euro"] is None
+    # una sola valuta oltre le prime otto: «altra 1 valuta»
+    def nove_valute(d):
+        d["valute"] += [{"voce": c, "nome": c, "peso": p} for c, p in
+                        (("CHF", .009), ("AUD", .008), ("CAD", .007), ("SEK", .006), ("NOK", .004))]
+        d["quota_euro"] = None
+    rc, _, se, b_9, _ = _cruscotto(_json_variante("lt.json", nove_valute))
+    assert rc == 0 and len(b_9["look_through"]["valute"]) == 9, se[-300:]
+    assert b_9["look_through"]["valute"][-1] == {"nome": "altra 1 valuta", "peso": .004}, b_9["look_through"]["valute"]
     # revisione finale I1: una posizione diretta descritta a mano con una riga «titolo» è una posizione dell'utente e non
     # entra nella pagina; M3: N_TITOLI_REPORT taglia la lista e la quota insieme
     tmp = os.path.dirname(js["lt.json"])
@@ -6799,6 +6871,20 @@ def t_lt_cruscotto():
     assert b_d["look_through"]["n_titoli_diretti"] == 2 and abs(b_d["look_through"]["quota_primi_titoli"] - r["quota_primi_titoli"]) < 1e-12
     for vietato in ("BTP Futura", "SAP SE", "IT0005454241", "DE0007164600"):
         assert vietato not in html_dirette, vietato
+    # una posizione diretta con l'ISIN di un titolo di un ETF: il suo nome («Azioni del nonno») non rappresenta il titolo
+    with open(os.path.join(FIXTURES, "composizione-look-through-v5.csv"), encoding="utf-8") as f, \
+         open(os.path.join(tmp, "comp-nonno.csv"), "w", encoding="utf-8") as g:
+        g.write(f.read() + "IE00B4L5Y983;titolo;SAP SE;2,00;DE0007164600\nDE0007164600;titolo;Azioni del nonno;100;DE0007164600\n")
+    rc, out = run_script(asset(*LT), "--composizione", "comp-nonno.csv", "--posizioni", "broker-lt.json", "--json", "lt-nonno.json", cwd=tmp)
+    assert rc == 0, out[-400:]
+    r = json.load(open(os.path.join(tmp, "lt-nonno.json"), encoding="utf-8"))
+    sap = [t for t in r["titoli"] if "DE0007164600" in t["isin"]]
+    assert len(sap) == 1 and sap[0]["nome"] == "SAP SE" and sap[0]["diretto"] is False, sap
+    assert not any("nonno" in t["nome"] for t in r["titoli"]), r["titoli"]
+    rc, _, se, b_n, html_nonno = _cruscotto(os.path.join(tmp, "lt-nonno.json"))
+    assert rc == 0, se[-300:]
+    assert "SAP SE" in [t["nome"] for t in b_n["look_through"]["titoli"]] and b_n["look_through"]["n_titoli_diretti"] == 0
+    assert "Azioni del nonno" not in html_nonno and "Azioni del nonno" not in json.dumps(b_n), "la posizione diretta è nella pagina"
     def peso_testo(d):
         d["titoli"][0]["peso"] = "5"
     rc, _, se, _, _ = _cruscotto(_json_variante("lt.json", peso_testo))
@@ -6819,6 +6905,9 @@ def t_lt_cruscotto():
             assert "1 posizione senza composizione" in testo and "minimo della concentrazione" in testo, testo[:800]
             assert formato_it_percento(lt["copertura"]["settori"]) in testo, testo[:800]
             assert "Regioni (copertura" in testo and "Valute (copertura" in testo and "In euro:" in testo, testo[:1200]
+            # l'ordine dei grafici (spec §7.3): settori, regioni, paesi, valute, primi titoli
+            ordine = [testo.index(t + " (copertura") for t in ("Settori", "Regioni", "Paesi", "Valute", "Primi titoli")]
+            assert ordine == sorted(ordine), ordine
             page, errori, eccezioni, _ = _apri_cruscotto(br, html_10)
             testo = page.inner_text("#sez-look_through")
             assert errori == [] and "Valute (copertura" in testo and "In euro:" not in testo, testo[:1200]
@@ -6862,6 +6951,15 @@ def t_lt_documentazione():
     t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
     assert "[x] **Look-through del portafoglio**" in t16 and "2026-11-01-look-through" in t16, t16[:1200]
     assert "regioni" in t16 and "ISIN dei titoli" in t16 and "valuta" in t16
+    # revisione finale: Step 8 chiede di cercare «Hedged» prima di importare; reference e Riferimenti allineati alle valute
+    assert "Hedged" in step8 and "Hedged" in ref.split("## Classi con copertura del cambio")[1].split("\n## ")[0], "manca il controllo dei nomi coperti"
+    assert "settori, paesi, valute e titoli descrivono il collaterale" in ref and "quello francese di Amundi" not in ref
+    assert "Escluse da tutte e tre le dimensioni" in ref
+    riferimenti = skill.split("## Riferimenti")[1]
+    assert "--copertura" in riferimenti and "valuta" in riferimenti and "`isin`" in riferimenti and "regioni" in riferimenti
+    cu_ref = open(os.path.join(ob, "references", "capitale-umano.md"), encoding="utf-8").read()
+    assert "cinque colonne" in cu_ref and "`valuta`" in cu_ref
+    assert "colonne.valuta" in nr and "valuta_non_classificato" in nr and "il file non ha la colonna della valuta" in nr
 
 
 @test("T17 cruscotto: ponte pensione e riscatto della laurea nella sezione Pensione")

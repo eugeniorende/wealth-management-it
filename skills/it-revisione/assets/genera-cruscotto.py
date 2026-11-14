@@ -166,8 +166,8 @@ def _allocazione(alloc, rib):
 def _look_through(lt):
     """Solo gli aggregati del look-through: le posizioni dell'utente (nomi, ISIN) restano fuori dalla pagina,
     ne passa il numero e la quota di quelle senza composizione. Paesi oltre i primi dieci sommati in «altri», valute oltre le
-    prime otto in «altre N valute». Regioni, valute e quota in euro sono facoltative (un JSON della 0.12.0 non le ha): se
-    mancano valgono None e la pagina salta i due grafici. Gli ISIN dei titoli non passano."""
+    prime otto in «altre N valute» («altra 1 valuta» se una sola). Regioni, valute e quota in euro sono facoltative (un
+    JSON della 0.12.0 non le ha): se mancano valgono None e la pagina salta i due grafici. Gli ISIN dei titoli non passano."""
     if not lt:
         return None
     f, d = lt
@@ -180,7 +180,7 @@ def _look_through(lt):
     valute = voci("valute") if "valute" in d else None
     if valute is not None and len(valute) > 8:
         resto = valute[8:]
-        valute = valute[:8] + [{"nome": f"altre {len(resto)} valute", "peso": sum(v["peso"] for v in resto)}]
+        valute = valute[:8] + [{"nome": "altra 1 valuta" if len(resto) == 1 else f"altre {len(resto)} valute", "peso": sum(v["peso"] for v in resto)}]
     copertura = {k: numero_di(d, f"copertura.{k}", f) for k in ("settori", "paesi", "titoli")}
     for k in ("regioni", "valute"):
         if k in d:

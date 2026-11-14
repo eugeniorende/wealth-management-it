@@ -16,7 +16,7 @@ Regole applicate (references/composizione-etf.md, «Il look-through del portafog
 - le regioni (Nord America, America Latina e Caraibi, Europa, Asia, Oceania, Africa, Antartide) non si leggono dal
   CSV: derivano dai paesi con la classificazione ONU M49, hanno la stessa copertura dei paesi e sommano a 1;
 - le valute (codici ISO 4217, per esempio «USD») si aggregano come settori e paesi, con la loro copertura; «quota_euro»
-  è il peso dell'euro sulla parte coperta (0 se l'euro non c'è tra le valute coperte, assente se non c'è nessuna valuta);
+  è il peso dell'euro sulla parte coperta (0 se l'euro non c'è tra le valute coperte, null se non c'è nessuna valuta);
   una posizione diretta si descrive a mano («IT0005454241;valuta;EUR;100»);
 - i titoli sono i primi N di ogni ETF, quindi la concentrazione che ne risulta è un MINIMO, non il totale;
 - lo stesso titolo scritto da due emittenti in modi diversi («Apple Inc.», «APPLE INC») si somma con una chiave
@@ -162,7 +162,7 @@ def _numero_csv(testo):
 
 def leggi_composizione(path, avvisi=None):
     """{chiave: {"settori": {GICS: frazione}, "paesi": {ISO: frazione}, "titoli": {nome: frazione},
-    "valute": {ISO 4217: frazione}, "isin": {nome del titolo: ISIN}}} dal CSV dell'importatore (strumento;dimensione;voce;peso;isin, o senza l'ultima
+    "valute": {ISO 4217: frazione}, "isin": {nome del titolo: tupla ordinata dei suoi ISIN}}} dal CSV dell'importatore (strumento;dimensione;voce;peso;isin, o senza l'ultima
     colonna) o dal vecchio strumento;settore;peso (solo settori). L'ISIN è del solo titolo, non è una dimensione.
     Pesi in percento o in frazione, per strumento e dimensione: settori, paesi e valute come in capitale-umano.py (somma
     sopra 1,5 → percento); i titoli seguono la scala delle altre dimensioni dello strumento, o sono percento se
@@ -187,7 +187,7 @@ def leggi_composizione(path, avvisi=None):
     else:
         errore(f"--composizione {path}: colonne non riconosciute ({';'.join(colonne)}): servono "
                "strumento;dimensione;voce;peso;isin (da importa-composizione-etf.py), la stessa senza isin o strumento;settore;peso")
-    comp, percento = {}, {}
+    comp, percento, isin_per_nome = {}, {}, {}
     for r in lettore:
         r = {k.strip().lower(): (v or "").strip() for k, v in r.items() if k is not None}
         if not any(r.values()):
@@ -225,8 +225,10 @@ def leggi_composizione(path, avvisi=None):
         if dim == "titoli" and isin:
             if not ISIN_TITOLO.fullmatch(isin):
                 errore(f"--composizione: ISIN {r['isin']!r} malformato per il titolo {voce!r} ({strumento})")
-            scheda["isin"][voce] = isin
+            isin_per_nome.setdefault((strumento, voce), set()).add(isin)
     for strumento, dims in comp.items():
+        # un emittente può ripetere il nome di un titolo con ISIN diversi (le obbligazioni): nessun ISIN si perde
+        dims["isin"] = {voce: tuple(sorted(i)) for (s_, voce), i in isin_per_nome.items() if s_ == strumento}
         scala_nota = None
         for dim in ("settori", "paesi", "valute"):
             voci = dims[dim]
@@ -239,7 +241,8 @@ def leggi_composizione(path, avvisi=None):
                     voci[k] /= 100
             totale = sum(voci.values())
             if abs(totale - 1) > 0.02:
-                errore(f"--composizione: i pesi dei {dim} di {strumento!r} sommano a {pct(totale)}, non a 100%")
+                articolata = {"settori": "dei settori", "paesi": "dei paesi", "valute": "delle valute"}[dim]
+                errore(f"--composizione: i pesi {articolata} di {strumento!r} sommano a {pct(totale)}, non a 100%")
         titoli = dims["titoli"]
         if titoli:
             esplicito = percento.get((strumento, "titoli"))
@@ -380,20 +383,24 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
             if not k:
                 avvisi.append(f"titolo «{nome}» di {v['chiave']} ignorato: dopo la pulizia del nome non resta nulla")
                 continue
-            isin = c["isin"].get(nome)
+            isin = c["isin"].get(nome, ())
             radice(("nome", k))
-            if isin:
-                padre[radice(("isin", isin))] = radice(("nome", k))
+            for i in isin:
+                padre[radice(("isin", i))] = radice(("nome", k))
             righe_titoli.append((v, nome, k, isin, v["valore"] * peso / V_t))
     titoli = {}
     for v, nome, k, isin, contributo in righe_titoli:
-        t = titoli.setdefault(radice(("nome", k)), {"peso": 0.0, "nomi": {}, "da": {}, "isin": set()})
+        t = titoli.setdefault(radice(("nome", k)), {"peso": 0.0, "nomi": {}, "nomi_etf": {}, "da": {}, "isin": set()})
         t["peso"] += contributo
         t["nomi"][nome] = t["nomi"].get(nome, 0.0) + contributo
+        if v["chiave"] not in diretti:
+            t["nomi_etf"][nome] = t["nomi_etf"].get(nome, 0.0) + contributo
         t["da"][v["chiave"]] = t["da"].get(v["chiave"], 0.0) + contributo
-        if isin:
-            t["isin"].add(isin)
-    lista_titoli = [{"nome": max(t["nomi"], key=t["nomi"].get), "peso": t["peso"],
+        t["isin"].update(isin)
+    # il nome è quello dello strumento che contribuisce di più; se c'è uno strumento che non è una posizione diretta
+    # si sceglie tra i suoi nomi: l'etichetta scritta a mano su una posizione diretta («Azioni del nonno») non rappresenta
+    # il titolo e non deve arrivare al cruscotto
+    lista_titoli = [{"nome": max(t["nomi_etf"] or t["nomi"], key=(t["nomi_etf"] or t["nomi"]).get), "peso": t["peso"],
                      "da": [s for s, _ in sorted(t["da"].items(), key=lambda kv: -kv[1])],
                      "diretto": all(s in diretti for s in t["da"]), "isin": sorted(t["isin"])}
                     for t in sorted(titoli.values(), key=lambda t: -t["peso"])]
@@ -452,7 +459,8 @@ def stampa(r):
     primi, altre = r["valute"][:N_VALUTE_REPORT], r["valute"][N_VALUTE_REPORT:]
     riga = " · ".join(f"{x['nome']} {pct(x['peso'])}" for x in primi)
     if altre:
-        riga += f" · altre {len(altre)} valute {pct(sum(x['peso'] for x in altre))}"
+        riga += (f" · {'altra 1 valuta' if len(altre) == 1 else f'altre {len(altre)} valute'} "
+                 f"{pct(sum(x['peso'] for x in altre))}")
     print("   " + (riga or "nessuna posizione con le valute"))
     if r["quota_euro"] is not None:
         print(f"   In euro: {pct(r['quota_euro'])} della parte coperta.")
