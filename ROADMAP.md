@@ -245,6 +245,7 @@ Il proprietario ha chiesto di completare le voci rimaste aperte: gli «sviluppi 
   - [ ] Cruscotto: archivio e confronto tra due revisioni, versione anonimizzata per la condivisione.
 - [ ] **Ondata 2 — capitale umano, il modello** (0.14.0): volatilità personale del reddito dall'estratto INPS; secondo reddito del nucleo.
 - [ ] **Ondata 3 — calibrazione e parametri 2027** (0.14.0, da febbraio 2027, quando sono uscite le circolari INPS): `R_F`, `p_u` e `durata_anni`, NASpI, `sigma_h`, rendimenti azionari non USA, parametri 2027 del calendario.
+  - [ ] Igiene della suite, dalla revisione finale dell'ondata 0, da fare prima di luglio 2027: il test del filtro `--only`/`--skip` pretende che il test di freshness passi, e dalla scadenza dei marcatori di giugno 2026 fermerebbe la CI delle PR; `_json_esempio()` fissa `ANNI=25` e sei test del cruscotto cadono quando la persona della fixture compie 38 anni arrotondati (metà settembre 2027).
 - [ ] **Ondata 4 — postura** (0.15.0, prima di giugno 2027 o dopo la riverifica dei marcatori): polizza vita; aggiustamento dei target, che aspetta dal proprietario la decisione sulla postura.
 
 Fuori dal programma, perché non si chiudono con il lavoro: le riverifiche di giugno e ottobre 2027, la citazione principale sul testo unico nuovo quando la prassi dell'Agenzia lo segue, i correttivi del D.Lgs. 117/2026. Restano nel calendario del README.

@@ -57,7 +57,7 @@ Implicazione importante per RAL alti: per chi guadagna oltre il tetto, la pensio
 
 ## Coefficienti di trasformazione 2027-2028 — Tabella ufficiale del decreto 16/10/2026
 
-Tabella completa dal decreto direttoriale del Ministero del Lavoro e delle Politiche Sociali, di concerto con il Ministero dell'Economia e delle Finanze, del 16 ottobre 2026 (articolo unico, sul sito del Ministero; la Gazzetta Ufficiale si cita quando esce). Aggiorna la Tabella A dell'Allegato 2 della Legge 247/2007 e la Tabella A della Legge 335/1995. Valido per le pensioni con decorrenza dal **1° gennaio 2027** (biennio 2027-2028). Per le decorrenze fino al 31 dicembre 2026 valgono ancora i coefficienti 2025-2026 (decreto direttoriale del 20 novembre 2024, GU n. 35 del 12 febbraio 2025): cinque età sono nel confronto qui sotto, la tabella intera è nel decreto. Verificato: 2026-11.
+Tabella completa dal decreto direttoriale del Ministero del Lavoro e delle Politiche Sociali, di concerto con il Ministero dell'Economia e delle Finanze, del 16 ottobre 2026 (articolo unico, sul sito del Ministero; la Gazzetta Ufficiale si cita quando esce). Aggiorna la Tabella A dell'Allegato 2 della Legge 247/2007 e la Tabella A della Legge 335/1995. Valido per le pensioni con decorrenza dal **1° gennaio 2027** (biennio 2027-2028). Verificato: 2026-11. Alle decorrenze fino al 31 dicembre 2026 si applicano i coefficienti 2025-2026 (decreto direttoriale del 20 novembre 2024, GU n. 35 del 12 febbraio 2025): cinque età sono nel confronto qui sotto, la tabella intera è nel decreto.
 
 | Età | Divisore | Coefficiente |
 |---|---|---|

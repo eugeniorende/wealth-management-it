@@ -132,6 +132,7 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 | `it-pianificazione-obiettivi/references/asset-location.md` | 2026-10 | 2027-10 |
 | `it-pianificazione-obiettivi/references/capitale-umano.md` | 2026-10 | 2027-10 |
 | `it-pianificazione/SKILL.md` | 2026-10 | 2027-10 |
+| `it-pianificazione/assets/importa-previdenza.py` | 2026-10 | 2027-10 |
 | `it-pianificazione/assets/proiezione-inps.py` | 2026-10 | 2027-10 |
 | `it-pianificazione/assets/riscatto-laurea.py` | 2026-10 | 2027-10 |
 | `it-pianificazione/references/previdenza-complementare.md` | 2026-10 | 2027-10 |
@@ -148,7 +149,6 @@ I dati normativi (aliquote, scaglioni, coefficienti, requisiti) portano il marca
 | `it-tax-optimization/references/multi-intermediario.md` | 2026-10 | 2027-10 |
 | `it-tax-optimization/references/successione-donazione.md` | 2026-10 | 2027-10 |
 | `it-pianificazione-obiettivi/assets/capitale-umano.py` | 2026-11 | 2027-11 |
-| `it-pianificazione/assets/importa-previdenza.py` | 2026-11 | 2027-11 |
 
 **Calendario dei parametri da riverificare** (stato a novembre 2026):
 

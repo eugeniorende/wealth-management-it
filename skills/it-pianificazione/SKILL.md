@@ -230,7 +230,7 @@ pensione_netta_annua = pensione_lorda_annua - IRPEF - addizionali
 **Esempio del perché conta** (caso d'esempio: 37 anni, pensione a 67 = 30 anni di orizzonte):
 - Coefficiente attuale a 67 anni: 5,514%
 - Coefficiente proiettato al 2056 (15 bienni × −1,8%): **4,199%**
-- Su un montante di €786k: pensione lorda €33.004 col proiettato, contro €43.340 col coefficiente attuale (sovrastima del 31%!). Il tasso di sostituzione passa da un irrealistico 78% a un realistico 60%.
+- Su un montante di €786k: pensione lorda €33.004 col proiettato, contro €43.340 col coefficiente attuale (sovrastima del 31%!). Il tasso di sostituzione passa da un irrealistico 78% a un realistico 59%.
 
 Output Step 2:
 - Pensione lorda mensile/annua attesa

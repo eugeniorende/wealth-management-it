@@ -786,6 +786,18 @@ def t_tassi_capitalizzazione():
     for cattivo in ("ANNO_CORRENTE=1990", "ANNO_CORRENTE=2026.5", "ANNO_CORRENTE='prossimo'"):
         rc, so, se = run_script_split(P, X, "--set", cattivo)
         assert rc == 1 and se.lstrip().startswith("ERRORE:") and "ANNO_CORRENTE" in se and "Traceback" not in se, (cattivo, se[-200:])
+    # revisione finale dell'ondata 0, M-5: un anno prima delle retribuzioni dell'estratto le lascia fuori, e lo script lo dice
+    rc, out = run_script(P, X, "--set", "ANNO_CORRENTE=2023")
+    avviso = next((r for r in out.splitlines() if "restano fuori dal montante" in r), "")
+    assert rc == 0 and "2024" in avviso and "2023" in avviso, out[-600:]
+    assert euro(out, "MONTANTE CONTRIBUTIVO RICOSTRUITO") == 9900, "solo il 2023: 30.000 × 33%"
+    rc, out = run_script(P, X, "--set", "ANNO_CORRENTE=2024")
+    assert rc == 0 and "restano fuori dal montante" not in out, out[-600:]
+    # M-1: il marcatore di novembre copre la serie ISTAT riletta sull'allegato; la regola del DL 65/2015 resta a ottobre
+    commento = " ".join(open(P, encoding="utf-8").read().split("TASSI_CAPITALIZZAZIONE = {")[0][-900:].replace("#", " ").split())
+    m_istat = re.search(r"nota ISTAT prot\. 2582754/26 del 16/10/2026[^—]*— Verificato: 2026-11", commento)
+    assert m_istat and "DL 65/2015" not in m_istat.group(0), commento
+    assert re.search(r"DL 65/2015 — Verificato: 2026-10", commento), commento
     tmp = tempfile.mkdtemp()
     try:
         for inizio, intervallo in ((1995, "(1995,"), (1990, "(1990-1995,")):
@@ -799,6 +811,18 @@ def t_tassi_capitalizzazione():
             atteso = m.ricostruisci_montante({a: 30_000.0 for a in range(1996, 2026)}, 2026)[0]
             assert abs(euro(out, "MONTANTE CONTRIBUTIVO RICOSTRUITO") - atteso) <= 1, \
                 f"carriera dal {inizio}: il montante stampato deve contare solo i contributi dal 1996"
+        # revisione finale dell'ondata 0, M-4a: anche l'ultimo anno dei versamenti al fondo segue ANNO_CORRENTE
+        fondo = os.path.join(tmp, "fondo-due-anni.csv")
+        intestazione = open(os.path.join(FIXTURES, "storico-fondo-test.csv"), encoding="utf-8-sig").read().splitlines()[0]
+        with open(fondo, "w", encoding="utf-8") as f:
+            f.write(intestazione + "\n"
+                    "15/06/2024;VERSAMENTO;FONDO TEST COMPARTO AZIONARIO;150,000;0,000;0,000;1.500,00;0,00;0,00;10,000;+\n"
+                    "15/06/2025;VERSAMENTO;FONDO TEST COMPARTO AZIONARIO;200,000;0,000;0,000;2.000,00;0,00;0,00;10,000;+\n")
+        for anno, versato, osservato in ((2026, 2000.0, 2025), (2025, 1500.0, 2024)):
+            j = os.path.join(tmp, f"fondo-{anno}.json")
+            rc, out = run_script(P, X, fondo, "--set", f"ANNO_CORRENTE={anno}", "--json", j)
+            assert rc == 0, out[-300:]
+            assert json.load(open(j, encoding="utf-8"))["fp_versamento_annuo"] == versato and f"osservato nel {osservato}" in out, (anno, out[-400:])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -1490,6 +1514,21 @@ def t_coefficienti_testi_2027():
         assert "20/11/2024" not in testo and "16/10/2026" in testo, f"{nome}: il decreto citato è ancora quello del 2024"
     # Review Focus 1 e 2: i JSON e i fogli compilati prima dell'aggiornamento portano i numeri vecchi
     assert "rilancia la catena dall'inizio" in skill and "foglio Coefficienti della tua copia" in skill
+    # revisione finale dell'ondata 0, I-1: chi usa l'Excel degli autonomi ha solo la sua copia del foglio
+    autonomi = leggi("it-pianificazione-autonomi", "SKILL.md")
+    assert "foglio Coefficienti della tua copia" in autonomi and "prima della 0.13.0" in autonomi
+    # M-6: 33.004 / 43.340 × 78% = 59,4%
+    assert "da un irrealistico 78% a un realistico 59%" in skill
+    # M-1 e M-7: il marcatore sta sul decreto nuovo, non sulla citazione del vecchio, e la frase non invecchia a gennaio
+    sezione = rif.split("## Coefficienti di trasformazione 2027-2028")[1].split("\n| Età |")[0]
+    assert sezione.index("Verificato: 2026-11") < sezione.index("20 novembre 2024") and "valgono ancora" not in sezione, sezione
+    # M-2: la storia delle due skill dice tutto ciò che la versione porta, non solo ciò che era fatto al primo commit
+    storia = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## Storia delle skill")[1]
+    v014 = storia.split("#### v0.14 (plugin 0.13.0)")[1].split("####")[0]
+    v06 = storia.split("#### v0.6 (plugin 0.13.0)")[1].split("####")[0]
+    for parola in ("foglio Coefficienti di", "tasso di capitalizzazione 2026", "ANNO_CORRENTE"):
+        assert parola in v014, f"storia di it-pianificazione v0.14: manca «{parola}»"
+    assert "foglio Coefficienti di" in v06 and "copia già compilata" in v06, v06
 
 
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════

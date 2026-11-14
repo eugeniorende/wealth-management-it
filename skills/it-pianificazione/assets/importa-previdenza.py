@@ -56,9 +56,9 @@ ANNO_CORRENTE = None      # anno a cui si ferma la ricostruzione del montante: N
 # Convenzione: TASSO[X] rivaluta al 31/12/X il montante accumulato fino al 31/12/(X-1); vale per le
 # pensioni con decorrenza dall'anno X+1. Le tabelle INPS etichettano lo stesso valore col 31/12/(X-1).
 # Tassi ISTAT 1996-2026: nota ISTAT prot. 2582754/26 del 16/10/2026 (lavoro.gov.it), con la serie
-# allegata; regola del minimo e del recupero dal DL 65/2015 — Verificato: 2026-11. I valori applicati
-# da INPS per 2014, 2021 e 2022 (minimo e recupero) vengono dai messaggi INPS 840/2024 e 707/2026,
-# letti in copia.
+# allegata — Verificato: 2026-11. Regola del minimo e del recupero: DL 65/2015 — Verificato: 2026-10.
+# I valori applicati da INPS per 2014, 2021 e 2022 (minimo e recupero) vengono dai messaggi INPS
+# 840/2024 e 707/2026, letti in copia.
 TASSI_CAPITALIZZAZIONE = {
     1996: 1.062054,   # rivaluta il montante al 31/12/1995, che nel contributivo è zero (INPS pubblica dal 1997)
     1997: 1.055871, 1998: 1.053597, 1999: 1.056503, 2000: 1.051781, 2001: 1.047781,
@@ -339,6 +339,11 @@ def main():
         print(f"  ⚠ tasso {ultimo + 1}{'-' + str(max(dopo)) if max(dopo) > ultimo + 1 else ''} "
               f"non ancora pubblicato: il montante al 31/12/{ultimo} non è ancora rivalutato "
               f"per gli anni successivi")
+    oltre = sorted(a for a in retrib if a > anno_corrente)
+    if oltre:
+        intervallo = f"del {oltre[0]}" if len(oltre) == 1 else f"dal {oltre[0]} al {oltre[-1]}"
+        print(f"  ⚠ le retribuzioni {intervallo} vengono dopo l'anno corrente ({anno_corrente}) e restano fuori dal montante: "
+              "controlla ANNO_CORRENTE")
     if prima:
         anni_prima = sum(sett[a] for a in prima) / 52
         intervallo = f"{prima[0]}-{prima[-1]}" if len(prima) > 1 else f"{prima[0]}"
