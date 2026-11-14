@@ -133,7 +133,7 @@ Rispetto al 2025-2026 i coefficienti scendono tra l'1,21% (57 anni) e l'1,97% (7
 
 ### 6.3 Pesi settoriali dell'indice mondiale
 
-`PESI_MONDO` di `capitale-umano.py` viene dalla scheda MSCI ACWI del 30/09/2026. Si aggiorna all'ultima scheda mensile disponibile, dalla stessa fonte indicata nel commento. Perché «manuale a ogni release» non resti una promessa:
+`PESI_MONDO` di `capitale-umano.py` viene dalla scheda MSCI ACWI del 30/09/2026. Si aggiorna all'ultima scheda mensile disponibile, dalla stessa fonte indicata nel commento. La scheda del **30/10/2026**, letta il 14/11/2026 dalla sessione, dà: Information Technology 31,18%, Financials 16,63%, Industrials 10,23%, Health Care 9,36%, Consumer Discretionary 8,57%, Communication Services 7,04%, Consumer Staples 5,09%, Energy 4,49%, Materials 3,45%, Utilities 2,44%, Real Estate 1,53% (somma 100,01%). Il costruttore la rilegge, e usa quella di novembre se nel frattempo è uscita. Perché «manuale a ogni release» non resti una promessa:
 
 - il commento prende il marcatore `Verificato: AAAA-MM` e `capitale-umano.py` entra in `OBBLIGATI_FRESHNESS` (servirà anche alla NASpI dell'ondata 3);
 - la sezione «Release» del README aggiunge il passo.
