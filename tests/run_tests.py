@@ -4746,6 +4746,19 @@ def t_cu_profili():
     assert e["p_u"] == 0.08 and p["privato_ciclico"]["p_u"] == 0.05   # l'override non tocca la tabella
 
 
+@test("T15 capitale umano: pesi MSCI ACWI della scheda del 30/10/2026, marcatore «Verificato» obbligatorio")
+def t_cu_pesi_mondo():
+    m = carica_modulo(asset(*CU))
+    assert m.PESI_MONDO == {
+        "Information Technology": 0.3118, "Financials": 0.1663, "Industrials": 0.1023, "Health Care": 0.0936,
+        "Consumer Discretionary": 0.0857, "Communication Services": 0.0704, "Consumer Staples": 0.0509,
+        "Energy": 0.0449, "Materials": 0.0345, "Utilities": 0.0244, "Real Estate": 0.0153}, m.PESI_MONDO
+    sorgente = open(asset(*CU), encoding="utf-8").read()
+    commento = sorgente.split("PESI_MONDO = {")[0][-600:]
+    assert "30/10/2026" in commento and re.search(r"Verificato: \d{4}-\d{2}", commento), commento
+    assert "it-pianificazione-obiettivi/assets/capitale-umano.py" in OBBLIGATI_FRESHNESS
+
+
 def _cu(*args, cwd=None):
     return run_script_split(asset(*CU), *args, cwd=cwd)
 
@@ -5419,7 +5432,7 @@ def t_ce_documentazione():
     step8 = skill.split("Step 8")[1]
     assert "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" in step8 and "--strumento" in step8
     assert step8.index("importa-composizione-etf.py") < step8.index("capitale-umano.py\" --dati"), step8[:600]
-    assert "references/composizione-etf.md" in skill and 'version: "0.24"' in skill
+    assert "references/composizione-etf.md" in skill and 'version: "0.25"' in skill
     ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
     for parola in ("iShares", "Xtrackers", "Vanguard", "Amundi", "SPDR", "ICB", "da confermare", "non si ridistribuisc",
                    "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py"):
@@ -6537,7 +6550,7 @@ def t_lt_documentazione():
     skill = open(os.path.join(ob, "SKILL.md"), encoding="utf-8").read()
     step8 = skill.split("Step 8")[1]
     assert "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" in step8 and "--posizioni" in step8 and "--isin" in step8
-    assert 'version: "0.24"' in skill and "look-through-portafoglio.py" in skill.split("## Riferimenti")[1]
+    assert 'version: "0.25"' in skill and "look-through-portafoglio.py" in skill.split("## Riferimenti")[1]
     ref = open(os.path.join(ob, "references", "composizione-etf.md"), encoding="utf-8").read()
     for parola in ("look-through", "titolo", "ISIN", "a mano", "copertura", "minimo"):
         assert parola in ref, parola
@@ -6699,6 +6712,7 @@ OBBLIGATI_FRESHNESS = (
     "it-pianificazione-autonomi/references/fiscalita-forfettario.md",
     "it-pianificazione-obiettivi/references/asset-location.md",
     "it-pianificazione-obiettivi/references/capitale-umano.md",
+    "it-pianificazione-obiettivi/assets/capitale-umano.py",
     "it-rebalance/SKILL.md",
     "it-revisione/assets/genera-ips.py",
 )

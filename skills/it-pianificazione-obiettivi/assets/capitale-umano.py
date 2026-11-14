@@ -75,13 +75,13 @@ SETTORI_GICS = {
     "Real Estate": "Immobiliare",
 }
 
-# Pesi dei settori nell'indice MSCI ACWI (USD), dalla scheda ufficiale MSCI «Index Factsheet» del 30/09/2026,
-# sezione Sector Weights: https://www.msci.com/documents/10199/255599/msci-acwi-net.pdf
+# Pesi dei settori nell'indice MSCI ACWI (USD), dalla scheda ufficiale MSCI «Index Factsheet» del 30/10/2026,
+# sezione Sector Weights: https://www.msci.com/documents/10199/255599/msci-acwi-net.pdf — Verificato: 2026-11
 # Da riverificare a ogni release: il peso della tecnologia cambia di qualche punto in pochi mesi.
 PESI_MONDO = {
-    "Information Technology": 0.3321, "Financials": 0.1617, "Industrials": 0.1027, "Health Care": 0.0842,
-    "Consumer Discretionary": 0.0824, "Communication Services": 0.0801, "Consumer Staples": 0.0451,
-    "Energy": 0.0396, "Materials": 0.0351, "Utilities": 0.0225, "Real Estate": 0.0145,
+    "Information Technology": 0.3118, "Financials": 0.1663, "Industrials": 0.1023, "Health Care": 0.0936,
+    "Consumer Discretionary": 0.0857, "Communication Services": 0.0704, "Consumer Staples": 0.0509,
+    "Energy": 0.0449, "Materials": 0.0345, "Utilities": 0.0244, "Real Estate": 0.0153,
 }
 
 

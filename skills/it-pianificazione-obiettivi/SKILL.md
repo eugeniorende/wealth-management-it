@@ -2,7 +2,7 @@
 name: it-pianificazione-obiettivi
 description: "Pianificazione finanziaria per obiettivi (goals-based) per investitori privati italiani: più obiettivi (fondo di emergenza, casa, università dei figli, pensione integrativa, obiettivi liberi), ciascuno con orizzonte, importo e priorità, profilo di allocazione e piano di accumulo. Usa questa skill quando l'utente parla di pianificare gli investimenti, da dove iniziare, quanto mettere da parte al mese, fondo di emergenza, risparmiare per la casa o per i figli, asset allocation per obiettivo, orizzonte e rischio, «ho X € e non so come allocarli», PAC, bucket strategy, probabilità di raggiungere un obiettivo, Monte Carlo del piano, glide path, capitale umano (reddito da lavoro nella ricchezza totale, «sono un'azione o un'obbligazione?»). È il passo a monte di `it-rebalance`: definisce l'allocazione target che quella mantiene. Postura educativa e metodologica: mostra allocazioni-tipo come esempi, NON raccomanda titoli specifici, NON sceglie l'allocazione al posto dell'utente e NON è consulenza di investimento."
 metadata:
-  version: "0.24"
+  version: "0.25"
 ---
 
 # it-pianificazione-obiettivi

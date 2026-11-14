@@ -386,6 +386,9 @@ Le note di ogni iterazione, fino alla 0.10.0 tenute in fondo a ciascun `SKILL.md
 
 ### it-pianificazione-obiettivi
 
+#### v0.25 (plugin 0.13.0)
+- `capitale-umano.py`: pesi settoriali dell'indice mondiale dalla scheda MSCI ACWI del 30/10/2026, con il marcatore `Verificato`; il file entra tra quelli che il test di freshness obbliga a riverificare.
+
 #### v0.24 (plugin 0.12.0)
 - Look-through del portafoglio (`look-through-portafoglio.py`) nello Step 8; l'importatore scrive i primi titoli, accetta l'ISIN come chiave (`--isin`) e legge i file in tedesco e in francese; `capitale-umano.py` confronta le posizioni per ISIN.
 
