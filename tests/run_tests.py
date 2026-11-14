@@ -7090,14 +7090,77 @@ def t_t17_browser_anonimo():
     tmp = tempfile.mkdtemp()
     try:
         prima, ora = _revisioni_di_prova(tmp)
-        rc, so, se, pieno, _ = _cruscotto(*ora, extra=("--precedente", prima))
+        rc, so, se, pieno, html_pieno = _cruscotto(*ora, extra=("--precedente", prima))
         rc, so, se, anon, html = _cruscotto(*ora, extra=("--precedente", prima, "--anonimo"))
         assert rc == 0, se[-300:]
+        blocco_dati = re.compile(r'(<script id="dati" type="application/json">)(.*?)(</script>)', re.S)
+        def con_dati(pagina_html, modifica):
+            """La stessa pagina con il bundle del blocco dati modificato da `modifica(bundle)`."""
+            bundle = json.loads(blocco_dati.search(pagina_html).group(2))
+            modifica(bundle)
+            dati = json.dumps(bundle, ensure_ascii=False).replace("<", "\\u003c")
+            return blocco_dati.sub(lambda m: m.group(1) + dati + m.group(3), pagina_html, count=1)
+        def nullo(percorso):
+            def modifica(bundle):
+                nodo = bundle
+                for chiave in percorso[:-1]:
+                    nodo = nodo[chiave]
+                nodo[percorso[-1]] = None
+            return modifica
+        # il testo della pagina compreso quello dei <details> chiusi (inner_text non lo vede) e dei <title> dei grafici
+        TESTO_COMPLETO = """() => { const c = document.body.cloneNode(true);
+            c.querySelectorAll("script, style").forEach(e => e.remove()); return c.textContent; }"""
+        ID_SEZIONI = "Array.from(document.querySelectorAll('section[id^=sez-]')).map(s => s.id)"
         with sync_playwright() as p:
             br = lancia(p)
             try:
                 page, errori, eccezioni, _ = _apri_cruscotto(br, html)
                 corpo = page.inner_text("body")
+                completo = page.evaluate(TESTO_COMPLETO)
+                assert "€" not in completo, completo[completo.index("€") - 60:completo.index("€") + 20]
+                for brutto in ("NaN", "undefined", "null", "Infinity"):
+                    assert brutto not in completo, (brutto, completo[completo.index(brutto) - 60:completo.index(brutto) + 40])
+                for nome in [o["nome"] for o in pieno["obiettivi"]["obiettivi"]] + list(pieno["fiscalita"]["per_broker"]) + [f["file"] for f in pieno["fonti"]]:
+                    assert nome not in completo, nome
+                # nessun importo vero dell'utente (scritto all'italiana) nemmeno nelle tabelle chiuse
+                for vero in (pieno["allocazione"]["capitale"], pieno["pensione"]["montante_fp"]["mediana"],
+                             pieno["pensione"]["inps"]["pensione_inps_lorda_annua"]):
+                    assert f"{round(vero):,}".replace(",", ".") not in completo, vero
+                # le stesse sezioni, nello stesso ordine, della pagina completa: nessuna sparisce in silenzio
+                pagina_piena = _apri_cruscotto(br, html_pieno)[0]
+                sezioni = page.evaluate(ID_SEZIONI)
+                assert sezioni == pagina_piena.evaluate(ID_SEZIONI) and len(sezioni) >= 9, sezioni
+                assert page.locator("section .avviso", has_text="Sezione non disegnata").count() == 0
+                # un campo a null, uno alla volta: nessun errore, nessun «null», nessuna sezione persa né saltata
+                CAMPI_NULLI = [("indicatori", 0, "fonte"), ("obiettivi", "modello"), ("obiettivi", "obiettivi", 0, "profilo"),
+                               ("obiettivi", "obiettivi", 0, "priorita"), ("pensione", "riscatto", "modalita"),
+                               ("capitale_umano", "settore", "settore"), ("look_through", "n_posizioni"), ("glide_path", "anni", 1),
+                               ("fiscalita", "zainetto", 0, "broker"), ("fiscalita", "zainetto", 0, "anno"),
+                               ("confronto", "plugin_precedente"), ("look_through", "settori", 0, "nome"),
+                               ("pensione", "netto", "scenari", 1, "nome"), ("capitale_umano", "voci", 1, "nome")]
+                for percorso in CAMPI_NULLI:
+                    variante, errori, eccezioni, _ = _apri_cruscotto(br, con_dati(html, nullo(percorso)))
+                    testo = variante.evaluate(TESTO_COMPLETO)
+                    assert errori == [] and eccezioni == [], (percorso, errori, eccezioni)
+                    for brutto in ("NaN", "undefined", "null", "Infinity"):
+                        assert brutto not in testo, (percorso, brutto, testo[testo.index(brutto) - 60:testo.index(brutto) + 40])
+                    assert variante.evaluate(ID_SEZIONI) == sezioni, (percorso, variante.evaluate(ID_SEZIONI))
+                    assert variante.locator("section .avviso", has_text="Sezione non disegnata").count() == 0, percorso
+                # «invariato» si decide sul valore mostrato: 0,4 su un indice è una variazione, non zero
+                def con_variazione(pagina_html, delta):
+                    def modifica(bundle):
+                        voce = next(v for v in bundle["confronto"]["voci"] if v["formato"] == "euro" and v["id"] == "capitale_allocato")
+                        voce.update(prima=2.0, ora=2.0 + delta, delta=delta, delta_rel=delta / 2.0)
+                    return con_dati(pagina_html, modifica)
+                def riga_capitale(pagina):
+                    return next(r for r in pagina.evaluate("""() => Array.from(document.querySelectorAll("#sez-confronto tr"))
+                        .map(r => r.textContent)""") if r.startswith("Capitale allocato"))
+                piccola = riga_capitale(_apri_cruscotto(br, con_variazione(html, 0.4))[0])
+                assert "invariato" not in piccola and "+0,40" in piccola, piccola
+                assert "invariato" in riga_capitale(_apri_cruscotto(br, con_variazione(html, 0.0))[0])
+                assert "invariato" in riga_capitale(_apri_cruscotto(br, con_variazione(html, 0.004))[0])     # a due decimali è 0,00
+                assert "invariato" in riga_capitale(_apri_cruscotto(br, con_variazione(html_pieno, 0.3))[0])
+                assert "invariato" not in riga_capitale(_apri_cruscotto(br, con_variazione(html_pieno, 20.0))[0])
                 assert errori == [] and eccezioni == [], (errori, eccezioni)
                 assert "€" not in corpo, corpo[corpo.index("€") - 60:corpo.index("€") + 20]
                 nota = page.inner_text("#nota-anonima")

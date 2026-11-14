@@ -196,11 +196,15 @@ footer .fonti { color: var(--muto); }
     return (v > 0.05 ? "+" : v < -0.05 ? "-" : "") + s + " punti";
   }
   function anni(x) { return ok(x) ? nfDec(Number.isInteger(x) ? 0 : 1).format(x) : "n/d"; }
+  // Un testo o un conteggio che manca (null) non si scrive mai come «null»: stringa vuota, e chi lo usa salta il frammento.
+  function S(x) { return x === null || x === undefined ? "" : String(x); }
+  function frasi(parti, sep) { return parti.filter(function (x) { return x; }).join(sep); }
 
   // ─── DOM: gli unici punti che creano nodi, i dati solo come testo ───
   function el(tag, attrs) {
     var n = document.createElement(tag);
     for (var k in attrs || {}) {
+      if (attrs[k] === null || attrs[k] === undefined) continue;
       if (k === "testo") n.textContent = attrs[k];
       else n.setAttribute(k, attrs[k]);
     }
@@ -213,7 +217,7 @@ footer .fonti { color: var(--muto); }
   }
   function sv(tag, attrs, titolo) {
     var n = document.createElementNS(SVGNS, tag);
-    for (var k in attrs || {}) n.setAttribute(k, attrs[k]);
+    for (var k in attrs || {}) if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
     if (titolo) { var t = document.createElementNS(SVGNS, "title"); t.textContent = titolo; n.appendChild(t); }
     return n;
   }
@@ -311,6 +315,7 @@ footer .fonti { color: var(--muto); }
 
   // Linee nel tempo: serie [{nome, valori, colore}], fascia {lo, hi}, marcatore {x, testo}.
   function linee(opz) {
+    opz.serie = opz.serie.map(function (x) { return Object.assign({}, x, { nome: S(x.nome) }); });
     var W = larghezza(), H = opz.altezza || 230, ml = opz.margineSx || 52, mr = 14, mt = 12, mb = 30;
     var xs = opz.x, n = xs.length;
     var tutti = [];
@@ -380,6 +385,7 @@ footer .fonti { color: var(--muto); }
 
   // Colonne impilate per anno: serie [{nome, valori, colore}], con 2px di superficie tra i segmenti.
   function colonneImpilate(opz) {
+    opz.serie = opz.serie.map(function (x) { return Object.assign({}, x, { nome: S(x.nome) }); });
     var W = larghezza(), H = 220, ml = 64, mr = 8, mt = 10, mb = 30;
     var n = opz.x.length;
     var totali = opz.x.map(function (_, i) {
@@ -440,6 +446,7 @@ footer .fonti { color: var(--muto); }
   // L'etichetta sta a sinistra (colonna larga quanto il nome più lungo, fino a un tetto) o sopra la barra su uno schermo stretto;
   // se non ci sta va a capo su due righe e, in ultimo, si accorcia: il nome intero resta nel <title>.
   function barre(righe, fmt, etichetta) {
+    righe = righe.map(function (r) { return Object.assign({}, r, { nome: S(r.nome) }); });
     if (ANON) righe = righe.filter(function (r) { return ok(r.valore); });       // un importo tolto non ha barra
     if (!righe.length) return el("div");
     var W = larghezza(), sopra = W < 520, mr = 84, ml = 0, largo = W - 4;
@@ -484,7 +491,7 @@ footer .fonti { color: var(--muto); }
       var a = X(Math.min(0, r.drift)), b = X(Math.max(0, r.drift));
       s.appendChild(sv("rect", { x: a, y: y + 6, width: Math.max(2, b - a), height: 12, rx: 3,
                                  fill: r.fuori ? "var(--serio)" : "var(--s1)" },
-                       r.classe + ": drift " + punti(r.drift) + (r.fuori ? ", fuori banda" : ", in banda")));
+                       S(r.classe) + ": drift " + punti(r.drift) + (r.fuori ? ", fuori banda" : ", in banda")));
       s.appendChild(testoSvg(ml - 8, y + 16, r.classe, { "text-anchor": "end", fill: "var(--testo-2)" }));
     });
     s.appendChild(sv("line", { x1: X(0), x2: X(0), y1: 0, y2: H - 22, stroke: "var(--asse)", "stroke-width": 1 }));
@@ -505,10 +512,15 @@ footer .fonti { color: var(--muto); }
   // ═══════════════════ SEZIONI ═══════════════════
 
   // Variazione tra due revisioni, neutra: segno e numero. Importi «+€10.000 (+7,7%)», quote «+1,4 punti».
+  // «invariato» si decide sul valore come si scrive: euro interi nella pagina normale, i decimali dell'indice in quella anonima.
+  function zeroMostrato(x) {
+    if (!ANON) return Math.round(x) === 0;
+    return !/[1-9]/.test(nfDec(Math.abs(x) >= 10 ? 1 : 2).format(Math.abs(x)));
+  }
   function variazione(v) {
     if (v.formato === "euro") {
       if (!ok(v.delta)) return "n/d";
-      if (Math.round(v.delta) === 0) return "invariato";
+      if (zeroMostrato(v.delta)) return "invariato";
       var d = (v.delta > 0 ? "+" : "") + euro(v.delta);
       if (!ok(v.delta_rel)) return d;
       var r = nfDec(1).format(Math.abs(v.delta_rel) * 100) + "%";
@@ -531,8 +543,8 @@ footer .fonti { color: var(--muto); }
         el("div", { class: "valore", "data-valore": ind.id, testo: v }),
         c ? el("div", { class: "fonte" }, "prima " + valoreVoce(c.formato, c.prima) + " · ",
                el("span", { style: "white-space: nowrap", testo: variazione(c) })) : null,
-        el("div", { class: "fonte", testo: (ANON && ind.formato === "euro" ? "(indice) · " : "") + (ind.nota ? ind.nota + " · " : "") +
-                                           "fonte: " + ind.fonte })));
+        el("div", { class: "fonte", testo: frasi([ANON && ind.formato === "euro" ? "(indice)" : "", S(ind.nota),
+                                                  ind.fonte ? "fonte: " + ind.fonte : ""], " · ") })));
     });
     s.appendChild(g);
     return s;
@@ -543,11 +555,11 @@ footer .fonti { color: var(--muto); }
 
   function sezioneConfronto(c) {
     if (!c) return null;
-    var s = sezione("confronto", "Rispetto alla revisione del " + dataIt(c.data_precedente),
+    var s = sezione("confronto", c.data_precedente ? "Rispetto alla revisione del " + dataIt(c.data_precedente) : "Rispetto alla revisione precedente",
       (ANON ? "Importi in indice, nominali" : "Importi nominali") + ", ognuno alla data della sua revisione: non sono corretti per l'inflazione.");
     if (c.versioni_diverse) {
-      s.appendChild(el("p", { class: "avviso", testo: "La revisione precedente è stata generata con la versione " + c.plugin_precedente +
-        " del plugin: parte delle differenze può venire da dati normativi e metodi aggiornati, non dalla tua situazione (vedi CHANGELOG)." }));
+      s.appendChild(el("p", { class: "avviso", testo: "La revisione precedente è stata generata con " +
+        (c.plugin_precedente ? "la versione " + c.plugin_precedente : "un'altra versione") + " del plugin: parte delle differenze può venire da dati normativi e metodi aggiornati, non dalla tua situazione (vedi CHANGELOG)." }));
     }
     SEZIONI_CONFRONTO.forEach(function (d) {
       var voci = c.voci.filter(function (v) { return v.sezione === d[0]; });
@@ -563,8 +575,8 @@ footer .fonti { color: var(--muto); }
       var barreProb = [];
       presenti.forEach(function (o) {
         if (!o.probabilita) return;
-        barreProb.push({ nome: o.nome + " · prima", valore: o.probabilita.prima, colore: "var(--s2)" });
-        barreProb.push({ nome: o.nome + " · ora", valore: o.probabilita.ora, colore: "var(--s1)" });
+        barreProb.push({ nome: S(o.nome) + " · prima", valore: o.probabilita.prima, colore: "var(--s2)" });
+        barreProb.push({ nome: S(o.nome) + " · ora", valore: o.probabilita.ora, colore: "var(--s1)" });
       });
       if (barreProb.length) {
         s.appendChild(legenda([{ nome: "probabilità di successo prima", colore: "var(--s2)" }, { nome: "probabilità di successo ora", colore: "var(--s1)" }]));
@@ -581,7 +593,7 @@ footer .fonti { color: var(--muto); }
       s.appendChild(tabella(["Obiettivo", "Quantità", "Prima", "Ora", "Variazione"], righe, [false, false, true, true, true], true));
     }
     var testi = c.obiettivi.filter(function (o) { return o.stato !== "presente"; }).map(function (o) {
-      return o.nome + ": " + (o.stato === "nuovo" ? "nuovo, non c'era nella revisione precedente."
+      return (S(o.nome) || "Obiettivo") + ": " + (o.stato === "nuovo" ? "nuovo, non c'era nella revisione precedente."
         : o.stato === "non_piu_presente" ? "non più presente rispetto alla revisione precedente."
         : "nome ripetuto, non confrontato.");
     });
@@ -616,7 +628,7 @@ footer .fonti { color: var(--muto); }
                                    height: 22, rx: 4, fill: "var(--fascia)" }, "Banda stretta: " + pct(c.target - c.tight) + " – " + pct(c.target + c.tight)));
         g.appendChild(sv("rect", { x: ml, y: y + 5, width: Math.max(1, X(c.peso) - ml), height: 12, rx: 4,
                                    fill: c.fuori_banda ? "var(--serio)" : "var(--s1)" },
-                         c.classe + ": attuale " + pct(c.peso) + (c.fuori_banda ? " (fuori banda)" : " (in banda)")));
+                         S(c.classe) + ": attuale " + pct(c.peso) + (c.fuori_banda ? " (fuori banda)" : " (in banda)")));
         g.appendChild(sv("line", { x1: X(c.target), x2: X(c.target), y1: y - 2, y2: y + 24, stroke: "var(--testo)", "stroke-width": 2 },
                          "Target " + pct(c.target)));
         if (ok(c.risultante)) {
@@ -653,7 +665,7 @@ footer .fonti { color: var(--muto); }
       "Cosa contengono gli ETF messi insieme, pesati per controvalore: settori, regioni, paesi, valute e primi titoli. I pesi sono sulla parte coperta; la copertura è la quota del controvalore che ha quella dimensione.");
     if (l.n_senza_composizione > 0) {
       s.appendChild(el("p", { class: "nota", testo: l.n_senza_composizione + (l.n_senza_composizione === 1 ? " posizione senza composizione" : " posizioni senza composizione") +
-        " su " + l.n_posizioni + " (" + pct(l.quota_senza_composizione) + " del controvalore): non entra nei pesi." }));
+        (ok(l.n_posizioni) ? " su " + l.n_posizioni : "") + " (" + pct(l.quota_senza_composizione) + " del controvalore): non entra nei pesi." }));
     }
     var fmt = function (v) { return pct(v); };
     [["Settori", "settori", "Settori aggregati del portafoglio"], ["Regioni", "regioni", "Regioni aggregate del portafoglio"],
@@ -681,8 +693,9 @@ footer .fonti { color: var(--muto); }
   function sezioneObiettivi(o) {
     if (!o) return null;
     var s = sezione("obiettivi", "Obiettivi",
-      "Probabilità di raggiungere ogni obiettivo nel Monte Carlo (" + o.modello + ", " + nf0.format(o.n_sim) +
-      " simulazioni) contro la confidenza scelta, e il capitale finale tra P10 e P90 contro il target nominale.");
+      "Probabilità di raggiungere ogni obiettivo nel Monte Carlo" +
+      (o.modello || ok(o.n_sim) ? " (" + frasi([S(o.modello), ok(o.n_sim) ? nf0.format(o.n_sim) + " simulazioni" : ""], ", ") + ")" : "") +
+      " contro la confidenza scelta, e il capitale finale tra P10 e P90 contro il target nominale.");
     s.appendChild(legenda([{ nome: "probabilità di successo", colore: "var(--s1)" }, { nome: "sotto la confidenza", colore: "var(--serio)" },
                            { nome: "confidenza / target", colore: "var(--testo)", linea: true },
                            { nome: "capitale finale P10–P90" + IND, colore: "var(--fascia)" }]));
@@ -690,7 +703,7 @@ footer .fonti { color: var(--muto); }
       var r = el("div", { class: "riga" });
       r.appendChild(riga(ob.nome, el("span", { class: "valori" },
         cifra(pct(ob.probabilita_successo), { "data-valore": "prob-" + i }), " di probabilità · confidenza " + pct(ob.confidenza, 0))));
-      r.appendChild(el("div", { class: "valori", testo: ob.priorita + " · " + ob.profilo + " · " + anni(ob.anni) + " anni" }));
+      r.appendChild(el("div", { class: "valori", testo: frasi([S(ob.priorita), S(ob.profilo), anni(ob.anni) + " anni"], " · ") }));
       r.appendChild(trackQuota(ob.probabilita_successo, ob.confidenza,
                                ob.probabilita_successo >= ob.confidenza ? "var(--s1)" : "var(--serio)",
                                "Probabilità " + pct(ob.probabilita_successo) + " contro confidenza " + pct(ob.confidenza, 0)));
@@ -712,7 +725,7 @@ footer .fonti { color: var(--muto); }
     if (!g) return null;
     var s = sezione("glide_path", "Glide path",
       "Quota azionaria anno per anno: aggregata e per obiettivo; sotto, il capitale proiettato di ogni obiettivo.");
-    var fx = function (a) { return "anno " + a; };
+    var fx = function (a) { return ok(a) ? "anno " + a : ""; };
     var serie = [{ nome: "Portafoglio aggregato", valori: g.portafoglio, colore: "var(--testo)" }].concat(
       g.obiettivi.map(function (o, i) { return { nome: o.nome, valori: o.quota_azionaria, colore: colore(i) }; }));
     s.appendChild(linee({ x: g.anni, serie: serie, ymax: 1, fmtY: function (v) { return pct(v, 0); }, fmtX: fx,
@@ -721,7 +734,7 @@ footer .fonti { color: var(--muto); }
     s.appendChild(colonneImpilate({ x: g.anni, fmtX: fx, etichetta: "Capitale proiettato per anno",
       serie: g.obiettivi.map(function (o, i) { return { nome: o.nome, valori: o.capitale_proiettato, colore: colore(i) }; }) }));
     s.appendChild(inTabella("Valori in tabella", tabella(["Anno", "Aggregato"].concat(g.obiettivi.map(function (o) { return o.nome; })),
-      g.anni.map(function (a, i) { return [String(a), pct(g.portafoglio[i], 0)].concat(g.obiettivi.map(function (o) { return pct(o.quota_azionaria[i], 0); })); }),
+      g.anni.map(function (a, i) { return [S(a), pct(g.portafoglio[i], 0)].concat(g.obiettivi.map(function (o) { return pct(o.quota_azionaria[i], 0); })); }),
       [false, true].concat(g.obiettivi.map(function () { return true; })))));
     return s;
   }
@@ -783,7 +796,7 @@ footer .fonti { color: var(--muto); }
     }
     if (p.riscatto) {
       var k = p.riscatto;
-      s.appendChild(el("h3", { testo: "Riscatto della laurea (" + anni(k.anni_riscatto) + " anni, " + k.modalita + ")" }));
+      s.appendChild(el("h3", { testo: "Riscatto della laurea (" + frasi([anni(k.anni_riscatto) + " anni", S(k.modalita)], ", ") + ")" }));
       if (ANON && !ok(k.onere_agevolato)) {
         // gli importi sono tolti (importo di legge): restano anni, modalità, rientro e anticipo
         s.appendChild(el("p", { class: "nota", testo: "Pensione a " + anni(k.eta_pensionamento) + " anni; rientro in " + anni(k.anni_per_rientrare) +
@@ -793,7 +806,7 @@ footer .fonti { color: var(--muto); }
       }
       s.appendChild(barre([{ nome: "Onere agevolato", valore: k.onere_agevolato },
                            { nome: "Onere ordinario", valore: k.onere_ordinario, colore: "var(--muto)" },
-                           { nome: "Costo netto (" + k.modalita + ")", valore: k.costo_netto }],
+                           { nome: "Costo netto" + (k.modalita ? " (" + k.modalita + ")" : ""), valore: k.costo_netto }],
                           euro, "Onere del riscatto, agevolato contro ordinario, e costo netto"));
       s.appendChild(el("p", { class: "nota", testo: (k.rate_mensili > 1 ? "Rata mensile " + euro(k.rata_mensile) + " in " + nf0.format(k.rate_mensili) + " rate" :
         "Unica soluzione " + euro(k.rata_mensile)) + "; pensione lorda in più " +
@@ -836,7 +849,7 @@ footer .fonti { color: var(--muto); }
       serie: [{ nome: "Esposizione attesa", valori: c.proiezione.map(function (r) { return r.esposizione; }), colore: colore(0) }],
       fascia: { nome: "Monte Carlo P10–P90", lo: c.proiezione.map(function (r) { return r.p10; }), hi: c.proiezione.map(function (r) { return r.p90; }) } }));
     if (c.settore) {
-      s.appendChild(el("p", { class: "nota", testo: "Settore del lavoro (" + c.settore.settore + "): " + pct(c.settore.quota_settore_fin) +
+      s.appendChild(el("p", { class: "nota", testo: "Settore del lavoro" + (c.settore.settore ? " (" + c.settore.settore + ")" : "") + ": " + pct(c.settore.quota_settore_fin) +
         " del portafoglio contro " + pct(c.settore.peso_mondo) + " nel mondo" +
         (c.settore.sovrappeso ? ": il portafoglio è sovrappesato sul settore da cui viene il reddito." : ": nessun sovrappeso.") }));
     }
@@ -857,7 +870,7 @@ footer .fonti { color: var(--muto); }
       s.appendChild(legenda([{ nome: "valida", colore: COLORI.valida }, { nome: "in scadenza quest'anno", colore: COLORI.in_scadenza },
                              { nome: "scaduta", colore: COLORI.scaduta }]));
       s.appendChild(barre(ordinate.map(function (z) {
-        return { nome: z.broker + " · " + z.anno + " → " + (z.scade_il || "n/d"), valore: z.importo_26_equivalente, colore: COLORI[z.stato] || "var(--s1)" };
+        return { nome: frasi([S(z.broker), S(z.anno)], " · ") + " → " + (z.scade_il || "n/d"), valore: z.importo_26_equivalente, colore: COLORI[z.stato] || "var(--s1)" };
       }), euro, "Zainetto per broker e scadenza"));
     } else {
       s.appendChild(el("p", { class: "nota", testo: "Nessuna minus nello zainetto." }));
@@ -912,18 +925,24 @@ footer .fonti { color: var(--muto); }
 
   function disegna() {
     var main = document.getElementById("cruscotto");
-    // nella versione anonimizzata un campo a null che nessun blocco prevede non deve far sparire la pagina: la sezione si salta
-    var prova = function (f) {
-      if (!ANON) return f();
-      try { return f(); } catch (e) { return null; }
+    // Nella versione anonimizzata una sezione che non si riesce a disegnare non sparisce: resta con il suo id e una riga che lo dice.
+    var prova = function (d) {
+      if (!ANON) return d[2]();
+      try { return d[2](); } catch (e) {
+        return sezione(d[0], d[1], null).appendChild(el("p", { class: "avviso", testo: "Sezione non disegnata in questa versione: " + d[1] })).parentNode;
+      }
     };
     var sezioni = [
-      function () { return B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori, B.confronto) : null; },
-      function () { return sezioneConfronto(B.confronto); },
-      function () { return sezioneAllocazione(B.allocazione); }, function () { return sezioneLookThrough(B.look_through); },
-      function () { return sezioneObiettivi(B.obiettivi); }, function () { return sezioneGlide(B.glide_path); },
-      function () { return sezionePensione(B.pensione); }, function () { return sezioneCapitaleUmano(B.capitale_umano); },
-      function () { return sezioneFiscalita(B.fiscalita); }, function () { return sezioneRibilanciamento(B.ribilanciamento); }
+      ["indicatori", "In sintesi", function () { return B.indicatori && B.indicatori.length ? sezioneIndicatori(B.indicatori, B.confronto) : null; }],
+      ["confronto", "Rispetto alla revisione precedente", function () { return sezioneConfronto(B.confronto); }],
+      ["allocazione", "Allocazione", function () { return sezioneAllocazione(B.allocazione); }],
+      ["look_through", "Look-through", function () { return sezioneLookThrough(B.look_through); }],
+      ["obiettivi", "Obiettivi", function () { return sezioneObiettivi(B.obiettivi); }],
+      ["glide_path", "Glide path", function () { return sezioneGlide(B.glide_path); }],
+      ["pensione", "Pensione", function () { return sezionePensione(B.pensione); }],
+      ["capitale_umano", "Capitale umano", function () { return sezioneCapitaleUmano(B.capitale_umano); }],
+      ["fiscalita", "Fiscalità", function () { return sezioneFiscalita(B.fiscalita); }],
+      ["ribilanciamento", "Ribilanciamento", function () { return sezioneRibilanciamento(B.ribilanciamento); }]
     ].map(prova).filter(function (x) { return x; });
     main.replaceChildren.apply(main, sezioni.length ? sezioni :
       [el("p", { class: "avviso", testo: "Nessun dato da disegnare: rigenera il cruscotto con i JSON degli script." })]);
@@ -937,8 +956,8 @@ footer .fonti { color: var(--muto); }
       "Si apre il file generato, non questo." }));
     return;
   }
-  document.getElementById("testata").textContent = "Dati del " + String(B.generato_il || "").split("-").reverse().join("/") +
-    " · wealth-management-it " + (B.plugin || "?");
+  document.getElementById("testata").textContent = (B.generato_il ? "Dati del " + String(B.generato_il).split("-").reverse().join("/") + " · " : "") +
+    "wealth-management-it " + (B.plugin || "?");
   if (ANON) {
     // testata della versione anonimizzata: cosa è stato sostituito, cosa resta, il limite
     var indiceBase = B.anonimo.base ? "gli importi sono un indice (base 100 = " + B.anonimo.base + "), " : "";
