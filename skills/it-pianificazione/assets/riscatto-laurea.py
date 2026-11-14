@@ -175,7 +175,7 @@ def main():
     else:
         pi = _proiezione_inps()
         coeff = pi.coeff_vigente(ETA_PENSIONAMENTO) * (1 - pi.RIDUZIONE_COEFF_ANNUA) ** anni
-        origine = (f"come proiezione-inps.py: tabella 2025-26 a {ETA_PENSIONAMENTO:.0f} anni ridotta del "
+        origine = (f"come proiezione-inps.py: tabella {pi._BIENNIO_COEFF} a {ETA_PENSIONAMENTO:.0f} anni ridotta del "
                    f"{pct(pi.RIDUZIONE_COEFF_ANNUA)}/anno per {anni} anni")
     anni_contributivi = ANNI_RISCATTO - ANNI_PRIMA_DEL_1996
     agev, ordi = scenario("agevolato", anni_contributivi, anni, coeff), scenario("ordinario", anni_contributivi, anni, coeff)

@@ -293,6 +293,38 @@ def t_proiezione():
     assert abs(pens - atteso) <= 2, f"pensione {pens} != {atteso:.0f}"
 
 
+# Decreto direttoriale Min. Lavoro-MEF del 16/10/2026, tabella allegata: età → (divisore, coefficiente)
+DECRETO_COEFF_2027 = {
+    57: (24.080, 0.04153), 58: (23.507, 0.04254), 59: (22.929, 0.04361), 60: (22.345, 0.04475), 61: (21.756, 0.04596),
+    62: (21.163, 0.04725), 63: (20.565, 0.04863), 64: (19.963, 0.05009), 65: (19.357, 0.05166), 66: (18.747, 0.05334),
+    67: (18.136, 0.05514), 68: (17.523, 0.05707), 69: (16.908, 0.05914), 70: (16.290, 0.06139), 71: (15.669, 0.06382)}
+
+
+@test("proiezione-inps: coefficienti 2027-2028 del decreto 16/10/2026, 1/divisore, default di proiezione, riscatto e ponte")
+def t_coefficienti_2027():
+    pi = _modulo_previdenza("proiezione-inps.py")
+    assert pi.COEFF_VIGENTI == {eta: c for eta, (_, c) in DECRETO_COEFF_2027.items()}, pi.COEFF_VIGENTI
+    assert all(round(1 / d, 5) == c for d, c in DECRETO_COEFF_2027.values()), "un coefficiente non è 1/divisore"
+    assert pi._BIENNIO_COEFF == "2027-2028" and not hasattr(pi, "COEFF_2025_2026")
+    # Review Focus 5: 67 anni e 7 mesi, l'esempio della reference (5,6266%)
+    assert abs(pi.coeff_vigente(67 + 7 / 12) - 0.0562658) < 5e-7, pi.coeff_vigente(67 + 7 / 12)
+    tmp = tempfile.mkdtemp()
+    try:
+        j = os.path.join(tmp, "x.json")
+        rc, out = run_script(asset("it-pianificazione", "proiezione-inps.py"), "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["coefficiente_trasformazione"] == 0.04723 and r["pensione_inps_lorda_annua"] == 29247.4, r
+        assert "tabella 2027-2028 a 69 anni (5,914%)" in out and "2025-26" not in out, out[-900:]
+        rc, out = run_script(asset("it-pianificazione", "riscatto-laurea.py"), "--json", j)
+        assert rc == 0 and "tabella 2027-2028" in out and "2025-26" not in out, out[-900:]
+        rc, out = run_script(asset("it-pianificazione", "ponte-pensione.py"), "--json", j)
+        r = json.load(open(j, encoding="utf-8"))
+        assert rc == 0 and r["costo_permanente_lordo_annuo"] == 19916.59, r["costo_permanente_lordo_annuo"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    assert _modulo_previdenza("ponte-pensione.py").COEFF_TRASFORMAZIONE == 0.047
+
+
 @test("override --set: refuso su costante inesistente respinto con errore chiaro")
 def t_override_refuso():
     rc, out = run_script(asset("it-pianificazione", "proiezione-inps.py"),
@@ -3938,16 +3970,16 @@ def t_riscatto_laurea():
         assert r["onere_agevolato"] == 31033.2 and r["onere_ordinario"] == 59400.0, r      # 5 × 6.206,64; 5 × 36.000 × 33%
         assert r["rata_mensile"] == 258.61 and r["costo_netto"] == 20792.24, r              # 120 rate; deduzione al 33%
         assert r["delta_montante_al_pensionamento"] == 36403.28, r                          # × 1,005^32
-        assert r["delta_pensione_lorda_annua"] == 1751.46 and r["anni_per_rientrare"] == 19.1, r   # × 4,8113%; netto/(× 0,62)
-        assert r["coefficiente_trasformazione"] == 0.04811 and r["eta_pensionamento"] == 69.0, r
+        assert r["delta_pensione_lorda_annua"] == 1719.48 and r["anni_per_rientrare"] == 19.5, r   # × 4,7234%; netto/(× 0,62)
+        assert r["coefficiente_trasformazione"] == 0.04723 and r["eta_pensionamento"] == 69.0, r
         assert r["eta_anticipata_senza_riscatto"] == 68.33 and r["eta_anticipata_con_riscatto"] == 63.33, r
         assert r["montante_attuale"] == 85000 + 31033.2 and r["modalita"] == "agevolato", r
-        for atteso in ("€ 6.206,64 (€ 18.808 × 33%)", "€ 31.033", "€ 59.400", "€ 258,61", "€ 20.792", "€ 1.751",
+        for atteso in ("€ 6.206,64 (€ 18.808 × 33%)", "€ 31.033", "€ 59.400", "€ 258,61", "€ 20.792", "€ 1.719",
                        "senza riscatto: a 68,3 anni", "con il riscatto: a 63,3 anni", "rendono allo stesso modo",
                        "Deduzione dell'anno con 120 rate: € 3.103", "requisito uomini dal 2028"):
             assert atteso in out, f"riscatto: manca «{atteso}»"
         # le due modalità rendono uguale per euro versato: stessi anni per rientrare
-        assert re.search(r"rientrare\s+19,1\s+19,1", out), out
+        assert re.search(r"rientrare\s+19,5\s+19,5", out), out
         # ordinario sotto il minimale: costa meno, e lo script lo dice
         rc, out = run_script(P, "--set", "RAL_ATTUALE=15_000")
         assert rc == 0 and "sotto il minimale" in out, out[-300:]
@@ -6531,7 +6563,7 @@ def t_t17_ponte_riscatto():
             assert page.locator("#sez-pensione svg").count() >= 2, page.locator("#sez-pensione svg").count()
             assert "Ponte pensionistico" in testo and "uscita a 62" in testo and "69" in testo, testo[:600]
             assert formato_it_percento(ponte["probabilita_successo"]) in testo and "€120.704" in testo, testo[:900]
-            assert "RITA" in testo and "Riscatto della laurea" in testo and "€31.033" in testo and "19,1 anni" in testo, testo[-900:]
+            assert "RITA" in testo and "Riscatto della laurea" in testo and "€31.033" in testo and "19,5 anni" in testo, testo[-900:]
             assert "73,3" in testo and "78,3" in testo and "in 120 rate" in testo, testo[-600:]
             for brutto in ("NaN", "undefined", "null"):
                 assert brutto not in testo, brutto
@@ -7169,8 +7201,8 @@ def t_rami_avanzati():
     assert 0 < p0 <= 1 and 0 < p2 <= 1 and (p0, f0) != (p2, f2), (p0, p2)
     # proiezione-inps: coefficiente interpolato sui dodicesimi e tabella di sensibilità monotona nel PIL
     pi = _modulo_previdenza("proiezione-inps.py")
-    assert abs(pi.coeff_vigente(67.5) - (pi.COEFF_2025_2026[67] + pi.COEFF_2025_2026[68]) / 2) < 1e-12
-    assert pi.coeff_vigente(67) == pi.COEFF_2025_2026[67] and pi.coeff_vigente(80) == pi.COEFF_2025_2026[71] and pi.coeff_vigente(50) == pi.COEFF_2025_2026[57]
+    assert abs(pi.coeff_vigente(67.5) - (pi.COEFF_VIGENTI[67] + pi.COEFF_VIGENTI[68]) / 2) < 1e-12
+    assert pi.coeff_vigente(67) == pi.COEFF_VIGENTI[67] and pi.coeff_vigente(80) == pi.COEFF_VIGENTI[71] and pi.coeff_vigente(50) == pi.COEFF_VIGENTI[57]
     rc, out = run_script(asset("it-pianificazione", "proiezione-inps.py"))
     assert rc == 0 and "COEFF_ESPLICITO impostato" not in out, out[-300:]
     righe = [r for r in out.split("SENSIBILITÀ")[1].splitlines() if re.match(r"\s+\d+,\d%\s", r)]

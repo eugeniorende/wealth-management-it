@@ -51,14 +51,16 @@ MASSIMALE_CONTRIBUTIVO = 122_295.0  # retribuzione massima su cui si versano con
 COEFF_ESPLICITO      = None   # se valorizzato (es. 0.048), vince su tabella e riduzione
 RIDUZIONE_COEFF_ANNUA = 0.007 # riduzione RELATIVA annua attesa dei coefficienti per
                               # l'allungamento della speranza di vita (~-0,7%/anno, coerente
-                              # con le revisioni biennali storiche ~-1,5/-2%; 0 = coefficienti
+                              # con le revisioni biennali osservate tra -1,2% e -2,2%; 0 = coefficienti
                               # vigenti congelati, scenario ottimistico)
 
-# Tabella vigente (biennio 2025-2026, DM 436 del 20/11/2024; Verificato: 2026-06) — età: coefficiente
-COEFF_2025_2026 = {
-    57: 0.04204, 58: 0.04308, 59: 0.04419, 60: 0.04536, 61: 0.04661,
-    62: 0.04795, 63: 0.04936, 64: 0.05088, 65: 0.05250, 66: 0.05423,
-    67: 0.05608, 68: 0.05808, 69: 0.06024, 70: 0.06258, 71: 0.06510,
+# Tabella vigente (biennio 2027-2028, decreto direttoriale Min. Lavoro-MEF del 16/10/2026, decorrenza 1/1/2027;
+# Verificato: 2026-11) — età: coefficiente
+_BIENNIO_COEFF = "2027-2028"
+COEFF_VIGENTI = {
+    57: 0.04153, 58: 0.04254, 59: 0.04361, 60: 0.04475, 61: 0.04596,
+    62: 0.04725, 63: 0.04863, 64: 0.05009, 65: 0.05166, 66: 0.05334,
+    67: 0.05514, 68: 0.05707, 69: 0.05914, 70: 0.06139, 71: 0.06382,
 }
 
 # =======================================================================
@@ -66,13 +68,13 @@ COEFF_2025_2026 = {
 
 def coeff_vigente(eta):
     """Coefficiente della tabella vigente all'età data (interpolazione sui dodicesimi, come da norma)."""
-    e_min, e_max = min(COEFF_2025_2026), max(COEFF_2025_2026)
+    e_min, e_max = min(COEFF_VIGENTI), max(COEFF_VIGENTI)
     e = max(e_min, min(e_max, eta))
     lo = int(e)
     if lo >= e_max:
-        return COEFF_2025_2026[e_max]
+        return COEFF_VIGENTI[e_max]
     frazione = e - lo
-    return COEFF_2025_2026[lo] + frazione * (COEFF_2025_2026[lo + 1] - COEFF_2025_2026[lo])
+    return COEFF_VIGENTI[lo] + frazione * (COEFF_VIGENTI[lo + 1] - COEFF_VIGENTI[lo])
 
 
 def proietta(montante0, ral0, g_ral, pil, anni, coeff):
@@ -116,7 +118,7 @@ def main():
         coeff, origine = COEFF_ESPLICITO, "esplicito (da parametro)"
     else:
         coeff = c_vig * (1 - RIDUZIONE_COEFF_ANNUA) ** n
-        origine = (f"tabella 2025-26 a {ETA_PENSIONAMENTO:.0f} anni ({pct(c_vig, 3)}) "
+        origine = (f"tabella {_BIENNIO_COEFF} a {ETA_PENSIONAMENTO:.0f} anni ({pct(c_vig, 3)}) "
                    f"ridotto del {pct(RIDUZIONE_COEFF_ANNUA)}/anno per {n} anni")
 
     m_fin, fv_att, fv_fut, pensione = proietta(

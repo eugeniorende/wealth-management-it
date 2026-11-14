@@ -88,7 +88,7 @@ ANNI_ISCRIZIONE_FP = 30             # anni di partecipazione alla complementare 
 RAL_ALL_USCITA = 52_000.0     # ultima RAL (per i contributi INPS che NON verserai)
 ALIQUOTA_COMPUTO = 0.33
 PIL_REALE = 0.0               # rivalutazione reale del montante INPS nel ponte
-COEFF_TRASFORMAZIONE = 0.048  # coefficiente a 69 (coerente con proiezione-inps.py)
+COEFF_TRASFORMAZIONE = 0.047  # coefficiente a 69 anni sui default di proiezione-inps.py (4,723% con la tabella 2027-2028)
 VERSAMENTO_FP_ANNUO = 7_000.0 # versamenti al fondo che si fermano (TFR + personale + datore)
 RENDIMENTO_FP_REALE = 0.030   # rendimento reale del fondo (per i versamenti persi)
 
