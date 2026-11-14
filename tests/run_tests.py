@@ -6064,7 +6064,7 @@ def t_lt_valori_chiusi():
         pos = {p["chiave"]: p for p in r["posizioni"]}
         assert pos["IE00B4L5Y983"]["valore"] == 13000 and pos["IE00B4L5Y983"]["nome"] == "iShares Core MSCI World"   # Review Focus 1: due broker
         assert pos["IT0005454241"] == {"chiave": "IT0005454241", "nome": "BTP Futura 2037", "valore": 2850,
-                                       "quota": 2850 / tot, "settori": False, "paesi": True, "titoli": False}
+                                       "quota": 2850 / tot, "settori": False, "paesi": True, "titoli": False, "valute": False}
         assert r["senza_composizione"] == [{"chiave": "DE0007164600", "nome": "SAP SE", "valore": 1500, "quota": 1500 / tot}]
         V_s = 13000 + 19500                                                         # settori e titoli: i due ETF
         assert abs(r["copertura"]["settori"] - V_s / tot) < 1e-12 and abs(r["copertura"]["titoli"] - V_s / tot) < 1e-12
@@ -6098,7 +6098,7 @@ def t_lt_valori_chiusi():
                                       "--posizioni", os.path.join(tmp, "broker.json"), "--json", "-", cwd=tmp)
         assert rc == 0, se[-300:]
         r = json.loads(so)
-        assert r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 1500 / tot, "regioni": 0.0} and r["settori"] == [] and r["regioni"] == [] and r["titoli"][0]["peso"] == 1.0
+        assert r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 1500 / tot, "regioni": 0.0, "valute": 0.0} and r["settori"] == [] and r["regioni"] == [] and r["titoli"][0]["peso"] == 1.0
         # il --dati del capitale umano come sorgente, con --posizioni ripetuto che somma
         dati = {"persona": {"profilo": "privato_stabile", "eta": 35},
                 "posizioni": [{"asset_class": "azionario", "valore": 1000, "isin": "IE00B5BMR087"},
@@ -6252,6 +6252,45 @@ def t_lt_importatore_valuta():
         c = m.componi(coperto, "H")
         assert any("copertura del cambio" in a and "--copertura H=EUR" in a for a in c["avvisi"]), c["avvisi"]
         assert not any("copertura del cambio" in a for a in m.componi(coperto, "H", copertura="EUR")["avvisi"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 look-through: valute aggregate per controvalore con la copertura e la quota in euro, capitale-umano le salta")
+def t_lt_valute():
+    cu = carica_modulo(asset(*CU))
+    tmp = tempfile.mkdtemp()
+    try:
+        v5, broker = os.path.join(FIXTURES, "composizione-look-through-v5.csv"), _broker_look_through(tmp)
+        rc, so, se = run_script_split(asset(*LT), "--composizione", v5, "--posizioni", broker, "--json", "lt.json", cwd=tmp)
+        assert rc == 0, se[-300:]
+        r = json.load(open(os.path.join(tmp, "lt.json"), encoding="utf-8"))
+        tot, V_v = 36850, 13000 + 19500 + 2850
+        valute = {x["voce"]: x for x in r["valute"]}
+        assert abs(valute["USD"]["peso"] - (13000 * .60 + 19500) / V_v) < 1e-12 and valute["USD"]["nome"] == "Dollaro USA"
+        assert abs(valute["JPY"]["peso"] - 13000 * .25 / V_v) < 1e-12 and abs(valute["GBP"]["peso"] - 13000 * .15 / V_v) < 1e-12
+        assert abs(valute["EUR"]["peso"] - 2850 / V_v) < 1e-12 and abs(r["quota_euro"] - 2850 / V_v) < 1e-12
+        assert [x["voce"] for x in r["valute"]] == ["USD", "JPY", "EUR", "GBP"] and abs(sum(x["peso"] for x in r["valute"]) - 1) < 1e-12
+        assert abs(r["copertura"]["valute"] - V_v / tot) < 1e-12 and all(p["valute"] is True for p in r["posizioni"])
+        assert "4. VALUTE (copertura 95,9%)" in so and "In euro: 8,1% della parte coperta" in so, so
+        # il file a quattro colonne non ha valute: copertura zero, nessuna quota
+        rc, so, se = run_script_split(asset(*LT), "--composizione", os.path.join(FIXTURES, "composizione-look-through.csv"),
+                                      "--posizioni", broker, "--json", "-", cwd=tmp)
+        r4 = json.loads(so)
+        assert rc == 0 and r4["valute"] == [] and r4["copertura"]["valute"] == 0.0 and r4["quota_euro"] is None
+        # Review Focus 5: uno strumento con le sole righe valuta, senza euro tra le valute coperte
+        solo = os.path.join(tmp, "solo-valuta.csv")
+        open(solo, "w", encoding="utf-8").write("strumento;dimensione;voce;peso;isin\nDE0007164600;valuta;USD;100;\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", solo, "--posizioni", broker, "--json", "-", cwd=tmp)
+        r = json.loads(so)
+        assert rc == 0 and r["copertura"] == {"settori": 0.0, "paesi": 0.0, "titoli": 0.0, "regioni": 0.0, "valute": 1500 / tot}, r["copertura"]
+        assert r["quota_euro"] == 0.0 and r["valute"] == [{"voce": "USD", "nome": "Dollaro USA", "peso": 1.0}]
+        storta = os.path.join(tmp, "storta.csv")
+        open(storta, "w", encoding="utf-8").write("strumento;dimensione;voce;peso;isin\nDE0007164600;valuta;Dollari;100;\n")
+        rc, so, se = run_script_split(asset(*LT), "--composizione", storta, "--posizioni", broker, cwd=tmp)
+        assert rc == 1 and "ISO 4217" in se and "Dollari" in se, se[-300:]
+        # capitale-umano: le righe valuta si saltano, una dimensione sconosciuta resta un errore
+        assert abs(cu.leggi_composizione(v5)["IE00B4L5Y983"]["Health Care"] - 0.5) < 1e-9
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

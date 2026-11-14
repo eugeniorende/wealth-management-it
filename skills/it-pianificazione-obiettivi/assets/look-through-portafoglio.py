@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-look-through-portafoglio.py — cosa possiedi davvero sommando gli ETF: settori, paesi e primi titoli aggregati
+look-through-portafoglio.py — cosa possiedi davvero sommando gli ETF: settori, paesi, valute e primi titoli aggregati
 su tutte le posizioni, pesati per controvalore.
 
 Perché esiste: composizione.csv (scritto da importa-composizione-etf.py) descrive ogni ETF per settore GICS,
-paese e primi titoli, ma nessuno script risponde alla domanda «messi insieme, cosa contengono i miei ETF?».
+paese, valuta e primi titoli, ma nessuno script risponde alla domanda «messi insieme, cosa contengono i miei ETF?».
 Questo script legge quel CSV e le posizioni (il --json di importa-estratto-broker.py, o il --dati del capitale
 umano), confronta ogni posizione con la composizione per ISIN e poi per nome, e aggrega. Tutto offline: niente
 rete, nessun dato lascia la cartella di lavoro. Non è consulenza finanziaria.
 
 Regole applicate (references/composizione-etf.md, «Il look-through del portafoglio»):
-- per ogni dimensione (settori, paesi, titoli) contano solo le posizioni che la hanno nel CSV; i pesi si
+- per ogni dimensione (settori, paesi, valute, titoli) contano solo le posizioni che la hanno nel CSV; i pesi si
   rinormalizzano sulla PARTE COPERTA e la copertura (quota del controvalore totale) sta sempre accanto;
 - le regioni (Nord America, America Latina e Caraibi, Europa, Asia, Oceania, Africa, Antartide) non si leggono dal
   CSV: derivano dai paesi con la classificazione ONU M49, hanno la stessa copertura dei paesi e sommano a 1;
+- le valute (codici ISO 4217, per esempio «USD») si aggregano come settori e paesi, con la loro copertura; «quota_euro»
+  è il peso dell'euro sulla parte coperta (0 se l'euro non c'è tra le valute coperte, assente se non c'è nessuna valuta);
+  una posizione diretta si descrive a mano («IT0005454241;valuta;EUR;100»);
 - i titoli sono i primi N di ogni ETF, quindi la concentrazione che ne risulta è un MINIMO, non il totale;
 - lo stesso titolo scritto da due emittenti in modi diversi («Apple Inc.», «APPLE INC») si somma con una chiave
   normalizzata del nome (senza punteggiatura, suffissi societari e classi di azioni); «da» elenca gli ETF che
@@ -42,6 +45,7 @@ from motore_bootstrap import cli, errore, euro, numero, pct, scrivi_json
 # ── Costanti sovrascrivibili con --set ───────────────────────────────────────
 N_TITOLI_REPORT = 10   # i primi titoli aggregati nel report e nel JSON del cruscotto
 N_PAESI_REPORT = 10    # i primi paesi nel report; gli altri in una riga «altri N paesi»
+N_VALUTE_REPORT = 8    # le prime valute nel report; le altre in una riga «altre N valute»
 # Parole in coda al nome di un titolo che non distinguono la società: si tolgono prima di sommare
 SUFFISSI_SOCIETARI = ("inc", "corp", "corporation", "co", "ltd", "limited", "plc", "sa", "spa", "ag", "se", "nv",
                       "ab", "asa", "oyj", "kk", "holdings", "holding", "group")
@@ -55,7 +59,7 @@ _IMPORTATORE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "importa
 
 
 def _importatore():
-    """Il modulo importa-composizione-etf.py, per SETTORI_GICS, PAESI e normalizza(): una sola copia delle tabelle."""
+    """Il modulo importa-composizione-etf.py, per SETTORI_GICS, PAESI, le valute e normalizza(): una sola copia delle tabelle."""
     spec = importlib.util.spec_from_file_location("importa_composizione_etf", _IMPORTATORE)
     modulo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modulo)
@@ -64,7 +68,8 @@ def _importatore():
 
 _imp = _importatore()
 SETTORI_GICS, PAESI, normalizza = _imp.SETTORI_GICS, _imp.PAESI, _imp.normalizza
-DIMENSIONI = ("settori", "paesi", "titoli")
+codice_valuta, nome_valuta = _imp.codice_valuta, _imp.nome_valuta
+DIMENSIONI = ("settori", "paesi", "titoli", "valute")
 ISIN_TITOLO = re.compile(r"[A-Z]{2}[A-Z0-9]{9}[0-9]")
 
 # Le regioni geografiche derivano dai paesi, non si leggono dai file degli emittenti. Fonte: «Standard country or area
@@ -157,10 +162,9 @@ def _numero_csv(testo):
 
 def leggi_composizione(path, avvisi=None):
     """{chiave: {"settori": {GICS: frazione}, "paesi": {ISO: frazione}, "titoli": {nome: frazione},
-    "isin": {nome del titolo: ISIN}}} dal CSV dell'importatore (strumento;dimensione;voce;peso;isin, o senza l'ultima
-    colonna) o dal vecchio strumento;settore;peso (solo settori). L'ISIN è del solo titolo, non è una dimensione;
-    le righe «valuta» si saltano (le legge un'altra parte dello script).
-    Pesi in percento o in frazione, per strumento e dimensione: settori e paesi come in capitale-umano.py (somma
+    "valute": {ISO 4217: frazione}, "isin": {nome del titolo: ISIN}}} dal CSV dell'importatore (strumento;dimensione;voce;peso;isin, o senza l'ultima
+    colonna) o dal vecchio strumento;settore;peso (solo settori). L'ISIN è del solo titolo, non è una dimensione.
+    Pesi in percento o in frazione, per strumento e dimensione: settori, paesi e valute come in capitale-umano.py (somma
     sopra 1,5 → percento); i titoli seguono la scala delle altre dimensioni dello strumento, o sono percento se
     uno supera 1; nei casi in cui la scala dei titoli è un'inferenza (pesi tutti fino a 1) un avviso lo dice.
     Colonne, dimensioni, settori, paesi o pesi non riconosciuti fermano lo script."""
@@ -192,17 +196,20 @@ def leggi_composizione(path, avvisi=None):
         if vecchio:
             dim, voce = "settori", r["settore"]
         else:
-            dim = {"settore": "settori", "paese": "paesi", "titolo": "titoli", "valuta": None}.get(r["dimensione"], "?")
+            dim = {"settore": "settori", "paese": "paesi", "titolo": "titoli", "valuta": "valute"}.get(r["dimensione"], "?")
             if dim == "?":
                 errore(f"--composizione: dimensione {r['dimensione']!r} sconosciuta ({strumento}): "
                        "attese «settore», «paese», «valuta» o «titolo»")
-            if dim is None:                         # «valuta»: riconosciuta, per ora saltata
-                continue
             voce = r["voce"]
         if dim == "settori" and voce not in SETTORI_GICS:
             errore(f"--composizione: settore {voce!r} non GICS ({strumento}): usa uno di {', '.join(SETTORI_GICS)}")
         if dim == "paesi" and voce not in PAESI:
             errore(f"--composizione: paese {voce!r} non è un codice ISO 3166-1 alpha-2 ({strumento})")
+        if dim == "valute":
+            codice = codice_valuta(voce)
+            if codice is None:
+                errore(f"--composizione: valuta {voce!r} non è un codice ISO 4217 ({strumento})")
+            voce = codice
         if dim == "titoli" and not voce:
             errore(f"--composizione: riga «titolo» senza nome ({strumento})")
         try:
@@ -221,7 +228,7 @@ def leggi_composizione(path, avvisi=None):
             scheda["isin"][voce] = isin
     for strumento, dims in comp.items():
         scala_nota = None
-        for dim in ("settori", "paesi"):
+        for dim in ("settori", "paesi", "valute"):
             voci = dims[dim]
             if not voci:
                 continue
@@ -352,6 +359,9 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
         pesi_regioni[r_k] = pesi_regioni.get(r_k, 0.0) + w
     regioni = [{"voce": k, "nome": REGIONI[k][0], "peso": w} for k, w in sorted(pesi_regioni.items(), key=lambda kv: -kv[1])]
     copertura["regioni"] = copertura["paesi"]
+    valute = [{"voce": k, "nome": nome_valuta(k), "peso": w} for k, w in sorted(pesi["valute"].items(), key=lambda kv: -kv[1])]
+    # il peso dell'euro sulla parte coperta: zero se la parte coperta non ne ha, nessuno se non c'è parte coperta
+    quota_euro = pesi["valute"].get("EUR", 0.0) if valute else None
 
     # titoli: due righe sono lo stesso titolo se hanno lo stesso ISIN o la stessa chiave del nome (componenti
     # connesse, con una union-find sui nodi «ISIN» e «nome»); il nome viene dallo strumento che contribuisce di più
@@ -389,7 +399,8 @@ def aggrega(posizioni, composizione, csv_path, avvisi):
                     for t in sorted(titoli.values(), key=lambda t: -t["peso"])]
     return {"controvalore_totale": totale, "posizioni": [v for v, _ in con], "senza_composizione": senza,
             "composizioni_senza_posizione": senza_posizione,
-            "copertura": copertura, "settori": settori, "paesi": paesi, "regioni": regioni, "titoli": lista_titoli,
+            "copertura": copertura, "settori": settori, "paesi": paesi, "regioni": regioni, "valute": valute, "quota_euro": quota_euro,
+            "titoli": lista_titoli,
             "n_titoli_report": n_report, "quota_primi_titoli": sum(t["peso"] for t in lista_titoli[:n_report]),
             "n_titoli_aggregati": len(lista_titoli), "avvisi": avvisi}
 
@@ -437,6 +448,14 @@ def stampa(r):
               f"coperta ({numero(r['n_titoli_aggregati'])} titoli distinti in tutto).")
     else:
         print("   nessuna posizione con i titoli")
+    print(f"\n4. VALUTE (copertura {pct(r['copertura']['valute'])})")
+    primi, altre = r["valute"][:N_VALUTE_REPORT], r["valute"][N_VALUTE_REPORT:]
+    riga = " · ".join(f"{x['nome']} {pct(x['peso'])}" for x in primi)
+    if altre:
+        riga += f" · altre {len(altre)} valute {pct(sum(x['peso'] for x in altre))}"
+    print("   " + (riga or "nessuna posizione con le valute"))
+    if r["quota_euro"] is not None:
+        print(f"   In euro: {pct(r['quota_euro'])} della parte coperta.")
     print("\nNon è consulenza: è la fotografia delle composizioni alla data dei file degli emittenti, da riguardare "
           "a ogni revisione.")
 
