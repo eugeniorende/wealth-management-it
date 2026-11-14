@@ -1,6 +1,6 @@
 # Completamento della roadmap: programma a ondate e ciclo 0.13.0 (design)
 
-Stato: spec da rivedere, 14/11/2026. Nasce dalla richiesta del proprietario dopo la 0.12.0: «voglio completare le attività rimaste aperte» della ROADMAP. Contiene il **programma intero** (§5) e il design di dettaglio delle **ondate 0 e 1**, che insieme fanno la 0.13.0 (§6 e §7). Per le ondate 2, 3 e 4 fissa solo l'impianto (§8): ognuna avrà la sua spec prima del piano.
+Stato: spec da approvare, 14/11/2026; già letta da un revisore contro il repository, con le sue osservazioni integrate (§13). Nasce dalla richiesta del proprietario dopo la 0.12.0: «voglio completare le attività rimaste aperte» della ROADMAP. Contiene il **programma intero** (§5) e il design di dettaglio delle **ondate 0 e 1**, che insieme fanno la 0.13.0 (§6 e §7). Per le ondate 2, 3 e 4 fissa solo l'impianto (§8): ognuna avrà la sua spec prima del piano.
 
 > ⚠️ Come il resto del plugin: strumento di pianificazione personale, non consulenza finanziaria, fiscale o previdenziale.
 
@@ -109,19 +109,20 @@ Rispetto al 2025-2026 i coefficienti scendono tra l'1,21% (57 anni) e l'1,97% (7
 |---|---|---|
 | D1 | Quale tabella usa lo script | Solo quella vigente, la 2027-2028, già nella 0.13.0 di dicembre: chi proietta oggi va in pensione dal 2027. La tabella 2025-2026 resta nella reference, nel confronto tra bienni |
 | D2 | Nome della costante | `COEFF_VIGENTI`, con il biennio in una costante privata (`_BIENNIO_COEFF = "2027-2028"`, che `--set` non elenca) per i testi dell'output: alla prossima revisione cambiano solo i dati. Oggi il nome `COEFF_2025_2026` è scritto anche in un test |
-| D3 | Riduzione attesa dei coefficienti futuri | Invariata (`RIDUZIONE_COEFF_ANNUA = 0.007` nello script, decadimento per biennio nell'Excel): la revisione osservata sta nell'intervallo già dichiarato. Nei testi l'intervallo osservato si aggiorna con il dato nuovo |
+| D3 | Riduzione attesa dei coefficienti futuri | I default non cambiano (`RIDUZIONE_COEFF_ANNUA = 0.007` nello script, decadimento per biennio nell'Excel): a 67 anni la revisione vale −1,68% per biennio, vicino a entrambi. Cambiano i testi: gli intervalli osservati oggi dichiarati («1,5-2,2% per biennio» nella reference e nelle note dei due Excel, «~-1,5/-2%» nel commento dello script) non contengono più il dato nuovo per le età fino a 63 anni (da −1,21% a −1,48%) e diventano 1,2-2,2% |
 | D4 | Output | Cambiano a parità di input (pensione proiettata più bassa dell'1-2%): riga «Output cambiati» nel CHANGELOG, con un esempio sui default |
 
-**Copie da aggiornare** (la regola è propagare: `git grep` su `5,608`, `5.608`, `2025-2026`, `2025-26`, `20/11/2024`, `COEFF_2025_2026`):
+**Copie da aggiornare** (la regola è propagare: `git grep` su `5,608`, `5.608`, `2025-2026`, `2025-26`, `20/11/2024`, `20 novembre 2024`, `COEFF_2025_2026`; negli Excel la ricerca va fatta nell'XML estratto, perché `git grep` non entra negli xlsx):
 
 - `skills/it-pianificazione/assets/proiezione-inps.py`: tabella, commento con fonte e marcatore, stringa «origine»;
 - `skills/it-pianificazione/assets/riscatto-laurea.py`: legge tabella e riduzione dal modulo di `proiezione-inps.py`; controllare i testi che nominano il biennio;
+- `skills/it-pianificazione/assets/ponte-pensione.py`: il default `COEFF_TRASFORMAZIONE = 0.048` è «il coefficiente a 69 anni, coerente con proiezione-inps.py», e nessuna delle ricerche sopra lo trova. Con la tabella nuova il coefficiente sui default di `proiezione-inps.py` passa da 0,04811 a 0,04723: il default del ponte diventa `0.047`, e i suoi valori chiusi lo seguono;
 - `skills/it-pianificazione/references/previdenza-obbligatoria.md`: tabella con i divisori, confronto 2025-2026 contro 2027-2028, esempi svolti (età non intera, montante di €300.000, coefficiente proiettato), prossimo aggiornamento (biennio 2029-2030, atteso nell'autunno 2028);
 - `skills/it-pianificazione/SKILL.md` (il coefficiente a 67 anni e l'esempio «del perché conta», da ricalcolare) e `skills/it-pianificazione-autonomi/references/previdenza-gestione-separata.md`;
-- foglio `Coefficienti` di `proiezione-pensione.xlsx` e di `proiezione-pensione-autonomi.xlsx`: titolo, fonte, `B5:C19`, note che nominano il biennio; modifica nell'XML, ricalcolo in locale italiano, struttura confrontata prima e dopo;
+- foglio `Coefficienti` di `proiezione-pensione.xlsx` e di `proiezione-pensione-autonomi.xlsx`: titolo, fonte, `B5:C19`, note che nominano il biennio e l'intervallo osservato; fuori dal foglio, le due celle che nominano il biennio: `Pubblica!A59` del primo e `Input!C42` del secondo. Modifica nell'XML, ricalcolo in locale italiano, struttura confrontata prima e dopo;
 - README: tabella della freshness e riga del calendario (il decreto è uscito; la prossima è l'autunno 2028).
 
-**Test, prima del codice**: la tabella dello script è quella del decreto, valore per valore, e ogni coefficiente è 1/divisore; script, reference e i due Excel portano gli stessi quindici valori; i valori chiusi che dipendono dal coefficiente si ricalcolano (proiezione INPS, `--json` previdenziali, Excel contro script, riscatto della laurea, cifre documentate nelle skill). Il costruttore li trova lanciando la suite dopo aver cambiato il primo test.
+**Test, prima del codice**: la tabella dello script è quella del decreto, valore per valore, e ogni coefficiente è 1/divisore; script, reference e i due Excel portano gli stessi quindici valori; i valori chiusi che dipendono dal coefficiente si ricalcolano: proiezione INPS, Excel contro script, riscatto della laurea, ponte (per il default nuovo), cifre documentate nelle skill. I `--json` di Monte Carlo e netto della pensione girano su default che non leggono la tabella e non cambiano. Il costruttore trova il resto lanciando la suite dopo aver cambiato il primo test.
 
 ### 6.2 Tasso di capitalizzazione 2026
 
@@ -130,6 +131,7 @@ Rispetto al 2025-2026 i coefficienti scendono tra l'1,21% (57 anni) e l'1,97% (7
 - `importa-previdenza.py`: `TASSI_CAPITALIZZAZIONE[2026] = 1.063359`, con la convenzione già scritta nel file (rivaluta il montante al 31/12/2025, per le decorrenze dal 2027); commento della fonte e marcatore aggiornati; il docstring dice 1996-2026.
 - `previdenza-obbligatoria.md`: le medie del tasso nominale e l'intervallo dei singoli anni si ricalcolano (il 6,3% del 2026 è il nuovo massimo dal 1996).
 - **Test**: il dizionario dei tassi ufficiali prende il 2026; il test sulle medie documentate segue; il montante ricostruito sulla fixture cambia dove l'anno corrente è il 2026. L'avviso «tasso non ancora pubblicato» resta per gli anni dopo l'ultimo tasso.
+- **Un test da rendere indipendente dalla data.** Oggi un test lancia lo script con la data di sistema e pretende l'avviso: con il tasso 2026 in tabella fallirebbe fino al 31/12/2026 e tornerebbe verde dal 2027. Lo script prende l'anno corrente da una costante che `--set` può fissare (default: l'anno di oggi; il nome è del costruttore), e il test prova i due casi: con l'ultimo anno in tabella nessun avviso, con l'anno dopo l'avviso c'è.
 
 ### 6.3 Pesi settoriali dell'indice mondiale
 
@@ -154,13 +156,16 @@ Tre regole valgono per tutte le voci dell'ondata:
 
 ### 7.1 Archivio e confronto tra due revisioni
 
-**Perché.** La revisione chiede «cosa è cambiato dall'ultima volta» (passo 2) e il template del report ha un «variazione vs anno scorso», ma niente conserva la revisione precedente: `cruscotto.html` si sovrascrive a ogni lancio e il bundle (`--json`) è facoltativo. Oggi quella variazione la calcola Claude a mano, o nessuno.
+**Perché.** La revisione chiede «cosa è cambiato dall'ultima volta» (passo 2), ma niente conserva i numeri della revisione precedente: `cruscotto.html` si sovrascrive a ogni lancio e il bundle (`--json`) è facoltativo. Le variazioni di probabilità, tassi di sostituzione, esposizioni e zainetto oggi le ricostruisce Claude a mano dai report vecchi, o nessuno.
 
 **La foto di una revisione è il bundle**: i dati che la pagina mostra, già senza posizioni né ISIN. Non serve un formato nuovo.
+
+**Perimetro.** Il confronto copre le grandezze che vengono dagli script, come il resto del cruscotto. Il **patrimonio netto** resta fuori: sta nel foglio Patrimonio del cruscotto Excel, compilato a mano, e nessuno script lo scrive. La riga «variazione vs anno scorso» del template resta il confronto tra due valori scritti dall'utente, e il template lo dice. Nel confronto ci sono i suoi analoghi calcolati: valore in portafoglio e patrimonio finanziario.
 
 **Interfaccia** (`genera-cruscotto.py`):
 
 - `--archivia [CARTELLA]`: scrive anche il bundle in `CARTELLA/cruscotto-AAAA-MM-GG.json` (default `revisioni/` nella cartella corrente, creata se manca; la data è `generato_il`). Un secondo lancio nello stesso giorno sovrascrive la foto del giorno, e lo dice.
+- `--solo-dati`: compone il bundle, archivia e confronta **senza scrivere la pagina**. Vuole `--json` o `--archivia`; con un `-o` esplicito è un errore di riga di comando (codice 2). Serve alla revisione, dove la pagina è facoltativa e il confronto no.
 - `--precedente FILE|CARTELLA`: la revisione con cui confrontare. Un **bundle** (`versione` 1 o 2), una **pagina** `cruscotto.html` generata dal plugin (il bundle si estrae dal blocco `<script id="dati" type="application/json">`: così vale anche una pagina della 0.12.0 messa da parte), oppure una **cartella**: tra i suoi `cruscotto-*.json` si prende la foto più recente con data precedente a quella corrente. La data di una foto è il suo `generato_il`, non il nome del file.
 - Errori con `ERRORE:` e codice 1: file o cartella inesistente; cartella senza foto precedenti, o con una foto illeggibile (si nomina il file: non si salta in silenzio a una più vecchia); file che non è un bundle né una pagina del plugin (compreso il template senza dati); `versione` sconosciuta; foto anonimizzata; data uguale o successiva a quella corrente.
 - A fine esecuzione stampa la data della revisione di confronto e quante grandezze ha confrontato.
@@ -187,13 +192,20 @@ Gli **obiettivi** si confrontano per nome (uguale dopo aver tolto gli spazi ai b
 - **importi nominali**: ognuno alla data della sua revisione, non corretti per l'inflazione; la sezione lo dice;
 - **versioni diverse**: se le due revisioni vengono da versioni diverse del plugin la sezione avvisa che parte delle differenze può venire da dati normativi e metodi aggiornati, e rimanda al CHANGELOG. Con la 0.13.0 succede subito: la pensione proiettata scende per i coefficienti nuovi, non per la situazione dell'utente.
 
-**Nella skill `it-revisione`**: al passo 6 di una revisione completa si archivia sempre (`--archivia`) e, se in `revisioni/` c'è una foto precedente, la si passa con `--precedente revisioni/`; un `/cruscotto` esplorativo non archivia, se l'utente non lo chiede. Al passo 2 e nel report le variazioni vengono da `confronto`, mai da sottrazioni fatte a mano (nuovo anti-pattern). Il «Contratto di input» prende la riga «Confronto»; `template-revisione.md` la sezione 2 con la riga del confronto. README, «Dove vanno i tuoi dati»: la cartella `revisioni/` contiene i bundle, con importi ed età, e resta nella cartella di lavoro.
+**Nella skill `it-revisione`.** Oggi il cruscotto è il passo 6, facoltativo e dopo il report: se il confronto nascesse lì, il report sarebbe già scritto. Quindi:
+
+- **fine del passo 3, in ogni revisione completa**: con i JSON degli script appena scritti si lancia il generatore con `--solo-dati --archivia --json bundle.json`, più `--precedente revisioni/` se c'è una foto precedente. È la foto della revisione: non disegna e non pubblica nulla;
+- **passo 5**: nel report le variazioni delle grandezze calcolate dagli script vengono da `confronto`, mai da sottrazioni fatte a mano sui report vecchi (nuovo anti-pattern). Il passo 2 resta la raccolta di ciò che dice l'utente: versamenti, eventi, novità normative;
+- **passo 6**: resta facoltativo. La pagina si disegna dagli stessi JSON con lo stesso `--precedente`, senza archiviare di nuovo: la foto di oggi è già in `revisioni/`, e la regola della data la salta;
+- un `/cruscotto` fuori da una revisione non archivia, se l'utente non lo chiede.
+
+Il «Contratto di input» prende la riga «Confronto»; `template-revisione.md` la riga del confronto nella sezione 2 e la nota sul patrimonio netto nella sezione 1. README, «Dove vanno i tuoi dati»: la cartella `revisioni/` contiene i bundle, con importi ed età, e resta nella cartella di lavoro.
 
 **Test**
 
-- Python: valori chiusi dei delta su due bundle costruiti dagli esempi (un obiettivo con probabilità cambiata, uno rinominato); `--precedente` da pagina HTML, da bundle di versione 1 (fixture sintetica), da cartella con più foto; ogni errore dell'elenco; `--archivia` (nome con la data, cartella indicata, sovrascrittura nello stesso giorno); senza `--precedente` il bundle ha `confronto: null`.
+- Python: valori chiusi dei delta su due bundle costruiti dagli esempi (un obiettivo con probabilità cambiata, uno rinominato); `--precedente` da pagina HTML, da bundle di versione 1 (fixture sintetica), da cartella con più foto, compresa quella di oggi; ogni errore dell'elenco; `--archivia` (nome con la data, cartella indicata, sovrascrittura nello stesso giorno); `--solo-dati` (nessuna pagina scritta, codice 2 senza `--json` né `--archivia` e con `-o`); senza `--precedente` il bundle ha `confronto: null`.
 - Browser: `#sez-confronto` presente con i numeri all'italiana, assente senza confronto; avviso delle versioni diverse; 375 px; nessun errore in console.
-- Documentazione: passi 2 e 6, contratto di input, anti-pattern, template, README.
+- Documentazione: passi 3, 5 e 6, contratto di input, anti-pattern, template, README.
 
 ### 7.2 Versione anonimizzata
 
@@ -205,35 +217,36 @@ Gli **obiettivi** si confrontano per nome (uguale dopo aver tolto gli spazi ai b
 
 | Cosa | Diventa |
 |---|---|
-| Ogni importo in euro | Un **indice**: importo × 100 / base, con un solo fattore per tutta la pagina, così proporzioni e grafici restano veri. La base è la prima disponibile tra: capitale allocato, valore in portafoglio, patrimonio finanziario di oggi (capitale umano), totale del ribilanciamento, netto dell'ultimo stipendio, RAL finale, capitale-ponte; in mancanza, l'importo più grande della pagina. La testata dice qual è |
+| Ogni importo in euro | Un **indice**: importo × 100 / base, con un solo fattore per tutta la pagina, così proporzioni e grafici restano veri. La base è la prima disponibile tra: capitale allocato, valore in portafoglio, patrimonio finanziario di oggi (capitale umano), totale del ribilanciamento, netto dell'ultimo stipendio, capitale-ponte; in mancanza, l'importo più grande rimasto nella pagina. La testata dice qual è |
 | Importi del riscatto della laurea | `null`: l'onere agevolato è un importo di legge, e accanto all'indice rivelerebbe il fattore. Restano anni, modalità, anni per rientrare, anticipo |
+| Importi lordi della proiezione INPS (pensione lorda annua, montante contributivo, RAL finale) | `null`. La regola è **mai il lordo e il netto della stessa grandezza**: l'IRPEF è progressiva e pubblica, quindi il rapporto tra netto e lordo dipende dal livello del reddito e lo farebbe stimare a chiunque. Restano età e anni, i netti come indice e i due tassi di sostituzione, lordo e netto, da cui il livello si ricava solo con molta approssimazione |
 | Nomi degli obiettivi | «Obiettivo 1…n», lo stesso nome con la stessa etichetta in tutte le sezioni, nel confronto e nella nota dell'indicatore che nomina un obiettivo |
 | Nomi dei broker | «Broker A, B…», coerenti tra fiscalità e ribilanciamento |
 | Nomi dei file di origine | Tolti; restano i tipi |
-| Testi liberi (avvisi dell'importatore, nota degli ordini, esito e motivo del drift) | Tolti; gli avvisi si contano tra gli omessi. Contengono importi e nomi di broker |
+| Testi con importi o nomi (avvisi dell'importatore, nota degli ordini, motivo del drift) | Tolti; gli avvisi si contano tra gli omessi. L'esito del drift è un'etichetta fissa dello script e resta |
 | Percentuali, probabilità, anni, **età**, date, conteggi, classi, profili, priorità, settore del lavoro, aggregati del look-through | Invariati |
 
-Nel bundle: `anonimo = {base, obiettivi, broker}` (l'etichetta della base e quanti nomi sono stati sostituiti). Nella pagina: la testata dice che è la versione anonimizzata, cosa è stato sostituito e cosa resta (età, anni, percentuali, settore del lavoro); gli importi si scrivono come numero senza «€», con «(indice)» sugli assi; il blocco del riscatto mostra solo il testo.
+Nel bundle: `anonimo = {base, obiettivi, broker}` (l'etichetta della base e quanti nomi sono stati sostituiti). Nella pagina: la testata dice che è la versione anonimizzata, cosa è stato sostituito e cosa resta (età, anni, percentuali, settore del lavoro); gli importi si scrivono come numero senza «€», con «(indice)» sugli assi; il blocco del riscatto e la riga della proiezione INPS mostrano solo ciò che non è un importo. Le due regole sui `null` valgono in tutto il bundle, confronto compreso: la riga della pensione INPS lorda non entra nel confronto anonimo.
 
 **Guardia.** Lo script dichiara quali campi del bundle sono importi in euro (`CAMPI_EURO`, per percorso) e quali no. Un test percorre il bundle completo degli esempi e fallisce se trova un campo numerico non classificato: un campo aggiunto domani non può portare un importo nella pagina anonima per dimenticanza.
 
-**Limite dichiarato**, in pagina e nella reference: nasconde gli importi e i nomi, non rende irriconoscibile chi conosce già un numero dell'utente (con un importo vero si ricava il fattore).
+**Limite dichiarato**, in pagina, nel passo 6 della skill e nel README (`it-revisione` non ha una reference sul cruscotto): nasconde importi e nomi a chi legge la pagina. Non protegge da chi conosce già un importo vero dell'utente, perché ne ricava il fattore, né da chi ricostruisce l'ordine di grandezza del reddito dai rapporti rimasti, con le regole fiscali e previdenziali alla mano.
 
 **Nella skill**: al passo 6, se l'utente vuole mostrare la pagina ad altri, si genera e si pubblica la versione anonimizzata; la conferma prima di pubblicare resta, e dice cosa resta visibile.
 
 **Test**
 
-- Python: nel bundle e nell'HTML anonimi non compaiono «€», né gli importi degli esempi da 1.000 euro in su (interi o in formato italiano), né i nomi di obiettivi, broker e file; i rapporti si conservano (già accumulato su target, prima e dopo); la base vale 100; importi del riscatto a `null`; etichette coerenti tra sezioni; `--anonimo --archivia` dà codice 2; il test della guardia.
-- Browser: testata della versione anonimizzata, nessun «€» nel testo della pagina, «Obiettivo 1» al posto del nome, 375 px.
+- Python: nel bundle anonimo e nel blocco dei dati della pagina non compaiono «€», né gli importi degli esempi da 1.000 euro in su (interi o in formato italiano), né i nomi di obiettivi, broker e file. Il controllo è sul bundle e sul blocco dei dati, non sull'HTML intero: il template contiene di suo «€», un importo in un commento e i nomi dei file d'esempio nel messaggio del template vuoto. I rapporti si conservano (già accumulato su target, prima e dopo); la base vale 100; importi del riscatto e lordi della proiezione INPS a `null`; etichette coerenti tra sezioni; `--anonimo --archivia` dà codice 2; il test della guardia.
+- Browser: testata della versione anonimizzata, nessun «€» nel testo reso della pagina, «Obiettivo 1» al posto del nome, sezione Pensione senza importi lordi, 375 px.
 
 ### 7.3 Regioni come dimensione del look-through
 
 Le regioni si **derivano dai paesi** al momento dell'aggregazione: nessun cambio a `composizione.csv`, all'importatore, al capitale umano, e valgono anche per le righe compilate a mano.
 
-- **Classificazione**: le regioni geografiche dello standard ONU M49, con le Americhe divise nelle loro due sottoregioni: Nord America, America Latina e Caraibi, Europa, Asia, Oceania, Africa. Stanno in una tabella `REGIONI` di `look-through-portafoglio.py` che copre **ogni** codice di `PAESI`; l'Antartide, che M49 non assegna a una regione, ha una voce sua. È una classificazione stabile e senza licenze, da leggere sulla pagina M49 della Divisione statistica dell'ONU e citare nel commento. La divisione tra mercati sviluppati ed emergenti resta fuori: è di un fornitore di indici, cambia nel tempo e tra fornitori.
+- **Classificazione**: le regioni geografiche dello standard ONU M49, con le Americhe divise nelle loro due sottoregioni: Nord America, America Latina e Caraibi, Europa, Asia, Oceania, Africa. Stanno in una tabella `REGIONI` di `look-through-portafoglio.py` che copre **ogni** codice di `PAESI`. Due codici sono fuori dallo standard e si decidono qui: **Taiwan**, che M49 non elenca, va in Asia; l'**Antartide**, che M49 non assegna a una regione, ha una voce sua. La reference dichiara entrambe le scelte. È una classificazione stabile e senza licenze, da leggere sulla pagina M49 della Divisione statistica dell'ONU e citare nel commento. La divisione tra mercati sviluppati ed emergenti resta fuori: è di un fornitore di indici, cambia nel tempo e tra fornitori.
 - La reference dichiara le assegnazioni che sorprendono un investitore: Turchia, Israele, Cipro e i paesi del Golfo in Asia; Russia in Europa; Messico in America Latina.
 - **JSON**: `regioni: [{voce, nome, peso}]` per peso decrescente, `copertura.regioni` uguale a quella dei paesi. **Report**: una riga «Per regione» sotto i paesi. **Cruscotto**: barre «Regioni» prima di «Paesi».
-- **Test**: valori chiusi sulla fixture; ogni codice di `PAESI` in una e una sola regione; le assegnazioni dichiarate sopra; il cruscotto con e senza `regioni`.
+- **Test**: valori chiusi sulla fixture; ogni codice di `PAESI` in una e una sola regione; le assegnazioni dichiarate sopra, Taiwan compresa; il cruscotto con e senza `regioni`.
 
 ### 7.4 ISIN dei titoli in `composizione.csv`
 
@@ -293,8 +306,26 @@ Nomi delle funzioni interne e testo esatto dei messaggi; il disegno dei grafici 
 ## 12. Limiti dichiarati
 
 - Il confronto mette accanto due fotografie: non distingue quanto di una variazione viene dal mercato, dai versamenti o da un dato normativo cambiato; l'avviso sulle versioni diverse copre solo l'ultimo caso.
-- La versione anonimizzata nasconde importi e nomi, non età, settore del lavoro e struttura del piano.
+- Il confronto non copre il patrimonio netto, che non viene da uno script: nel report resta un confronto tra due valori scritti dall'utente.
+- La versione anonimizzata nasconde importi e nomi, non età, settore del lavoro e struttura del piano; dai rapporti rimasti l'ordine di grandezza del reddito si può ancora stimare.
 - Le regioni sono geografiche: Giappone e India stanno entrambi in Asia.
 - La valuta è quella di negoziazione dei titoli; per le classi con copertura del cambio conta ciò che dichiara l'utente con `--copertura`.
 - Gli ISIN uniscono i titoli solo dove il file dell'emittente li riporta.
 - Subito dopo un cambio di tabella dei coefficienti le pensioni proiettate scendono di un gradino: la riduzione attesa si conta dagli anni mancanti alla pensione, non dall'anno della tabella. È così da prima, e questo ciclo non lo cambia.
+
+## 13. Scelte del progettista, da controllare
+
+Il proprietario ha deciso il cosa (completare le voci aperte). Tutto il come è una scelta del progettista: qui l'elenco, con il paragrafo dove sta il motivo. Le scelte 4, 5 e 6 rispondono alle tre domande del revisore.
+
+| # | Scelta | Dove |
+|---|---|---|
+| 1 | Cinque ondate per dipendenza e tre rilasci (0.13.0 entro dicembre, 0.14.0 da febbraio, 0.15.0 dopo) | §4, §5 |
+| 2 | Tabella dei coefficienti 2027-2028 già nella 0.13.0 di dicembre, con gli output che cambiano; default del ponte da 0,048 a 0,047 | §6.1 |
+| 3 | `capitale-umano.py` tra i file con il marcatore obbligatorio, per i pesi MSCI | §6.3 |
+| 4 | La foto della revisione si scrive a fine passo 3 in ogni revisione completa, con `--solo-dati`; la pagina resta facoltativa | §7.1 |
+| 5 | Confronto neutro (niente verde e rosso), obiettivi confrontati per nome, patrimonio netto fuori | §7.1 |
+| 6 | Versione anonimizzata: importi come indice con un solo fattore, nomi sostituiti, età e settore del lavoro visibili; importi del riscatto e importi lordi della proiezione INPS tolti | §7.2 |
+| 7 | Regioni geografiche dell'ONU, non mercati sviluppati ed emergenti; Taiwan in Asia | §7.3 |
+| 8 | Quinta colonna `isin` in `composizione.csv`, con i tre formati ancora letti | §7.4 |
+| 9 | `--copertura` per le classi con copertura del cambio: lo dichiara l'utente, lo script non lo deduce | §7.5 |
+| 10 | Ondata 4: l'aggiustamento dei target proposto come opzione con gate. Questa non è decisa: la decisione di postura resta al proprietario, alla spec dell'ondata | §8 |
