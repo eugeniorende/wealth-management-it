@@ -448,7 +448,7 @@ def stampa_proiezione(p):
 def leggi_composizione(path):
     """Composizione settoriale degli strumenti, da un CSV in uno dei due formati (righe «#» saltate, BOM ammesso):
     strumento;dimensione;voce;peso scritto da importa-composizione-etf.py, di cui contano le righe «settore»
-    (le righe «paese» e «titolo» servono al look-through), oppure strumento;settore;peso compilato a mano.
+    (le righe «paese», «titolo» e «valuta» servono al look-through), oppure strumento;settore;peso compilato a mano.
     La chiave è il campo «strumento» del CSV: un ISIN o un nome (vedi chiave_composizione).
     Pesi in frazione o in percento (se quelli di uno strumento sommano più di 1,5), virgola o punto."""
     if not os.path.exists(path):
@@ -472,9 +472,9 @@ def leggi_composizione(path):
         if not any(r.values()):
             continue
         if importato:
-            if r["dimensione"] not in ("settore", "paese", "titolo"):
+            if r["dimensione"] not in ("settore", "paese", "titolo", "valuta"):
                 errore(f"--composizione: dimensione {r['dimensione']!r} sconosciuta ({r['strumento']}): "
-                       "attese «settore», «paese» o «titolo»")
+                       "attese «settore», «paese», «titolo» o «valuta»")
             if r["dimensione"] != "settore":
                 continue
             r["settore"] = r["voce"]

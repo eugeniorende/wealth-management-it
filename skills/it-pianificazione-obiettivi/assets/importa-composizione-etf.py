@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-importa-composizione-etf.py — composizione per settore e paese degli ETF, dal file delle posizioni dell'emittente.
+importa-composizione-etf.py — composizione per settore, paese e valuta degli ETF, dal file delle posizioni dell'emittente.
 
 Perché esiste: la diagnosi 4 di capitale-umano.py (sovrapposizione tra il settore del proprio lavoro e il
 portafoglio) ha bisogno dei pesi per settore di ogni ETF posseduto. Gli emittenti li pubblicano nel file delle
@@ -19,10 +19,14 @@ nomi diversi, segnala i nomi da aggiungere: lo script si ferma e li elenca, non 
 
 Regole applicate (references/composizione-etf.md):
 - liquidità e derivati (asset class «Cash», «Futures», «FX»…, o peso negativo) si escludono da tutto;
-- le righe senza settore o senza paese («unknown», «Unassigned», «-») si escludono solo da quella dimensione;
+- le righe senza settore, paese o valuta («unknown», «Unassigned», «-») si escludono solo da quella dimensione;
 - per le obbligazioni (asset class «Fixed Income», «Reddito fisso»…) il settore non è GICS: contano solo nei paesi;
 - i pesi rimasti si rinormalizzano a 100 per dimensione; la quota esclusa è nel report, nel CSV e nel JSON;
 - settori: gli 11 GICS con il nome inglese, come in capitale-umano.py; paesi: codice ISO 3166-1 alpha-2;
+- valute: la valuta di negoziazione dei titoli come la riporta l'emittente, codice ISO 4217 (le unità minori,
+  «GBX», «GBp», «ZAc», si riportano alla valuta); anche le obbligazioni contano. Una classe di azioni con copertura
+  del cambio ha le valute dei titoli ma non l'esposizione: --copertura STRUMENTO=VALUTA scrive una sola riga al
+  100% nella valuta della copertura. Lo script non decide da solo che una classe è coperta, avvisa se lo sospetta;
 - un file in classificazione ICB (FTSE) dà solo i paesi: ICB → GICS non si converte senza errore;
 - i primi N_TITOLI titoli per peso (liquidità e derivati esclusi) si scrivono come righe «titolo», con il peso
   nel fondo NON rinormalizzato, e l'ISIN del titolo quando il file lo ha: servono al look-through del portafoglio
@@ -34,6 +38,7 @@ XLS del vecchio Excel; niente lingue diverse da italiano, inglese, tedesco e fra
 
 Uso:
     python importa-composizione-etf.py --file FILE --strumento NOME|ISIN [--file FILE --isin ISIN ...]
+                                       [--copertura STRUMENTO=VALUTA ...]
                                        [--emittente NOME] [--out composizione.csv] [--json FILE|-]
     (--strumento, o il suo alias --isin, è la chiave con cui le posizioni trovano la composizione: l'ISIN
      quando le posizioni vengono dall'estratto del broker, altrimenti il campo «strumento» delle posizioni del
@@ -65,6 +70,10 @@ SINONIMI_COLONNE = {
     # l'ordine conta: «secteur» prima di «industrie» (il livello sotto), come «sector» prima di «industry classification»
     "settore": ("sector", "gics sector", "sector classification", "industry classification", "settore",
                 "settore gics", "secteur", "secteur gics", "classification sectorielle", "branche", "sektor", "industrie"),
+    # l'ordine conta: la valuta di negoziazione del titolo prima di quella generica. «Cambio» non è un sinonimo: nel
+    # file italiano di iShares è la borsa («NASDAQ»)
+    "valuta": ("market currency", "valuta di mercato", "marktwährung", "devise de cotation", "currency", "valuta",
+               "divisa", "währung", "devise", "currency code"),
     "paese": ("location", "country", "trade country name", "country of risk", "domicile", "area geografica",
               "paese", "nazione", "regione", "land", "standort", "sitzland", "pays", "localisation", "pays de risque"),
     "asset_class": ("asset class", "type of security", "security type", "asset type", "classe di attivo",
@@ -512,7 +521,53 @@ _PAESI_DE_FR = {codice: tuple(nomi.split("|")) for codice, nomi in
                 (r.split(";") for r in _ELENCO_PAESI_DE_FR.strip().splitlines())}
 
 # ── Righe da escludere ──────────────────────────────────────────────────────
-# Asset class o settore che indicano liquidità e derivati: esclusi da tutte e due le dimensioni
+# ── Valute ──────────────────────────────────────────────────────────────────
+# Codice ISO 4217 → nome italiano, per il report. Un codice valido che manca qui si scrive e si riporta col codice.
+VALUTE = {
+    "USD": "Dollaro USA", "EUR": "Euro", "JPY": "Yen giapponese", "GBP": "Sterlina britannica",
+    "CHF": "Franco svizzero", "CAD": "Dollaro canadese", "AUD": "Dollaro australiano",
+    "NZD": "Dollaro neozelandese", "SEK": "Corona svedese", "NOK": "Corona norvegese", "DKK": "Corona danese",
+    "HKD": "Dollaro di Hong Kong", "SGD": "Dollaro di Singapore", "ILS": "Nuovo shekel israeliano",
+    "CNY": "Renminbi cinese", "TWD": "Nuovo dollaro taiwanese", "KRW": "Won sudcoreano", "INR": "Rupia indiana",
+    "IDR": "Rupia indonesiana", "MYR": "Ringgit malese", "PHP": "Peso filippino", "THB": "Baht thailandese",
+    "BRL": "Real brasiliano", "MXN": "Peso messicano", "CLP": "Peso cileno", "COP": "Peso colombiano",
+    "PEN": "Sol peruviano", "ZAR": "Rand sudafricano", "EGP": "Sterlina egiziana", "TRY": "Lira turca",
+    "PLN": "Zloty polacco", "CZK": "Corona ceca", "HUF": "Fiorino ungherese", "SAR": "Riyal saudita",
+    "AED": "Dirham degli Emirati", "QAR": "Riyal del Qatar", "KWD": "Dinaro kuwaitiano", "RUB": "Rublo russo",
+}
+# Tutti i codici ISO 4217 attivi: i <Ccy> distinti della «List One» dell'agenzia di mantenimento (SIX), pubblicata il
+# 17/09/2026 (attributo Pblshd), letta il 14/11/2026 da
+# https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml
+# (178 codici). Lo script non accede alla rete: la lista si rilegge a mano alla revisione annuale.
+CODICI_VALUTA = frozenset("""
+AED AFN ALL AMD AOA ARS AUD AWG AZN BAM BBD BDT BHD BIF BMD BND BOB BOV BRL BSD BTN BWP BYN BZD CAD CDF CHE CHF
+CHW CLF CLP CNY COP COU CRC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GNF GTQ GYD
+HKD HNL HTG HUF IDR ILS INR IQD IRR ISK JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD
+MAD MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MXV MYR MZN NAD NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN
+PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD
+TWD TZS UAH UGX USD USN UYI UYU UYW UZS VED VES VND VUV WST XAD XAF XAG XAU XBA XBB XBC XBD XCD XCG XDR XOF XPD
+XPF XPT XSU XTS XUA XXX YER ZAR ZMW ZWG
+""".split())
+# Unità minori e varianti di mercato → valuta, dopo strip().upper() («GBp» è già «GBP»)
+ALIAS_VALUTE = {"GBX": "GBP", "ZAC": "ZAR", "ILA": "ILS", "CNH": "CNY", "RMB": "CNY"}
+# Nel preambolo o nel nome del file: la classe è con copertura del cambio (le valute dei titoli non sono l'esposizione)
+PAROLE_COPERTURA = ("hedged", "hedge", "copertura del cambio", "con copertura", "couvert", "couverte",
+                    "währungsgesichert", "abgesichert")
+
+
+def codice_valuta(valore):
+    """Il codice ISO 4217 di una cella (unità minori e alias riportati alla valuta), o None se non è un codice noto."""
+    codice = str(valore if valore is not None else "").strip().upper()
+    codice = ALIAS_VALUTE.get(codice, codice)
+    return codice if codice in CODICI_VALUTA else None
+
+
+def nome_valuta(codice):
+    """Il nome italiano della valuta, o il codice stesso se non è in VALUTE."""
+    return VALUTE.get(codice, codice)
+
+
+# Asset class o settore che indicano liquidità e derivati: esclusi da tutte le dimensioni
 VALORI_LIQUIDITA = ("cash", "cash and/or derivatives", "cash and derivatives", "cash collateral and margins",
                     "money market", "fx", "futures", "future", "forward", "forwards", "swap", "swaps",
                     "liquidità", "liquidità e/o derivati", "derivati", "contanti",
@@ -924,17 +979,37 @@ def data_posizioni(preambolo, titolo_foglio, scheda):
 
 # ── Composizione di un file ─────────────────────────────────────────────────
 
-_DIMENSIONI = (("settore", "settori"), ("paese", "paesi"))
+_DIMENSIONI = (("settore", "settori"), ("paese", "paesi"), ("valuta", "valute"))
+# Le dimensioni femminili, per i messaggi: (della, la, non classificata, non scritte, non riconosciute)
+_FEMMINILI = {"valuta": ("della", "la", "non classificata", "non scritte", "non riconosciute")}
 
 
-def componi(path, strumento, forzato=None):
+def _genere(dim):
+    """(preposizione, articolo, «non classificato», «non scritti», «non riconosciuti») della dimensione, per i messaggi."""
+    return _FEMMINILI.get(dim, ("del", "il", "non classificato", "non scritti", "non riconosciuti"))
+
+
+def _copertura_valida(copertura):
+    """Il codice ISO della valuta di copertura (None se non c'è); un valore che non è un codice ferma lo script."""
+    if copertura is None:
+        return None
+    codice = codice_valuta(copertura)
+    if codice is None:
+        errore(f"copertura {copertura!r}: non è un codice di valuta ISO 4217")
+    return codice
+
+
+def componi(path, strumento, forzato=None, copertura=None):
     """La composizione di un file delle posizioni: la voce di «strumenti» del JSON (spec §3.4), pesi in frazione
-    rinormalizzati a 1 per dimensione e ordinati per peso decrescente. Un errore nei dati ferma lo script."""
+    rinormalizzati a 1 per dimensione e ordinati per peso decrescente. Un errore nei dati ferma lo script.
+    Con «copertura» (un codice ISO) le valute del file si ignorano: la classe è con copertura del cambio e
+    l'esposizione è al 100% quella valuta."""
     file = os.path.basename(path)
     avvisi = []
+    copertura = _copertura_valida(copertura)
     righe, foglio, ripartizione = leggi_file(path, avvisi)
     if ripartizione is not None:
-        return _componi_ripartizione(file, strumento, forzato, ripartizione, avvisi)
+        return _componi_ripartizione(file, strumento, forzato, ripartizione, avvisi, copertura)
     i, col, testi = trova_intestazione(righe)
     dati = righe_dati(righe, i, col["peso"])
     chiave, riconosciuto_da = riconosci_emittente(righe[:i], file, forzato)
@@ -969,8 +1044,8 @@ def componi(path, strumento, forzato=None):
     non_classificati = _tabella("VALORI_NON_CLASSIFICATI")
     obbligazionari = _tabella("VALORI_OBBLIGAZIONARI")
     esclusi = {"liquidita_derivati": 0.0, "settore_obbligazionario": 0.0, "settore_non_classificato": 0.0,
-               "paese_non_classificato": 0.0}
-    grezzi = {"settore": [], "paese": []}            # (nome normalizzato, nome originale, peso) per dimensione
+               "paese_non_classificato": 0.0, "valuta_non_classificato": 0.0}
+    grezzi = {dim: [] for dim, _ in _DIMENSIONI}     # (nome normalizzato, nome originale, peso) per dimensione
     n_titoli = 0
     candidati = []                                   # (nome, isin, peso) delle righe non escluse, per i primi titoli
     n_primi = globals()["N_TITOLI"]                  # letto qui: --set N_TITOLI=… ha effetto
@@ -988,7 +1063,7 @@ def componi(path, strumento, forzato=None):
             isin_titolo = cella(r, "isin")
             candidati.append((str(nome_titolo).strip(), _isin_titolo(isin_titolo), peso))
         for dim, _ in _DIMENSIONI:
-            if dim not in col:
+            if dim not in col or (dim == "valuta" and copertura):
                 continue
             if dim == "settore" and classe in obbligazionari:
                 esclusi["settore_obbligazionario"] += peso
@@ -1000,10 +1075,10 @@ def componi(path, strumento, forzato=None):
                 grezzi[dim].append((normalizza(valore), str(valore).strip(), peso))
 
     return _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, n_titoli,
-                      candidati, n_primi, avvisi, righe[:i], foglio)
+                      candidati, n_primi, avvisi, righe[:i], foglio, copertura=copertura)
 
 
-def _componi_ripartizione(file, strumento, forzato, rip, avvisi):
+def _componi_ripartizione(file, strumento, forzato, rip, avvisi, copertura=None):
     """La composizione da un file di ripartizione: i pesi per settore e per paese sono già aggregati; nessun titolo."""
     chiave, riconosciuto_da = riconosci_emittente(rip["preambolo"], file, forzato)
     scheda = SCHEDE.get(chiave)
@@ -1011,8 +1086,8 @@ def _componi_ripartizione(file, strumento, forzato, rip, avvisi):
         avvisi.append("emittente non riconosciuto: regole generiche, controlla le esclusioni")
     non_classificati = _tabella("VALORI_NON_CLASSIFICATI")
     esclusi = {"liquidita_derivati": 0.0, "settore_obbligazionario": 0.0, "settore_non_classificato": 0.0,
-               "paese_non_classificato": 0.0}
-    grezzi, col, testi = {"settore": [], "paese": []}, {}, {}
+               "paese_non_classificato": 0.0, "valuta_non_classificato": 0.0}
+    grezzi, col, testi = {dim: [] for dim, _ in _DIMENSIONI}, {}, {}
     for dim in ("settore", "paese"):
         if dim not in rip:
             continue
@@ -1046,11 +1121,11 @@ def _componi_ripartizione(file, strumento, forzato, rip, avvisi):
     avvisi.append("file di ripartizione dell'indice per settore e paese, non elenco dei titoli: nessun titolo scritto "
                   "(per i primi titoli serve il file delle posizioni) e pesi dell'indice, non del fondo")
     return _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, 0, [],
-                      globals()["N_TITOLI"], avvisi, rip["preambolo"], None, ripartizione=True)
+                      globals()["N_TITOLI"], avvisi, rip["preambolo"], None, ripartizione=True, copertura=copertura)
 
 
 def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, grezzi, esclusi, n_titoli, candidati,
-               n_primi, avvisi, preambolo, foglio, ripartizione=False):
+               n_primi, avvisi, preambolo, foglio, ripartizione=False, copertura=None):
     """La coda comune: classificazione, sinonimi, rinormalizzazione, avvisi, primi titoli e data."""
     # classificazione: dalla scheda, o dai nomi esclusivi dei due sistemi
     nomi_settori = {n for n, _, _ in grezzi["settore"]}
@@ -1062,8 +1137,8 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
                    "controlla di aver scaricato un solo fondo")
         classificazione = "ICB" if icb else "GICS"
 
-    ignoti = {"settore": {}, "paese": {}}
-    pesi = {"settore": {}, "paese": {}}
+    ignoti = {dim: {} for dim, _ in _DIMENSIONI}
+    pesi = {dim: {} for dim, _ in _DIMENSIONI}
     vecchi = set()
     for dim, _ in _DIMENSIONI:
         if dim == "settore" and classificazione == "ICB":
@@ -1073,18 +1148,23 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
                 voce = SINONIMI_SETTORI.get(n) or SETTORI_GICS_VECCHI.get(n)
                 if n in SETTORI_GICS_VECCHI:
                     vecchi.add(originale)
-            else:
+            elif dim == "paese":
                 voce = SINONIMI_PAESI.get(n)
+            else:
+                voce = codice_valuta(originale)
             if voce is None:
                 ignoti[dim][originale] = ignoti[dim].get(originale, 0) + peso
             else:
                 pesi[dim][voce] = pesi[dim].get(voce, 0) + peso
-    if ignoti["settore"] or ignoti["paese"]:
-        parti = [f"{etichetta} non riconosciuti: " + ", ".join(f"{k} ({pct(v, 2)})" for k, v in ignoti[dim].items())
-                 for dim, etichetta in (("settore", "settori"), ("paese", "paesi")) if ignoti[dim]]
+    if any(ignoti.values()):
+        parti = [f"{plurale} {_genere(dim)[4]}: "
+                 + ", ".join(f"{k} ({pct(v, 2)})" for k, v in ignoti[dim].items())
+                 for dim, plurale in _DIMENSIONI if ignoti[dim]]
         errore(f"{file}: {'; '.join(parti)}. Lo script non li indovina: segnalali per aggiungerli ai sinonimi "
                "(references/composizione-etf.md)")
 
+    if copertura:                                   # classe con copertura: l'esposizione è la valuta della copertura
+        pesi["valuta"] = {copertura: 1.0}
     # rinormalizzazione per dimensione, peso decrescente; una dimensione con pochi titoli classificati non si scrive
     risultato, scartate = {}, {}
     for dim, plurale in _DIMENSIONI:
@@ -1106,16 +1186,19 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
     for vecchio in sorted(vecchi):
         avvisi.append(f"«{vecchio}» (GICS prima del 2018) letto come Communication Services: il perimetro non è identico")
     for dim, plurale in _DIMENSIONI:
+        if dim == "valuta" and copertura:
+            continue
+        di, il, non_classificato, non_scritti, _ = _genere(dim)
         if dim not in col:
-            avvisi.append(f"il file non ha la colonna del {dim}: {plurale} non scritti")
+            avvisi.append(f"il file non ha la colonna {di} {dim}: {plurale} {non_scritti}")
         elif dim in scartate:
-            avvisi.append(f"solo {pct(scartate[dim], 2)} dei titoli ha il {dim}, meno del "
-                          f"{numero(SOGLIA_CLASSIFICATI * 100)}%: {plurale} non scritti, quella quota non descrive il fondo")
+            avvisi.append(f"solo {pct(scartate[dim], 2)} dei titoli ha {il} {dim}, meno del "
+                          f"{numero(SOGLIA_CLASSIFICATI * 100)}%: {plurale} {non_scritti}, quella quota non descrive il fondo")
         elif not risultato[plurale] and not (dim == "settore" and (classificazione == "ICB"
                                                                    or esclusi["settore_obbligazionario"] > 0)):
-            avvisi.append(f"nessun titolo con il {dim}: {plurale} non scritti")
+            avvisi.append(f"nessun titolo con {il} {dim}: {plurale} {non_scritti}")
         if esclusi[f"{dim}_non_classificato"] > SOGLIA_AVVISO:
-            avvisi.append(f"{dim} non classificato per {pct(esclusi[f'{dim}_non_classificato'], 2)} del fondo, sopra "
+            avvisi.append(f"{dim} {non_classificato} per {pct(esclusi[f'{dim}_non_classificato'], 2)} del fondo, sopra "
                           f"la soglia del 5%: i pesi per {dim} descrivono solo il resto")
     if esclusi["settore_obbligazionario"] > 0:
         avvisi.append(f"titoli obbligazionari per {pct(esclusi['settore_obbligazionario'], 2)} del fondo: il loro "
@@ -1141,11 +1224,16 @@ def _finalizza(file, strumento, chiave, riconosciuto_da, scheda, col, testi, gre
     if sintetica:
         avvisi.append("replica sintetica dichiarata nel file: le posizioni sono il paniere di collaterale dello swap, non "
                       "l'esposizione all'indice; settori, paesi e titoli descrivono il collaterale")
+    # classe con copertura del cambio: le valute dei titoli non sono l'esposizione (lo script non lo decide da solo)
+    coperta = any(f" {parola}" in " " + normalizza(f"{testo_preambolo} {file}") for parola in PAROLE_COPERTURA)
+    if coperta and not copertura:
+        avvisi.append("il file sembra di una classe con copertura del cambio: le valute dei titoli non sono "
+                      f"l'esposizione; se è così reimporta con --copertura {strumento}=EUR")
     return {"strumento": strumento, "emittente": chiave, "riconosciuto_da": riconosciuto_da, "file": file,
             "data_posizioni": data, "classificazione": classificazione,
             "colonne": {k: v for k, v in testi.items() if k != "nome"}, "titoli": n_titoli, "esclusi": esclusi,
-            "settori": risultato["settori"], "paesi": risultato["paesi"], "primi_titoli": primi,
-            "replica_sintetica": sintetica, "avvisi": avvisi}
+            "settori": risultato["settori"], "paesi": risultato["paesi"], "valute": risultato["valute"],
+            "copertura_cambio": copertura, "primi_titoli": primi, "replica_sintetica": sintetica, "avvisi": avvisi}
 
 
 # ── composizione.csv ────────────────────────────────────────────────────────
@@ -1253,7 +1341,8 @@ def _esclusi(c):
     return [f"{etichetta} {quota(c['esclusi'][k])}" for k, etichetta in (
         ("liquidita_derivati", "liquidità e derivati"), ("settore_obbligazionario", "obbligazioni senza settore GICS"),
         ("settore_non_classificato", "settore non classificato"),
-        ("paese_non_classificato", "paese non classificato")) if c["esclusi"][k] > 0]
+        ("paese_non_classificato", "paese non classificato"),
+        ("valuta_non_classificato", "valuta non classificata")) if c["esclusi"][k] > 0]
 
 
 def righe_strumento(c, oggi):
@@ -1266,6 +1355,8 @@ def righe_strumento(c, oggi):
     esclusi = _esclusi(c)
     if esclusi:
         commento += "; esclusi " + ", ".join(esclusi)
+    if c["copertura_cambio"]:
+        commento += f"; copertura del cambio in {c['copertura_cambio']} dichiarata dall'utente"
     if c["replica_sintetica"]:
         commento += "; replica sintetica: posizioni del collaterale, non esposizione all'indice"
     righe = [commento]
@@ -1323,6 +1414,8 @@ def stampa(composizioni, out, conservati, formato):
             print("   Settori: " + " · ".join(f"{SETTORI_GICS[k]} {pct(v, 2)}" for k, v in list(c["settori"].items())[:5]))
         if c["paesi"]:
             print("   Paesi: " + " · ".join(f"{PAESI[k][0]} {pct(v, 2)}" for k, v in list(c["paesi"].items())[:5]))
+        if c["valute"]:
+            print("   Valute: " + " · ".join(f"{nome_valuta(k)} {pct(v, 2)}" for k, v in list(c["valute"].items())[:5]))
         if c["primi_titoli"]:
             print("   Primi titoli: " + " · ".join(f"{t['nome']} {pct(t['peso'], 2)}" for t in c["primi_titoli"][:5])
                   + " (peso nel fondo)")
@@ -1345,6 +1438,9 @@ def main():
                           (("--strumento", "--isin"), {"action": "append", "required": True, "metavar": "NOME|ISIN",
                                                         "help": "nome o ISIN dello strumento, come nelle posizioni (uno per "
                                                                 "--file); con le posizioni dell'estratto del broker usa l'ISIN"}),
+                          (("--copertura",), {"action": "append", "metavar": "STRUMENTO=VALUTA", "default": [],
+                                              "help": "classe con copertura del cambio: scrive una sola valuta al 100%% (per "
+                                                      "esempio U=EUR); la chiave è uno degli --strumento (ripetibile)"}),
                           (("--emittente",), {"choices": sorted(SCHEDE),
                                               "help": "forza la scheda dell'emittente per tutti i file"}),
                           (("--out",), {"default": "composizione.csv", "metavar": "FILE",
@@ -1359,12 +1455,22 @@ def main():
     if doppi:
         args.parser.error(f"--strumento ripetuto: {', '.join(doppi)}")
 
+    coperture = {}
+    for voce in args.copertura:
+        chiave, uguale, valuta = (p.strip() for p in voce.partition("="))
+        if not uguale or chiave not in args.strumento:
+            args.parser.error(f"--copertura {voce}: serve STRUMENTO=VALUTA con lo strumento tra gli --strumento "
+                              f"({', '.join(args.strumento)})")
+        if codice_valuta(valuta) is None:
+            args.parser.error(f"--copertura {voce}: {valuta!r} non è un codice di valuta ISO 4217 (per esempio EUR)")
+        coperture[chiave] = codice_valuta(valuta)
+
     # tutto letto e validato prima di scrivere: un errore lascia composizione.csv com'era
     verifica_destinazione(args.out, "--out")
     if args.json and args.json != "-":
         verifica_destinazione(args.json, "--json")
     testa, blocchi, formato = leggi_out(args.out)
-    composizioni = [componi(path, strumento, args.emittente) for path, strumento in zip(args.file, args.strumento)]
+    composizioni = [componi(path, strumento, args.emittente, coperture.get(strumento)) for path, strumento in zip(args.file, args.strumento)]
     scrivi_out(args.out, testa, blocchi, composizioni, datetime.date.today().strftime("%d/%m/%Y"))
     risultato = {"strumenti": composizioni, "out": args.out}
     if args.json == "-":

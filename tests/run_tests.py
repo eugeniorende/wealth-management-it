@@ -5124,7 +5124,7 @@ def t_ce_lettura():
         righe, foglio = m.leggi_righe(os.path.join(FIXTURES, nome))
         i, col, testi = m.trova_intestazione(righe)
         assert i == 5 and foglio is None, (nome, i)
-        assert set(col) == {"peso", "settore", "paese", "asset_class", "nome"}, col
+        assert set(col) == {"peso", "settore", "paese", "valuta", "asset_class", "nome"}, col
         dati = m.righe_dati(righe, i, col["peso"])
         assert len(dati) == 8, (nome, len(dati))                 # il disclaimer in fondo non entra
         v = m.virgola_decimale([r[col["peso"]] for r in dati])
@@ -5385,7 +5385,7 @@ def t_ce_uscita():
                             r"importato il \d\d/\d\d/\d{4}; esclusi liquidità e derivati 1,00%", commento), commento
         mw = [r for r in righe if r.startswith("ETF MSCI World;")]
         assert mw[0] == "ETF MSCI World;settore;Information Technology;40,40;" and "ETF MSCI World;paese;KR;10,10;" in mw, mw
-        assert len(mw) == 16 and not any(";Energy;100" in r for r in righe), mw   # 5 settori, 5 paesi, 6 titoli (look-through)
+        assert len(mw) == 21 and not any(";Energy;100" in r for r in righe), mw   # 5 settori, 5 paesi, 5 valute, 6 titoli
         for dim in ("settore", "paese"):
             tot = sum(float(r.split(";")[3].replace(",", ".")) for r in mw if r.split(";")[1] == dim)
             assert abs(tot - 100) <= 0.05, (dim, tot)
@@ -5396,7 +5396,7 @@ def t_ce_uscita():
         assert d["out"] == out and [s["strumento"] for s in d["strumenti"]] == ["ETF MSCI World"], d
         s = d["strumenti"][0]
         assert {"strumento", "emittente", "riconosciuto_da", "file", "data_posizioni", "classificazione", "colonne",
-                "titoli", "esclusi", "settori", "paesi", "primi_titoli", "replica_sintetica", "avvisi"} == set(s), set(s)
+                "titoli", "esclusi", "settori", "paesi", "valute", "copertura_cambio", "primi_titoli", "replica_sintetica", "avvisi"} == set(s), set(s)
         assert abs(sum(s["settori"].values()) - 1) < 1e-9 and abs(sum(s["paesi"].values()) - 1) < 1e-9
         # --json - : solo JSON su stdout, --out scritto lo stesso
         rc, so, se = run_script_split(asset(*CE), "--file", en, "--strumento", "Y", "--out", out, "--json", "-", cwd=tmp)
@@ -5457,9 +5457,12 @@ def t_ce_capitale_umano():
         assert z["mancanti"] == ["ETF FTSE", "etf msci world"], z["mancanti"]  # il refuso di maiuscole è visibile
         assert "etf msci world" in so
         with open(out, "a", encoding="utf-8") as f:
-            f.write("ETF MSCI World;valuta;USD;100\n")
+            f.write("ETF MSCI World;rating;AAA;100\n")
         rc, so, se = run_script_split(asset(*CU), "--dati", pd_, "--composizione", out, cwd=tmp)
-        assert rc == 1 and "valuta" in se, se[-300:]
+        assert rc == 1 and "rating" in se, se[-300:]
+        # le righe «valuta» (scritte dall'importatore, lette dal look-through) il capitale umano le salta
+        assert abs(cu.leggi_composizione(os.path.join(FIXTURES, "composizione-look-through-v5.csv"))
+                   ["IE00B4L5Y983"]["Health Care"] - 0.5) < 1e-9
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -5684,7 +5687,9 @@ def t_ce_lingue():
         # stessi titoli e pesi del file inglese: stessi settori e paesi al bit, stessa data, stesse esclusioni
         assert c["data_posizioni"] == "2026-09-30" and c["titoli"] == 6 and c["classificazione"] == "GICS", c
         assert c["settori"] == en["settori"] and c["paesi"] == en["paesi"], (c["settori"], c["paesi"])
-        assert abs(c["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9 and c["avvisi"] == [], c
+        assert abs(c["esclusi"]["liquidita_derivati"] - 0.01) < 1e-9, c
+        # il file francese non ha la colonna della valuta: l'unico avviso è quello
+        assert c["avvisi"] == ([] if c is de else ["il file non ha la colonna della valuta: valute non scritte"]), c["avvisi"]
     assert de["colonne"]["settore"] == "Branche" and de["colonne"]["paese"] == "Land" and de["colonne"]["peso"] == "Gewichtung (%)"
     assert fr["colonne"]["settore"] == "Secteur" and fr["colonne"]["asset_class"] == "Classe d'actifs"
     assert [t["isin"] for t in fr["primi_titoli"]][:2] == ["US0000000001", "US0000000002"]   # «Code ISIN»
@@ -6185,6 +6190,68 @@ def t_lt_titoli_isin():
         assert abs(t["ALPHABET INC CLASS A"]["peso"] - 19500 * .055 / V_s) < 1e-12
         assert t["ALPHABET INC CLASS A"]["isin"] == ["US0000000037", "US0000000045"]
         assert t["NESTLE SA"]["isin"] == [] and r["n_titoli_aggregati"] == 4
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T16 look-through: l'importatore legge la valuta dei titoli (quattro lingue, «Cambio» è la borsa), unità minori, --copertura")
+def t_lt_importatore_valuta():
+    m = carica_modulo(asset(*CE))
+    r2 = lambda d: {k: round(v * 100, 2) for k, v in d.items()}  # noqa: E731
+    F = lambda n: os.path.join(FIXTURES, n)                       # noqa: E731
+    en = m.componi(F("composizione-ishares-en.csv"), "X")
+    assert en["colonne"]["valuta"] == "Currency" and en["copertura_cambio"] is None
+    assert r2(en["valute"]) == {"USD": 50.51, "JPY": 15.15, "GBP": 15.15, "KRW": 10.10, "CAD": 9.09}, en["valute"]
+    it = m.componi(F("composizione-ishares-it-2026-11.csv"), "X")
+    assert it["colonne"]["valuta"] == "Valuta di mercato", it["colonne"]            # non «Cambio», che è la borsa
+    assert r2(it["valute"]) == {"USD": 50.51, "GBP": 15.15, "JPY": 15.15, "HKD": 10.10, "CAD": 9.09}, it["valute"]
+    assert m.componi(F("composizione-ishares-it.csv"), "X")["colonne"]["valuta"] == "Valuta"
+    de = m.componi(F("composizione-xtrackers-de.csv"), "X")
+    assert de["colonne"]["valuta"] == "Währung" and r2(de["valute"])["USD"] == 50.51
+    fr = m.componi(F("composizione-amundi-fr.csv"), "X")
+    assert fr["valute"] == {} and any("colonna della valuta" in a for a in fr["avvisi"]), fr["avvisi"]
+    assert m.codice_valuta(" gbx ") == "GBP" and m.codice_valuta("CNH") == "CNY" and m.codice_valuta("Cambio") is None
+    assert m.nome_valuta("USD") == "Dollaro USA" and set(m.VALUTE) <= m.CODICI_VALUTA and len(m.CODICI_VALUTA) > 140
+    tmp = tempfile.mkdtemp()
+    try:
+        def scrivi(nome, righe):
+            path = os.path.join(tmp, nome)
+            open(path, "w", encoding="utf-8").write("Name,Sector,Asset Class,Location,Currency,Weight (%)\n" + righe)
+            return path
+        g = scrivi("p.csv", "A,Energy,Equity,United Kingdom,GBp,40\nB,Energy,Equity,South Africa,ZAc,30\n"
+                            "C,-,Fixed Income,China,CNH,20\nD,Energy,Equity,Italy,EUR,10\n")
+        c = m.componi(g, "U")
+        assert r2(c["valute"]) == {"GBP": 40.0, "ZAR": 30.0, "CNY": 20.0, "EUR": 10.0}, c["valute"]   # anche l'obbligazione
+        # Review Focus 3: segnaposto sopra il 5% → avviso; sotto la metà dei titoli la dimensione non si scrive
+        c = m.componi(scrivi("meta.csv", "A,Energy,Equity,Italy,EUR,40\nB,Energy,Equity,Italy,-,60\n"), "M")
+        assert c["valute"] == {} and abs(c["esclusi"]["valuta_non_classificato"] - 0.6) < 1e-9
+        assert any("valuta" in a and "meno del" in a for a in c["avvisi"]), c["avvisi"]
+        c = m.componi(scrivi("poco.csv", "A,Energy,Equity,Italy,EUR,90\nB,Energy,Equity,Italy,-,10\n"), "P")
+        assert c["valute"] == {"EUR": 1.0} and any("valuta non classificata" in a for a in c["avvisi"]), c["avvisi"]
+        out, js = os.path.join(tmp, "composizione.csv"), os.path.join(tmp, "c.json")
+        rc, so, se = run_script_split(asset(*CE), "--file", scrivi("ignota.csv", "A,Energy,Equity,Italy,ABC,100\n"),
+                                      "--strumento", "I", "--out", out, cwd=tmp)
+        assert rc == 1 and "valute non riconosciute" in se and "ABC" in se and not os.path.exists(out), se[-300:]
+        rc, so, se = run_script_split(asset(*CE), "--file", g, "--strumento", "U", "--copertura", "U=EUR",
+                                      "--out", out, "--json", js, cwd=tmp)
+        assert rc == 0, se[-300:]
+        testo = open(out, encoding="utf-8-sig").read()
+        assert [r for r in testo.splitlines() if ";valuta;" in r] == ["U;valuta;EUR;100,00;"], testo
+        assert "copertura del cambio in EUR" in next(r for r in testo.splitlines() if r.startswith("# U:")), testo
+        assert json.load(open(js, encoding="utf-8"))["strumenti"][0]["copertura_cambio"] == "EUR"
+        # Review Focus 4: reimportato senza --copertura, tornano le valute dei titoli
+        rc, so, se = run_script_split(asset(*CE), "--file", g, "--strumento", "U", "--out", out, cwd=tmp)
+        testo = open(out, encoding="utf-8-sig").read()
+        assert rc == 0 and testo.count(";valuta;") == 4 and "U;valuta;GBP;40,00;" in testo and "copertura del cambio" not in testo, testo
+        assert "Valute: Sterlina britannica 40,00%" in so, so
+        for cattiva in ("Z=EUR", "U=EURO", "U"):
+            rc, so, se = run_script_split(asset(*CE), "--file", g, "--strumento", "U", "--copertura", cattiva, "--out", out, cwd=tmp)
+            assert rc == 2 and "--copertura" in se, (cattiva, rc, se[-200:])
+        coperto = os.path.join(tmp, "world-eur-hedged.csv")
+        shutil.copy(g, coperto)
+        c = m.componi(coperto, "H")
+        assert any("copertura del cambio" in a and "--copertura H=EUR" in a for a in c["avvisi"]), c["avvisi"]
+        assert not any("copertura del cambio" in a for a in m.componi(coperto, "H", copertura="EUR")["avvisi"])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
