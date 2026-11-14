@@ -62,7 +62,7 @@ pensione_lorda_annua = montante × coefficiente_trasformazione(età)
 
 Per legge la rivalutazione segue il PIL nominale. In una proiezione in euro di oggi si usa il PIL reale (~0,5%), e il contributo dell'anno si rivaluta solo dall'anno dopo, come in `it-pianificazione/references/previdenza-obbligatoria.md`.
 
-I **coefficienti di trasformazione sono gli stessi** dei dipendenti (sono fissati per legge a livello di sistema, non per categoria). Vedi la tabella ufficiale completa DM 20/11/2024 in `it-pianificazione/references/previdenza-obbligatoria.md`. A 67 anni = 5,608% per il biennio 2025-2026.
+I **coefficienti di trasformazione sono gli stessi** dei dipendenti (sono fissati per legge a livello di sistema, non per categoria). Vedi la tabella ufficiale completa (decreto del 16/10/2026) in `it-pianificazione/references/previdenza-obbligatoria.md`. A 67 anni = 5,514% per il biennio 2027-2028.
 
 ### La differenza che conta: aliquota di computo 25% vs 33%
 
@@ -145,7 +145,7 @@ Frequente nel mondo tech: dipendente che ha anche una P.IVA per attività extra 
 2. **Aliquota corretta**: 26,07% per professionista senza altra copertura; 24% se ha altra copertura (es. anche dipendente) o è pensionato.
 3. **Ricordare il massimale**: €122.295. Per redditi alti, la pubblica si appiattisce; segnalare che oltre il massimale serve la complementare.
 4. **Nessun contributo minimo**: non assumere minimi per la Gestione Separata (a differenza di artigiani/commercianti).
-5. **Coefficienti di trasformazione**: stessi dei dipendenti (tabella DM 20/11/2024 in `it-pianificazione/references/previdenza-obbligatoria.md`). Non duplicare, rinviare.
+5. **Coefficienti di trasformazione**: stessi dei dipendenti (tabella del decreto 16/10/2026 in `it-pianificazione/references/previdenza-obbligatoria.md`). Non duplicare, rinviare.
 6. **Tasso di sostituzione più basso**: per via dell'aliquota di computo del 25%, evidenziare che l'autonomo ha una pensione pubblica più magra a parità di reddito → la complementare è più necessaria.
 7. **Anzianità contributiva**: l'autonomo la verifica sull'estratto conto INPS (www.inps.it, area riservata con SPID, CIE o CNS: servizio "Estratto conto contributivo"). Se non disponibile, stimare ma flaggare.
 8. **Il secondo anno di attività**: avvisare che nel secondo anno si versano insieme il saldo del primo e gli acconti del secondo, circa 1,9-2,1 volte un anno a regime (esempio sopra), e che la rivalsa del 4% è un compenso, non un contributo.

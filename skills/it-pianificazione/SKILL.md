@@ -2,7 +2,7 @@
 name: it-pianificazione
 description: "Pianificazione pensionistica integrata per lavoratori dipendenti italiani: previdenza obbligatoria (INPS contributivo), complementare (fondi pensione, PIP, TFR) e proiezione del tenore di vita dopo la pensione. Usa questa skill quando l'utente parla di pensione futura, quando e quanto prenderò di pensione, conferimento del TFR, scelta del fondo pensione (negoziale, aperto, PIP), deduzione €5.300, anzianità contributiva, coefficiente di trasformazione, tasso di sostituzione, gap pensionistico, anticipata vs vecchiaia, riscatto della laurea, anticipazioni del fondo, capitale vs rendita, RITA, uscita anticipata con capitale-ponte, o chiede «ce la farò a mantenere lo stile di vita?». Legge l'estratto conto INPS e lo storico del fondo con gli script della skill. Per autonomi, partite IVA e forfettari usa `it-pianificazione-autonomi`. NON copre dipendenti pubblici, ricongiunzione e totalizzazione (rinvia a INPS o a un consulente). NON sostituisce un consulente previdenziale abilitato."
 metadata:
-  version: "0.13"
+  version: "0.14"
 ---
 
 # it-pianificazione
@@ -39,7 +39,7 @@ pensione_lorda_annua = montante_contributivo × coefficiente_trasformazione_PROI
                        # il coefficiente va proiettato in calo all'anno di pensionamento (vedi Step 2)
 ```
 
-I coefficienti di trasformazione sono fissati per legge e aggiornati ogni 2 anni (in calo strutturale per via dell'aumento speranza di vita). Per il biennio 2025-2026 (Decreto direttoriale 20/11/2024, GU n. 35 del 12/02/2025): a 67 anni = **5,608%** (era 5,723%); range 57-71 anni.
+I coefficienti di trasformazione sono fissati per legge e aggiornati ogni 2 anni (in calo strutturale per via dell'aumento speranza di vita). Per il biennio 2027-2028 (decreto direttoriale del 16/10/2026, in vigore dal 1° gennaio 2027): a 67 anni = **5,514%** (era 5,608%); range 57-71 anni.
 
 Vedi `references/previdenza-obbligatoria.md` per: tabella coefficienti completa, requisiti accesso (vecchiaia, anticipata ordinaria e contributiva, APE sociale; Quota 103 e Opzione donna solo per chi aveva già maturato i requisiti), tasso di sostituzione tipico, tassazione assegno pensione.
 
@@ -143,7 +143,7 @@ python "$A/riscatto-laurea.py"     --from dati.json --from inps.json --set ANNI_
 python "$A/proiezione-inps.py"     --from riscatto.json --json inps-riscatto.json
 ```
 
-Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Il ponte vuole il montante del fondo **all'uscita**, non alla vecchiaia: se riceve il `mc.json` della vecchiaia si ferma e indica il valore di `ANNI` con cui rigenerarlo. Lo stesso fa il riscatto se un `--set` di età contraddice il JSON della proiezione; il JSON del riscatto porta l'età di uscita, mentre gli altri `--set` di scenario della prima proiezione vanno ripetuti nella seconda.
+Ogni `--from` applica solo le chiavi che riconosce e le stampa (`[from] inps.json: PENSIONE_INPS_ANNUA=…`); `--set` prevale su `--from`; `--help` di ogni script elenca le chiavi lette. Il ponte vuole il montante del fondo **all'uscita**, non alla vecchiaia: se riceve il `mc.json` della vecchiaia si ferma e indica il valore di `ANNI` con cui rigenerarlo. Lo stesso fa il riscatto se un `--set` di età contraddice il JSON della proiezione; il JSON del riscatto porta l'età di uscita, mentre gli altri `--set` di scenario della prima proiezione vanno ripetuti nella seconda. Dopo un aggiornamento del plugin rilancia la catena dall'inizio: i JSON salvati portano i numeri della versione che li ha scritti (dalla 0.13.0 i coefficienti sono quelli del 2027-2028).
 
 Legge l'**estratto conto contributivo INPS** (XML dal portale) e lo **storico movimenti del fondo pensione** (CSV), e produce: anzianità e retribuzioni per anno, la ricostruzione del montante contributivo (contributi × aliquota, capitalizzati coi tassi ufficiali ISTAT — tabella verificata nello script, ±qualche % rispetto al dato esatto de "La mia pensione futura"), montante del fondo per comparto con stima euristica del mix azionario, versamenti per anno/fonte, e il blocco di parametri pronti per `proiezione-inps.py` e `montecarlo-pensione.py`. I dati reali battono sempre quelli dichiarati a memoria.
 
@@ -185,7 +185,7 @@ Se manca un dato critico (RAL, anzianità, età) → CHIEDERE, non inventare.
 
 ### Step 2: Calcolo previdenza obbligatoria
 
-Lo script `assets/proiezione-inps.py` implementa questo calcolo in forma parametrica ed eseguibile: montante attuale + contributi futuri (RAL con crescita reale) capitalizzati al PIL reale, coefficiente di trasformazione dalla tabella vigente 2025-26 (DM 436/2024) con riduzione parametrica per l'allungamento della speranza di vita, e **tabella di sensibilità 3×3** sui due parametri fuori dal controllo dell'utente (PIL reale × riduzione coefficienti). Preferirlo al calcolo a mano: rispetta la meccanica L.335/1995 (l'ultimo anno di contributi non si rivaluta) e rende confrontabili gli scenari. Lo pseudocodice sotto resta la specifica di riferimento.
+Lo script `assets/proiezione-inps.py` implementa questo calcolo in forma parametrica ed eseguibile: montante attuale + contributi futuri (RAL con crescita reale) capitalizzati al PIL reale, coefficiente di trasformazione dalla tabella vigente 2027-2028 (decreto del 16/10/2026) con riduzione parametrica per l'allungamento della speranza di vita, e **tabella di sensibilità 3×3** sui due parametri fuori dal controllo dell'utente (PIL reale × riduzione coefficienti). Preferirlo al calcolo a mano: rispetta la meccanica L.335/1995 (l'ultimo anno di contributi non si rivaluta) e rende confrontabili gli scenari. Lo pseudocodice sotto resta la specifica di riferimento.
 
 ```pseudocodice
 # 1) Montante GIÀ MATURATO a oggi — usare il valore REALE dall'estratto conto INPS
@@ -212,7 +212,7 @@ montante_finale = proiezione_anno_per_anno(montante_oggi, RAL_crescente, rivalut
 # 3) Pensione lorda — il coefficiente va PROIETTATO in calo all'anno di pensionamento.
 # I coefficienti calano ~1,8% per biennio (speranza di vita in aumento). Usare quello
 # ATTUALE per una pensione lontana sovrastima l'assegno (errore comune e grave).
-coefficiente_attuale = coefficiente_trasformazione(eta_pensionamento_target)  # da tabella DM 20/11/2024
+coefficiente_attuale = coefficiente_trasformazione(eta_pensionamento_target)  # da tabella del decreto 16/10/2026
 bienni_mancanti = anni_residui / 2
 coefficiente_proiettato = coefficiente_attuale × (1 - decadimento_biennale)^bienni_mancanti
                           # decadimento_biennale ≈ 0,018 (1,8%); usare 0 solo per scenario "congelato"
@@ -228,9 +228,9 @@ pensione_netta_annua = pensione_lorda_annua - IRPEF - addizionali
 > **Il montante di partenza è il dato che più conta, e il più incerto da stimare.** La stima dipende dall'intera carriera passata, che la formula non conosce: per questo va sempre chiesto all'utente il **montante reale dall'estratto conto INPS** (gratis sul sito INPS). La stima è solo un ripiego ed è dichiarata tale.
 
 **Esempio del perché conta** (caso d'esempio: 37 anni, pensione a 67 = 30 anni di orizzonte):
-- Coefficiente attuale a 67 anni: 5,608%
-- Coefficiente proiettato al 2056 (15 bienni × −1,8%): **4,271%**
-- Su un montante di €786k: pensione lorda €33.576 col proiettato, contro €44.100 col coefficiente attuale (sovrastima del 31%!). Il tasso di sostituzione passa da un irrealistico 79% a un realistico 61%.
+- Coefficiente attuale a 67 anni: 5,514%
+- Coefficiente proiettato al 2056 (15 bienni × −1,8%): **4,199%**
+- Su un montante di €786k: pensione lorda €33.004 col proiettato, contro €43.340 col coefficiente attuale (sovrastima del 31%!). Il tasso di sostituzione passa da un irrealistico 78% a un realistico 60%.
 
 Output Step 2:
 - Pensione lorda mensile/annua attesa
@@ -367,9 +367,9 @@ Il template `assets/proiezione-pensione.xlsx` (incluso nella skill) è il delive
 
 - **Input**: tutti i parametri editabili dall'utente (testo blu), in euro di oggi. Età, RAL, anzianità INPS, crescita retributiva reale, **PIL reale** (default 0,5%, come `proiezione-inps.py`), inflazione, **decadimento del coefficiente per biennio** (default 1,8%), stato TFR, parametri fondo pensione, spese, massimale contributivo 2026. Le formule (testo nero) calcolano i valori derivati: anni residui, aliquota IRPEF marginale, aliquota fondo finale, spesa annua target, e il **coefficiente proiettato all'anno di pensionamento**.
 
-- **Coefficienti**: tabella ufficiale completa DM 20/11/2024 (15 valori 57-71 anni) con note operative.
+- **Coefficienti**: tabella ufficiale completa del decreto 16/10/2026 (15 valori 57-71 anni) con note operative. Se hai compilato il foglio prima della 0.13.0, aggiorna il foglio Coefficienti della tua copia con la tabella 2027-2028 (o ricopia il modello e riporta i tuoi input).
 
-- **Pubblica**: proiezione INPS anno per anno (50 righe), con risultati finali aggregati: contributi fino al massimale, rivalutazione dall'anno successivo al versamento (L. 335/1995). Mostra **sia il coefficiente attuale 2025-2026** (come riferimento) **sia quello proiettato** all'anno di pensionamento (quello effettivamente usato per la pensione), così la differenza è visibile. Poi pensione lorda, IRPEF, detrazione pensionati, addizionali, pensione netta, tasso di sostituzione.
+- **Pubblica**: proiezione INPS anno per anno (50 righe), con risultati finali aggregati: contributi fino al massimale, rivalutazione dall'anno successivo al versamento (L. 335/1995). Mostra **sia il coefficiente attuale 2027-2028** (come riferimento) **sia quello proiettato** all'anno di pensionamento (quello effettivamente usato per la pensione), così la differenza è visibile. Poi pensione lorda, IRPEF, detrazione pensionati, addizionali, pensione netta, tasso di sostituzione.
 
 - **Complementare**: proiezione fondo pensione anno per anno (TFR se conferito, contributi del lavoratore e del datore, rendimenti), con quota deducibile e non dedotto da comunicare (plafond condiviso), spazio deducibile residuo, prestazione finale netta (tassa sui soli TFR e contributi dedotti), rendita stimata, risparmio IRPEF sulla quota deducibile e il **confronto TFR in azienda vs fondo**.
 

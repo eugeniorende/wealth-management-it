@@ -68,7 +68,7 @@ RATE_MENSILI = 120            # 1 = unica soluzione; fino a 120 rate senza inter
 
 ALIQUOTA_MARGINALE_IRPEF = 0.33    # aliquota a cui si deduce l'onere (scaglione del reddito di oggi)
 ALIQUOTA_IRPEF_IN_PENSIONE = 0.38  # marginale sulla pensione in più: 33% + calo della detrazione pensionati
-                                   # + addizionali sulla pensione dei default (≈ €29.800; netto-pensione.py dà
+                                   # + addizionali sulla pensione dei default (≈ €29.200; netto-pensione.py dà
                                    # 38,4%); tra €8.500 e €28.000 di pensione ≈ 32%
 
 # Proiezione (come proiezione-inps.py, che con --json li passa qui)

@@ -1459,6 +1459,30 @@ def t_requisiti_e_link_inps():
         "netto-pensione: l'ulteriore detrazione dal 2027 è l'art. 13 c. 10 D.Lgs. 117/2026"
 
 
+@test("previdenza: coefficienti 2027-2028 nella reference e nelle skill, esempi ricalcolati, cosa fare di JSON e fogli vecchi")
+def t_coefficienti_testi_2027():
+    leggi = lambda *p: open(os.path.join(SKILLS, *p), encoding="utf-8").read()
+    rif = leggi("it-pianificazione", "references", "previdenza-obbligatoria.md")
+    it = lambda x, d: f"{x:.{d}f}".replace(".", ",")
+    for eta, (div, coeff) in DECRETO_COEFF_2027.items():
+        assert f"| {eta} | {it(div, 3)} | **{it(coeff * 100, 3)}%** |" in rif, f"reference: riga dei {eta} anni"
+    for atteso in ("16 ottobre 2026", "1° gennaio 2027", "| 67 | 5,608% | 5,514% | -1,68% |", "5,6266%", "€16.542",
+                   "€16.880", "€17.121", "4,199%", "€33.004", "€43.340", "1,2-2,2%", "2029-2030", "€13.844"):
+        assert atteso in rif, f"previdenza-obbligatoria.md: manca «{atteso}»"
+    for superato in ("atteso entro novembre 2026", "atteso novembre 2026", "5,7247%", "€16.824", "4,271%", "1,5-2,2%"):
+        assert superato not in rif, f"previdenza-obbligatoria.md: resta «{superato}»"
+    skill = leggi("it-pianificazione", "SKILL.md")
+    gs = leggi("it-pianificazione-autonomi", "references", "previdenza-gestione-separata.md")
+    assert "a 67 anni = **5,514%** (era 5,608%)" in skill and "Coefficiente attuale a 67 anni: 5,514%" in skill
+    assert "4,199%" in skill and "€33.004" in skill and "€43.340" in skill
+    assert "A 67 anni = 5,514% per il biennio 2027-2028" in gs and "5,608%" not in gs
+    for nome, testo in (("it-pianificazione/SKILL.md", skill), ("previdenza-gestione-separata.md", gs),
+                        ("it-pianificazione-autonomi/SKILL.md", leggi("it-pianificazione-autonomi", "SKILL.md"))):
+        assert "20/11/2024" not in testo and "16/10/2026" in testo, f"{nome}: il decreto citato è ancora quello del 2024"
+    # Review Focus 1 e 2: i JSON e i fogli compilati prima dell'aggiornamento portano i numeri vecchi
+    assert "rilancia la catena dall'inizio" in skill and "foglio Coefficienti della tua copia" in skill
+
+
 # ══════════════════ it-pianificazione-obiettivi (goals-based) ══════════════════
 
 def _excel_test(obiettivi):
@@ -4089,8 +4113,8 @@ def t_riscatto_testi():
     sezione = ref.split("\n## Riscatto della laurea\n")[1].split("\n## ")[0]
     for atteso in ("€18.808 × 33% = **€6.206,64**", "120 rate mensili senza interessi", "art. 10 c. 1 lett. e TUIR",
                    "dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026", "c. 5-quater", "art. 20 c. 6 DL 4/2019",
-                   "riserva matematica", "art. 1 c. 23 L. 335/1995", "€31.033", "€20.792", "€258,61", "€1.751",
-                   "circa 19 anni", "del 38%", "Circ. INPS 14/2026", "Verificato: 2026-10", "(c. 5-ter) e, poiché",
+                   "riserva matematica", "art. 1 c. 23 L. 335/1995", "€31.033", "€20.792", "€258,61", "€1.719",
+                   "circa 19 anni e mezzo", "€29.200 circa", "del 38%", "Circ. INPS 14/2026", "Verificato: 2026-10", "(c. 5-ter) e, poiché",
                    "dal 2027 art. 10 c. 1 lett. u e art. 14 c. 1 lett. i D.Lgs. 117/2026", "per le donne 42 anni e 1 mese",
                    "ripetuti"):
         assert atteso in sezione, f"previdenza-obbligatoria.md, Riscatto della laurea: manca «{atteso}»"

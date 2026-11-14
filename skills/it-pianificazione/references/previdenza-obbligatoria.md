@@ -5,7 +5,7 @@
 - Il sistema contributivo
 - Formula di calcolo (contributivo puro)
 - Aliquote contributive lavoro dipendente privato 2026
-- Coefficienti di trasformazione 2025-2026 — Tabella ufficiale DM 20/11/2024
+- Coefficienti di trasformazione 2027-2028 — Tabella ufficiale del decreto 16/10/2026
 - Requisiti di accesso pensione 2026
 - Riscatto della laurea
 - Tassazione assegno pensionistico
@@ -55,43 +55,43 @@ Step 3: Pensione lorda annua
 
 Implicazione importante per RAL alti: per chi guadagna oltre il tetto, la pensione INPS smette di crescere col reddito. Diventa critico massimizzare la complementare per la parte sopra il tetto.
 
-## Coefficienti di trasformazione 2025-2026 — Tabella ufficiale DM 20/11/2024
+## Coefficienti di trasformazione 2027-2028 — Tabella ufficiale del decreto 16/10/2026
 
-Tabella completa dal Decreto direttoriale del Ministero del Lavoro del 20 novembre 2024, pubblicato in GU n. 35 del 12 febbraio 2025. Aggiorna la Tabella A dell'Allegato 2 della Legge 247/2007 e la Tabella A della Legge 335/1995. Valido per pensioni con decorrenza dal **1° gennaio 2025 al 31 dicembre 2026**.
+Tabella completa dal decreto direttoriale del Ministero del Lavoro e delle Politiche Sociali, di concerto con il Ministero dell'Economia e delle Finanze, del 16 ottobre 2026 (articolo unico, sul sito del Ministero; la Gazzetta Ufficiale si cita quando esce). Aggiorna la Tabella A dell'Allegato 2 della Legge 247/2007 e la Tabella A della Legge 335/1995. Valido per le pensioni con decorrenza dal **1° gennaio 2027** (biennio 2027-2028). Per le decorrenze fino al 31 dicembre 2026 valgono ancora i coefficienti 2025-2026 (decreto direttoriale del 20 novembre 2024, GU n. 35 del 12 febbraio 2025): cinque età sono nel confronto qui sotto, la tabella intera è nel decreto. Verificato: 2026-11.
 
 | Età | Divisore | Coefficiente |
 |---|---|---|
-| 57 | 23,789 | **4,204%** |
-| 58 | 23,213 | **4,308%** |
-| 59 | 22,631 | **4,419%** |
-| 60 | 22,044 | **4,536%** |
-| 61 | 21,453 | **4,661%** |
-| 62 | 20,857 | **4,795%** |
-| 63 | 20,258 | **4,936%** |
-| 64 | 19,656 | **5,088%** |
-| 65 | 19,049 | **5,250%** |
-| 66 | 18,441 | **5,423%** |
-| 67 | 17,831 | **5,608%** |
-| 68 | 17,218 | **5,808%** |
-| 69 | 16,600 | **6,024%** |
-| 70 | 15,980 | **6,258%** |
-| 71 | 15,360 | **6,510%** |
+| 57 | 24,080 | **4,153%** |
+| 58 | 23,507 | **4,254%** |
+| 59 | 22,929 | **4,361%** |
+| 60 | 22,345 | **4,475%** |
+| 61 | 21,756 | **4,596%** |
+| 62 | 21,163 | **4,725%** |
+| 63 | 20,565 | **4,863%** |
+| 64 | 19,963 | **5,009%** |
+| 65 | 19,357 | **5,166%** |
+| 66 | 18,747 | **5,334%** |
+| 67 | 18,136 | **5,514%** |
+| 68 | 17,523 | **5,707%** |
+| 69 | 16,908 | **5,914%** |
+| 70 | 16,290 | **6,139%** |
+| 71 | 15,669 | **6,382%** |
 
 **Tasso di sconto utilizzato dal decreto**: 1,5%
 
 Per i trattamenti liquidati a soggetti di età < 57 anni (assegno invalidità, pensione superstiti) si applica comunque il coefficiente dei 57 anni.
 
-### Confronto biennio 2023-2024 vs 2025-2026
+### Confronto biennio 2025-2026 vs 2027-2028
 
-| Età | 2023-2024 | 2025-2026 | Variazione |
+| Età | 2025-2026 | 2027-2028 | Variazione |
 |---|---|---|---|
-| 57 | 4,270% | 4,204% | -1,55% |
-| 64 | 5,184% | 5,088% | -1,85% |
-| 67 | 5,723% | 5,608% | -2,01% |
-| 70 | 6,395% | 6,258% | -2,14% |
-| 71 | n/d | 6,510% | esteso |
+| 57 | 4,204% | 4,153% | -1,21% |
+| 64 | 5,088% | 5,009% | -1,55% |
+| 67 | 5,608% | 5,514% | -1,68% |
+| 70 | 6,258% | 6,139% | -1,90% |
+| 71 | 6,510% | 6,382% | -1,97% |
 
-Trend: tutti negativi (mediamente -1,55% a -2,18%), per via dell'aumento speranza di vita ISTAT. Il prossimo aggiornamento sarà per il biennio 2027-2028 (decreto atteso entro novembre 2026).
+Trend: tutti negativi (da -1,21% a 57 anni a -1,97% a 71), per via dell'aumento della speranza di vita ISTAT; nella revisione precedente, dal 2023-2024 al 2025-2026, i cali erano più ampi (da -1,55% a 57 anni a -2,14% a 70). Il prossimo aggiornamento sarà per il biennio 2029-2030 (decreto atteso nell'autunno 2028).
 
 ### Calcolo per età non intera (interpolazione mensile)
 
@@ -106,18 +106,18 @@ coefficiente(anni_y, mesi_m) = coefficiente(y) + (m/12) × (coefficiente(y+1) - 
 **Esempio worked**: pensionamento a 67 anni e 7 mesi.
 
 ```
-coefficiente(67) = 5,608%
-coefficiente(68) = 5,808%
-delta = 5,808% - 5,608% = 0,200%
-coefficiente(67y 7m) = 5,608% + (7/12) × 0,200%
-                     = 5,608% + 0,1167%
-                     = 5,7247%
+coefficiente(67) = 5,514%
+coefficiente(68) = 5,707%
+delta = 5,707% - 5,514% = 0,193%
+coefficiente(67y 7m) = 5,514% + (7/12) × 0,193%
+                     = 5,514% + 0,1126%
+                     = 5,6266%
 ```
 
 Per un montante di €300.000:
-- A 67 anni esatti: €300.000 × 5,608% = €16.824 lordi annui
-- A 67 anni e 7 mesi: €300.000 × 5,7247% = €17.174 lordi annui (+€350/anno)
-- A 68 anni esatti: €300.000 × 5,808% = €17.424 lordi annui (+€600/anno)
+- A 67 anni esatti: €300.000 × 5,514% = €16.542 lordi annui
+- A 67 anni e 7 mesi: €300.000 × 5,6266% = €16.880 lordi annui (+€338/anno)
+- A 68 anni esatti: €300.000 × 5,707% = €17.121 lordi annui (+€579/anno)
 
 Quindi anche posticipare di pochi mesi ha un impatto numerico tangibile sull'assegno.
 
@@ -125,7 +125,7 @@ Quindi anche posticipare di pochi mesi ha un impatto numerico tangibile sull'ass
 
 1. **Usare la tabella ufficiale per età intere** sopra. Mai inventare o stimare.
 2. **Per età non intere applicare l'interpolazione mensile** con la formula sopra.
-3. **Disclaimer**: i coefficienti tabulati si applicano solo a pensioni con decorrenza nel biennio 2025-2026. Per chi va in pensione successivamente, applicare i valori del biennio appropriato (aggiornamento atteso novembre 2026 per il biennio 2027-2028, novembre 2028 per 2029-2030, ecc.).
+3. **Disclaimer**: i coefficienti tabulati si applicano solo a pensioni con decorrenza nel biennio 2027-2028. Per chi va in pensione successivamente, applicare i valori del biennio appropriato (aggiornamento atteso nell'autunno 2028 per il biennio 2029-2030, nell'autunno 2030 per il 2031-2032, ecc.).
 4. **Proiezione del coefficiente per pensionamenti futuri (NON opzionale)**: i coefficienti calano strutturalmente. Per chi va in pensione tra molti anni, usare quello attuale **sovrastima** gravemente la pensione. Applicare la proiezione:
 
    ```
@@ -133,11 +133,11 @@ Quindi anche posticipare di pochi mesi ha un impatto numerico tangibile sull'ass
    coefficiente_proiettato = coefficiente_attuale(età_target) × (1 − decadimento_biennale)^bienni_mancanti
    ```
 
-   Tasso di decadimento storico: **~1,8% per biennio** (range osservato 1,5-2,2%). Esempio: pensione a 67 anni tra 30 anni (15 bienni):
+   Tasso di decadimento storico: **~1,8% per biennio** (range osservato 1,2-2,2%). Esempio: pensione a 67 anni tra 30 anni (15 bienni):
    ```
-   coefficiente_proiettato = 5,608% × (1 − 0,018)^15 = 5,608% × 0,7615 = 4,271%
+   coefficiente_proiettato = 5,514% × (1 − 0,018)^15 = 5,514% × 0,7615 = 4,199%
    ```
-   Su un montante di €786k, questo significa €33.576 di pensione lorda invece di €44.100 (sovrastima del 31% se si usasse il coefficiente attuale). Il template Excel della skill calcola automaticamente il coefficiente proiettato; il tasso di decadimento è un parametro editabile (mettere 0 solo per lo scenario "coefficiente congelato", da etichettare come irrealistico).
+   Su un montante di €786k, questo significa €33.004 di pensione lorda invece di €43.340 (sovrastima del 31% se si usasse il coefficiente attuale). Il template Excel della skill calcola automaticamente il coefficiente proiettato; il tasso di decadimento è un parametro editabile (mettere 0 solo per lo scenario "coefficiente congelato", da etichettare come irrealistico).
 5. **Verifica sempre con INPS**: per chi è prossimo al pensionamento, rinviare a verifica diretta sul portale INPS (www.inps.it, area riservata con SPID, CIE o CNS: "Estratto conto contributivo" e simulatore "La mia pensione futura") o patronato. La proiezione serve per chi è lontano dal pensionamento; chi è vicino usa il coefficiente reale del proprio biennio.
 
 ## Requisiti di accesso pensione 2026
@@ -194,7 +194,7 @@ Per gli anni che cadono nel retributivo (prima del 1996) l'ordinario segue la ri
 
 **Fisco.** L'onere si deduce dal reddito complessivo senza tetto, tra i contributi versati facoltativamente alla propria gestione obbligatoria (art. 10 c. 1 lett. e TUIR; dal 2027 art. 10 c. 1 lett. f D.Lgs. 117/2026). Chi non ha mai lavorato può riscattare con lo stesso onere dell'agevolato (c. 5-bis): lo deduce lui stesso, oppure il familiare di cui è fiscalmente a carico lo detrae al 19% (c. 5-bis, ultimo periodo; dal 2027 art. 10 c. 1 lett. u e art. 14 c. 1 lett. i D.Lgs. 117/2026, che abroga quel periodo).
 
-**Cosa compra.** L'onere entra nel montante e si rivaluta dalla data della domanda (c. 5), quindi la pensione in più è proporzionale a quanto si paga: per ogni euro versato agevolato e ordinario rendono allo stesso modo. L'agevolato compra gli **stessi anni di anzianità** al prezzo minimo, l'ordinario più pensione a un prezzo più alto. Sui default di `assets/riscatto-laurea.py` (5 anni, retribuzione di €36.000, uscita a 69 anni, PIL reale 0,5%) l'agevolato costa €31.033 lordi e €20.792 netti con la deduzione al 33% (120 rate da €258,61), e aggiunge circa €1.751 lordi l'anno di pensione: con l'aliquota del 38% sulla pensione in più (la marginale che `netto-pensione.py` dà sulla pensione dei default, €29.800 circa) servono circa 19 anni di pensione netta per rientrare del costo netto. Gli anni contano soprattutto per l'**anticipata ordinaria**, che chiede solo anni di contributi: con 12 anni di contributi a 37 anni e il requisito degli uomini di 43 anni e 1 mese dal 2028 (per le donne 42 anni e 1 mese, un anno prima: `--set SESSO='F'`), l'anticipata passa da circa 68 anni e 4 mesi a circa 63 anni e 4 mesi. Uscire prima abbassa però la pensione, quindi la proiezione va rifatta a quell'età. Per chi arriverebbe alla vecchiaia sotto i 20 anni di contributi, il riscatto può completarli.
+**Cosa compra.** L'onere entra nel montante e si rivaluta dalla data della domanda (c. 5), quindi la pensione in più è proporzionale a quanto si paga: per ogni euro versato agevolato e ordinario rendono allo stesso modo. L'agevolato compra gli **stessi anni di anzianità** al prezzo minimo, l'ordinario più pensione a un prezzo più alto. Sui default di `assets/riscatto-laurea.py` (5 anni, retribuzione di €36.000, uscita a 69 anni, PIL reale 0,5%) l'agevolato costa €31.033 lordi e €20.792 netti con la deduzione al 33% (120 rate da €258,61), e aggiunge circa €1.719 lordi l'anno di pensione: con l'aliquota del 38% sulla pensione in più (la marginale che `netto-pensione.py` dà sulla pensione dei default, €29.200 circa) servono circa 19 anni e mezzo di pensione netta per rientrare del costo netto. Gli anni contano soprattutto per l'**anticipata ordinaria**, che chiede solo anni di contributi: con 12 anni di contributi a 37 anni e il requisito degli uomini di 43 anni e 1 mese dal 2028 (per le donne 42 anni e 1 mese, un anno prima: `--set SESSO='F'`), l'anticipata passa da circa 68 anni e 4 mesi a circa 63 anni e 4 mesi. Uscire prima abbassa però la pensione, quindi la proiezione va rifatta a quell'età. Per chi arriverebbe alla vecchiaia sotto i 20 anni di contributi, il riscatto può completarli.
 
 Lo script legge con `--from` il JSON di `importa-previdenza.py` (montante, retribuzione, età, anzianità) e quello di `proiezione-inps.py` (coefficiente, età e anni all'uscita); senza quest'ultimo calcola il coefficiente come `proiezione-inps.py`. Con `--json` scrive il montante con il riscatto e l'età di uscita, che `proiezione-inps.py --from` rilegge per la proiezione completa; gli altri `--set` di scenario (PIL reale, crescita della retribuzione) vanno ripetuti. Il dato esatto lo dà la simulazione del riscatto sul portale INPS.
 
@@ -225,16 +225,16 @@ Rispetto ai lavoratori dipendenti la detrazione dei pensionati scende più in fr
 - **Regionale**: 0,70% - 3,33% (varia per regione e per scaglione)
 - **Comunale**: 0% - 0,90% (varia per comune)
 
-### Esempio numerico (pensione lorda annua €16.824 a 67 anni, residenza tipica)
+### Esempio numerico (pensione lorda annua €16.542 a 67 anni, residenza tipica)
 
 ```
-Pensione lorda annua: €16.824
-IRPEF lorda (tutto nel primo scaglione 23%): €3.870
-Meno detrazione pensionati: 700 + 1.255 × (28.000 − 16.824) / 19.500 = €1.419
-IRPEF netta: €2.450
-Addizionali (~2%): €336
-Pensione netta annua: €16.824 - €2.450 - €336 = €14.038
-Pensione netta mensile (su 13 mensilità): €1.080
+Pensione lorda annua: €16.542
+IRPEF lorda (tutto nel primo scaglione 23%): €3.805
+Meno detrazione pensionati: 700 + 1.255 × (28.000 − 16.542) / 19.500 = €1.437
+IRPEF netta: €2.367
+Addizionali (~2%): €331
+Pensione netta annua: €16.542 - €2.367 - €331 = €13.844
+Pensione netta mensile (su 13 mensilità): €1.065
 ```
 
 Nota: la pensione INPS si percepisce in **13 mensilità** (tredicesima a dicembre). Il calcolo mensile diviso per 13 dà la mensilità.
@@ -263,7 +263,7 @@ Per questa ragione la **complementare diventa strutturalmente necessaria**, non 
 
 2-bis. **Montante contributivo già maturato**: è il dato che più pesa sul risultato, e il più incerto se stimato (dipende dall'intera carriera passata, che non conosciamo). Va **chiesto all'utente il valore reale**: lo trova sul sito INPS in "La mia pensione futura" o nell'estratto conto contributivo (il montante rivalutato a oggi). Se non disponibile, lo si **stima** dalla RAL attuale e dall'anzianità, ma la stima va dichiarata tale. La stima migliore non è la grezza `anzianità × RAL × 33%` (che assume RAL costante e nessuna rivalutazione dei contributi passati): è la somma anno per anno `Σ(k=1..anzianità) min(RAL/(1+g)^k, massimale) × 33% × (1+rivalutazione)^(k−1)`, con k = anni fa. Tiene conto della retribuzione passata più bassa, del massimale (costante in euro di oggi, perché si rivaluta sui prezzi: L. 335/1995 art. 2 c. 18) e della rivalutazione dei versamenti già fatti; il contributo dell'anno scorso non è ancora rivalutato. Quando rivalutazione ≈ crescita salariale le due distorsioni si compensano e ci si avvicina alla grezza; quando differiscono, la stima migliorata corregge nella direzione giusta. Il template Excel lo fa: se la cella "Montante INPS da estratto conto" è valorizzata usa quella, altrimenti applica la stima migliorata.
 
-3. **Coefficienti aggiornati**: usare i valori 2025-2026 nei calcoli ma raccomandare **sempre** all'utente di verificare sul sito INPS per la propria età esatta al momento del pensionamento. Per chi si pensiona oltre il 2026, i coefficienti saranno diversi (più bassi) — quindi le proiezioni sono ottimistiche.
+3. **Coefficienti aggiornati**: usare i valori 2027-2028 nei calcoli ma raccomandare **sempre** all'utente di verificare sul sito INPS per la propria età esatta al momento del pensionamento. Per chi si pensiona oltre il 2028, i coefficienti saranno diversi (più bassi) — quindi le proiezioni sono ottimistiche.
 
 4. **Rivalutazione PIL**: la proiezione è in euro di oggi (RAL reale, spesa reale), quindi il montante si rivaluta al PIL **reale**: 0,5% di default, come `proiezione-inps.py` e l'Excel; scenari 0% (stagnazione) e 1%. Il PIL nominale (~1,8-2%) applicato a una RAL reale gonfia la pensione di oltre il 20%: si usa solo se anche RAL e spesa sono espresse in valori nominali.
 

@@ -494,7 +494,10 @@ Da estendere in iterazioni successive:
 
 ### it-pianificazione
 
-#### v0.13 (non rilasciata)
+#### v0.14 (plugin 0.13.0)
+- Coefficienti di trasformazione 2027-2028 (decreto direttoriale del 16/10/2026) in `proiezione-inps.py`, `riscatto-laurea.py` e nel default di `ponte-pensione.py`, nella reference INPS e negli esempi della skill, tutti ricalcolati; cosa fare dei JSON e dei fogli compilati prima dell'aggiornamento.
+
+#### v0.13 (plugin 0.12.0)
 - Riscatto della laurea: `riscatto-laurea.py` (agevolato e ordinario, costo netto, rate, pensione in più, anticipo sull'anticipata ordinaria, sesso e anni di corso prima del 1996), sezione nella reference INPS e Pattern P7 con i dati da chiedere; anzianità contributiva nel JSON di `importa-previdenza.py`, al massimo 52 settimane per anno.
 
 #### v0.12 (plugin 0.11.0)
@@ -552,7 +555,10 @@ Roadmap:
 
 ### it-pianificazione-autonomi
 
-#### v0.5 (non rilasciata)
+#### v0.6 (plugin 0.13.0)
+- Coefficienti di trasformazione 2027-2028 (decreto direttoriale del 16/10/2026) nella reference della Gestione Separata e nella descrizione dell'Excel.
+
+#### v0.5 (plugin 0.12.0)
 - Casi frequenti del freelance: rivalsa del 4% come compenso, saldo e acconti con l'esempio primo anno contro secondo, deduzione per cassa ed eccedenza LM49 → RP21, Pattern A6.
 
 #### v0.4 (plugin 0.11.0)
