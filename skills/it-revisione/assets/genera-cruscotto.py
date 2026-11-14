@@ -35,6 +35,7 @@ Questo strumento è educativo e non costituisce consulenza finanziaria o fiscale
 import argparse
 import datetime
 import json
+import math
 import os
 import re
 import sys
@@ -402,7 +403,10 @@ def componi_bundle(sorgenti, data, versione_plugin):
     - ribilanciamento: totale, totale_post, imposta, prelievo, drift {classe: {peso, target, drift, tight, wide,
       fuori_banda, esito, motivo}}, risultante, zainetto, ordini [{broker, operazione, classe,
       categoria_fiscale, importo_eur, imposta_eur, nota}], dati_esempio (il piano gira sull'esempio dello script).
-    - confronto e anonimo: None (li compilano il confronto con la revisione precedente e la versione anonimizzata).
+    - confronto: None, o con --precedente {data_precedente, plugin_precedente, versioni_diverse, voci [{sezione, id,
+      etichetta, formato, prima, ora, delta, delta_rel}], obiettivi [{nome, stato, probabilita, gia, versamento}]}
+      (vedi confronta());
+    - anonimo: None (lo compila la versione anonimizzata).
     Una sezione senza fonte è None. ErroreDati per un campo mancante, con il file e la chiave."""
     s = sorgenti.get
     bundle = {
@@ -423,6 +427,157 @@ def componi_bundle(sorgenti, data, versione_plugin):
     }
     bundle["indicatori"] = _indicatori(bundle)
     return bundle
+
+
+# ═══════════════════════════ IL CONFRONTO ═══════════════════════════
+
+def _via(b, *percorso):
+    """Il valore di b lungo il percorso (chiavi di dizionario, indici di lista), None se un passo manca o non è
+    percorribile: una sezione assente o a None non è mai un errore."""
+    for passo in percorso:
+        if isinstance(b, dict) and isinstance(passo, str):
+            b = b.get(passo)
+        elif isinstance(b, list) and isinstance(passo, int) and -len(b) <= passo < len(b):
+            b = b[passo]
+        else:
+            return None
+    return b
+
+
+def _e_numero(x):
+    """Un numero finito: un booleano non lo è (True non vale 1)."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+
+
+def _da_lista(b, percorso, chiave_nome, nome, chiave_valore):
+    """Il campo `chiave_valore` dell'elemento di una lista del bundle il cui `chiave_nome` è `nome`."""
+    elenco = _via(b, *percorso)
+    for x in elenco if isinstance(elenco, list) else []:
+        if isinstance(x, dict) and x.get(chiave_nome) == nome:
+            return x.get(chiave_valore)
+    return None
+
+
+def _quota_azioni(b):
+    azioni, totale = _via(b, "allocazione", "target_aggregato", "azioni"), _via(b, "allocazione", "target_aggregato", "totale")
+    return azioni / totale if _e_numero(azioni) and _e_numero(totale) and totale else None
+
+
+def _glide_anno_0(b):
+    anni = _via(b, "glide_path", "anni")
+    return _via(b, "glide_path", "portafoglio", anni.index(0)) if isinstance(anni, list) and 0 in anni else None
+
+
+def _scenario_mediana(b):
+    return _da_lista(b, ("pensione", "netto", "scenari"), "nome", "mediana", "pensione_netta_totale")
+
+
+# Le grandezze scalari del confronto (spec §7.1): (sezione, id, etichetta, formato, estrai(bundle) -> numero | None).
+# Le famiglie che dipendono dai dati (i cinque indicatori, il peso di ogni classe, i primi tre settori) le genera
+# _confronti_generati(). L'ordine della tabella è l'ordine delle sezioni nel bundle di confronto.
+CONFRONTI = [
+    ("allocazione", "target_azioni", "Quota azionaria del target", "percento", _quota_azioni),
+    ("glide_path", "quota_azionaria_anno_0", "Quota azionaria del glide path, oggi", "percento", _glide_anno_0),
+    ("pensione", "pensione_inps_lorda", "Pensione INPS lorda annua", "euro",
+     lambda b: _via(b, "pensione", "inps", "pensione_inps_lorda_annua")),
+    ("pensione", "tasso_lordo_mediana", "Tasso di sostituzione lordo (mediana)", "percento",
+     lambda b: _via(b, "pensione", "tasso_lordo", "mediana")),
+    ("pensione", "prob_target", "Probabilità del target", "percento", lambda b: _via(b, "pensione", "prob_target")),
+    ("pensione", "montante_fp_mediana", "Montante del fondo pensione (mediana)", "euro",
+     lambda b: _via(b, "pensione", "montante_fp", "mediana")),
+    ("pensione", "pensione_netta_mediana", "Pensione netta annua, scenario mediano", "euro", _scenario_mediana),
+    ("capitale_umano", "esposizione_finanziaria", "Esposizione azionaria finanziaria", "percento",
+     lambda b: _via(b, "capitale_umano", "esposizione_finanziaria")),
+    ("capitale_umano", "esposizione_totale", "Esposizione azionaria totale", "percento",
+     lambda b: _via(b, "capitale_umano", "esposizione_totale")),
+    ("capitale_umano", "patrimonio_finanziario", "Patrimonio finanziario di oggi", "euro",
+     lambda b: _via(b, "capitale_umano", "proiezione", 0, "F")),
+    ("capitale_umano", "capitale_umano", "Capitale umano di oggi", "euro",
+     lambda b: _via(b, "capitale_umano", "proiezione", 0, "HC")),
+    ("fiscalita", "zainetto", "Zainetto fiscale (26% equivalente)", "euro",
+     lambda b: _via(b, "fiscalita", "totali", "zainetto_26_equivalente")),
+    ("fiscalita", "plus_compensabili", "Plusvalenze latenti compensabili", "euro",
+     lambda b: _via(b, "fiscalita", "totali", "plus_latenti_compensabili")),
+    ("look_through", "quota_primi_titoli", "Quota dei primi titoli", "percento",
+     lambda b: _via(b, "look_through", "quota_primi_titoli")),
+]
+ORDINE_SEZIONI_CONFRONTO = ("indicatori", "allocazione", "glide_path", "pensione", "capitale_umano", "fiscalita", "look_through")
+
+
+def _confronti_generati(prima, ora):
+    """Le righe che dipendono dai dati, nel formato di CONFRONTI: i cinque indicatori (per id), il peso di ogni
+    classe presente in entrambe le revisioni, i primi tre settori del look-through di oggi."""
+    righe = []
+    for ind in _via(ora, "indicatori") or []:
+        if isinstance(ind, dict) and isinstance(ind.get("id"), str):
+            righe.append(("indicatori", ind["id"], str(ind.get("etichetta", ind["id"])), ind.get("formato"),
+                          lambda b, i=ind["id"]: _da_lista(b, ("indicatori",), "id", i, "valore")))
+    classi = lambda b: [c["classe"] for c in _via(b, "allocazione", "classi") or [] if isinstance(c, dict) and "classe" in c]  # noqa: E731
+    in_prima = classi(prima)
+    for classe in classi(ora):
+        if classe in in_prima:
+            righe.append(("allocazione", f"peso_{classe}", f"Peso {classe}", "percento",
+                          lambda b, c=classe: _da_lista(b, ("allocazione", "classi"), "classe", c, "peso")))
+    for s in (_via(ora, "look_through", "settori") or [])[:3]:
+        if isinstance(s, dict) and isinstance(s.get("nome"), str):
+            righe.append(("look_through", f"settore_{s['nome']}", f"Settore {s['nome']}", "percento",
+                          lambda b, n=s["nome"]: _da_lista(b, ("look_through", "settori"), "nome", n, "peso")))
+    return righe
+
+
+def _obiettivi_per_nome(b):
+    """{nome senza spazi ai bordi: [obiettivi]} nell'ordine del bundle."""
+    per_nome = {}
+    for o in _via(b, "obiettivi", "obiettivi") or []:
+        if isinstance(o, dict) and isinstance(o.get("nome"), str):
+            per_nome.setdefault(o["nome"].strip(), []).append(o)
+    return per_nome
+
+
+def _variazione(prima, ora):
+    return {"prima": prima, "ora": ora, "delta": ora - prima} if _e_numero(prima) and _e_numero(ora) else None
+
+
+def _confronta_obiettivi(prima, ora):
+    """Gli obiettivi si confrontano per nome. Presente in un solo bundle: «nuovo» o «non_piu_presente»; un nome
+    ripetuto in uno dei due non si confronta («ripetuto»). Il piano di ribilanciamento non si confronta."""
+    p, o = _obiettivi_per_nome(prima), _obiettivi_per_nome(ora)
+    risultato = []
+    for nome in [*o, *(n for n in p if n not in o)]:
+        riga = {"nome": nome, "stato": None, "probabilita": None, "gia": None, "versamento": None}
+        if len(p.get(nome, [])) > 1 or len(o.get(nome, [])) > 1:
+            riga["stato"] = "ripetuto"
+        elif nome not in p:
+            riga["stato"] = "nuovo"
+        elif nome not in o:
+            riga["stato"] = "non_piu_presente"
+        else:
+            riga["stato"] = "presente"
+            for k, chiave in (("probabilita", "probabilita_successo"), ("gia", "gia"), ("versamento", "versamento_confidenza")):
+                riga[k] = _variazione(p[nome][0].get(chiave), o[nome][0].get(chiave))
+        risultato.append(riga)
+    return risultato
+
+
+def confronta(prima, ora):
+    """Il confronto tra due bundle (la revisione precedente e quella di oggi, di versione 1 o 2), con le sole
+    grandezze che sono un numero in entrambi: una sezione assente o a None in uno dei due lascia fuori le sue
+    righe, senza errori. Ritorna {data_precedente, plugin_precedente, versioni_diverse, voci, obiettivi}; una voce è
+    {sezione, id, etichetta, formato, prima, ora, delta, delta_rel}: gli importi hanno delta in euro e delta_rel la
+    variazione relativa (None se «prima» è zero), le quote hanno delta in frazione e delta_rel None."""
+    righe = [*_confronti_generati(prima, ora), *CONFRONTI]
+    righe.sort(key=lambda r: ORDINE_SEZIONI_CONFRONTO.index(r[0]))      # stabile: dentro la sezione, l'ordine di generazione
+    voci = []
+    for sezione, id_, etichetta, formato, estrai_valore in righe:
+        v_prima, v_ora = estrai_valore(prima), estrai_valore(ora)
+        if not (_e_numero(v_prima) and _e_numero(v_ora)):
+            continue
+        delta = v_ora - v_prima
+        voci.append({"sezione": sezione, "id": id_, "etichetta": etichetta, "formato": formato, "prima": v_prima, "ora": v_ora,
+                     "delta": delta, "delta_rel": delta / v_prima if formato == "euro" and v_prima != 0 else None})
+    plugin_prima, plugin_ora = str(prima.get("plugin", "?")), str(ora.get("plugin", "?"))
+    return {"data_precedente": str(prima["generato_il"]), "plugin_precedente": plugin_prima,
+            "versioni_diverse": plugin_prima != plugin_ora, "voci": voci, "obiettivi": _confronta_obiettivi(prima, ora)}
 
 
 def incorpora(template, bundle):
@@ -639,9 +794,10 @@ def main(argv=None):
         sorgenti, ignorati = leggi_sorgenti(args.sorgenti)
         if not sorgenti:
             raise ErroreDati("nessun JSON che il cruscotto sappia disegnare tra quelli passati")
-        if args.precedente:
-            leggi_precedente(args.precedente, data)    # il confronto vero e proprio è un passo successivo
+        precedente = leggi_precedente(args.precedente, data) if args.precedente else None   # letta per intero prima di scrivere
         bundle = componi_bundle(sorgenti, data, versione_plugin())
+        if precedente:
+            bundle["confronto"] = confronta(precedente[1], bundle)
         html = None
         if not args.solo_dati:
             with open(TEMPLATE, encoding="utf-8") as f:
@@ -681,6 +837,10 @@ def main(argv=None):
     for ind in bundle["indicatori"]:
         nota = f" ({ind['nota']})" if ind["nota"] else ""
         print(f"  {ind['etichetta']}: {_valore(ind)}{nota}")
+    if bundle["confronto"]:
+        c, d = bundle["confronto"], bundle["confronto"]["data_precedente"]
+        print(f"Confronto con la revisione del {d[8:]}/{d[5:7]}/{d[:4]} ({precedente[0]}): "
+              f"{len(c['voci'])} grandezze, {len(c['obiettivi'])} obiettivi")
     if args.json:
         print(f"Bundle: {args.json}")
     if not args.solo_dati:

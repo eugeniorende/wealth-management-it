@@ -6754,6 +6754,66 @@ def t_t17_archivio():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _revisioni_di_prova(tmp):
+    """(bundle della revisione precedente, sorgenti di oggi) per i test del confronto e della versione anonimizzata."""
+    tutti = _tutti_i_json()
+    prima = _come_v1(_bundle_di(tmp, "prima.json", *[f for f in tutti if not f.endswith("cu.json")], data="2025-11-20"))
+    def piu_capitale(d):
+        d["capitale"] += 10000
+    def obiettivi(d):
+        d["obiettivi"][0]["probabilita_successo"] -= 0.10
+        d["obiettivi"][1]["nome"] = "Obiettivo rinominato"
+    ora = [f for f in tutti if not f.endswith(("alloc.json", "mco.json"))]
+    return prima, ora + [_json_variante("alloc.json", piu_capitale), _json_variante("mco.json", obiettivi)]
+
+
+@test("T17 cruscotto: confronto tra due revisioni, variazioni chiuse, obiettivi nuovi e non più presenti, versioni diverse")
+def t_t17_confronto():
+    mod, js = carica_modulo(asset("it-revisione", "genera-cruscotto.py")), _json_esempio()
+    L = lambda n: json.load(open(js[n], encoding="utf-8"))       # noqa: E731
+    tmp = tempfile.mkdtemp()
+    try:
+        prima, ora = _revisioni_di_prova(tmp)
+        rc, so, se, b, html = _cruscotto(*ora, extra=("--precedente", prima))
+        assert rc == 0, se[-300:]
+        c = b["confronto"]
+        assert c["data_precedente"] == "2025-11-20" and c["plugin_precedente"] == "0.11.0" and c["versioni_diverse"] is True
+        v = {x["id"]: x for x in c["voci"]}
+        cap, p0 = L("alloc.json")["capitale"], L("mco.json")["obiettivi"][0]["probabilita_successo"]
+        assert p0 > 0.10, "l'esempio deve lasciare spazio per togliere dieci punti"
+        assert v["capitale_allocato"] == {"sezione": "indicatori", "id": "capitale_allocato", "etichetta": "Capitale allocato",
+                                          "formato": "euro", "prima": cap, "ora": cap + 10000, "delta": 10000, "delta_rel": 10000 / cap}
+        assert abs(v["probabilita_essenziali"]["delta"] + 0.10) < 1e-12 and v["probabilita_essenziali"]["delta_rel"] is None
+        assert v["tasso_lordo_mediana"]["formato"] == "percento" and v["tasso_lordo_mediana"]["delta"] == 0
+        assert v["zainetto"]["prima"] == L("broker.json")["analisi"]["zainetto_26_equivalente"] and v["zainetto"]["delta"] == 0
+        assert {"peso_azionario", "target_azioni", "quota_azionaria_anno_0", "pensione_inps_lorda", "prob_target", "montante_fp_mediana",
+                "pensione_netta_mediana", "plus_compensabili", "quota_primi_titoli"} <= set(v), sorted(v)
+        assert sum(1 for x in c["voci"] if x["id"].startswith("settore_")) == 3
+        # Review Focus 1: la revisione precedente non aveva il capitale umano
+        assert not [x for x in c["voci"] if x["sezione"] == "capitale_umano"] and b["capitale_umano"] is not None
+        ob, nomi = {o["nome"]: o for o in c["obiettivi"]}, [o["nome"] for o in L("mco.json")["obiettivi"]]
+        assert ob[nomi[0]]["stato"] == "presente" and abs(ob[nomi[0]]["probabilita"]["delta"] + 0.10) < 1e-12 and ob[nomi[0]]["gia"]["delta"] == 0
+        assert ob[nomi[1]] == {"nome": nomi[1], "stato": "non_piu_presente", "probabilita": None, "gia": None, "versamento": None}
+        assert ob["Obiettivo rinominato"]["stato"] == "nuovo"
+        assert "Confronto con la revisione del 20/11/2025 (prima.json)" in so, so
+        # Review Focus 2: la revisione precedente è la pagina che si sta per riscrivere
+        stessa = os.path.join(tmp, "cruscotto.html")
+        rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), "--from", js["alloc.json"], "-o", stessa, "--data", "2025-11-20", cwd=tmp)
+        rc, so, se = run_script_split(asset("it-revisione", "genera-cruscotto.py"), "--from", js["alloc.json"], "-o", stessa,
+                                      "--precedente", stessa, "--data", "2026-10-25", cwd=tmp)
+        assert rc == 0 and mod.estrai_bundle_da_pagina(open(stessa, encoding="utf-8").read())["confronto"]["data_precedente"] == "2025-11-20", se
+        # casi di bordo, sulla funzione: importo di partenza a zero, nome ripetuto
+        def minimo(capitale, nomi):
+            return {"versione": 2, "generato_il": "2025-01-01", "plugin": "x", "indicatori": [
+                        {"id": "capitale_allocato", "etichetta": "Capitale allocato", "valore": capitale, "formato": "euro", "fonte": "", "nota": ""}],
+                    "obiettivi": {"obiettivi": [{"nome": n, "probabilita_successo": 0.5, "gia": 0, "versamento_confidenza": 100} for n in nomi]}}
+        k = mod.confronta(minimo(0, ["Casa", "Casa"]), dict(minimo(500, ["Casa"]), generato_il="2026-01-01"))
+        assert k["voci"][0]["delta"] == 500 and k["voci"][0]["delta_rel"] is None and k["versioni_diverse"] is False
+        assert [o["stato"] for o in k["obiettivi"]] == ["ripetuto"], k["obiettivi"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # Il rendering si verifica in Chromium con Playwright per Python. Senza Playwright i test sono saltati,
 # salvo RICHIEDI_BROWSER=1 (la CI). PLAYWRIGHT_CHROMIUM_EXECUTABLE indica un Chromium già installato
 # fuori dalla cache di Playwright.
