@@ -9,6 +9,7 @@
 - Dove si scarica il file delle posizioni
 - Cosa legge e cosa esclude
 - Il file composizione.csv
+- Classi con copertura del cambio
 - Stato dei formati
 - Il look-through del portafoglio
 - Limiti
@@ -17,7 +18,7 @@
 
 ## A cosa serve
 
-La diagnosi 4 del capitale umano confronta il settore del proprio lavoro con la parte azionaria del portafoglio (vedi `capitale-umano.md`). Serve sapere quanto pesa ogni settore dentro ciascun ETF. L'importatore lo ricava dal **file delle posizioni** del fondo, cioè l'elenco completo dei titoli con il loro peso, che ogni emittente pubblica nella pagina dell'ETF. Lo script aggrega i titoli per **settore GICS** e per **paese** (codice ISO 3166-1 alpha-2), tiene i **primi dieci titoli** per peso e scrive `composizione.csv`. Paesi e titoli servono al look-through del portafoglio (sezione in fondo), i settori anche alla diagnosi 4.
+La diagnosi 4 del capitale umano confronta il settore del proprio lavoro con la parte azionaria del portafoglio (vedi `capitale-umano.md`). Serve sapere quanto pesa ogni settore dentro ciascun ETF. L'importatore lo ricava dal **file delle posizioni** del fondo, cioè l'elenco completo dei titoli con il loro peso, che ogni emittente pubblica nella pagina dell'ETF. Lo script aggrega i titoli per **settore GICS**, per **paese** (codice ISO 3166-1 alpha-2) e per **valuta** (codice ISO 4217), tiene i **primi dieci titoli** per peso e scrive `composizione.csv`. Paesi, valute e titoli servono al look-through del portafoglio (sezione in fondo), i settori anche alla diagnosi 4.
 
 ## Come si usa
 
@@ -25,12 +26,13 @@ Dalla cartella di lavoro, un `--file` e un `--strumento` per ogni ETF:
 
 ```
 python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file swda.csv --strumento "ETF MSCI World" \
-    --file xdem.xlsx --strumento "ETF Momentum" [--out composizione.csv] [--json composizione.json]
+    --file xdem.xlsx --strumento "ETF Momentum" [--copertura "ETF Momentum=EUR"] [--out composizione.csv] [--json composizione.json]
 python "${CLAUDE_SKILL_DIR}/assets/capitale-umano.py" --dati capitale-umano.json --composizione composizione.csv
 ```
 
 - `--strumento` è la **chiave** con cui le posizioni trovano la composizione: l'**ISIN** (alias `--isin`) quando le posizioni vengono dall'estratto del broker, altrimenti il testo **esatto** del campo `strumento` delle posizioni nel JSON del capitale umano (maiuscole e spazi compresi). Il confronto avviene prima per ISIN e poi per nome; se nessuno coincide, lo strumento finisce tra quelli «senza composizione» e i report lo elencano per nome.
-- Se `composizione.csv` esiste già, si sostituiscono solo le righe degli strumenti importati; le altre, comprese quelle compilate a mano, restano. Un file nel vecchio formato `strumento;settore;peso` viene convertito nel nuovo, con gli stessi pesi.
+- Se `composizione.csv` esiste già, si sostituiscono solo le righe degli strumenti importati; le altre, comprese quelle compilate a mano, restano. Un file nel vecchio formato `strumento;settore;peso` viene convertito nel nuovo, con gli stessi pesi; uno a quattro colonne (`strumento;dimensione;voce;peso`) riceve la quinta, `isin`, e lo script lo dice («Il file esistente aveva quattro colonne: aggiunta la colonna isin, stesse righe»).
+- `--copertura STRUMENTO=VALUTA` (ripetibile) è per le classi di azioni con copertura del cambio: la chiave è uno degli `--strumento`, la valuta un codice ISO 4217. Vedi «Classi con copertura del cambio».
 - `--emittente ishares|xtrackers|vanguard|amundi|spdr` forza la scheda dell'emittente quando il riconoscimento automatico (dal preambolo del file o dal suo nome) non basta.
 - `--json FILE` scrive anche il risultato strutturato (pesi in frazione); `--json -` lo stampa da solo su stdout (gli eventuali `--set` si annotano su stderr).
 - Un errore (file sbagliato, nome sconosciuto, pesi che non tornano, `--out` o `--json` in una cartella che non esiste) ferma lo script con `ERRORE:` prima di scrivere: `composizione.csv` resta com'era e il JSON non nasce.
@@ -56,7 +58,9 @@ Se il sito apre la pagina invece di scaricare il file (capita quando si copia il
 
 ## Cosa legge e cosa esclude
 
-La riga d'intestazione si cerca nelle prime 40 righe con tabelle di sinonimi in italiano, inglese, tedesco e francese: peso (`Weight (%)`, `Weighting`, `Percent of Fund`, `Ponderazione (%)`, `Peso`, `Gewichtung (%)`, `Poids (%)`…), settore (`Sector`, `Sector Classification`, `Industry Classification`, `Settore`, `Branche`, `Secteur`…), paese (`Location`, `Country`, `Trade Country Name`, `Area geografica`, `Paese`, `Land`, `Pays`…), asset class (`Asset Class`, `Type of Security`, `Wertpapierart`, `Classe d'actifs`…). Le stesse tabelle coprono i nomi dei settori GICS (`Informationstechnologie`, `Technologies de l'information`…), le esclusioni (`Barmittel`, `Liquidités`, `Anleihen`, `Obligations`, `Unbekannt`, `Non classé`…), le etichette della data (`Stand`, `Stichtag`, `Données au`…) e i nomi tedeschi e francesi dei paesi dei file reali; un paese assente nelle tabelle si legge dal codice ISO. In tedesco e francese `Technologie`, `Telekommunikation`/`Télécommunications` e `Grundstoffe`/`Matériaux de base` sono nomi ICB, `Informationstechnologie`/`Technologies de l'information`, `Kommunikationsdienste`/`Services de communication` e `Roh-, Hilfs- & Betriebsstoffe`/`Matériaux` nomi GICS. Il preambolo sopra e il disclaimer sotto non contano. La scala dei pesi (frazione o percento) si deduce dalla somma.
+La riga d'intestazione si cerca nelle prime 40 righe con tabelle di sinonimi in italiano, inglese, tedesco e francese: peso (`Weight (%)`, `Weighting`, `Percent of Fund`, `Ponderazione (%)`, `Peso`, `Gewichtung (%)`, `Poids (%)`…), settore (`Sector`, `Sector Classification`, `Industry Classification`, `Settore`, `Branche`, `Secteur`…), paese (`Location`, `Country`, `Trade Country Name`, `Area geografica`, `Paese`, `Land`, `Pays`…), asset class (`Asset Class`, `Type of Security`, `Wertpapierart`, `Classe d'actifs`…) e valuta di negoziazione dei titoli (`Market Currency`, `Valuta di mercato`, `Marktwährung`, `Devise de cotation`, `Currency`, `Valuta`, `Währung`, `Devise`…). Le stesse tabelle coprono i nomi dei settori GICS (`Informationstechnologie`, `Technologies de l'information`…), le esclusioni (`Barmittel`, `Liquidités`, `Anleihen`, `Obligations`, `Unbekannt`, `Non classé`…), le etichette della data (`Stand`, `Stichtag`, `Données au`…) e i nomi tedeschi e francesi dei paesi dei file reali; un paese assente nelle tabelle si legge dal codice ISO. In tedesco e francese `Technologie`, `Telekommunikation`/`Télécommunications` e `Grundstoffe`/`Matériaux de base` sono nomi ICB, `Informationstechnologie`/`Technologies de l'information`, `Kommunikationsdienste`/`Services de communication` e `Roh-, Hilfs- & Betriebsstoffe`/`Matériaux` nomi GICS. Il preambolo sopra e il disclaimer sotto non contano. La scala dei pesi (frazione o percento) si deduce dalla somma.
+
+**Valuta.** Si legge la valuta di **negoziazione** del titolo, come la riporta l'emittente, e si aggrega come settori e paesi. «Cambio» **non** è un sinonimo: nel file italiano di iShares è la borsa («NASDAQ»), non la valuta; lì la colonna giusta è «Valuta di mercato». Le obbligazioni contano nelle valute, anche se non hanno il settore. I codici si controllano sulla lista ISO 4217 (`CODICI_VALUTA`, 178 codici dalla «List One» pubblicata il 17/09/2026, letta il 14/11/2026); un codice fuori lista ferma lo script e li elenca con il peso («valute non riconosciute: ABC (15,00%)»). Le **unità minori** si riportano alla valuta: `GBX` e `GBp` a `GBP`, `ZAc` a `ZAR`, `ILa` a `ILS`; `CNH` (yuan offshore) e `RMB` a `CNY`. Un `-` o una cella vuota esclude la riga dalle sole valute; oltre il 5% del fondo c'è un avviso, e se meno della metà dei titoli ha la valuta la dimensione non si scrive (avviso). Un file senza colonna della valuta (per esempio quello francese di Amundi) dà settori e paesi e un avviso; il look-through lo conta come senza valute.
 
 Si escludono, con la quota riportata nel report e nel commento del CSV:
 
@@ -73,13 +77,30 @@ I pesi rimasti si **rinormalizzano a 100** per dimensione. Se meno della metà d
 
 ```
 # ETF MSCI World: iShares, swda.csv, posizioni al 30/09/2026, importato il 25/10/2026; esclusi liquidità e derivati 0,40%
-strumento;dimensione;voce;peso
-ETF MSCI World;settore;Information Technology;26,84
-ETF MSCI World;paese;US;71,20
-ETF MSCI World;titolo;NVIDIA CORP;5,12
+strumento;dimensione;voce;peso;isin
+ETF MSCI World;settore;Information Technology;26,84;
+ETF MSCI World;paese;US;71,20;
+ETF MSCI World;valuta;USD;71,20;
+ETF MSCI World;titolo;NVIDIA CORP;5,12;US0000000011
 ```
 
-UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decimali: si apre in Excel italiano. Le righe `settore` e `paese` sono rinormalizzate a 100; le righe `titolo` (i primi `N_TITOLI`, dieci, per peso, liquidità e derivati esclusi) portano il **peso nel fondo** così com'è, e sommate danno la quota del fondo coperta dai primi titoli. `capitale-umano.py` legge le righe `settore` e salta le altre; accetta anche il vecchio formato `strumento;settore;peso` compilato a mano.
+L'intestazione è `strumento;dimensione;voce;peso;isin`. UTF-8 con BOM, separatore `;`, virgola decimale, pesi in percento con due decimali: si apre in Excel italiano. Le righe `settore`, `paese` e `valuta` sono rinormalizzate a 100; le righe `titolo` (i primi `N_TITOLI`, dieci, per peso, liquidità e derivati esclusi) portano il **peso nel fondo** così com'è, e sommate danno la quota del fondo coperta dai primi titoli.
+
+La colonna `isin` ha senso solo sulle righe `titolo` ed è l'ISIN del **titolo**, non dell'ETF (quello è `strumento`). L'importatore lo scrive quando il file dell'emittente lo riporta **e** ha la forma di un ISIN (due lettere, nove tra lettere e cifre, una cifra di controllo; le minuscole diventano maiuscole); qualsiasi altra cosa («-», un codice interno, una cella vuota) lascia il campo vuoto, come per un segnaposto. Non ne calcola la cifra di controllo.
+
+Compatibilità: i lettori (`capitale-umano.py`, `look-through-portafoglio.py`) leggono ancora il formato a **quattro colonne** (`strumento;dimensione;voce;peso`) e il vecchio a **tre** (`strumento;settore;peso`, solo settori), con gli stessi numeri di prima. Le righe compilate **a mano** possono omettere il quinto campo, anche in un file che ha l'intestazione a cinque colonne. `capitale-umano.py` legge le righe `settore` e salta le altre (`paese`, `valuta`, `titolo`).
+
+## Classi con copertura del cambio
+
+Una classe di azioni con copertura del cambio («EUR Hedged», «USD Hedged») ha gli stessi titoli dell'ETF non coperto, e quindi le stesse valute di negoziazione: ma chi la possiede non è esposto a quelle valute, perché il fondo le cambia in quella della classe con i contratti a termine. Per questo la valuta dei titoli **non** è l'esposizione, e lo script non decide da solo che una classe è coperta: ci pensi tu, con la scheda del fondo.
+
+```
+python "${CLAUDE_SKILL_DIR}/assets/importa-composizione-etf.py" --file world-eur-hedged.csv \
+    --strumento IE00B4L5Y983 --copertura IE00B4L5Y983=EUR
+```
+
+`--copertura CHIAVE=VALUTA` (la chiave è uno degli `--strumento`) scrive **una sola riga** `valuta` al 100% nella valuta della copertura e lo annota nel commento del CSV («copertura del cambio in EUR dichiarata dall'utente»); settori, paesi e titoli restano quelli del file. Se il nome del file o il preambolo dicono «hedged» (o «copertura del cambio», «couvert», «währungsgesichert»…) e l'opzione manca, l'importatore avvisa: «il file sembra di una classe con copertura del cambio: le valute dei titoli non sono l'esposizione; se è così reimporta con --copertura IE00B4L5Y983=EUR». Reimportando senza `--copertura` tornano le valute dei titoli. Una copertura che non è un codice ISO 4217 o una chiave che non è tra gli `--strumento` ferma lo script (codice 2).
+
 
 ## Stato dei formati
 
@@ -107,12 +128,14 @@ python "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" --composizione c
 ```
 
 - **Posizioni**: il `--json` di `importa-estratto-broker.py` (un file per broker; la stessa posizione su due broker è un'unica esposizione e si somma) oppure il `--dati` del capitale umano. Ogni posizione si confronta con il CSV per **ISIN** e poi per nome: con l'estratto del broker si importa ogni ETF con `--isin`.
-- **Copertura**: per ogni dimensione (settori, paesi, titoli) contano solo le posizioni che la hanno nel CSV; i pesi sono rinormalizzati sulla **parte coperta** e la copertura (quota del controvalore totale) sta sempre accanto. Niente «altro» inventato: ciò che non si sa non entra nei pesi.
-- **Titoli**: sono i primi dieci di ogni ETF, quindi la concentrazione sui titoli è un **minimo**, non il totale. Lo stesso titolo scritto in modo diverso da due emittenti («Apple Inc.», «APPLE INC») si somma con una chiave normalizzata del nome (senza punteggiatura, suffissi societari come Inc, Corp, SpA, SA, e classi di azioni); `da` nel JSON elenca gli ETF che contribuiscono, per accorgersi di quelli rimasti separati.
-- **Posizioni dirette** (una singola azione, un BTP): non hanno un file delle posizioni; si compilano **a mano** nel CSV con l'ISIN della posizione come chiave, per esempio `IT0005454241;paese;IT;100` e, se si vuole il titolo tra i primi, `IT0005454241;titolo;BTP Futura 2037;100`. Una riga `titolo` al 100% da sola identifica una posizione diretta: nel report a terminale e nel JSON compare (`diretto: true`), nel cruscotto no, perché è una posizione dell'utente e non un titolo di un ETF. Lo script non deduce il paese dall'ISIN: un ISIN irlandese può essere un ETF di titoli americani.
+- **Copertura**: per ogni dimensione (settori, paesi, valute, titoli) contano solo le posizioni che la hanno nel CSV; i pesi sono rinormalizzati sulla **parte coperta** e la copertura (quota del controvalore totale) sta sempre accanto. Niente «altro» inventato: ciò che non si sa non entra nei pesi.
+- **Regioni**: non stanno nel CSV, derivano dai paesi con la classificazione ONU **M49** («Geographic Regions», letta il 14/11/2026): Nord America, America Latina e Caraibi (le Americhe sono divise in due, come nello standard), Europa, Asia, Oceania, Africa, Antartide. Hanno la stessa copertura dei paesi e sommano a 100%; nel report sono la riga «Per regione» sotto i paesi. Turchia, Israele, Cipro e i paesi del Golfo stanno in **Asia**, la Russia in **Europa**, il Messico in **America Latina**; Taiwan e l'Antartide sono le due scelte fuori dallo standard: Taiwan sta in Asia, l'Antartide è una regione a sé. Niente «mercati sviluppati ed emergenti»: non c'è uno standard pubblico e cambia da indice a indice.
+- **Titoli**: sono i primi dieci di ogni ETF, quindi la concentrazione sui titoli è un **minimo**, non il totale. Due righe `titolo` sono lo stesso titolo se hanno lo **stesso ISIN oppure** la stessa chiave del nome: la chiave normalizza il nome (senza punteggiatura, suffissi societari come Inc, Corp, SpA, SA, e classi di azioni), per cui «Apple Inc.» e «APPLE INC» si sommano anche senza ISIN, mentre due nomi diversi con lo stesso ISIN («TSMC ADR» e «TAIWAN SEMICONDUCTOR MANUFACTURING») si sommano per l'ISIN. Le due regole si concatenano: se A e B hanno lo stesso ISIN e B e C lo stesso nome, sono un solo titolo. Per ogni titolo aggregato il JSON riporta `da` (gli ETF che contribuiscono) e `isin` (la lista degli ISIN del gruppo, vuota se nessuna riga ne ha: due classi di una società possono averne due). Un ISIN scritto a mano che non ha la forma giusta ferma lo script («ISIN 'US037833100' malformato per il titolo 'APPLE INC'»).
+- **Valute**: aggregate per controvalore come settori e paesi, con la loro copertura. `quota_euro` è il peso dell'euro **sulla parte coperta** (non sul controvalore totale): `0.0` se la parte coperta c'è ma l'euro non è tra le sue valute, `null` se nessuna posizione ha le valute. Il report ha la sezione «4. VALUTE» con la riga «In euro: 8,1% della parte coperta.». Per una classe con copertura vale la valuta della copertura (sezione precedente).
+- **Posizioni dirette** (una singola azione, un BTP): non hanno un file delle posizioni; si compilano **a mano** nel CSV con l'ISIN della posizione come chiave, per esempio `IT0005454241;paese;IT;100`, `IT0005454241;valuta;EUR;100` (senza la riga `valuta` la posizione non entra nelle valute) e, se si vuole il titolo tra i primi, `IT0005454241;titolo;BTP Futura 2037;100`. Una riga `titolo` al 100% da sola identifica una posizione diretta: nel report a terminale e nel JSON compare (`diretto: true`), nel cruscotto no, perché è una posizione dell'utente e non un titolo di un ETF. Lo script non deduce il paese dall'ISIN: un ISIN irlandese può essere un ETF di titoli americani.
 - **Pesi scritti a mano**: in percento, come li scrive l'importatore (`5` o `5,00` per il 5%, `0,05` è lo 0,05%). I pesi dei titoli seguono la scala delle altre righe dello strumento; quando sono tutti fino a 1 e la scala è un'inferenza, il report lo dice con un avviso.
 - **Senza composizione**: le posizioni senza riscontro restano fuori dai pesi e il report le elenca per nome (e ISIN), con il controvalore: si importa il file dell'emittente, o si aggiungono le righe.
-- Il JSON (`controvalore_totale`, `posizioni`, `senza_composizione`, `copertura`, `settori`, `paesi`, `titoli`, `quota_primi_titoli`) entra nel passo 3 di `it-revisione` e nel cruscotto grafico, dove passano solo gli aggregati: niente nomi né ISIN delle posizioni.
+- Il JSON (`controvalore_totale`, `posizioni`, `senza_composizione`, `copertura`, `settori`, `paesi`, `regioni`, `valute`, `quota_euro`, `titoli`, `quota_primi_titoli`) entra nel passo 3 di `it-revisione` e nel cruscotto grafico, dove passano solo gli aggregati: niente nomi né ISIN delle posizioni.
 - Ogni ETF ha la data del suo file (nel commento del CSV): il look-through non le allinea. Il fondo pensione non entra, perché la sua composizione non è disponibile.
 
 ## Limiti
@@ -120,6 +143,9 @@ python "${CLAUDE_SKILL_DIR}/assets/look-through-portafoglio.py" --composizione c
 - **Posizioni del fondo, non dell'indice**: un ETF a replica campionaria espone posizioni diverse dall'indice; un ETF sintetico (swap) può pubblicare il paniere di collaterale. Un file di ripartizione dice invece la composizione dell'**indice**: utile per settori e paesi, muto sui titoli.
 - **Fotografia a una data**: la composizione cambia; la data delle posizioni è nel commento del CSV e va riguardata a ogni revisione annuale. Una data numerica sotto un'etichetta inglese con giorno e mese entrambi fino a 12 («Holdings as of 03/04/2026») è ambigua tra il formato britannico e quello statunitense: non si scrive, con un avviso. Con un numero oltre il 12 («10/24/2026») o un'etichetta italiana («Posizioni al») la data si legge senza dubbi.
 - **Solo GICS** per i settori; nessuna conversione da ICB.
+- **Regioni geografiche, non di mercato**: la regione deriva dal paese secondo l'ONU, quindi il Giappone e l'India stanno nella stessa regione (Asia) pur essendo mercati molto diversi; per sviluppati ed emergenti si guardano i paesi.
+- **Valuta di negoziazione, non dei ricavi**: una società americana che incassa metà dei ricavi in Europa conta tutta in dollari; per le classi con copertura vale quella che dichiari tu con `--copertura`.
+- **Gli ISIN uniscono solo dove l'emittente li riporta**: un file senza colonna ISIN, o con codici non validi, lascia il campo vuoto e la somma dei titoli resta affidata alla chiave del nome.
 - **Paese secondo l'emittente**: domicilio, paese di rischio o di negoziazione, a seconda del file; il report dice quale colonna ha letto.
 - Lingue: italiano, inglese, tedesco e francese (i siti tedesco e francese di Xtrackers e Amundi, verificati su file sintetici con il loro layout, non su file reali). Niente PDF né XLS del vecchio Excel: si esporta in XLSX o CSV.
 

@@ -6220,6 +6220,11 @@ def t_lt_importatore_valuta():
             return path
         g = scrivi("p.csv", "A,Energy,Equity,United Kingdom,GBp,40\nB,Energy,Equity,South Africa,ZAc,30\n"
                             "C,-,Fixed Income,China,CNH,20\nD,Energy,Equity,Italy,EUR,10\n")
+        # «Cambio» da solo è la borsa: senza una colonna della valuta vera non si legge niente, nessun errore sul nome della borsa
+        borsa = os.path.join(tmp, "borsa.csv")
+        open(borsa, "w", encoding="utf-8").write("Name,Sector,Asset Class,Location,Cambio,Weight (%)\nA,Energy,Equity,Italy,NASDAQ,100\n")
+        c = m.componi(borsa, "B")
+        assert c["valute"] == {} and "valuta" not in c["colonne"] and any("colonna della valuta" in a for a in c["avvisi"]), c
         c = m.componi(g, "U")
         assert r2(c["valute"]) == {"GBP": 40.0, "ZAR": 30.0, "CNY": 20.0, "EUR": 10.0}, c["valute"]   # anche l'obbligazione
         # Review Focus 3: segnaposto sopra il 5% → avviso; sotto la metà dei titoli la dimensione non si scrive
@@ -6765,6 +6770,16 @@ def t_lt_cruscotto():
     rc, _, se, b_v, html_vecchio = _cruscotto(_json_variante("lt.json", come_prima))
     assert rc == 0 and b_v["look_through"]["regioni"] is None and b_v["look_through"]["valute"] is None, se[-300:]
     assert "lt.json → look_through" in so and "look_through" in so.split("Sezioni:")[1], so
+    # oltre otto valute: le altre si sommano in una voce; quota_euro nulla (nessuna posizione con le valute): niente nota
+    def dieci_valute(d):
+        d["valute"] += [{"voce": c, "nome": c, "peso": p} for c, p in
+                        (("CHF", .009), ("AUD", .008), ("CAD", .007), ("SEK", .006), ("NOK", .004), ("DKK", .003))]
+        d["quota_euro"] = None
+    rc, _, se, b_10, html_10 = _cruscotto(_json_variante("lt.json", dieci_valute))
+    assert rc == 0, se[-300:]
+    v10 = b_10["look_through"]["valute"]
+    assert len(v10) == 9 and v10[-1]["nome"] == "altre 2 valute" and abs(v10[-1]["peso"] - (.004 + .003)) < 1e-12, v10
+    assert v10[7]["nome"] == "SEK" and b_10["look_through"]["quota_euro"] is None
     # revisione finale I1: una posizione diretta descritta a mano con una riga «titolo» è una posizione dell'utente e non
     # entra nella pagina; M3: N_TITOLI_REPORT taglia la lista e la quota insieme
     tmp = os.path.dirname(js["lt.json"])
@@ -6804,6 +6819,9 @@ def t_lt_cruscotto():
             assert "1 posizione senza composizione" in testo and "minimo della concentrazione" in testo, testo[:800]
             assert formato_it_percento(lt["copertura"]["settori"]) in testo, testo[:800]
             assert "Regioni (copertura" in testo and "Valute (copertura" in testo and "In euro:" in testo, testo[:1200]
+            page, errori, eccezioni, _ = _apri_cruscotto(br, html_10)
+            testo = page.inner_text("#sez-look_through")
+            assert errori == [] and "Valute (copertura" in testo and "In euro:" not in testo, testo[:1200]
             page, errori, eccezioni, _ = _apri_cruscotto(br, html_vecchio)
             testo = page.inner_text("#sez-look_through")
             assert errori == [] and eccezioni == [] and "Regioni (copertura" not in testo and "Valute (copertura" not in testo, testo[:600]
@@ -6826,9 +6844,15 @@ def t_lt_documentazione():
         assert parola in ref, parola
     assert "isin" in open(os.path.join(ob, "references", "capitale-umano.md"), encoding="utf-8").read()
     rev = open(os.path.join(SKILLS, "it-revisione", "SKILL.md"), encoding="utf-8").read()
-    assert 'version: "0.9"' in rev
+    assert 'version: "0.10"' in rev
     contratto = rev.split("### Contratto di input")[1].split("\n## ")[0]
     assert "look-through-portafoglio.py" in contratto and "senza_composizione" in contratto
+    for parola in ("regioni", "M49", "Taiwan", "strumento;dimensione;voce;peso;isin", "valuta", "--copertura", "Cambio", "ISO 4217"):
+        assert parola in ref, parola
+    assert "--copertura" in step8 and "regioni" in step8 and "valute" in step8
+    assert "regioni" in contratto and "valute" in contratto and "quota_euro" in contratto
+    nr = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.12.0")[0]
+    assert "regioni" in nr and "colonna `isin`" in nr and "--copertura" in nr
     assert "look-through" in rev.split("### 3. Avanzamento")[1].split("### 4.")[0].lower()
     assert "look-through" in rev.split("### 6. Cruscotto grafico")[1].split("\n## ")[0].lower()
     readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
@@ -6837,6 +6861,7 @@ def t_lt_documentazione():
     assert "look-through" in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.11.0")[0].lower()
     t16 = open(os.path.join(ROOT, "ROADMAP.md"), encoding="utf-8").read().split("**T16")[1]
     assert "[x] **Look-through del portafoglio**" in t16 and "2026-11-01-look-through" in t16, t16[:1200]
+    assert "regioni" in t16 and "ISIN dei titoli" in t16 and "valuta" in t16
 
 
 @test("T17 cruscotto: ponte pensione e riscatto della laurea nella sezione Pensione")
