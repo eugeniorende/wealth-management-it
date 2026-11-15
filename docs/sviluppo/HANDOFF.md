@@ -163,6 +163,7 @@ Cruscotto:
 - La sostituzione dei nomi è scritta campo per campo invece di essere guidata da `CAMPI_NOME`; manca come fixture un bundle vero della 0.12.0; `_json_esempio()` non fissa la data.
 - Gli indicatori confrontano «essenziale» in modo esatto, gli script a monte per sottostringa.
 - Un template mancante e un `NaN` in un JSON sorgente finiscono male (c'era già).
+- Dal riesame delle correzioni della revisione finale: `capitale-umano.py` sa quando gira sul suo esempio ma non lo scrive nel JSON, quindi la versione anonimizzata rifiuta il piano di ribilanciamento d'esempio ma non il capitale umano d'esempio (oggi lo copre solo la frase sugli importi di default: estendere il rifiuto è la prossima cosa da fare sulla riservatezza); la guardia dei test sui «lordi» copre i percorsi numerici del bundle e non gli id delle voci del confronto (una voce lorda aggiunta a `CONFRONTI` non verrebbe fermata: basta un'asserzione che lega le etichette con «lord» a `VOCI_CONFRONTO_TOLTE`); la nota della sezione Pensione della pagina anonima parla del tasso netto anche quando la sezione non lo mostra; una priorità fuori dal vocabolario, ora tolta, lascia una cella vuota nella tabella degli obiettivi; il messaggio di rifiuto del piano d'esempio porta tra parentesi `(dati_esempio)`.
 
 ## 4. Regole di lavoro
 
