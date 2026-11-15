@@ -6515,13 +6515,24 @@ def _cruscotto(*sorgenti, cartella=None, extra=()):
     return rc, so, se, b, h
 
 
-def _json_variante(nome, modifica):
-    """Copia di un JSON d'esempio con `modifica(dati)` applicata, nella stessa cartella con un prefisso."""
+def _json_variante(nome, modifica, prefisso="variante-"):
+    """Copia di un JSON d'esempio con `modifica(dati)` applicata, nella stessa cartella con un prefisso. Un prefisso
+    diverso da quello di default tiene la copia al riparo dalle varianti scritte dopo nello stesso test."""
     d = json.load(open(_json_esempio()[nome], encoding="utf-8"))
     modifica(d)
-    path = os.path.join(os.path.dirname(_json_esempio()[nome]), "variante-" + nome)
+    path = os.path.join(os.path.dirname(_json_esempio()[nome]), prefisso + nome)
     json.dump(d, open(path, "w", encoding="utf-8"), ensure_ascii=False)
     return path
+
+
+def _piano_utente(modifica=None, prefisso="utente-"):
+    """Il piano di ribilanciamento d'esempio come lo scrive lo script con --dati (dati_esempio falso): la versione
+    anonimizzata rifiuta il piano d'esempio, i cui importi sono pubblici."""
+    def come_da_dati(d):
+        d["dati_esempio"] = False
+        if modifica:
+            modifica(d)
+    return _json_variante("piano.json", come_da_dati, prefisso=prefisso)
 
 
 @test("T17 cruscotto: ogni output reale riconosciuto con il suo tipo, nessuno con due firme")
@@ -6539,8 +6550,11 @@ def t_t17_riconosci():
         assert sum(1 for _, firma in mod.FIRME if firma(d)) <= 1, nome
     assert {t for t, _ in mod.FIRME} == {t for t in attesi.values() if not t.startswith("ignorato")}
     assert mod.riconosci({"a": 1}) is None
-    # l'importatore della previdenza resta l'unico ignorato: la catena previdenziale si passa intera
-    assert [n for n, _ in mod.IGNORATI] == ["importa-previdenza"]
+    # gli ignorati: l'importatore della previdenza (la catena previdenziale si passa intera) e il bundle del cruscotto stesso
+    # (bundle.json e le foto in revisioni/ stanno nella cartella di lavoro: si confrontano con --precedente, non si disegnano)
+    assert [n for n, _ in mod.IGNORATI] == ["importa-previdenza", "cruscotto"]
+    bundle = mod.componi_bundle({"allocatore": ("alloc.json", json.load(open(js["alloc.json"], encoding="utf-8")))}, "2026-10-25", "x")
+    assert mod.riconosci(json.loads(json.dumps(bundle))) == "ignorato:cruscotto"
 
 
 @test("T17 cruscotto: il bundle porta i valori dei JSON di origine e nessuna posizione dell'estratto")
@@ -6748,6 +6762,27 @@ def t_t17_archivio():
         tre["versione"], tre["anonimo"] = 2, {"base": "capitale allocato", "obiettivi": 1, "broker": 0}
         json.dump(tre, open(os.path.join(tmp, "anon.json"), "w", encoding="utf-8"))
         respinto(os.path.join(tmp, "anon.json"), "2026-10-25", "anonimizzata")
+        # un bundle o una pagina risalvati con il BOM restano una revisione precedente
+        con_bom = os.path.join(tmp, "bom.json")
+        open(con_bom, "w", encoding="utf-8-sig").write(open(v2, encoding="utf-8").read())
+        assert open(con_bom, "rb").read(3) == b"\xef\xbb\xbf"
+        assert mod.leggi_precedente(con_bom, "2026-10-25")[1] == json.load(open(v2, encoding="utf-8"))
+        pagina_bom = os.path.join(tmp, "bom.html")
+        open(pagina_bom, "w", encoding="utf-8-sig").write(html)
+        assert mod.leggi_precedente(pagina_bom, "2026-10-25")[1] == b_pagina
+        # generato_il nella forma AAAA-MM-GG esatta: un'altra forma che date.fromisoformat accetta («20251120») si respinge
+        for forma in ("20251120", "2025-11-20T00:00", "2025-W47-4"):
+            tre["anonimo"], tre["generato_il"] = None, forma
+            json.dump(tre, open(os.path.join(tmp, "data.json"), "w", encoding="utf-8"))
+            respinto(os.path.join(tmp, "data.json"), "2026-10-25", "AAAA-MM-GG")
+        # dalla riga di comando: un errore su --precedente ferma tutto prima di scrivere (né pagina, né bundle, né archivio)
+        m4 = os.path.join(tmp, "m4")
+        os.makedirs(m4)
+        for precedente in (os.path.join(tmp, "anon.json"), os.path.join(tmp, "non-esiste.json"), os.path.join(tmp, "data.json")):
+            rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--precedente", precedente, "-o", "p.html", "--json", "b.json",
+                                          "--archivia", "--data", "2026-10-25", cwd=m4)
+            assert rc == 1 and se.lstrip().startswith("ERRORE:") and "Traceback" not in se and "ERRORE:" not in so, (precedente, rc, se)
+            assert os.listdir(m4) == [], (precedente, os.listdir(m4))
         open(os.path.join(cartella, "cruscotto-rotta.json"), "w", encoding="utf-8").write("{rotta")
         respinto(cartella, "2026-10-25", "cruscotto-rotta.json")                    # Review Focus 3: non si salta in silenzio
     finally:
@@ -6755,8 +6790,9 @@ def t_t17_archivio():
 
 
 def _revisioni_di_prova(tmp):
-    """(bundle della revisione precedente, sorgenti di oggi) per i test del confronto e della versione anonimizzata."""
-    tutti = _tutti_i_json()
+    """(bundle della revisione precedente, sorgenti di oggi) per i test del confronto e della versione anonimizzata. Il
+    piano di ribilanciamento è quello scritto con --dati: la versione anonimizzata non accetta il piano d'esempio."""
+    tutti = [f for f in _tutti_i_json() if not f.endswith("piano.json")] + [_piano_utente()]
     prima = _come_v1(_bundle_di(tmp, "prima.json", *[f for f in tutti if not f.endswith("cu.json")], data="2025-11-20"))
     def piu_capitale(d):
         d["capitale"] += 10000
@@ -6834,7 +6870,7 @@ def t_t17_confronto():
         k = mod.confronta(minimo(0, ["Casa", "Casa"]), dict(minimo(500, ["Casa"]), generato_il="2026-01-01"))
         assert k["voci"][0]["delta"] == 500 and k["voci"][0]["delta_rel"] is None and k["versioni_diverse"] is False
         assert [o["stato"] for o in k["obiettivi"]] == ["ripetuto"], k["obiettivi"]
-        # A2, casi limite sulla funzione. Il confronto di partenza ha una voce e un obiettivo presente, con tutto confrontato
+        # casi limite sulla funzione. Il confronto di partenza ha una voce e un obiettivo presente, con tutto confrontato
         oggi = lambda x: dict(x, generato_il="2026-01-01")                                       # noqa: E731
         base = mod.confronta(minimo(100, ["Casa"]), oggi(minimo(200, ["Casa"], prob=0.7)))
         assert [v["id"] for v in base["voci"]] == ["capitale_allocato"] and base["obiettivi"][0]["stato"] == "presente"
@@ -6929,7 +6965,7 @@ def t_t17_anonimo():
         veri = {round(v) for p, v in mod.foglie_numeriche(pieno) if mod.classifica(p) == "euro" and abs(v) >= 1000}
         rimasti = {round(v) for p, v in mod.foglie_numeriche(anon) if mod.classifica(p) == "euro"}
         assert veri and not (veri & rimasti), sorted(veri & rimasti)
-        # C2: lo stesso controllo senza fidarsi della classificazione: nessuna foglia numerica del bundle anonimo, a qualunque
+        # lo stesso controllo senza fidarsi della classificazione: nessuna foglia numerica del bundle anonimo, a qualunque
         # percorso, arrotondata all'intero è uno degli importi veri (un importo dichiarato per errore «non euro» resterebbe vero)
         veri_tutti = _importi_veri(mod, pieno)
         rimasti_tutti = {(p, round(abs(v))) for p, v in mod.foglie_numeriche(anon) if p not in NUMERI_NON_IMPORTI and round(abs(v)) in veri_tutti}
@@ -6960,13 +6996,13 @@ def t_t17_anonimo():
         non_classificati = sorted({p for p, v in mod.foglie_testo(pieno) if v != "" and mod.classifica_testo(p) is None})
         assert not non_classificati, f"campi di testo non classificati: {non_classificati}"
         assert mod.classifica_testo("fiscalita.avvisi[]") == "tolto" and mod.classifica_testo("obiettivi.obiettivi[].nome") == "nome"
-        assert mod.classifica_testo("obiettivi.obiettivi[].priorita") == "resta" and not (mod.CAMPI_TESTO & mod.CAMPI_TESTO_TOLTI)
+        assert mod.classifica_testo("obiettivi.obiettivi[].priorita") == "vocabolario" and not (mod.CAMPI_TESTO & mod.CAMPI_TESTO_TOLTI)
         # Review Focus 4: una base a zero si salta; senza importi non c'è indice
         b0 = copy.deepcopy(pieno)
         b0["allocazione"]["capitale"] = 0
         assert mod.base_indice(b0)[0] == "valore in portafoglio"
         assert mod.base_indice({"versione": 2, "indicatori": [], "obiettivi": None}) is None
-        # C1: i testi liberi tolti, con un caso in cui ci sono davvero. Nell'esempio gli avvisi sono vuoti e il motivo del drift anche:
+        # i testi liberi tolti, con un caso in cui ci sono davvero. Nell'esempio gli avvisi sono vuoti e il motivo del drift anche:
         # senza marcatori le asserzioni su di loro passerebbero anche se anonimizza() non li toccasse
         BANCA, CIFRA = "Banca Fittizia Orsetto", "7.654,32"
         def avvisi_con_marcatori(d):
@@ -6976,7 +7012,7 @@ def t_t17_anonimo():
             d["drift"]["azionario"]["esito"] = "rinviata"
             d["ordini"][0]["nota"] = f"{BANCA}: € {CIFRA} in attesa"
         sorgenti_c1 = [f for f in ora if not f.endswith(("broker.json", "piano.json"))] + [
-            _json_variante("broker.json", avvisi_con_marcatori), _json_variante("piano.json", piano_con_marcatori)]
+            _json_variante("broker.json", avvisi_con_marcatori), _piano_utente(piano_con_marcatori, prefisso="marcatori-")]
         rc, so, se, pieno_c1, _ = _cruscotto(*sorgenti_c1)
         assert rc == 0, se[-300:]
         rc, so, se, anon_c1, html_c1 = _cruscotto(*sorgenti_c1, extra=("--anonimo",))
@@ -7002,6 +7038,223 @@ def t_t17_anonimo():
         assert "Versione anonimizzata" in so and "base 100 = capitale allocato" in so and "€" not in so, so
         rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--anonimo", "--archivia", cwd=tmp)
         assert rc == 2 and "--archivia" in se, (rc, se[-200:])
+        # il piano di ribilanciamento d'esempio ha importi pubblici (totale €100.000): accanto all'indice rivelerebbe il
+        # fattore, quindi la versione anonimizzata si rifiuta, con codice 1 e senza scrivere nulla (né pagina né bundle)
+        assert json.load(open(js["piano.json"], encoding="utf-8"))["dati_esempio"] is True
+        vuota = os.path.join(tmp, "esempio")
+        os.makedirs(vuota)
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--from", js["piano.json"], "--anonimo", "-o", "a.html",
+                                      "--json", "a.json", "--data", "2026-10-25", cwd=vuota)
+        assert rc == 1 and se.lstrip().startswith("ERRORE:") and "esempio" in se and "--dati" in se, (rc, se[-400:])
+        assert "Traceback" not in se and os.listdir(vuota) == [], os.listdir(vuota)
+        try:
+            mod.anonimizza(mod.componi_bundle({"ribilanciamento": ("piano.json", json.load(open(js["piano.json"], encoding="utf-8")))},
+                                              "2026-10-25", "x"))
+            raise AssertionError("anonimizza() deve rifiutare il piano d'esempio")
+        except mod.ErroreDati as e:
+            assert "esempio" in str(e), str(e)
+        # lo stesso piano scritto con --dati (dati_esempio falso) passa
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--from", _piano_utente(), "--anonimo", "-o", "a.html",
+                                      "--data", "2026-10-25", cwd=vuota)
+        assert rc == 0 and os.listdir(vuota) == ["a.html"], (rc, se[-300:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _ral_dai_tassi_lordi(bundle, ritenuta):
+    """La RAL finale ricostruita dai soli scenari della pagina: (pensione netta P90 − P10) / ((1 − ritenuta sulla rendita del
+    fondo) × (tasso di sostituzione lordo P90 − P10)). Sul bundle completo dà euro; su quello anonimo darebbe la RAL in punti
+    d'indice, e con il netto dello stipendio e le funzioni pubbliche di netto-pensione.py il livello del reddito. None se
+    manca un ingresso."""
+    scenari = {s.get("nome"): s for s in ((bundle.get("pensione") or {}).get("netto") or {}).get("scenari") or []}
+    if "P10" not in scenari or "P90" not in scenari:
+        return None
+    netti = [scenari[n].get("pensione_netta_totale") for n in ("P90", "P10")]
+    lordi = [scenari[n].get("tasso_sostituzione_lordo") for n in ("P90", "P10")]
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in netti + lordi) or lordi[0] == lordi[1]:
+        return None
+    return (netti[0] - netti[1]) / ((1 - ritenuta) * (lordi[0] - lordi[1]))
+
+
+@test("T17 cruscotto: versione anonimizzata senza grandezze lorde della pensione, che non si possono ricalcolare")
+def t_t17_anonimo_lordi():
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    tmp = tempfile.mkdtemp()
+    try:
+        prima, ora = _revisioni_di_prova(tmp)
+        rc, so, se, pieno, _ = _cruscotto(*ora, extra=("--precedente", prima))
+        assert rc == 0, se[-300:]
+        rc, so, se, anon, _ = _cruscotto(*ora, extra=("--precedente", prima, "--anonimo"))
+        assert rc == 0, se[-300:]
+        p_pieno, p_anon = pieno["pensione"], anon["pensione"]
+        # i tassi lordi, il target con la sua probabilità e il costo permanente lordo del ponte: numeri nel bundle completo,
+        # assenti in quello anonimo (il contenitore dei tassi lordi diventa None, non un oggetto di tre null)
+        lordi = ("pensione.tasso_lordo.p10", "pensione.tasso_lordo.mediana", "pensione.tasso_lordo.p90",
+                 "pensione.netto.scenari[].tasso_sostituzione_lordo", "pensione.target", "pensione.prob_target",
+                 "pensione.ponte.costo_permanente_lordo_annuo")
+        numeri_pieno = {p for p, _ in mod.foglie_numeriche(pieno)}
+        assert set(lordi) <= numeri_pieno, sorted(set(lordi) - numeri_pieno)
+        assert p_anon["tasso_lordo"] is None and p_anon["target"] is None and p_anon["prob_target"] is None, p_anon
+        assert p_anon["ponte"]["costo_permanente_lordo_annuo"] is None, p_anon["ponte"]
+        assert p_anon["netto"]["scenari"] and all(s["tasso_sostituzione_lordo"] is None for s in p_anon["netto"]["scenari"])
+        # restano il tasso di sostituzione netto, le pensioni nette in indice, età e anni
+        assert [s["tasso_sostituzione_netto"] for s in p_anon["netto"]["scenari"]] == [s["tasso_sostituzione_netto"] for s in p_pieno["netto"]["scenari"]]
+        cap = pieno["allocazione"]["capitale"]
+        assert all(abs(a["pensione_netta_totale"] - 100 * p["pensione_netta_totale"] / cap) < 1e-9
+                   for a, p in zip(p_anon["netto"]["scenari"], p_pieno["netto"]["scenari"]))
+        assert p_anon["ponte"]["eta_uscita"] == p_pieno["ponte"]["eta_uscita"] and p_anon["ponte"]["anni_ponte"] == p_pieno["ponte"]["anni_ponte"]
+        assert p_anon["inps"]["anni_al_pensionamento"] == p_pieno["inps"]["anni_al_pensionamento"]
+        assert p_anon["montante_fp"]["mediana"] is not None
+        # le stesse grandezze escono dal confronto
+        tolte = {"pensione_inps_lorda", "tasso_lordo_mediana", "prob_target"}
+        ids_pieno, ids_anon = ({v["id"] for v in b["confronto"]["voci"]} for b in (pieno, anon))
+        assert tolte <= ids_pieno and not (tolte & ids_anon), sorted(tolte & ids_anon)
+        assert ids_anon == ids_pieno - tolte, sorted(ids_pieno ^ ids_anon)
+        assert mod.VOCI_CONFRONTO_TOLTE == tolte
+        # la guardia: nessun numero del bundle anonimo sta a un percorso lordo, e ogni percorso numerico del bundle completo
+        # che contiene «lord» è dichiarato (un campo lordo aggiunto domani non arriva alla pagina per dimenticanza)
+        assert set(lordi) <= mod.CAMPI_LORDI, sorted(set(lordi) - mod.CAMPI_LORDI)
+        rimasti = sorted({p for p, _ in mod.foglie_numeriche(anon) if "lord" in p or p in mod.CAMPI_LORDI})
+        assert not rimasti, rimasti
+        non_dichiarati = sorted({p for p in numeri_pieno if "lord" in p} - mod.CAMPI_LORDI)
+        assert not non_dichiarati, non_dichiarati
+        # la prova d'attacco: dai tassi lordi P10 e P90 e dalle pensioni nette degli scenari si ricava la RAL. Sul bundle
+        # completo il calcolo riesce entro l'1% (il test sa attaccare); su quello anonimo i suoi ingressi non ci sono più
+        N = carica_modulo(asset("it-pianificazione", "netto-pensione.py"))
+        ritenuta = N.aliquota_rendita_fp(N.ANNI_ISCRIZIONE_FP) * N.QUOTA_IMPONIBILE_FP
+        vera = p_pieno["inps"]["ral_finale"]
+        stimata = _ral_dai_tassi_lordi(pieno, ritenuta)
+        assert stimata is not None and abs(stimata - vera) / vera < 0.01, (stimata, vera)
+        assert _ral_dai_tassi_lordi(anon, ritenuta) is None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@test("T17 cruscotto: versione anonimizzata, i testi scritti dall'utente tornano al vocabolario del plugin o escono")
+def t_t17_anonimo_testi():
+    import copy
+    mod = carica_modulo(asset("it-revisione", "genera-cruscotto.py"))
+    # marcatori inventati, nei campi di testo che vengono da celle libere del pianificatore e da etichette libere degli scenari
+    def alloc(d):
+        d["obiettivi"][0]["profilo"] = "Profilo di Mario"
+        d["obiettivi"][0]["tipo"] = "permanente (fondo di Mario Rossi)"
+    def mco(d):
+        d["obiettivi"][0]["profilo"] = "Profilo di Mario"
+        d["obiettivi"][0]["priorita"] = "essenziale per Mario"
+        d["obiettivi"][1]["profilo"] = "Profilo della zia"
+    def netto(d):
+        d["scenari"][0]["nome"] = "Scenario di Mario"
+    sostituiti = {"alloc.json": alloc, "mco.json": mco, "netto.json": netto}
+    sorgenti = [f for f in _tutti_i_json() if os.path.basename(f) not in sostituiti and not f.endswith("piano.json")]
+    sorgenti += [_json_variante(n, m, prefisso="mario-") for n, m in sostituiti.items()] + [_piano_utente()]
+    rc, so, se, pieno, _ = _cruscotto(*sorgenti)
+    assert rc == 0, se[-300:]
+    rc, so, se, anon, html = _cruscotto(*sorgenti, extra=("--anonimo",))
+    assert rc == 0, se[-300:]
+    # prima: i marcatori arrivano nel bundle completo, altrimenti la prova è vuota
+    a_p, o_p = pieno["allocazione"]["obiettivi"], pieno["obiettivi"]["obiettivi"]
+    assert a_p[0]["profilo"] == "Profilo di Mario" and a_p[0]["tipo"] == "permanente (fondo di Mario Rossi)"
+    assert o_p[0]["priorita"] == "essenziale per Mario" and o_p[1]["profilo"] == "Profilo della zia"
+    assert pieno["pensione"]["netto"]["scenari"][0]["nome"] == "Scenario di Mario"
+    # poi: «Mario» non compare né nel bundle anonimo né nel file della pagina
+    assert "Mario" not in json.dumps(anon, ensure_ascii=False) and "Mario" not in html and "della zia" not in html
+    a_a, o_a = anon["allocazione"]["obiettivi"], anon["obiettivi"]["obiettivi"]
+    assert all(o["tipo"] is None for o in a_a), [o["tipo"] for o in a_a]
+    assert o_a[0]["priorita"] == "essenziale" and [o["priorita"] for o in o_a[1:]] == [o["priorita"] for o in o_p[1:]]
+    # i profili fuori dal modello: «Profilo A», «Profilo B»… per prima comparsa, la stessa etichetta nelle due sezioni;
+    # quelli del modello restano col loro nome
+    assert [o["profilo"] for o in a_a] == ["Profilo A"] + [o["profilo"] for o in a_p[1:]], [o["profilo"] for o in a_a]
+    assert [o["profilo"] for o in o_a] == ["Profilo A", "Profilo B"] + [o["profilo"] for o in o_p[2:]], [o["profilo"] for o in o_a]
+    assert set(o["profilo"] for o in a_p[1:] + o_p[2:]) <= set(mod.PROFILI_MODELLO)
+    assert [s["nome"] for s in anon["pensione"]["netto"]["scenari"]] == ["Scenario 1", "mediana", "P90"]
+    # la regola delle priorità è quella degli script a monte, per sottostringa; un testo senza le radici esce
+    x = copy.deepcopy(pieno)
+    for o, priorita, profilo in zip(x["obiettivi"]["obiettivi"], ("Discrezionale", " importante ", "da vedere"),
+                                    ("  crescita massima ", "Moderato", "MODERATO")):
+        o["priorita"], o["profilo"] = priorita, profilo
+    r = mod.anonimizza(x)
+    assert [o["priorita"] for o in r["obiettivi"]["obiettivi"]] == ["desiderabile", "importante", None]
+    assert [o["profilo"] for o in r["obiettivi"]["obiettivi"]] == ["Crescita massima", "Moderato", "Moderato"]
+    assert [mod.priorita_del_plugin(t) for t in ("Essenziale", "desiderio", "discrezionale", "Importante", "", None, "urgente")] == \
+        ["essenziale", "desiderabile", "desiderabile", "importante", None, None, None]
+    # ogni stringa a un percorso di CAMPI_NOME è un'etichetta, vuota o il segnaposto degli ordini da finanziare
+    nomi = [(p, v) for p, v in mod.foglie_testo(anon) if mod.classifica_testo(p) == "nome"]
+    assert nomi and all(re.fullmatch(r"Obiettivo \d+|Broker [A-Z]+", v) or v in ("", mod.DA_FINANZIARE) for _, v in nomi), nomi
+    # le chiavi dei dizionari a chiavi libere: i broker rinominati, le classi restano come scritte
+    assert mod.CHIAVI_RINOMINATE | mod.CHIAVI_CLASSI == mod.CHIAVI_LIBERE and not (mod.CHIAVI_RINOMINATE & mod.CHIAVI_CLASSI)
+    assert mod.CHIAVI_RINOMINATE == {"fiscalita.per_broker", "ribilanciamento.zainetto"}
+    chiavi = list(anon["fiscalita"]["per_broker"]) + list(anon["ribilanciamento"]["zainetto"])
+    assert chiavi and all(re.fullmatch(r"Broker [A-Z]+", k) for k in chiavi), chiavi
+    assert list(anon["ribilanciamento"]["drift"]) == list(pieno["ribilanciamento"]["drift"])
+    assert list(anon["ribilanciamento"]["risultante"]) == list(pieno["ribilanciamento"]["risultante"])
+    # il segnaposto degli ordini senza cassa non è un broker: resta com'è e non si conta
+    y = copy.deepcopy(pieno)
+    y["ribilanciamento"]["ordini"].append({"broker": mod.DA_FINANZIARE, "operazione": "ACQUISTO", "classe": "azionario",
+                                           "categoria_fiscale": "", "importo_eur": 500.0, "imposta_eur": None, "nota": "x"})
+    veri = {b.strip() for b in [*pieno["fiscalita"]["per_broker"], *pieno["ribilanciamento"]["zainetto"],
+                                *(z["broker"] for z in pieno["fiscalita"]["zainetto"]), *(o["broker"] for o in pieno["ribilanciamento"]["ordini"])]}
+    assert mod.DA_FINANZIARE not in veri and len(veri) >= 2, veri
+    ry = mod.anonimizza(y)
+    assert ry["ribilanciamento"]["ordini"][-1]["broker"] == mod.DA_FINANZIARE and ry["anonimo"]["broker"] == len(veri), ry["anonimo"]
+    # le costanti che copiano un dato di un altro file sono legate alla fonte
+    bootstrap = carica_modulo(asset("it-pianificazione-obiettivi", "motore_bootstrap.py"))
+    modello = bootstrap.leggi_pianificatore(asset("it-pianificazione-obiettivi", "pianificatore-obiettivi.xlsx"), avvisa=lambda *a: None)
+    assert list(mod.PROFILI_MODELLO) == list(modello["profili"]), (mod.PROFILI_MODELLO, list(modello["profili"]))
+    N = carica_modulo(asset("it-pianificazione", "netto-pensione.py"))
+    assert list(mod.ETICHETTE_SCENARI) == [n for n, _ in N.RENDITE_FP], mod.ETICHETTE_SCENARI
+    sorgente_rib = open(asset("it-rebalance", "ribilanciamento-multibroker.py"), encoding="utf-8").read()
+    assert sorgente_rib.count(f'"broker": "{mod.DA_FINANZIARE}"') == 2, mod.DA_FINANZIARE
+
+
+@test("T17 cruscotto: righe dello stdout sul confronto, bundle passato con --from, stdout anonimo senza euro né nomi")
+def t_t17_stdout():
+    G = asset("it-revisione", "genera-cruscotto.py")
+    js = _json_esempio()
+    tmp = tempfile.mkdtemp()
+    try:
+        prima, ora = _revisioni_di_prova(tmp)                          # la precedente è del 20/11/2025, plugin 0.11.0
+        rev = os.path.join(tmp, "revisioni")
+        os.makedirs(rev)
+        shutil.copy(prima, os.path.join(rev, "cruscotto-2025-11-20.json"))
+        args = [a for f in ora for a in ("--from", f)]
+        rc, so, se = run_script_split(G, *args, "--solo-dati", "--archivia", rev, "--data", "2026-11-14", cwd=tmp)
+        assert rc == 0 and os.path.isfile(os.path.join(rev, "cruscotto-2026-11-14.json")), se[-300:]
+        # la pagina disegnata il giorno dopo con gli stessi JSON: la precedente è la foto di questa stessa revisione
+        rc, so, se = run_script_split(G, *args, "--precedente", rev, "-o", "c.html", "--data", "2026-11-15", cwd=tmp)
+        assert rc == 0 and "Confronto con la revisione del 14/11/2026" in so, (so, se[-300:])
+        assert "identiche a quelle della revisione del 14/11/2026" in so and "--data" in so and "cruscotto-AAAA-MM-GG.json" in so, so
+        assert "versione 0.11.0" not in so, so
+        # con --data del giorno della revisione: il confronto è con il 2025 e nessun avviso sulle grandezze identiche;
+        # le versioni diverse del plugin si dicono anche sullo stdout
+        rc, so, se = run_script_split(G, *args, "--precedente", rev, "-o", "c.html", "--data", "2026-11-14", cwd=tmp)
+        assert rc == 0 and "Confronto con la revisione del 20/11/2025" in so and "identiche" not in so, so
+        plugin = json.load(open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
+        assert f"versione 0.11.0 del plugin, ora {plugin}" in so and "CHANGELOG" in so, so
+        # un confronto vuoto non è «tutto identico»
+        mod = carica_modulo(G)
+        assert mod.confronto_tutto_uguale({"voci": [], "obiettivi": []}) is False
+        uguale = {"voci": [{"delta": 0}], "obiettivi": [{"stato": "presente", "probabilita": {"delta": 0}, "gia": None, "versamento": {"delta": 0}}]}
+        assert mod.confronto_tutto_uguale(uguale) is True
+        for diverso in ({"voci": [{"delta": 0.01}], "obiettivi": []},
+                        {"voci": [{"delta": 0}], "obiettivi": [{"stato": "nuovo", "probabilita": None, "gia": None, "versamento": None}]},
+                        {"voci": [{"delta": 0}], "obiettivi": [{"stato": "presente", "probabilita": {"delta": -0.1}, "gia": None, "versamento": None}]}):
+            assert mod.confronto_tutto_uguale(diverso) is False, diverso
+        # la versione anonimizzata: stesso avviso senza nomi di file; lo stdout non ha euro, nomi di obiettivi, broker o file
+        rc, so, se = run_script_split(G, *args, "--precedente", rev, "--anonimo", "-o", "a.html", "--data", "2026-11-15", cwd=tmp)
+        assert rc == 0 and "identiche a quelle della revisione del 14/11/2026" in so and "--data" in so, (so, se[-300:])
+        rc, so_anon, se = run_script_split(G, *args, "--precedente", rev, "--anonimo", "-o", "a.html", "--data", "2026-11-14", cwd=tmp)
+        assert rc == 0 and "versione 0.11.0 del plugin" in so_anon, (so_anon, se[-300:])
+        pieno = json.load(open(os.path.join(rev, "cruscotto-2026-11-14.json"), encoding="utf-8"))
+        vietati = ["€", ".json", "cruscotto-2025", *(o["nome"] for o in pieno["obiettivi"]["obiettivi"]), *pieno["fiscalita"]["per_broker"],
+                   *(os.path.basename(f) for f in ora)]
+        for testo in (so, so_anon):
+            assert not [v for v in vietati if v in testo], ([v for v in vietati if v in testo], testo)
+        # un bundle o una foto passati per sbaglio con --from si riconoscono e si saltano, come l'output di importa-previdenza
+        foto = os.path.join(rev, "cruscotto-2026-11-14.json")
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--from", foto, "-o", "c.html", cwd=tmp)
+        assert rc == 0 and "ℹ cruscotto-2026-11-14.json è un bundle del cruscotto: ignorato" in so and "--precedente" in so, (so, se[-300:])
+        rc, so, se = run_script_split(G, "--from", js["alloc.json"], "--from", foto, "--anonimo", "-o", "a.html", cwd=tmp)
+        assert rc == 0 and "bundle del cruscotto: ignorato" in so and "cruscotto-2026" not in so, (so, se[-300:])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -7297,6 +7550,8 @@ def t_t17_browser_confronto():
                             assert pg.locator("#sez-confronto svg").count() == 0, dove
                         elif etichetta == "senza voci né obiettivi":
                             assert pg.locator("#sez-confronto table, #sez-confronto svg, #sez-confronto h3").count() == 0, dove
+                            # una riga dice perché la sezione è vuota: non sembra un guasto
+                            assert "Le due revisioni non hanno grandezze in comune: non c'è niente da confrontare." in testo, (dove, testo)
                         elif etichetta == "tutto nullo":
                             assert len([r for r in righe if r[2:] == ND]) == 3 * len(presenti(base)), (dove, righe)
                             assert not [t for t in titoli if " · prima" in t], (dove, titoli)
@@ -7385,13 +7640,39 @@ def t_t17_browser_anonimo():
                 nota = page.inner_text("#nota-anonima")
                 assert "Versione anonimizzata" in nota and "base 100 = capitale allocato" in nota, nota
                 assert "età" in nota and "settore del lavoro" in nota and "ordine di grandezza del reddito" in nota, nota
+                # la testata dice anche che cosa non c'è più della pensione e che i nomi delle classi restano come scritti
+                assert "importi lordi" in nota and "tassi di sostituzione lordi della pensione" in nota, nota
+                assert "nomi delle classi come li hai scritti" in nota, nota
                 assert page.inner_text('[data-valore="capitale_allocato"]') == "100,0"
                 assert "Obiettivo 1" in corpo and "Broker A" in corpo and "(indice)" in corpo
                 for nome in [o["nome"] for o in pieno["obiettivi"]["obiettivi"]] + list(pieno["fiscalita"]["per_broker"]) + [f["file"] for f in pieno["fonti"]]:
                     assert nome not in corpo, nome
                 pensione = page.inner_text("#sez-pensione")
                 assert "Pensione INPS lorda" not in pensione and "Onere agevolato" not in pensione and "n/d" not in pensione, pensione[-900:]
-                assert "Tasso di sostituzione lordo" in pensione and "Pensione netta" in pensione
+                assert "Pensione netta" in pensione
+                # nessuna grandezza lorda della pensione, nemmeno nelle tabelle chiuse e nei <title>: né la riga del tasso lordo,
+                # né la fascia, né target e probabilità, né la colonna degli scenari, né il costo permanente del ponte; il tasso
+                # di sostituzione netto c'è, e nessun «n/d» né contenitore vuoto al posto di ciò che manca
+                tutta = page.evaluate("() => document.getElementById('sez-pensione').textContent")
+                assert "lord" not in tutta.lower(), tutta[max(0, tutta.lower().find("lord") - 80):tutta.lower().find("lord") + 40]
+                assert "Tasso di sostituzione netto" in pensione and "n/d" not in tutta and "Costo permanente" not in tutta, pensione[:900]
+                assert "target" not in tutta.lower() and "Sostituzione netta" in tutta, tutta[:900]
+                vuoti = page.evaluate("""() => ({ tabelle: Array.from(document.querySelectorAll("#sez-pensione table")).filter(t => !t.querySelector("tbody tr")).length,
+                    grafici: Array.from(document.querySelectorAll("#sez-pensione svg")).filter(s => !s.querySelector("rect, line, circle, path, polygon")).length,
+                    righe: Array.from(document.querySelectorAll("#sez-pensione .riga, #sez-pensione p, #sez-pensione td")).filter(e => !e.textContent.trim()).length })""")
+                assert vuoti == {"tabelle": 0, "grafici": 0, "righe": 0}, vuoti
+                colonne = page.evaluate("() => Array.from(document.querySelectorAll('#sez-pensione th')).map(t => t.textContent)")
+                assert colonne == ["Scenario", "Pensione netta", "Sostituzione netta"], colonne
+                assert "lord" not in page.evaluate("() => document.getElementById('sez-confronto').textContent").lower()
+                # la pagina completa li ha ancora (la prova sopra può fallire)
+                piena = _apri_cruscotto(br, html_pieno)[0]
+                assert "Tasso di sostituzione lordo" in piena.inner_text("#sez-pensione") and "Costo permanente" in piena.inner_text("#sez-pensione")
+                assert "Sostituzione lorda" in piena.evaluate("() => document.getElementById('sez-pensione').textContent")
+                # gli avvisi della fiscalità sono tutti tolti, non solo quelli sulle singole posizioni: la riga lo dice così
+                omessi = _apri_cruscotto(br, _con_dati(html, lambda b: b["fiscalita"].update(avvisi_omessi=3)))[0]
+                assert "3 avvisi della fiscalità non riportati in questa versione" in omessi.inner_text("#sez-fiscalita"), omessi.inner_text("#sez-fiscalita")[-400:]
+                normale = _apri_cruscotto(br, _con_dati(html_pieno, lambda b: b["fiscalita"].update(avvisi_omessi=1)))[0]
+                assert "1 avviso sulle singole posizioni non riportati qui" in normale.inner_text("#sez-fiscalita")
                 _senza_brutti(corpo, "testo visibile")
                 # nessun «€» nemmeno negli attributi e nei <title> dei grafici, che inner_text non vede
                 nascosti = page.evaluate("""() => Array.from(document.querySelectorAll("*")).filter(e => e.tagName !== "SCRIPT" && e.tagName !== "STYLE" &&
@@ -7455,12 +7736,38 @@ def t_t17_skill():
     nr = open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read().split("## v0.12.0")[0]
     assert "confronto" in nr.lower() and "anonimizzata" in nr and "--solo-dati" in nr
     assert "--anonimo" in comando
-    # fix round 1: il confronto si decide prima di archiviare, un errore di --precedente non perde la foto, il limite si dichiara
+    # il confronto si decide prima di archiviare, un errore di --precedente non perde la foto, il limite si dichiara
     assert "prima di archiviare" in passo3 and "rilancia senza `--precedente`" in passo3, passo3[-1500:]
     assert "ordine di grandezza del reddito" in passo and "ordine di grandezza del reddito" in comando
     out = readme.split("### Output")[1].split("\n## ")[0]
     assert "--anonimo" in out and "ordine di grandezza del reddito" in out and "senza nomi" not in out, out[-900:]
     assert "nomi che hai dato a obiettivi e broker" in dati, dati[-1500:]
+    # ogni versione ha il suo Artifact: la pagina completa non va mai su quello nato dalla versione anonimizzata
+    assert "si ripubblica sullo stesso Artifact" not in skill
+    for testo in (passo, comando):
+        assert "Ogni versione ha il suo Artifact" in testo and "nato dalla versione anonimizzata" in testo, testo[-1500:]
+    assert "chiedi all'utente" in passo.split("Ogni versione ha il suo Artifact")[1][:600]
+    assert "nato dalla versione anonimizzata" in anti, anti[-900:]
+    # la pagina disegnata in un giorno successivo alla revisione vuole --data con la data della revisione
+    for testo in (passo, comando):
+        assert "--data AAAA-MM-GG" in testo and "foto di questa stessa revisione" in testo, testo[-1500:]
+    assert "grandezze sono identiche" in passo and "--precedente revisioni/cruscotto-AAAA-MM-GG.json" in passo, passo[-2500:]
+    assert "hai rilanciato senza" in passo, passo[:2500]
+    # i file da non passare con --from: anche il bundle e le foto dell'archivio
+    for testo in (passo, comando):
+        assert "bundle.json" in testo and "revisioni/" in testo, testo[:1500]
+    # versioni diverse del plugin: nel report, e il template lo richiama
+    assert "versione del plugin" in passo5 and "riportalo nel report" in passo5, passo5
+    assert "versione del plugin" in modello.split("## 2.")[1].split("## 3.")[0], "template-revisione: manca il richiamo alle versioni"
+    # che cosa resta e che cosa no nella versione anonimizzata, la base dell'indice, gli importi pubblici
+    for testo in (passo, comando, dati):
+        assert "nomi delle classi come" in testo, testo[-1500:]
+        assert "riga «Versione anonimizzata" in testo, testo[-1500:]
+        assert "valore di default" in testo and "dati d'esempio" in testo and "rivela il fattore" in testo, testo[-1500:]
+    assert "100 = il capitale allocato" not in passo + comando + dati
+    assert "importi e tassi lordi della pensione" in passo and "probabilità del target" in passo and "tipo degli obiettivi" in passo, passo[-2500:]
+    assert "punti percentuali" in contratto, contratto[-900:]
+    assert "meno di un minuto" not in readme
 
 
 @test("T16 look-through: il cruscotto riconosce il JSON, il bundle non porta posizioni né ISIN, la sezione in pagina")

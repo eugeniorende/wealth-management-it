@@ -561,6 +561,10 @@ footer .fonti { color: var(--muto); }
       s.appendChild(el("p", { class: "avviso", testo: "La revisione precedente è stata generata con " +
         (c.plugin_precedente ? "la versione " + c.plugin_precedente : "un'altra versione") + " del plugin: parte delle differenze può venire da dati normativi e metodi aggiornati, non dalla tua situazione (vedi CHANGELOG)." }));
     }
+    if (!c.voci.length && !c.obiettivi.length) {
+      // senza nulla da confrontare la sezione lo dice, invece di restare con titolo e note come un guasto
+      s.appendChild(el("p", { class: "nota", testo: "Le due revisioni non hanno grandezze in comune: non c'è niente da confrontare." }));
+    }
     SEZIONI_CONFRONTO.forEach(function (d) {
       var voci = c.voci.filter(function (v) { return v.sezione === d[0]; });
       if (!voci.length) return;
@@ -741,7 +745,10 @@ footer .fonti { color: var(--muto); }
 
   function sezionePensione(p) {
     if (!p) return null;
-    var s = sezione("pensione", "Pensione",
+    // Nella versione anonimizzata non c'è nessuna grandezza lorda (tassi lordi, target, costo permanente del ponte): la
+    // sezione parla del netto e le righe del lordo non si disegnano, senza «n/d» al loro posto.
+    var s = sezione("pensione", "Pensione", ANON ?
+      "Il tasso di sostituzione netto (pensione netta sull'ultimo stipendio netto) si legge come tenore di vita." :
       "Il tasso di sostituzione lordo (INPS più fondo, sulla RAL finale) si confronta con il target lordo; il netto si legge come tenore di vita e non si confronta con un target lordo.");
     if (p.tasso_lordo) {
       var r = el("div", { class: "riga" });
@@ -750,22 +757,35 @@ footer .fonti { color: var(--muto); }
       r.appendChild(trackFascia(p.tasso_lordo, p.target, function (v) { return pct(v); }));
       r.appendChild(el("div", { class: "valori", testo: "P10 " + pct(p.tasso_lordo.p10) + " · mediana " + pct(p.tasso_lordo.mediana) + " · P90 " + pct(p.tasso_lordo.p90) }));
       s.appendChild(r);
-      if (!ANON || (p.montante_fp && ok(p.montante_fp.mediana))) {
-        var m = el("div", { class: "riga" });
-        m.appendChild(riga("Montante del fondo pensione al pensionamento" + IND, el("span", { class: "valori" }, "mediana ", cifra(euro(p.montante_fp.mediana)))));
-        m.appendChild(trackFascia(p.montante_fp, null, euro));
-        m.appendChild(el("div", { class: "valori", testo: "P10 " + euro(p.montante_fp.p10) + " · mediana " + euro(p.montante_fp.mediana) + " · P90 " + euro(p.montante_fp.p90) }));
-        s.appendChild(m);
-      }
+    }
+    if (ANON && p.netto && p.netto.scenari.some(function (sc) { return ok(sc.tasso_sostituzione_netto); })) {
+      var tn = el("div", { class: "riga" });
+      var med = p.netto.scenari.filter(function (sc) { return sc.nome === "mediana" && ok(sc.tasso_sostituzione_netto); })[0];
+      tn.appendChild(riga("Tasso di sostituzione netto", med ? el("span", { class: "valori" }, "mediana ", cifra(pct(med.tasso_sostituzione_netto))) : null));
+      tn.appendChild(el("div", { class: "valori", testo: frasi(p.netto.scenari.map(function (sc) {
+        return ok(sc.tasso_sostituzione_netto) ? frasi([S(sc.nome), pct(sc.tasso_sostituzione_netto)], " ") : "";
+      }), " · ") }));
+      s.appendChild(tn);
+    }
+    if (p.montante_fp && (!ANON || ok(p.montante_fp.mediana))) {
+      var m = el("div", { class: "riga" });
+      m.appendChild(riga("Montante del fondo pensione al pensionamento" + IND, el("span", { class: "valori" }, "mediana ", cifra(euro(p.montante_fp.mediana)))));
+      m.appendChild(trackFascia(p.montante_fp, null, euro));
+      m.appendChild(el("div", { class: "valori", testo: "P10 " + euro(p.montante_fp.p10) + " · mediana " + euro(p.montante_fp.mediana) + " · P90 " + euro(p.montante_fp.p90) }));
+      s.appendChild(m);
     }
     if (p.netto) {
       s.appendChild(el("h3", { testo: "Pensione netta annua per scenario" + IND }));
       var righe = p.netto.scenari.map(function (sc) { return { nome: sc.nome, valore: sc.pensione_netta_totale }; });
       righe.push({ nome: "Ultimo stipendio netto", valore: p.netto.netto_ultimo_stipendio, colore: "var(--muto)" });
       s.appendChild(barre(righe, euro, "Pensione netta per scenario contro l'ultimo stipendio netto"));
-      s.appendChild(inTabella("Valori in tabella" + IND, tabella(["Scenario", "Pensione netta", "Sostituzione netta", "Sostituzione lorda"],
-        p.netto.scenari.map(function (sc) { return [sc.nome, euro(sc.pensione_netta_totale), pct(sc.tasso_sostituzione_netto), pct(sc.tasso_sostituzione_lordo)]; }),
-        [false, true, true, true])));
+      // la colonna del lordo c'è solo se almeno uno scenario lo porta (nella versione anonimizzata nessuno)
+      var conLordo = p.netto.scenari.some(function (sc) { return ok(sc.tasso_sostituzione_lordo); });
+      s.appendChild(inTabella("Valori in tabella" + IND, tabella(["Scenario", "Pensione netta", "Sostituzione netta"].concat(conLordo ? ["Sostituzione lorda"] : []),
+        p.netto.scenari.map(function (sc) {
+          return [sc.nome, euro(sc.pensione_netta_totale), pct(sc.tasso_sostituzione_netto)].concat(conLordo ? [pct(sc.tasso_sostituzione_lordo)] : []);
+        }),
+        [false, true, true].concat(conLordo ? [true] : []))));
     }
     if (p.inps && ANON && !ok(p.inps.pensione_inps_lorda_annua)) {
       // gli importi lordi sono tolti: restano l'età e gli anni
@@ -790,9 +810,10 @@ footer .fonti { color: var(--muto); }
                            { nome: "Necessario per l'85%", valore: q.capitale_necessario["85%"], colore: "var(--muto)" },
                            { nome: "Necessario per il 95%", valore: q.capitale_necessario["95%"], colore: "var(--muto)" }],
                           euro, "Capitale-ponte disponibile contro necessario"));
+      // il costo permanente è lordo: nella versione anonimizzata non c'è, e la frase non si scrive
       s.appendChild(el("p", { class: "nota", testo: (q.rita.attiva ? "RITA dai " + anni(q.rita.eta_inizio) + " anni, rata netta " +
-        euro(q.rita.rata_netta) + IND + " l'anno. " : "Senza RITA. ") + "Costo permanente dell'uscita anticipata: " +
-        euro(q.costo_permanente_lordo_annuo) + IND + " l'anno di pensione lorda in meno, per sempre." }));
+        euro(q.rita.rata_netta) + IND + " l'anno." : "Senza RITA.") + (ok(q.costo_permanente_lordo_annuo) ? " Costo permanente dell'uscita anticipata: " +
+        euro(q.costo_permanente_lordo_annuo) + IND + " l'anno di pensione lorda in meno, per sempre." : "") }));
     }
     if (p.riscatto) {
       var k = p.riscatto;
@@ -885,7 +906,9 @@ footer .fonti { color: var(--muto); }
       var u = el("ul", { class: "avvisi" });
       f.avvisi.forEach(function (a) { u.appendChild(el("li", { testo: a })); });
       if (f.avvisi_omessi) {
-        u.appendChild(el("li", { testo: f.avvisi_omessi + (f.avvisi_omessi === 1 ? " avviso" : " avvisi") +
+        // nella versione anonimizzata gli avvisi della fiscalità sono tutti tolti, non solo quelli sulle singole posizioni
+        u.appendChild(el("li", { testo: ANON ? f.avvisi_omessi + (f.avvisi_omessi === 1 ? " avviso della fiscalità non riportato" :
+          " avvisi della fiscalità non riportati") + " in questa versione." : f.avvisi_omessi + (f.avvisi_omessi === 1 ? " avviso" : " avvisi") +
           " sulle singole posizioni non riportati qui: sono nell'output dell'importatore." }));
       }
       s.appendChild(u);
@@ -962,7 +985,8 @@ footer .fonti { color: var(--muto); }
     // testata della versione anonimizzata: cosa è stato sostituito, cosa resta, il limite
     var indiceBase = B.anonimo.base ? "gli importi sono un indice (base 100 = " + B.anonimo.base + "), " : "";
     document.querySelector("header").appendChild(el("p", { class: "avviso", id: "nota-anonima", testo: "Versione anonimizzata: " + indiceBase +
-      (indiceBase ? "i" : "I") + " nomi di obiettivi e broker sono sostituiti. Restano età, anni, percentuali e settore del lavoro. " +
+      (indiceBase ? "i" : "I") + " nomi di obiettivi e broker sono sostituiti; non ci sono gli importi lordi né i tassi di sostituzione lordi della pensione. " +
+      "Restano età, anni, percentuali e settore del lavoro, e i nomi delle classi come li hai scritti. " +
       "Nasconde importi e nomi a chi legge; chi conosce già un tuo importo ne ricava gli altri, e dai rapporti rimasti si può stimare " +
       "l'ordine di grandezza del reddito." }));
   }

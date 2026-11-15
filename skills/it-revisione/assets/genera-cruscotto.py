@@ -22,8 +22,11 @@ giorno). --solo-dati compone, archivia e legge la revisione precedente senza scr
 --archivia, non accetta -o). --precedente indica la revisione con cui confrontare: un bundle, una pagina
 generata dal plugin o una cartella di foto (si prende la più recente con data precedente a quella corrente).
 Versione anonimizzata: --anonimo scrive (di default in cruscotto-anonimo.html) una pagina da mostrare ad altri, senza
-importi in euro (diventano un indice, un solo fattore per tutta la pagina), senza nomi di obiettivi, broker e file e senza
-i testi liberi. Non si usa con --archivia: l'archivio serve al confronto e tiene gli importi veri.
+importi in euro (diventano un indice, un solo fattore per tutta la pagina), senza nomi di obiettivi, broker e file, senza
+grandezze lorde della pensione e senza avvisi, note e motivi; priorità, profili ed etichette degli scenari tornano al
+vocabolario del plugin, mentre i nomi delle classi restano come li ha scritti l'utente (vedi anonimizza()). Rifiuta il
+piano di ribilanciamento d'esempio, i cui importi sono pubblici. Non si usa con --archivia: l'archivio serve al confronto
+e tiene gli importi veri.
 
 ONESTÀ METODOLOGICA
 - Il cruscotto disegna i numeri degli script, non ne calcola di nuovi: ogni valore della pagina
@@ -89,9 +92,12 @@ FIRME = [
     ("broker",          lambda d: _ha(d, "posizioni", "zainetto", "analisi") and _ha(d["analisi"], "per_broker")),
     ("ribilanciamento", lambda d: _ha(d, "drift", "risultante", "ordini")),
 ]
-# JSON di altri script del plugin che il cruscotto riconosce e salta (la catena si passa intera)
+# JSON del plugin che il cruscotto riconosce e salta: l'output di importa-previdenza.py (la catena si passa intera) e il
+# bundle del cruscotto stesso (bundle.json e le foto in revisioni/ stanno nella cartella di lavoro: una revisione
+# precedente si passa con --precedente)
 IGNORATI = [
     ("importa-previdenza", lambda d: _ha(d, "montante_attuale", "ral_attuale", "fp_versamento_annuo")),
+    ("cruscotto", lambda d: _ha(d, "versione", "generato_il", "fonti")),
 ]
 ORDINE = [t for t, _ in FIRME]
 
@@ -585,6 +591,21 @@ def confronta(prima, ora):
             "versioni_diverse": plugin_prima != plugin_ora, "voci": voci, "obiettivi": _confronta_obiettivi(prima, ora)}
 
 
+def confronto_tutto_uguale(confronto):
+    """Vero se il confronto ha almeno una voce, tutte le voci hanno delta zero e nessun obiettivo è cambiato (tutti
+    «presente», con ogni variazione confrontata a zero): quasi certamente la revisione precedente è la foto di questa
+    stessa revisione, presa da --precedente CARTELLA in un giorno successivo."""
+    voci, obiettivi = confronto.get("voci") or [], confronto.get("obiettivi") or []
+    if not voci or any(v.get("delta") != 0 for v in voci):
+        return False
+    for o in obiettivi:
+        if o.get("stato") != "presente":
+            return False
+        if any(isinstance(o.get(k), dict) and o[k].get("delta") != 0 for k in ("probabilita", "gia", "versamento")):
+            return False
+    return True
+
+
 # ═══════════════════════════ LA VERSIONE ANONIMIZZATA ═══════════════════════════
 
 # Ogni campo numerico del bundle è dichiarato qui: importo in euro o no. Il percorso ha i punti tra le chiavi, «[]» per
@@ -658,14 +679,25 @@ CAMPI_NON_EURO = frozenset({
 # Importi solo se il campo «formato» dello stesso oggetto è «euro»: gli indicatori e le voci del confronto sono di
 # formati diversi (euro, percento).
 CAMPI_EURO_SE_FORMATO = ("indicatori[].valore", "confronto.voci[].prima", "confronto.voci[].ora", "confronto.voci[].delta")
-# Dizionari le cui chiavi sono nomi dell'utente o classi: nel percorso la chiave diventa «{}».
-CHIAVI_LIBERE = frozenset({"fiscalita.per_broker", "ribilanciamento.zainetto", "ribilanciamento.drift",
-                           "ribilanciamento.risultante"})
-# Importi lordi che la versione anonima azzera: mai il lordo e il netto della stessa grandezza (l'IRPEF è progressiva e
-# pubblica: il rapporto tra netto e lordo farebbe stimare il livello del reddito). Il riscatto, importo di legge, si
-# azzera per intero (ogni suo campo in euro).
+# Dizionari le cui chiavi sono nomi dell'utente o classi: nel percorso la chiave diventa «{}». CHIAVI_RINOMINATE: le chiavi
+# sono nomi di broker e nella versione anonima diventano «Broker X». CHIAVI_CLASSI: le chiavi sono i nomi delle classi
+# del piano, che restano come li ha scritti l'utente (rinominarle svuoterebbe i grafici dell'allocazione).
+CHIAVI_RINOMINATE = frozenset({"fiscalita.per_broker", "ribilanciamento.zainetto"})
+CHIAVI_CLASSI = frozenset({"ribilanciamento.drift", "ribilanciamento.risultante"})
+CHIAVI_LIBERE = CHIAVI_RINOMINATE | CHIAVI_CLASSI
+# Le grandezze lorde della pensione, che la versione anonima azzera tutte, importi e tassi. L'IRPEF è progressiva e
+# pubblica: lordo e netto della stessa grandezza danno il livello del reddito, e i tassi di sostituzione lordi accanto
+# alle pensioni nette degli scenari danno la RAL finale (in indice, quindi il fattore). Il target e la sua probabilità
+# sono un quantile della stessa distribuzione lorda; il costo permanente del ponte è lineare nello stipendio lordo con
+# coefficienti pubblici. Il riscatto, importo di legge, si azzera per intero (ogni suo campo in euro). Ogni percorso
+# numerico che contiene «lord» deve stare qui: lo controlla il test T17.
 CAMPI_LORDI = frozenset({"pensione.inps.pensione_inps_lorda_annua", "pensione.inps.montante_finale",
-                         "pensione.inps.ral_finale"})
+                         "pensione.inps.ral_finale",
+                         "pensione.tasso_lordo.p10", "pensione.tasso_lordo.mediana", "pensione.tasso_lordo.p90",
+                         "pensione.netto.scenari[].tasso_sostituzione_lordo", "pensione.target", "pensione.prob_target",
+                         "pensione.ponte.costo_permanente_lordo_annuo", "pensione.riscatto.delta_pensione_lorda_annua"})
+# Le voci del confronto che escono dalla versione anonima, per le stesse ragioni (id di CONFRONTI).
+VOCI_CONFRONTO_TOLTE = frozenset({"pensione_inps_lorda", "tasso_lordo_mediana", "prob_target"})
 # Le basi dell'indice, in ordine di preferenza: (etichetta, percorso nel bundle).
 BASI_INDICE = (
     ("capitale allocato", ("allocazione", "capitale")),
@@ -721,18 +753,20 @@ def _e_importo(percorso, contenitore):
     return tipo == "euro" or (tipo == "dipende" and not (isinstance(contenitore, dict) and contenitore.get("formato") == "percento"))
 
 
-# Le stringhe del bundle. CAMPI_TESTO: categorie, etichette fisse scritte dagli script, date, versione del plugin, settore
-# del lavoro, nomi del look-through (aggregati dei fondi, non posizioni dell'utente): restano. CAMPI_NOME: nomi di
-# obiettivi e di broker, sostituiti con «Obiettivo N» e «Broker X» (anche le chiavi dei dizionari, fiscalita.per_broker e
-# ribilanciamento.zainetto). CAMPI_TESTO_TOLTI: testi liberi che possono portare importi o nomi, tolti. Ogni altra
-# stringa è ignota e nella pagina anonima diventa None (le stringhe vuote non portano nulla e restano).
+# Le stringhe del bundle. CAMPI_TESTO restano come sono: categorie ed etichette fisse scritte dagli script, date, versione
+# del plugin, settore del lavoro, nomi del look-through (aggregati dei fondi, non posizioni dell'utente) e i nomi delle
+# classi del piano, che l'utente scrive a mano e che la versione anonima dichiara visibili. CAMPI_VOCABOLARIO vengono da
+# celle o etichette libere: restano solo se sono nel vocabolario del plugin, altrimenti si riportano a quello (priorità)
+# o diventano «Profilo A», «Scenario 1»… CAMPI_NOME: nomi di obiettivi e di broker, sostituiti con «Obiettivo N» e
+# «Broker X» (anche le chiavi dei dizionari di CHIAVI_RINOMINATE). CAMPI_TESTO_TOLTI: testi liberi che possono portare
+# importi o nomi, tolti. Ogni altra stringa è ignota e nella pagina anonima diventa None (le stringhe vuote non portano
+# nulla e restano).
 CAMPI_TESTO = frozenset({
     "generato_il", "plugin", "fonti[].tipo", "anonimo.base",
-    "allocazione.classi[].classe", "allocazione.obiettivi[].profilo", "allocazione.obiettivi[].tipo",
+    "allocazione.classi[].classe",
     "look_through.settori[].nome", "look_through.regioni[].nome", "look_through.paesi[].nome",
     "look_through.valute[].nome", "look_through.titoli[].nome",
-    "obiettivi.modello", "obiettivi.obiettivi[].profilo", "obiettivi.obiettivi[].priorita",
-    "pensione.netto.scenari[].nome", "pensione.riscatto.modalita",
+    "obiettivi.modello", "pensione.riscatto.modalita",
     "capitale_umano.voci[].nome", "capitale_umano.stato_sorpasso", "capitale_umano.settore.settore",
     "fiscalita.zainetto[].scade_il", "fiscalita.zainetto[].stato",
     "ribilanciamento.drift.{}.esito", "ribilanciamento.ordini[].operazione", "ribilanciamento.ordini[].classe",
@@ -746,8 +780,19 @@ CAMPI_NOME = frozenset({
     "confronto.obiettivi[].nome", "indicatori[].nota",
     "fiscalita.zainetto[].broker", "ribilanciamento.ordini[].broker",
 })
+CAMPI_VOCABOLARIO = frozenset({
+    "allocazione.obiettivi[].profilo", "obiettivi.obiettivi[].profilo", "obiettivi.obiettivi[].priorita",
+    "pensione.netto.scenari[].nome",
+})
 CAMPI_TESTO_TOLTI = frozenset({"fonti[].file", "fiscalita.avvisi[]", "ribilanciamento.ordini[].nota",
-                               "ribilanciamento.drift.{}.motivo"})
+                               "ribilanciamento.drift.{}.motivo", "allocazione.obiettivi[].tipo"})
+# Il vocabolario del plugin, copiato dalle fonti (lo script resta autosufficiente; il test T17 lega ogni costante alla sua
+# fonte). PROFILI_MODELLO: i profili della tabella del pianificatore-obiettivi.xlsx modello, nell'ordine del foglio
+# Parametri. ETICHETTE_SCENARI: gli scenari di netto-pensione.py (RENDITE_FP). DA_FINANZIARE: il segnaposto che
+# ribilanciamento-multibroker.py scrive al posto del broker quando un ordine non ha cassa: non è un broker.
+PROFILI_MODELLO = ("Preservazione", "Conservativo", "Moderato", "Crescita", "Crescita massima", "Azionario totale")
+ETICHETTE_SCENARI = ("P10", "mediana", "P90")
+DA_FINANZIARE = "(da finanziare)"
 
 
 def foglie_testo(bundle):
@@ -756,13 +801,29 @@ def foglie_testo(bundle):
 
 
 def classifica_testo(percorso):
-    """«resta», «nome», «tolto» o None se la stringa non è dichiarata."""
+    """«resta», «vocabolario», «nome», «tolto» o None se la stringa non è dichiarata."""
     if percorso in CAMPI_TESTO:
         return "resta"
+    if percorso in CAMPI_VOCABOLARIO:
+        return "vocabolario"
     if percorso in CAMPI_NOME:
         return "nome"
     if percorso in CAMPI_TESTO_TOLTI:
         return "tolto"
+    return None
+
+
+def priorita_del_plugin(testo):
+    """Una priorità scritta a mano riportata a uno dei tre valori del plugin, con la regola per sottostringa degli script a
+    monte e in quest'ordine: «essenz» → essenziale; «desider» o «discrez» → desiderabile; «import» → importante.
+    None se il testo non ne contiene nessuna (o non è un testo)."""
+    t = testo.casefold() if isinstance(testo, str) else ""
+    if "essenz" in t:
+        return "essenziale"
+    if "desider" in t or "discrez" in t:
+        return "desiderabile"
+    if "import" in t:
+        return "importante"
     return None
 
 
@@ -793,37 +854,74 @@ def _elementi(b, *percorso):
 
 
 def anonimizza(bundle):
-    """Una copia del bundle trasformata secondo la spec §7.2; l'argomento non cambia.
+    """Una copia del bundle per la versione anonimizzata (spec §7.2, da cui si scosta togliendo anche i tassi lordi della
+    pensione); l'argomento non cambia.
+    - Rifiuta il piano di ribilanciamento d'esempio (ribilanciamento.dati_esempio vero): i suoi importi sono costanti
+      pubbliche dello script e accanto all'indice rivelerebbero il fattore. ErroreDati.
     - Ogni importo in euro diventa un indice: importo × 100 / base, un solo fattore per tutta la pagina (la base la
       sceglie base_indice(), dichiarata in anonimo.base); senza importi la base è None e nulla cambia.
-    - Azzerati (None): gli importi del riscatto, gli importi lordi della proiezione INPS (CAMPI_LORDI) e la voce
-      «pensione_inps_lorda» del confronto.
-    - Nomi: «Obiettivo 1…n» e «Broker A, B…» per ordine di prima comparsa, gli stessi in ogni sezione (anche chiavi di
-      dizionario, nota dell'indicatore, confronto). Dalle fonti restano solo i tipi.
-    - Testi liberi tolti: gli avvisi della fiscalità (contati in avvisi_omessi), la nota degli ordini, il motivo del drift.
+    - Azzerati (None): nessuna grandezza lorda della pensione, né importo né tasso (CAMPI_LORDI: importi lordi della
+      proiezione INPS, tassi di sostituzione lordi, target e sua probabilità, costo permanente lordo del ponte), e gli
+      importi del riscatto; pensione.tasso_lordo, con le foglie tutte a None, diventa None. Le voci del confronto di
+      VOCI_CONFRONTO_TOLTE escono.
+    - Nomi: «Obiettivo 1…n» e «Broker A, B…» per ordine di prima comparsa, gli stessi in ogni sezione (anche le chiavi di
+      CHIAVI_RINOMINATE, la nota dell'indicatore, il confronto); il segnaposto DA_FINANZIARE degli ordini resta com'è e
+      non si conta. Dalle fonti restano solo i tipi.
+    - Vocabolario del plugin (CAMPI_VOCABOLARIO): la priorità torna a essenziale, importante o desiderabile con
+      priorita_del_plugin(), altrimenti None; un profilo resta se, senza maiuscole e spazi ai bordi, è uno di
+      PROFILI_MODELLO (scritto nella forma del modello), altrimenti diventa «Profilo A, B…» per ordine di prima comparsa,
+      lo stesso nelle due sezioni; il nome di uno scenario resta se è in ETICHETTE_SCENARI, altrimenti «Scenario N» per
+      posizione.
+    - Testi liberi tolti: gli avvisi della fiscalità (contati in avvisi_omessi), la nota degli ordini, il motivo del drift,
+      il tipo degli obiettivi dell'allocatore.
     - Fallisce chiuso: un numero non dichiarato (classifica() None) e una stringa non dichiarata (classifica_testo() None)
       diventano None; un formato mancante o sconosciuto in CAMPI_EURO_SE_FORMATO vale importo.
-    Il resto (percentuali, probabilità, anni, età, date, conteggi, classi, profili, esiti, aggregati del look-through)
-    resta com'è. anonimo = {base, obiettivi, broker}: l'etichetta della base e quanti nomi sono stati sostituiti."""
+    Il resto (percentuali, probabilità, tassi di sostituzione netti, anni, età, date, conteggi, esiti, aggregati del
+    look-through, i nomi delle classi e le chiavi di CHIAVI_CLASSI come li ha scritti l'utente) resta com'è.
+    anonimo = {base, obiettivi, broker}: l'etichetta della base e quanti nomi sono stati sostituiti."""
+    if _via(bundle, "ribilanciamento", "dati_esempio") is True:
+        raise ErroreDati("il piano di ribilanciamento è quello d'esempio dello script (dati_esempio): i suoi importi sono "
+                         "pubblici e, accanto all'indice, rivelerebbero il fattore, cioè tutti gli altri importi. Togli quel "
+                         "JSON dai --from, o rigenera il piano dai tuoi dati con ribilanciamento-multibroker.py --dati")
     b = copy.deepcopy(bundle)
     # 0. fallisce chiuso: un numero che non è dichiarato non entra nella pagina
     for percorso, _, contenitore, chiave in list(_percorre(b)):
         if classifica(percorso) is None:
             contenitore[chiave] = None
-    # 1. i lordi e gli importi di legge escono prima di scegliere la base: l'indice non li vede
+    # 1. le grandezze lorde e gli importi di legge escono prima di scegliere la base: l'indice non li vede
     for percorso, _, contenitore, chiave in list(_percorre(b)):
         if percorso in CAMPI_LORDI or (percorso.startswith("pensione.riscatto.") and classifica(percorso) == "euro"):
             contenitore[chiave] = None
+    pensione = b.get("pensione")
+    if isinstance(pensione, dict) and isinstance(pensione.get("tasso_lordo"), dict) and \
+            all(v is None for v in pensione["tasso_lordo"].values()):
+        pensione["tasso_lordo"] = None
     if isinstance(b.get("confronto"), dict):
         b["confronto"]["voci"] = [v for v in b["confronto"].get("voci") or []
-                                  if not (isinstance(v, dict) and v.get("id") == "pensione_inps_lorda")]
+                                  if not (isinstance(v, dict) and v.get("id") in VOCI_CONFRONTO_TOLTE)]
     # 2. nomi: gli obiettivi (per nome senza spazi ai bordi, come nel confronto) e i broker, per ordine di prima comparsa
-    obiettivi, broker = {}, {}
+    obiettivi, broker, profili = {}, {}, {}
     def etichetta(mappa, nome, modello):
         chiave = nome.strip() if isinstance(nome, str) else nome
         return mappa.setdefault(chiave, modello(len(mappa)))
     ob = lambda n: etichetta(obiettivi, n, lambda i: f"Obiettivo {i + 1}")        # noqa: E731
-    br = lambda n: etichetta(broker, n, lambda i: f"Broker {_lettera(i)}")        # noqa: E731
+    br = lambda n: n if n == DA_FINANZIARE else etichetta(broker, n, lambda i: f"Broker {_lettera(i)}")   # noqa: E731
+    modello = {p.casefold(): p for p in PROFILI_MODELLO}
+    def profilo(p):
+        if not isinstance(p, str):
+            return p
+        chiave = p.strip().casefold()
+        return modello.get(chiave) or profili.setdefault(chiave, f"Profilo {_lettera(len(profili))}")
+    # 2a. vocabolario del plugin: profili (nell'ordine delle sezioni, come i nomi degli obiettivi), priorità, scenari
+    for o in _elementi(b, "allocazione", "obiettivi") + _elementi(b, "obiettivi", "obiettivi"):
+        if "profilo" in o:
+            o["profilo"] = profilo(o["profilo"])
+    for o in _elementi(b, "obiettivi", "obiettivi"):
+        if "priorita" in o:
+            o["priorita"] = priorita_del_plugin(o["priorita"])
+    for i, s in enumerate(_elementi(b, "pensione", "netto", "scenari")):
+        if "nome" in s and s["nome"] not in ETICHETTE_SCENARI:
+            s["nome"] = f"Scenario {i + 1}"
     for o in _elementi(b, "allocazione", "obiettivi") + _elementi(b, "obiettivi", "obiettivi") + \
             _elementi(b, "glide_path", "obiettivi"):
         if isinstance(o.get("nome"), str):
@@ -857,9 +955,10 @@ def anonimizza(bundle):
             if isinstance(d, dict):
                 d["motivo"] = None
     b["fonti"] = [{"tipo": f.get("tipo")} for f in b.get("fonti") or [] if isinstance(f, dict)]
-    # 2b. fallisce chiuso: una stringa che non resta e non è un nome già sostituito diventa None (le vuote restano)
+    # 2b. fallisce chiuso: una stringa che non resta, non è stata riportata al vocabolario e non è un nome già sostituito
+    # diventa None (le vuote restano)
     for percorso, valore, contenitore, chiave in list(_percorre(b, testi=True)):
-        if valore != "" and classifica_testo(percorso) not in ("resta", "nome"):
+        if valore != "" and classifica_testo(percorso) not in ("resta", "vocabolario", "nome"):
             contenitore[chiave] = None
     # 3. l'indice: un solo fattore per tutti gli importi (con la base a None gli importi sono tutti zero e restano zero)
     base = base_indice(b)
@@ -900,7 +999,7 @@ def _bundle_da_file(percorso):
     """(nome del file, bundle) letto da un bundle JSON o da una pagina del plugin; ErroreDati se non lo è."""
     nome = os.path.basename(percorso)
     try:
-        with open(percorso, encoding="utf-8") as f:
+        with open(percorso, encoding="utf-8-sig") as f:       # un bundle o una pagina risalvati con il BOM restano leggibili
             testo = f.read()
     except UnicodeDecodeError:
         raise ErroreDati(f"«{nome}» non è una revisione del cruscotto: non è un testo")
@@ -923,7 +1022,11 @@ def _bundle_da_file(percorso):
     if bundle.get("anonimo") is not None:
         raise ErroreDati(f"«{nome}» è una versione anonimizzata: i suoi numeri sono riscalati, "
                          "non si confronta con una revisione anonimizzata")
+    # la forma esatta AAAA-MM-GG: le date si confrontano come stringhe e la pagina le scrive GG/MM/AAAA tagliando la stringa,
+    # mentre date.fromisoformat() accetta anche altre forme («20251120», «2025-W47-4»)
     try:
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", str(bundle["generato_il"])):
+            raise ValueError
         datetime.date.fromisoformat(str(bundle["generato_il"]))
     except ValueError:
         raise ErroreDati(f"«{nome}»: generato_il {bundle['generato_il']!r} non è una data AAAA-MM-GG")
@@ -1092,8 +1195,10 @@ def main(argv=None):
             raise ErroreDati("nessun JSON che il cruscotto sappia disegnare tra quelli passati")
         precedente = leggi_precedente(args.precedente, data) if args.precedente else None   # letta per intero prima di scrivere
         bundle = componi_bundle(sorgenti, data, versione_plugin())
+        tutto_uguale = False
         if precedente:
             bundle["confronto"] = confronta(precedente[1], bundle)
+            tutto_uguale = confronto_tutto_uguale(bundle["confronto"])
         if args.anonimo:
             bundle = anonimizza(bundle)
         html = None
@@ -1128,8 +1233,12 @@ def main(argv=None):
     for fonte in bundle["fonti"]:
         print(f"  {fonte['tipo']}" if args.anonimo else f"  {fonte['file']} → {fonte['tipo']}")
     for nome, script in ignorati:
-        print(f"  ℹ {script} ignorato: il cruscotto non lo usa" if args.anonimo else
-              f"  ℹ {nome} ({script}) ignorato: il cruscotto non lo usa")
+        if script == "cruscotto":
+            print(f"  ℹ {'un file' if args.anonimo else nome} è un bundle del cruscotto: ignorato; per il confronto si passa "
+                  "con --precedente")
+        else:
+            print(f"  ℹ {script} ignorato: il cruscotto non lo usa" if args.anonimo else
+                  f"  ℹ {nome} ({script}) ignorato: il cruscotto non lo usa")
     sezioni = [k for k in ("allocazione", "look_through", "obiettivi", "glide_path", "pensione", "capitale_umano",
                            "fiscalita", "ribilanciamento") if bundle[k]]
     print(f"Sezioni: {', '.join(sezioni)}")
@@ -1138,8 +1247,17 @@ def main(argv=None):
         print(f"  {ind['etichetta']}: {_valore(ind, args.anonimo)}{nota}")
     if bundle["confronto"]:
         c, d = bundle["confronto"], bundle["confronto"]["data_precedente"]
-        print(f"Confronto con la revisione del {d[8:]}/{d[5:7]}/{d[:4]}{'' if args.anonimo else f' ({precedente[0]})'}: "
+        data_it = f"{d[8:]}/{d[5:7]}/{d[:4]}"
+        print(f"Confronto con la revisione del {data_it}{'' if args.anonimo else f' ({precedente[0]})'}: "
               f"{len(c['voci'])} grandezze, {len(c['obiettivi'])} obiettivi")
+        if tutto_uguale:
+            foto = "il file della foto precedente" if args.anonimo else "il file della foto (--precedente revisioni/cruscotto-AAAA-MM-GG.json)"
+            print(f"  ⚠️  Tutte le grandezze confrontate sono identiche a quelle della revisione del {data_it}: probabilmente è "
+                  f"la foto di questa stessa revisione. Per confrontare con quella prima, indica {foto} o passa --data con "
+                  "la data della revisione.")
+        if c["versioni_diverse"]:
+            print(f"  ⚠️  La revisione precedente viene dalla versione {c['plugin_precedente']} del plugin, ora "
+                  f"{bundle['plugin']}: parte delle differenze può venire da dati normativi e metodi aggiornati (vedi CHANGELOG).")
     if args.anonimo:
         a = bundle["anonimo"]
         indice = f"importi come indice (base 100 = {a['base']})" if a["base"] else "nessun importo in euro nella pagina, quindi nessun indice"
